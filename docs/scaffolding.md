@@ -111,21 +111,38 @@ rails generate super_scaffold AppFile Team \
 ```
 
 #### 6. AppVersion
-Version control for apps (future feature).
+Version control for apps with GitHub integration.
 
 ```bash
 rails generate super_scaffold AppVersion Team \
   app:references{required} \
+  user:references \
+  commit_sha:text_field \
+  commit_message:text_field \
   version_number:text_field{required} \
   changelog:text_area \
   files_snapshot:text_area \
-  published_at:date_and_time_field \
-  is_current:boolean
+  changed_files:text_area \
+  external_commit:boolean{default=false} \
+  deployed:boolean{default=false} \
+  published_at:date_and_time_field
+```
+
+#### 7. AppCollaborator
+Manages GitHub repository collaborators.
+
+```bash
+rails generate super_scaffold AppCollaborator Team \
+  app:references{required} \
+  user:references{required} \
+  role:options{viewer,contributor,admin} \
+  github_username:text_field \
+  permissions_synced:boolean{default=false}
 ```
 
 ### Phase 3: Marketplace & Commerce
 
-#### 7. Purchase
+#### 8. Purchase
 Tracks app purchases.
 
 ```bash
@@ -143,7 +160,7 @@ rails generate super_scaffold Purchase Team \
   referral_commission:number_field
 ```
 
-#### 8. AppReview
+#### 9. AppReview
 User reviews for apps.
 
 ```bash
@@ -158,7 +175,7 @@ rails generate super_scaffold AppReview Team \
   reported:boolean{default=false}
 ```
 
-#### 9. FlashSale
+#### 10. FlashSale
 Time-limited sales for apps.
 
 ```bash
@@ -174,7 +191,7 @@ rails generate super_scaffold FlashSale Team \
 
 ### Phase 4: Viral Growth & Gamification
 
-#### 10. ReferralCode
+#### 11. ReferralCode
 User referral tracking.
 
 ```bash
@@ -187,7 +204,7 @@ rails generate super_scaffold ReferralCode User,Team \
   is_active:boolean{default=true}
 ```
 
-#### 11. Achievement
+#### 12. Achievement
 Gamification achievements.
 
 ```bash
@@ -201,7 +218,7 @@ rails generate super_scaffold Achievement Team \
   badge_color:color_picker
 ```
 
-#### 12. UserAchievement
+#### 13. UserAchievement
 Tracks earned achievements.
 
 ```bash
@@ -213,7 +230,7 @@ rails generate super_scaffold UserAchievement User,Team \
 
 ### Phase 5: Analytics & Monitoring
 
-#### 13. AppAnalytic
+#### 14. AppAnalytic
 Daily analytics for apps.
 
 ```bash
@@ -228,7 +245,7 @@ rails generate super_scaffold AppAnalytic Team \
   average_session_duration:number_field
 ```
 
-#### 14. AIUsageLog
+#### 15. AIUsageLog
 Tracks AI API usage for billing.
 
 ```bash
@@ -247,7 +264,7 @@ rails generate super_scaffold AIUsageLog User,Team \
 
 ### Phase 6: Community Features
 
-#### 15. Post
+#### 16. Post
 Community posts/updates.
 
 ```bash
@@ -263,7 +280,7 @@ rails generate super_scaffold Post Team \
   published_at:date_and_time_field
 ```
 
-#### 16. Comment
+#### 17. Comment
 Comments on posts.
 
 ```bash
@@ -383,6 +400,8 @@ end
    - App
    - AppGeneration
    - AppFile
+   - AppVersion (GitHub integration)
+   - AppCollaborator (GitHub integration)
 
 3. **Phase 3**: Marketplace (Revenue)
    - Purchase
@@ -401,7 +420,6 @@ end
 6. **Phase 6**: Community
    - Post
    - Comment
-   - AppVersion (later)
 
 ## 🚀 Post-Scaffolding Tasks
 
