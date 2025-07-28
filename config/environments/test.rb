@@ -80,7 +80,7 @@ Rails.application.configure do
   end
 
   # This header namespace will be used when sending webhook events.
-  config.outgoing_webhooks[:webhook_headers_namespace] = "X-Webhook-Untitled-Application"
+  config.outgoing_webhooks[:webhook_headers_namespace] = "X-Webhook-Overskill"
 
   # ✅ YOUR APPLICATION'S CONFIGURATION
   # If you need to customize your application's configuration, this is the place to do it. This helps avoid merge
