@@ -91,6 +91,15 @@ erd.pdf
 
 # AI things
 /.claude
-CLAUDE.md
 
 # 🚅 add your files to ignore here.
+
+# Environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Personal IDE settings
+.vscode/
+.cursor/

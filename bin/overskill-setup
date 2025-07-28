@@ -1,0 +1,60 @@
+#!/bin/bash
+# OverSkill Quick Setup Script
+
+echo "🚀 Setting up OverSkill platform..."
+
+# Check Ruby version
+RUBY_VERSION=$(ruby -v | awk '{print $2}')
+REQUIRED_VERSION="3.2.0"
+
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$RUBY_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then 
+    echo "❌ Ruby $REQUIRED_VERSION or higher required. Current: $RUBY_VERSION"
+    exit 1
+fi
+
+# Check for required services
+command -v psql >/dev/null 2>&1 || { echo "❌ PostgreSQL required but not installed."; exit 1; }
+command -v redis-server >/dev/null 2>&1 || { echo "❌ Redis required but not installed."; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "❌ Node.js required but not installed."; exit 1; }
+
+echo "✅ Dependencies verified"
+
+# Copy environment file
+if [ ! -f .env ]; then
+    echo "📝 Creating .env file..."
+    cp .env.example .env
+    echo "⚠️  Please edit .env with your API keys!"
+else
+    echo "✅ .env file exists"
+fi
+
+# Install gems
+echo "💎 Installing Ruby gems..."
+bundle install
+
+# Install JavaScript packages
+echo "📦 Installing JavaScript packages..."
+yarn install
+
+# Setup database
+echo "🗄️  Setting up database..."
+bin/rails db:create
+bin/rails db:migrate
+bin/rails db:seed
+
+# Run BulletTrain configuration
+echo "🚄 Running BulletTrain configuration..."
+bin/configure
+
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "Next steps:"
+echo "1. Edit .env with your API keys"
+echo "2. Run 'bin/dev' to start the server"
+echo "3. Visit http://localhost:3000"
+echo ""
+echo "To generate your first model:"
+echo "rails generate super_scaffold YourModel Team field:type"
+echo ""
+echo "Happy building! 🎉"

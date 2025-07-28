@@ -1,107 +1,165 @@
-# Bullet Train Application Template
-If you're new to Bullet Train, start with the [Bullet Train Developer Documentation](https://bullettrain.co/docs) and the [Getting Started](https://bullettrain.co/docs/getting-started) guide. You should also [join the community Discord server](https://discord.gg/bullettrain)!
+# OverSkill - AI-Powered App Marketplace Platform
 
-## Building a New Application with Bullet Train
-If you're building a new application with Bullet Train, you don't want to "Fork" the template repository on GitHub. Instead, you should:
+> Transform ideas into income-generating apps in minutes using AI, with built-in marketplace and viral growth mechanics.
 
-1. Clone the template repository:
+[![Built with Bullet Train](https://img.shields.io/badge/Built%20with-Bullet%20Train-purple)](https://bullettrain.co)
+[![Ruby](https://img.shields.io/badge/Ruby-3.2.0-red)](https://www.ruby-lang.org)
+[![Rails](https://img.shields.io/badge/Rails-7.1.0-red)](https://rubyonrails.org)
 
-    ```
-    git clone git@github.com:bullet-train-co/bullet_train.git your_new_project_name
-    ```
+## 🚀 Overview
 
-2. Enter the project directory:
+OverSkill is the ultimate "make money online" platform that enables anyone to create, deploy, and monetize AI-generated applications without coding knowledge. Built on Bullet Train Pro, it combines:
 
-    ```
-    cd your_new_project_name
-    ```
+- **AI-Powered App Generation** - Using Kimi K2 via OpenRouter for best-in-class code generation
+- **Instant Deployment** - Static hosting via Cloudflare Workers + R2
+- **Built-in Marketplace** - Connect creators with buyers automatically
+- **Viral Growth Engine** - Network effects and referral systems built-in
+- **Complete Monetization** - Stripe Connect for instant payouts
 
-3. Run the configuration and setup scripts:
+## 📚 Documentation
 
-    ```
-    bin/configure
-    bin/setup
-    ```
-    
-4. Boot your application:
+- [Business Plan](docs/business-plan.md) - Complete business strategy and market analysis
+- [Architecture](docs/architecture.md) - Technical architecture and infrastructure design
+- [Scaffolding Plan](docs/scaffolding.md) - BulletTrain super-scaffolding implementation
+- [AI Context](docs/ai-context.md) - Shared context for Claude/Cursor/Kimi K2 development
+- [API Documentation](docs/api.md) - Platform and generated app APIs
+- [Deployment Guide](docs/deployment.md) - Production deployment instructions
 
-    ```
-    bin/dev
-    ```
-    
-5. Visit `http://localhost:3000`.
+## 🏗️ Quick Start
 
-## Cloud Development with Gitpod
+### Prerequisites
+- Ruby 3.3.0 (Note: Ruby 3.4.4 has SSL issues with RubyGems)
+- PostgreSQL 14+
+- Redis 7+
+- Node.js 18+
+- Yarn
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/bullet-train-co/bullet_train)
+### Setup
 
-Clicking this button will set up a new Bullet Train project for development on [Gitpod](https://gitpod.io).
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/overskill.git
+cd overskill
 
-<br>
-<br>
+# Run BulletTrain configuration
+bin/configure
 
-<p align="center">
-<strong>Open-source development sponsored by:</strong>
-</p>
+# Install dependencies and setup database
+bin/setup
 
-<p align="center">
-<a href="https://www.clickfunnels.com"><img src="https://statics.myclickfunnels.com/workspace/Yjxavr/image/15795008/file/e4d910a06aaea6730652fb2cf60531a6.svg" width="575" /></a>
-</p>
+# Environment Setup
+# 1. Shared development config (already in repo)
+#    .env.development contains non-sensitive defaults
+#
+# 2. Create your personal secrets file:
+cp .env.development.local .env.development.local
+# Edit .env.development.local with your API keys
+# (See detailed instructions in the file)
 
-<br>
-<br>
+# Start the application
+bin/dev
+```
 
-## Provisioning a Production Environment
-You can use this public repository to provision a new application and then push your private application code there later.
+Visit `http://localhost:3000` to see OverSkill running locally.
 
-### Render
+## 🎯 Core Features
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/bullet-train-co/bullet_train)
+### For Creators
+- **AI App Builder** - Describe your app idea in plain language
+- **Instant Preview** - See your app running in seconds
+- **One-Click Publishing** - Deploy to production instantly
+- **Built-in Analytics** - Track users, revenue, and engagement
+- **Revenue Dashboard** - Real-time earnings and payouts
 
-Clicking this button will take you to the first step of a process that, when completed, will provision production-grade infrastructure for your Bullet Train application which will cost about **$30/month**.
+### For Users
+- **App Marketplace** - Discover and purchase AI-generated apps
+- **Try Before Buy** - Preview apps before purchasing
+- **Instant Access** - Start using apps immediately
+- **Custom Domains** - Professional URLs for your apps
+- **Team Collaboration** - Share apps with your team
 
-### Heroku
+### Platform Features
+- **Viral Mechanics** - Referral system and "Powered by" badges
+- **AI Cost Optimization** - Smart routing between AI providers
+- **Global CDN** - Fast loading worldwide via Cloudflare
+- **Multi-tenant Security** - Isolated data per app via Supabase RLS
+- **Automated Testing** - AI-generated tests for each app
 
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=http://github.com/bullet-train-co/bullet_train)
+## 📁 Project Structure
 
-Clicking this button will take you to the first step of a process that, when completed, will provision production-grade infrastructure and services for your Bullet Train application which will cost about **$140/month**.
+```
+overskill/
+├── app/
+│   ├── controllers/
+│   │   ├── apps_controller.rb          # App management
+│   │   ├── marketplace_controller.rb   # Marketplace browsing
+│   │   └── ai_generations_controller.rb # AI generation endpoints
+│   ├── models/
+│   │   ├── app.rb                     # Core app model
+│   │   ├── app_generation.rb          # AI generation tracking
+│   │   └── creator_profile.rb         # Creator profiles
+│   ├── services/
+│   │   ├── ai/                        # AI integration services
+│   │   ├── deployment/                # App deployment logic
+│   │   └── marketplace/               # Marketplace mechanics
+│   └── views/
+├── docs/                              # Documentation
+├── lib/
+│   └── generators/                    # Custom generators
+└── test/                             # Test suite
+```
 
-Once that process has completed, be sure to complete the other steps from the [Deploying to Heroku](https://bullettrain.co/docs/heroku) documentation.
+## 🧪 Testing
 
-## Contribute to Bullet Train
-If you're looking contribute to Bullet Train, you should "Fork" this template repository on GitHub, like so:
+```bash
+# Run all tests
+bin/rails test
 
-1. Visit https://github.com/bullet-train-co/bullet_train.
-2. Click "Fork" in the top-right corner.
-3. Select the account where you want to fork the repository.
-4. Click the "Code" button on the new repository and copy the SSH path.
-5. Clone your forked repository using the SSH path you copied, like so:
+# Run specific test file
+bin/rails test test/models/app_test.rb
 
-    ```
-    git clone git@github.com:your-account/bullet_train.git
-    cd bullet_train
-    ```
+# Run system tests
+bin/rails test:system
+```
 
-6. Run the setup script:
+## 🚀 Deployment
 
-    ```
-    bin/setup
-    ```
+OverSkill is designed to run on modern cloud platforms. See our [Deployment Guide](docs/deployment.md) for detailed instructions.
 
-7. Start the application:
+### Quick Deploy Options
 
-    ```
-    bin/dev
-    ```
+#### Render (Recommended)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/yourusername/overskill)
 
-    > [!NOTE]
-    > Optional: If you have [ngrok](https://ngrok.com/) installed, uncomment `ngrok: ngrok http 3000` from `Procfile.dev` and run
-    > `bin/set-ngrok-url` to set `BASE_URL` to a publically accessible domain.
-    > Run `bin/set-ngrok-url` after restarting `ngrok` to update `BASE_URL` to
-    > the current public url.
+#### Railway
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/yourusername/overskill)
 
-8. Visit http://localhost:3000.
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built on [Bullet Train](https://bullettrain.co) - The Ruby on Rails SaaS Framework
+- Powered by [Kimi K2](https://kimi.ai) via [OpenRouter](https://openrouter.ai)
+- Infrastructure by [Cloudflare](https://cloudflare.com) and [Supabase](https://supabase.com)
+
+## 📞 Support
+
+- Documentation: [docs.overskill.app](https://docs.overskill.app)
+- Discord: [Join our community](https://discord.gg/overskill)
+- Email: support@overskill.app
 
 ---
 
-This `README.md` file will be replaced with [`README.example.md`](./README.example.md) after running `bin/configure`.
+**Ready to turn your ideas into income?** Start building with OverSkill today! 🚀
