@@ -22,6 +22,11 @@ Rails.application.routes.draw do
     # root to: "my_new_root_controller#index"
   end
 
+  # Admin analytics dashboard (protected)
+  authenticate :user, ->(user) { user.email == ENV['SUPER_ADMIN_EMAIL'] } do
+    mount AhoyCaptain::Engine, at: "/admin/analytics"
+  end
+
   namespace :webhooks do
     namespace :incoming do
       namespace :oauth do

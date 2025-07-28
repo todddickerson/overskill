@@ -87,6 +87,18 @@ GEM
     acts_as_votable (0.14.0)
     addressable (2.8.7)
       public_suffix (>= 2.0.2, < 7.0)
+    ahoy_captain (1.1.0)
+      ahoy_matey (>= 1.1)
+      chartkick (>= 4)
+      groupdate (>= 5)
+      importmap-rails (>= 1)
+      pagy (>= 4)
+      rails (>= 6)
+      ransack (>= 2.3)
+      rubyzip
+      stimulus-rails (>= 1.1)
+      turbo-rails (>= 1.2)
+      view_component (>= 3)
     ahoy_matey (5.4.0)
       activesupport (>= 7.1)
       device_detector (>= 1)
@@ -378,6 +390,10 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
+    importmap-rails (2.2.0)
+      actionpack (>= 6.0.0)
+      activesupport (>= 6.0.0)
+      railties (>= 6.0.0)
     indefinite_article (0.2.5)
       activesupport
     inline_svg (1.10.0)
@@ -607,6 +623,10 @@ GEM
       zeitwerk (~> 2.6)
     rainbow (3.1.1)
     rake (13.3.0)
+    ransack (4.3.0)
+      activerecord (>= 6.1.5)
+      activesupport (>= 6.1.5)
+      i18n
     rdoc (6.14.2)
       erb
       psych (>= 4.0.0)
@@ -785,6 +805,7 @@ DEPENDENCIES
   active_hash
   acts_as_follower!
   acts_as_votable
+  ahoy_captain
   ahoy_matey
   annotate
   avo (>= 3.1.7)

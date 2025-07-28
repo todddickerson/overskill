@@ -162,6 +162,7 @@ gem "acts_as_votable" # Likes/reactions
 
 # Analytics & Monitoring
 gem "ahoy_matey" # User analytics
+gem "ahoy_captain" # Analytics dashboard for Ahoy
 gem "groupdate" # Time-series data grouping
 gem "chartkick" # Charts for dashboards
 gem "pretender" # User impersonation for support

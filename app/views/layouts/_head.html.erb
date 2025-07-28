@@ -29,3 +29,24 @@
 <%= capybara_lockstep if defined?(Capybara::Lockstep) %>
 
 <% # put your application-specific additions below to avoid merge conflicts later. %>
+
+<% # Ahoy analytics tracking %>
+<%= javascript_include_tag "https://unpkg.com/ahoy.js@0.4.2/dist/ahoy.js" %>
+<script>
+  ahoy.configure({
+    urlPrefix: "",
+    visitsUrl: "/ahoy/visits",
+    eventsUrl: "/ahoy/events",
+    cookieDomain: null,
+    page: null,
+    platform: "Web",
+    useBeacon: true,
+    startOnReady: true,
+    trackVisits: true,
+    cookies: true,
+    cookieName: "ahoy_visit",
+    visitorCookieName: "ahoy_visitor",
+    visitDuration: 30 * 60, // 30 minutes
+    visitTtl: 24 * 60 * 60 // 24 hours
+  });
+</script>
