@@ -4,27 +4,27 @@ module AI
       TEMPLATES = {
         todo: {
           keywords: %w[todo task list checklist planner organizer],
-          class: TodoAppTemplate,
+          class_name: "AI::PromptTemplates::TodoAppTemplate",
           name: "Todo List App"
         },
         game: {
           keywords: %w[game play score level puzzle arcade fun entertainment],
-          class: GameTemplate,
+          class_name: "AI::PromptTemplates::GameTemplate",
           name: "Interactive Game"
         },
         landing: {
           keywords: %w[landing page website marketing site homepage product launch startup],
-          class: LandingPageTemplate,
+          class_name: "AI::PromptTemplates::LandingPageTemplate",
           name: "Landing Page"
         },
         dashboard: {
           keywords: %w[dashboard analytics data chart graph metrics kpi admin panel],
-          class: DashboardTemplate,
+          class_name: "AI::PromptTemplates::DashboardTemplate",
           name: "Data Dashboard"
         },
         calculator: {
           keywords: %w[calculator calc calculate math arithmetic scientific],
-          class: CalculatorTemplate,
+          class_name: "AI::PromptTemplates::CalculatorTemplate",
           name: "Calculator App"
         }
       }
@@ -72,7 +72,8 @@ module AI
         
         if template_info
           # Use specific template enhancement
-          template_info[:class].enhance_user_prompt(user_prompt)
+          template_class = template_info[:class_name].constantize
+          template_class.enhance_user_prompt(user_prompt)
         else
           # Use base template enhancement
           user_prompt
