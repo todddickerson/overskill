@@ -88,6 +88,50 @@ app/
 └── views/             # ERB templates with Hotwire
 ```
 
+### UI/UX Architecture
+
+#### Namespace Strategy
+- **`/account/`** - BulletTrain's default admin namespace (Devise protected)
+  - Full CRUD interfaces from super-scaffolding
+  - Team management and settings
+  - Admin-style views for all models
+  - Developer/admin access during development
+  
+- **`/public/`** - Public-facing dynamic UI
+  - Modern marketplace experience
+  - AI app generation interface
+  - Community features
+  - No authentication required for browsing
+
+- **Hybrid Views** - Dynamic based on authentication
+  - Marketplace feed visible to all
+  - Dynamic navigation (sign in/dashboard)
+  - Progressive disclosure of features
+  - Same routes, different UI based on auth state
+
+#### Development Strategy
+```ruby
+# Use super-scaffolding for any model that needs:
+# - CRUD operations
+# - API endpoints
+# - Admin interface
+rails generate super_scaffold ModelName Team field:type{options}
+
+# Public controllers for user-facing features
+class Public::MarketplaceController < Public::ApplicationController
+  def index
+    @apps = App.published.featured
+    # Dynamic view based on user_signed_in?
+  end
+end
+
+# Account controllers for admin/management
+class Account::AppsController < Account::ApplicationController
+  # Full CRUD from super-scaffolding
+  # Only accessible to logged-in users
+end
+```
+
 ### Key Patterns
 
 #### BulletTrain Multi-tenancy
@@ -179,6 +223,8 @@ Required environment variables (copy `.env.example` to `.env`):
 3. **Use existing patterns**: Check similar files before implementing
 4. **Background jobs for AI**: Never call AI APIs synchronously
 5. **Follow BulletTrain conventions**: Especially for controllers and models
+6. **Super-scaffolding strategy**: Use for any model needing CRUD/API endpoints
+7. **Dual UI approach**: Admin features in `/account/`, public UX in `/public/`
 
 ## Debugging Tips
 
