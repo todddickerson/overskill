@@ -1,0 +1,38 @@
+<%# This is for future versions when we have more templates %>
+<div class="template-selector hidden" data-controller="template-selector">
+  <h3 class="text-lg font-semibold mb-4">Choose a Template</h3>
+  
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    <% AI::Templates::TemplateRegistry.available_templates(:v1).each do |key, template| %>
+      <div class="template-card border rounded-lg p-4 cursor-pointer hover:border-primary-500 transition-colors" 
+           data-template="<%= key %>"
+           data-action="click->template-selector#selectTemplate">
+        <h4 class="font-semibold text-gray-900"><%= template[:name] %></h4>
+        <p class="text-sm text-gray-600 mt-1"><%= template[:description] %></p>
+        <div class="mt-2">
+          <% template[:supports].each do |framework| %>
+            <span class="inline-block px-2 py-1 text-xs bg-gray-100 rounded mr-1"><%= framework %></span>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+  
+  <div class="roadmap-preview bg-gray-50 rounded-lg p-4">
+    <h4 class="font-semibold text-gray-700 mb-2">🗺️ Roadmap</h4>
+    
+    <% AI::Templates::TemplateRegistry.roadmap.each do |version, templates| %>
+      <div class="mb-3">
+        <h5 class="text-sm font-semibold text-gray-600"><%= version.to_s.upcase %></h5>
+        <ul class="text-sm text-gray-500 ml-4">
+          <% templates.each do |template| %>
+            <li class="flex items-center">
+              <%= template[:available] ? "✅" : "🔜" %>
+              <span class="ml-2"><%= template[:name] %></span>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+  </div>
+</div>

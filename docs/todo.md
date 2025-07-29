@@ -2,7 +2,7 @@
 
 This document tracks all pending features and improvements for the OverSkill platform.
 
-## Phase 2B: AI App Generation (Current - MVP Complete!)
+## Phase 2B: AI App Generation (v1 Complete!)
 - [x] Set up OpenRouter API integration
 - [x] Create AI::OpenRouterClient service
 - [x] Create AI::AppGeneratorService orchestrator
@@ -10,9 +10,21 @@ This document tracks all pending features and improvements for the OverSkill pla
 - [x] Implement Turbo status updates
 - [x] Create basic generation UI
 - [x] Add generation status tracking
-- [ ] Create AI::PromptEnhancer service (Phase 2C)
-- [ ] Create AI::CodeParser service (Phase 2C)
-- [ ] Create AI::SecurityScanner service (Phase 2C)
+- [x] Implement v1 Hello World template system
+- [x] Create SimpleCustomizerService for basic AI customization
+- [x] Add template registry for future expansion
+
+## Phase 2C: Enhanced Templates & Features
+- [ ] Test v1 hello world generation flow
+- [ ] Create v2 templates:
+  - [ ] Todo List template
+  - [ ] Countdown Timer template
+  - [ ] Calculator template
+- [ ] Add template preview/demo functionality
+- [ ] Create AI::PromptEnhancer service
+- [ ] Create AI::CodeParser service
+- [ ] Create AI::SecurityScanner service
+- [ ] Implement more sophisticated AI generation for v2+
 
 ## Phase 3: Marketplace & Commerce
 - [ ] Scaffold Purchase model

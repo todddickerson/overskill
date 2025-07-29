@@ -8,7 +8,23 @@
       <% if app.new_record? %>
         <%# For new apps, only show generation fields %>
         <%= render 'shared/fields/text_field', method: :name, options: {autofocus: true, placeholder: "My Awesome App"} %>
-        <%= render 'shared/fields/text_area', method: :prompt, options: {rows: 8, placeholder: "Create a todo list app with the ability to add, edit, and delete tasks. Include categories and due dates."} %>
+        
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Quick Examples</label>
+          <div class="space-y-2 text-sm">
+            <button type="button" class="text-primary-600 hover:text-primary-700" onclick="document.getElementById('app_prompt').value = 'Create a birthday countdown app with confetti colors'">
+              🎂 Birthday Countdown
+            </button>
+            <button type="button" class="text-primary-600 hover:text-primary-700 ml-4" onclick="document.getElementById('app_prompt').value = 'Make a meditation timer with calming blue and green colors'">
+              🧘 Meditation Timer
+            </button>
+            <button type="button" class="text-primary-600 hover:text-primary-700 ml-4" onclick="document.getElementById('app_prompt').value = 'Build a motivational quote app with energetic orange theme'">
+              💪 Motivation App
+            </button>
+          </div>
+        </div>
+        
+        <%= render 'shared/fields/text_area', method: :prompt, options: {rows: 4, placeholder: "Describe your app idea and any colors or theme you'd like..."} %>
         <%= render 'shared/fields/options', method: :app_type, options: {include_blank: false} %>
         <%= render 'shared/fields/options', method: :framework, options: {include_blank: false} %>
         <%= render 'shared/fields/number_field', method: :base_price, options: {value: 0} %>

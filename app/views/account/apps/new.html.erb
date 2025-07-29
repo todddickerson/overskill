@@ -1,7 +1,20 @@
 <%= render 'account/shared/page' do |page| %>
   <% page.title t('.section') %>
-  <% page.body.render 'account/shared/box', divider: true do |box| %>
-    <% box.t :description, title: '.header' %>
-    <% box.body.render 'form', app: @app %>
+  <% page.body do %>
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <h3 class="text-sm font-semibold text-blue-900 mb-2">🚀 OverSkill v1 - Hello World Apps</h3>
+      <p class="text-sm text-blue-800">
+        Start simple! This version creates customized hello world apps that you can use as a starting point.
+        Describe your app idea and we'll customize the colors, text, and theme to match your vision.
+      </p>
+      <p class="text-xs text-blue-700 mt-2">
+        <strong>Coming soon:</strong> Full app templates, complex functionality, database integration, and more!
+      </p>
+    </div>
+    
+    <%= render 'account/shared/box', divider: true do |box| %>
+      <% box.t :description, title: '.header' %>
+      <% box.body.render 'form', app: @app %>
+    <% end %>
   <% end %>
 <% end %>

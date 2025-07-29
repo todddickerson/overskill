@@ -1,4 +1,4 @@
-# Testing AI App Generation MVP
+# Testing AI App Generation v1 - Hello World Apps
 
 ## Setup Steps
 
@@ -6,22 +6,35 @@
 2. Start Sidekiq for background jobs: `bundle exec sidekiq`
 3. Ensure you have OPENROUTER_API_KEY in .env.development.local
 
-## Test Flow
+## v1 Test Scenarios
 
+### Basic Hello World
 1. Navigate to http://localhost:3000
 2. Sign in/sign up 
 3. Go to Apps section
 4. Click "New App"
-5. Fill in:
-   - Name: "Todo List App"
-   - Prompt: "Create a simple todo list app with add, edit, delete functionality"
+5. Try the quick examples or enter:
+   - Name: "Birthday Countdown"
+   - Prompt: "Create a birthday countdown app with confetti colors and party theme"
    - App Type: tool
-   - Framework: react
+   - Framework: vanilla or react
    - Base Price: 0
-6. Click Create
-7. You should be redirected to the app page showing generation status
-8. Wait for generation to complete (check Sidekiq logs)
-9. Once complete, you should see the generated files
+
+### Test Different Prompts
+- "Make a meditation timer with calming blue colors"
+- "Build a motivational quote app with energetic orange theme"
+- "Create a simple counter with a space theme and purple colors"
+- "Make a hello world app for a bakery with warm brown colors"
+
+## What v1 Does
+- Takes your prompt and extracts customization ideas
+- Uses Gemini Flash (fast & cheap) to customize a hello world template
+- Generates a working interactive app with:
+  - Custom colors based on your theme
+  - Custom text and messages
+  - Interactive counter functionality
+  - Responsive design
+  - Your chosen framework (vanilla JS or React)
 
 ## What to Check
 

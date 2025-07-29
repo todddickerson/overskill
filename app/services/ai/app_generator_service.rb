@@ -90,8 +90,37 @@ module AI
     end
 
     def generate_with_ai(enhanced_prompt)
-      client = AI::OpenRouterClient.new
-      client.generate_app(enhanced_prompt, framework: app.framework)
+      # For v1, use the simple customizer
+      customizer = AI::SimpleCustomizerService.new(enhanced_prompt, app.framework)
+      result = customizer.generate
+      
+      if result[:success]
+        # Format response to match expected structure
+        {
+          success: true,
+          content: format_as_json_response(result),
+          model: result[:ai_model],
+          usage: result[:usage]
+        }
+      else
+        result
+      end
+    end
+    
+    def format_as_json_response(result)
+      # Format the result as JSON that parse_ai_response expects
+      {
+        app: {
+          name: result[:customizations]["APP_NAME"] || app.name,
+          description: "A customized hello world app",
+          type: app.app_type,
+          features: ["Interactive counter", "Customized styling", "Responsive design"],
+          tech_stack: [app.framework]
+        },
+        files: result[:files],
+        instructions: "Open index.html in a web browser to run your app!",
+        deployment_notes: "This is a static site that can be hosted anywhere."
+      }.to_json
     end
 
     def parse_ai_response(content)
@@ -188,13 +217,13 @@ module AI
     def calculate_cost(usage)
       return 0.0 unless usage
       
-      # Rough estimate - can be refined based on actual OpenRouter pricing
+      # v1 uses Gemini Flash which is much cheaper
       prompt_tokens = usage["prompt_tokens"] || 0
       completion_tokens = usage["completion_tokens"] || 0
       
-      # Kimi K2 pricing estimate (per 1M tokens)
-      prompt_cost = (prompt_tokens / 1_000_000.0) * 3.0  # $3 per 1M prompt tokens
-      completion_cost = (completion_tokens / 1_000_000.0) * 10.0  # $10 per 1M completion tokens
+      # Gemini Flash pricing (per 1M tokens)
+      prompt_cost = (prompt_tokens / 1_000_000.0) * 0.15  # $0.15 per 1M prompt tokens
+      completion_cost = (completion_tokens / 1_000_000.0) * 0.60  # $0.60 per 1M completion tokens
       
       prompt_cost + completion_cost
     end
