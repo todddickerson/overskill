@@ -1,0 +1,18 @@
+<div id="preview_frame" class="h-full bg-white">
+  <% if app.app_files.any? %>
+    <iframe 
+      srcdoc="<%= html_for_preview(app) %>"
+      class="w-full h-full border-0"
+      sandbox="allow-scripts allow-same-origin"
+      title="App Preview">
+    </iframe>
+  <% else %>
+    <div class="h-full flex items-center justify-center text-gray-500">
+      <div class="text-center">
+        <i class="fas fa-code text-4xl mb-4"></i>
+        <p>No preview available yet</p>
+        <p class="text-sm">Generate your app to see it here</p>
+      </div>
+    </div>
+  <% end %>
+</div>

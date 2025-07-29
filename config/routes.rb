@@ -82,6 +82,10 @@ Rails.application.routes.draw do
         resources :follows
         resources :apps do
           resource :chat, controller: 'app_chats', only: [:show, :create]
+          resource :editor, controller: 'app_editors', only: [:show] do
+            post :create_message
+            patch 'files/:file_id', action: :update_file, as: :file
+          end
         end
         resources :app_generations
         resources :app_files

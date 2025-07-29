@@ -1,0 +1,37 @@
+<div class="<%= message.role == 'user' ? 'ml-8' : '' %>">
+  <div class="flex items-start space-x-2">
+    <% if message.role == 'assistant' %>
+      <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-robot text-white text-sm"></i>
+      </div>
+    <% end %>
+    
+    <div class="flex-1 <%= message.role == 'user' ? 'bg-gray-700' : 'bg-gray-750' %> rounded-lg px-4 py-2">
+      <% if message.role == 'user' %>
+        <div class="text-xs text-gray-400 mb-1">You</div>
+      <% end %>
+      
+      <div class="text-sm text-gray-200 prose prose-invert prose-sm max-w-none">
+        <%= simple_format(message.content) %>
+      </div>
+      
+      <% if message.processing? %>
+        <div class="mt-2 flex items-center text-xs text-gray-400">
+          <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-500 mr-2"></div>
+          Processing...
+        </div>
+      <% elsif message.failed? %>
+        <div class="mt-2 text-xs text-red-400">
+          <i class="fas fa-exclamation-circle mr-1"></i>
+          Error occurred
+        </div>
+      <% end %>
+    </div>
+    
+    <% if message.role == 'user' %>
+      <div class="w-8 h-8 bg-gray-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-user text-white text-sm"></i>
+      </div>
+    <% end %>
+  </div>
+</div>

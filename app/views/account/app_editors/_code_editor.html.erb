@@ -1,0 +1,44 @@
+<div class="h-full flex flex-col bg-gray-900" data-controller="code-editor" data-file-id="<%= file.id %>">
+  <!-- Editor Header -->
+  <div class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <i class="<%= file_icon(file.file_type) %> text-gray-400"></i>
+      <span class="text-white font-medium"><%= file.path %></span>
+      <span class="text-xs text-gray-500">
+        <%= number_to_human_size(file.size) %>
+      </span>
+    </div>
+    <div id="file_<%= file.id %>_status" class="text-sm">
+      <!-- Status will be updated here -->
+    </div>
+  </div>
+  
+  <!-- Code Editor -->
+  <div class="flex-1 relative">
+    <textarea
+      id="editor_<%= file.id %>"
+      class="absolute inset-0 w-full h-full bg-gray-900 text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
+      data-code-editor-target="editor"
+      data-action="input->code-editor#handleChange"
+      spellcheck="false"
+    ><%= file.content %></textarea>
+    
+    <!-- Line numbers (optional enhancement) -->
+    <div class="absolute left-0 top-0 bottom-0 w-12 bg-gray-800 border-r border-gray-700 select-none pointer-events-none">
+      <div class="text-gray-500 text-sm font-mono p-4 leading-relaxed">
+        <% file.content.lines.count.times do |i| %>
+          <div><%= i + 1 %></div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Save indicator -->
+  <div class="bg-gray-800 border-t border-gray-700 px-4 py-2 text-xs text-gray-400">
+    <span data-code-editor-target="status">Ready</span>
+    <span class="float-right">
+      Line <span data-code-editor-target="line">1</span>, 
+      Column <span data-code-editor-target="column">1</span>
+    </span>
+  </div>
+</div>

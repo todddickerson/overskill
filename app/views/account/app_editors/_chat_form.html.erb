@@ -1,0 +1,15 @@
+<%= form_with model: app.app_chat_messages.build, 
+              url: create_message_account_app_editor_path(app),
+              class: "flex gap-2" do |form| %>
+  <%= form.text_area :content,
+      placeholder: "Ask me to change something...",
+      rows: 2,
+      class: "flex-1 bg-gray-700 text-white placeholder-gray-400 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none",
+      data: {
+        controller: "autosize",
+        action: "keydown.cmd+enter->autosize#submit keydown.ctrl+enter->autosize#submit"
+      } %>
+  <button type="submit" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors self-end">
+    <i class="fas fa-paper-plane"></i>
+  </button>
+<% end %>

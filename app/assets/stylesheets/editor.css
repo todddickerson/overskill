@@ -1,0 +1,68 @@
+/* Editor-specific styles */
+.bg-gray-750 {
+  background-color: #2d3748;
+}
+
+/* Code editor syntax highlighting (basic) */
+.code-editor textarea {
+  tab-size: 2;
+  -moz-tab-size: 2;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling for dark theme */
+.code-editor textarea::-webkit-scrollbar,
+#chat_container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.code-editor textarea::-webkit-scrollbar-track,
+#chat_container::-webkit-scrollbar-track {
+  background: #1a202c;
+}
+
+.code-editor textarea::-webkit-scrollbar-thumb,
+#chat_container::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+}
+
+.code-editor textarea::-webkit-scrollbar-thumb:hover,
+#chat_container::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
+
+/* Chat message animations */
+#chat_messages > div {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Prose styles for chat */
+.prose-invert {
+  color: #e2e8f0;
+}
+
+.prose-invert strong {
+  color: #f7fafc;
+}
+
+.prose-invert code {
+  background-color: #2d3748;
+  color: #fbbf24;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}

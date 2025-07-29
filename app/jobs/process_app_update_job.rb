@@ -187,17 +187,39 @@ class ProcessAppUpdateJob < ApplicationJob
     Turbo::StreamsChannel.broadcast_append_to(
       "app_#{chat_message.app_id}_chat",
       target: "chat_messages",
-      partial: "account/app_chats/processing",
-      locals: { message: chat_message }
+      html: <<~HTML
+        <div id="processing_#{chat_message.id}" class="ml-8">
+          <div class="flex items-start space-x-2">
+            <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-robot text-white text-sm"></i>
+            </div>
+            <div class="flex-1 bg-gray-750 rounded-lg px-4 py-2">
+              <div class="flex items-center text-sm text-gray-400">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-500 mr-2"></div>
+                Processing your request...
+              </div>
+            </div>
+          </div>
+        </div>
+      HTML
     )
   end
   
   def broadcast_completion(user_message, assistant_message)
+    # Broadcast to chat
     Turbo::StreamsChannel.broadcast_replace_to(
       "app_#{user_message.app_id}_chat",
       target: "processing_#{user_message.id}",
-      partial: "account/app_chats/message",
+      partial: "account/app_editors/chat_message",
       locals: { message: assistant_message }
+    )
+    
+    # Refresh the preview
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{user_message.app_id}_chat",
+      target: "preview_frame",
+      partial: "account/app_editors/preview_frame",
+      locals: { app: user_message.app }
     )
   end
   

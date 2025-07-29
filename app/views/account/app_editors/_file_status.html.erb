@@ -1,0 +1,13 @@
+<% if status == "saved" %>
+  <span class="text-xs text-green-400">
+    <i class="fas fa-check-circle mr-1"></i>Saved
+  </span>
+<% elsif status == "saving" %>
+  <span class="text-xs text-yellow-400">
+    <i class="fas fa-spinner fa-spin mr-1"></i>Saving...
+  </span>
+<% elsif status == "error" %>
+  <span class="text-xs text-red-400">
+    <i class="fas fa-exclamation-circle mr-1"></i>Error
+  </span>
+<% end %>
