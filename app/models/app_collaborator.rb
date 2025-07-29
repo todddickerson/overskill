@@ -16,6 +16,7 @@ class AppCollaborator < ApplicationRecord
 
   validates :app, scope: true
   validates :membership, scope: true
+  validates :role, inclusion: { in: %w[owner editor viewer] }
   # 🚅 add validations above.
 
   # 🚅 add callbacks above.
@@ -23,15 +24,11 @@ class AppCollaborator < ApplicationRecord
   # 🚅 add delegations above.
 
   def valid_apps
-    raise "please review and implement `valid_apps` in `app/models/app_collaborator.rb`."
-    # please specify what objects should be considered valid for assigning to `app`.
-    # the resulting code should probably look something like `team.apps`.
+    team.apps
   end
 
   def valid_memberships
-    raise "please review and implement `valid_memberships` in `app/models/app_collaborator.rb`."
-    # please specify what objects should be considered valid for assigning to `membership`.
-    # the resulting code should probably look something like `team.memberships`.
+    team.memberships
   end
 
   # 🚅 add methods above.

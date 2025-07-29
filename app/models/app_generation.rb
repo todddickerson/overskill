@@ -23,9 +23,7 @@ class AppGeneration < ApplicationRecord
   # 🚅 add delegations above.
 
   def valid_apps
-    raise "please review and implement `valid_apps` in `app/models/app_generation.rb`."
-    # please specify what objects should be considered valid for assigning to `app`.
-    # the resulting code should probably look something like `team.apps`.
+    team.apps
   end
 
   # 🚅 add methods above.

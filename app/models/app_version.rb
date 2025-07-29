@@ -24,15 +24,11 @@ class AppVersion < ApplicationRecord
   # 🚅 add delegations above.
 
   def valid_apps
-    raise "please review and implement `valid_apps` in `app/models/app_version.rb`."
-    # please specify what objects should be considered valid for assigning to `app`.
-    # the resulting code should probably look something like `team.apps`.
+    team.apps
   end
 
   def valid_users
-    raise "please review and implement `valid_users` in `app/models/app_version.rb`."
-    # please specify what objects should be considered valid for assigning to `user`.
-    # the resulting code should probably look something like `team.users`.
+    team.users
   end
 
   # 🚅 add methods above.
