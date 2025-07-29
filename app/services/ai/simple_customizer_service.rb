@@ -16,8 +16,8 @@ module AI
         { role: "user", content: @prompt }
       ]
       
-      # Use a smaller model for simple customizations
-      response = client.chat(messages, model: :gemini_flash, temperature: 0.8, max_tokens: 1000)
+      # Use Kimi K2 for all generation
+      response = client.chat(messages, model: :kimi_k2, temperature: 0.8, max_tokens: 1000)
       
       if response[:success]
         begin

@@ -217,13 +217,13 @@ module AI
     def calculate_cost(usage)
       return 0.0 unless usage
       
-      # v1 uses Gemini Flash which is much cheaper
+      # Using Kimi K2 for all generation
       prompt_tokens = usage["prompt_tokens"] || 0
       completion_tokens = usage["completion_tokens"] || 0
       
-      # Gemini Flash pricing (per 1M tokens)
-      prompt_cost = (prompt_tokens / 1_000_000.0) * 0.15  # $0.15 per 1M prompt tokens
-      completion_cost = (completion_tokens / 1_000_000.0) * 0.60  # $0.60 per 1M completion tokens
+      # Kimi K2 pricing (per 1M tokens)
+      prompt_cost = (prompt_tokens / 1_000_000.0) * 0.30  # $0.30 per 1M tokens
+      completion_cost = (completion_tokens / 1_000_000.0) * 0.30  # $0.30 per 1M tokens
       
       prompt_cost + completion_cost
     end

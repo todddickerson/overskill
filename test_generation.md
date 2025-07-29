@@ -28,7 +28,7 @@
 
 ## What v1 Does
 - Takes your prompt and extracts customization ideas
-- Uses Gemini Flash (fast & cheap) to customize a hello world template
+- Uses Kimi K2 to intelligently customize a hello world template
 - Generates a working interactive app with:
   - Custom colors based on your theme
   - Custom text and messages
