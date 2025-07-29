@@ -6,24 +6,38 @@
 
 BulletTrain's super-scaffolding allows us to generate complete CRUD interfaces, API endpoints, and views with a single command. This document serves as our blueprint for all models and their relationships.
 
+### Key Syntax Notes:
+- Parent model is always `Team` for multi-tenancy (can add `,User` for user association)
+- Field options: `{required}`, `{readonly}`, `{default=value}`, `{minimum=n}`, `{maximum=n}`
+- References: `{class_name=Model,required}`
+- Options field: `field:options{option1,option2,option3}`
+- Unique validation must be added manually to models (not a field option)
+
+### BulletTrain Membership Pattern:
+- Use `Membership` (not `User`) for data that should persist after user deletion
+- `Membership` represents the User-Team relationship
+- Pattern: `Team,Membership` for membership-scoped data
+- Pattern: `Team,User` for user-specific data that can be deleted
+- Example: Apps should belong to Membership so they persist if creator leaves
+
 ## 📊 Core Models & Scaffolding Commands
 
 ### Phase 1: User & Creator System
 
 #### 1. CreatorProfile
-Extends the User model with creator-specific features.
+Extends the Membership model with creator-specific features. Using Membership ensures creator data persists even if user account is deleted.
 
 ```bash
-# One-to-one with User (belongs_to)
-rails generate super_scaffold CreatorProfile User,Team \
-  username:text_field{required,unique} \
+# One-to-one with Membership (data persists after user deletion)
+rails generate super_scaffold CreatorProfile Team,Membership \
+  username:text_field{required} \
   bio:text_area \
-  level:number_field{required} \
-  total_earnings:number_field{readonly} \
-  total_sales:number_field{readonly} \
+  level:number_field{required,default=1} \
+  total_earnings:number_field{readonly,default=0} \
+  total_sales:number_field{readonly,default=0} \
   verification_status:options{unverified,pending,verified} \
   featured_until:date_and_time_field \
-  slug:text_field{required,unique} \
+  slug:text_field{required} \
   stripe_account_id:text_field \
   public_email:email_field \
   website_url:text_field \
@@ -35,11 +49,11 @@ rails generate super_scaffold CreatorProfile User,Team \
 For creator following functionality.
 
 ```bash
-rails generate super_scaffold Follow User,Team \
+rails generate super_scaffold Follow Team,User \
   follower:references{class_name=User,required} \
-  followed:references{class_name=CreatorProfile,required} \
-  created_at:date_and_time_field{readonly}
+  followed:references{class_name=User,required}
 
+# Note: We'll need to manually update the association to CreatorProfile
 # Add indexes in migration
 # add_index :follows, [:follower_id, :followed_id], unique: true
 # add_index :follows, :followed_id
@@ -53,27 +67,27 @@ Core model for generated applications.
 ```bash
 rails generate super_scaffold App Team \
   name:text_field{required} \
-  slug:text_field{required,unique} \
+  slug:text_field{required} \
   description:text_area \
-  creator_profile:references{required} \
+  creator:references{class_name=Membership,required} \
   prompt:text_area{required} \
   app_type:options{tool,saas,landing_page,dashboard,game,other} \
   framework:options{react,vue,nextjs,vanilla} \
   status:options{generating,generated,testing,ready,published,failed} \
   visibility:options{private,preview,public} \
-  base_price:number_field{required} \
+  base_price:number_field{required,default=0} \
   stripe_product_id:text_field \
   preview_url:text_field \
   production_url:text_field \
   github_repo:text_field \
-  total_users:number_field{readonly} \
-  total_revenue:number_field{readonly} \
-  rating:number_field{readonly} \
-  featured:boolean \
+  total_users:number_field{readonly,default=0} \
+  total_revenue:number_field{readonly,default=0} \
+  rating:number_field{readonly,default=0} \
+  featured:boolean{default=false} \
   featured_until:date_and_time_field \
   launch_date:date_and_time_field \
   ai_model:text_field{readonly} \
-  ai_cost:number_field{readonly}
+  ai_cost:number_field{readonly,default=0}
 ```
 
 #### 4. AppGeneration
@@ -134,7 +148,7 @@ Manages GitHub repository collaborators.
 ```bash
 rails generate super_scaffold AppCollaborator Team \
   app:references{required} \
-  user:references{required} \
+  membership:references{required} \
   role:options{viewer,contributor,admin} \
   github_username:text_field \
   permissions_synced:boolean{default=false}
@@ -161,12 +175,12 @@ rails generate super_scaffold Purchase Team \
 ```
 
 #### 9. AppReview
-User reviews for apps.
+User reviews for apps. Uses Membership so reviews persist.
 
 ```bash
 rails generate super_scaffold AppReview Team \
   app:references{required} \
-  user:references{required} \
+  membership:references{required} \
   rating:number_field{required,minimum=1,maximum=5} \
   title:text_field \
   content:text_area \
@@ -218,11 +232,11 @@ rails generate super_scaffold Achievement Team \
   badge_color:color_picker
 ```
 
-#### 13. UserAchievement
-Tracks earned achievements.
+#### 13. MembershipAchievement
+Tracks earned achievements. Uses Membership so achievements persist.
 
 ```bash
-rails generate super_scaffold UserAchievement User,Team \
+rails generate super_scaffold MembershipAchievement Team,Membership \
   achievement:references{required} \
   earned_at:date_and_time_field{required} \
   progress:number_field{default=0}
@@ -246,10 +260,10 @@ rails generate super_scaffold AppAnalytic Team \
 ```
 
 #### 15. AIUsageLog
-Tracks AI API usage for billing.
+Tracks AI API usage for billing. Uses Membership to preserve usage history.
 
 ```bash
-rails generate super_scaffold AIUsageLog User,Team \
+rails generate super_scaffold AIUsageLog Team,Membership \
   model:options{kimi-k2,deepseek-v3,claude-sonnet,gpt-4} \
   action:options{generate_app,enhance_prompt,generate_test,analyze_code} \
   input_tokens:number_field{required} \
@@ -265,11 +279,11 @@ rails generate super_scaffold AIUsageLog User,Team \
 ### Phase 6: Community Features
 
 #### 16. Post
-Community posts/updates.
+Community posts/updates. Uses Membership so content persists.
 
 ```bash
 rails generate super_scaffold Post Team \
-  creator_profile:references{required} \
+  membership:references{required} \
   app:references \
   title:text_field \
   content:text_area{required} \
@@ -281,12 +295,12 @@ rails generate super_scaffold Post Team \
 ```
 
 #### 17. Comment
-Comments on posts.
+Comments on posts. Uses Membership so comments persist.
 
 ```bash
 rails generate super_scaffold Comment Team \
   post:references{required} \
-  user:references{required} \
+  membership:references{required} \
   parent:references{class_name=Comment} \
   content:text_area{required} \
   likes_count:number_field{default=0} \
@@ -302,16 +316,30 @@ After scaffolding, add these associations to the models:
 class User < ApplicationRecord
   # BulletTrain associations...
   
-  # OverSkill associations
-  has_one :creator_profile, dependent: :destroy
-  has_many :apps, through: :teams
+  # OverSkill associations (user-specific, deletable)
   has_many :purchases
-  has_many :app_reviews
-  has_many :posts, through: :creator_profile
-  has_many :comments
   has_one :referral_code
-  has_many :user_achievements
-  has_many :achievements, through: :user_achievements
+  
+  # Following (through memberships)
+  has_many :active_follows, through: :memberships
+end
+```
+
+### app/models/membership.rb
+```ruby
+class Membership < ApplicationRecord
+  # BulletTrain associations...
+  
+  # OverSkill associations (persist after user deletion)
+  has_one :creator_profile, dependent: :destroy
+  has_many :apps, foreign_key: :creator_id
+  has_many :app_reviews
+  has_many :posts
+  has_many :comments
+  has_many :membership_achievements
+  has_many :achievements, through: :membership_achievements
+  has_many :ai_usage_logs
+  has_many :app_collaborators
   
   # Following
   has_many :active_follows, class_name: "Follow", foreign_key: "follower_id"
@@ -322,15 +350,15 @@ end
 ### app/models/creator_profile.rb
 ```ruby
 class CreatorProfile < ApplicationRecord
-  belongs_to :user
+  belongs_to :membership
   belongs_to :team
   
-  has_many :apps
-  has_many :posts
+  has_many :apps, through: :membership
+  has_many :posts, through: :membership
   has_many :passive_follows, class_name: "Follow", foreign_key: "followed_id"
   has_many :followers, through: :passive_follows, source: :follower
   
-  # Validations
+  # Validations (add unique constraints manually)
   validates :username, presence: true, uniqueness: true
   validates :slug, presence: true, uniqueness: true
   
@@ -349,11 +377,12 @@ end
 ```ruby
 class App < ApplicationRecord
   belongs_to :team
-  belongs_to :creator_profile
+  belongs_to :creator, class_name: 'Membership'
   
   has_many :app_generations
   has_many :app_files
   has_many :app_versions
+  has_many :app_collaborators
   has_many :purchases
   has_many :app_reviews
   has_many :flash_sales
@@ -364,7 +393,7 @@ class App < ApplicationRecord
   scope :published, -> { where(status: 'published', visibility: 'public') }
   scope :featured, -> { where(featured: true).where('featured_until > ?', Time.current) }
   
-  # Validations
+  # Validations (add unique constraints manually)
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true
   validates :base_price, presence: true, numericality: { greater_than_or_equal_to: 0 }
@@ -460,7 +489,45 @@ After running all scaffolding commands:
 
 ## 📝 Notes
 
-- All models include `Team` for multi-tenancy (BulletTrain pattern)
+- All models include `Team` for multi-tenancy (BulletTrain pattern)  
 - Soft deletes are handled by BulletTrain's `discarded` gem
 - API versioning follows BulletTrain conventions
 - Use `super_scaffold:crud` for additional customization after initial generation
+
+## ⚠️ Manual Post-Scaffolding Updates
+
+After running the scaffolding commands, you'll need to make these manual updates:
+
+1. **Add unique constraints in migrations**
+   ```ruby
+   add_index :creator_profiles, :username, unique: true
+   add_index :creator_profiles, :slug, unique: true
+   add_index :apps, :slug, unique: true
+   ```
+
+2. **Update associations for Membership pattern**
+   - Update generated associations to use `class_name: 'Membership'` where needed
+   - Change foreign keys from `user_id` to `membership_id` in migrations
+   - Update `Follow` model to reference `CreatorProfile` for followed
+   - Ensure `creator` association in App model uses `class_name: 'Membership'`
+
+3. **Add custom validations**
+   - Unique validations for slugs, usernames
+   - Custom validation logic for business rules
+   - Add team scope validations where needed
+
+4. **Configure references**
+   - Update foreign key constraints
+   - Add dependent: :destroy where appropriate
+   - Ensure proper cascading for membership deletion
+
+5. **Helper methods for User access**
+   ```ruby
+   # In models using Membership, add helper to get user
+   delegate :user, to: :membership
+   
+   # In controllers, helper to get membership from current_user
+   def current_membership
+     current_user.memberships.find_by(team: current_team)
+   end
+   ```
