@@ -21,6 +21,11 @@ module AI
           keywords: %w[dashboard analytics data chart graph metrics kpi admin panel],
           class: DashboardTemplate,
           name: "Data Dashboard"
+        },
+        calculator: {
+          keywords: %w[calculator calc calculate math arithmetic scientific],
+          class: CalculatorTemplate,
+          name: "Calculator App"
         }
       }
 

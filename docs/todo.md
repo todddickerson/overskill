@@ -2,29 +2,29 @@
 
 This document tracks all pending features and improvements for the OverSkill platform.
 
-## Phase 2B: AI App Generation (v1 Complete!)
-- [x] Set up OpenRouter API integration
+## Phase 2B: AI App Generation (Complete!)
+- [x] Set up OpenRouter API integration with Kimi K2
 - [x] Create AI::OpenRouterClient service
 - [x] Create AI::AppGeneratorService orchestrator
 - [x] Create AppGenerationJob background job
 - [x] Implement Turbo status updates
 - [x] Create basic generation UI
 - [x] Add generation status tracking
-- [x] Implement v1 Hello World template system
-- [x] Create SimpleCustomizerService for basic AI customization
-- [x] Add template registry for future expansion
+- [x] Implement prompt template system (like lovable.dev)
+- [x] Create prompt templates for todo, game, landing, dashboard
+- [x] Add intelligent template selection based on prompts
 
-## Phase 2C: Enhanced Templates & Features
-- [ ] Test v1 hello world generation flow
-- [ ] Create v2 templates:
-  - [ ] Todo List template
-  - [ ] Countdown Timer template
-  - [ ] Calculator template
-- [ ] Add template preview/demo functionality
-- [ ] Create AI::PromptEnhancer service
-- [ ] Create AI::CodeParser service
+## Phase 2C: Testing & Enhancement
+- [ ] Test full app generation with various prompts
+- [ ] Add more prompt templates:
+  - [ ] Calculator app template
+  - [ ] Timer/countdown template
+  - [ ] Blog/content site template
+  - [ ] Chat app template
+- [ ] Implement app preview in iframe
+- [ ] Add one-click deployment to Cloudflare
 - [ ] Create AI::SecurityScanner service
-- [ ] Implement more sophisticated AI generation for v2+
+- [ ] Add generation analytics and metrics
 
 ## Phase 3: Marketplace & Commerce
 - [ ] Scaffold Purchase model
