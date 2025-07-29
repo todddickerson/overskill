@@ -1,0 +1,46 @@
+<%= render 'account/shared/page' do |page| %>
+  <% page.title t('.section') %>
+  <% page.body do %>
+    <%= cable_ready_updates_for @creator_profile do %>
+      <%= render 'account/shared/box', divider: true do |box| %>
+        <% box.title t('.header') %>
+        <% box.description do %>
+          <%= t('.description') %>
+          <%= t('.manage_description') if can? :manage, @creator_profile %>
+        <% end %>
+
+        <% box.body do %>
+          <% with_attribute_settings object: @creator_profile, strategy: :label do %>
+            <%= render 'shared/attributes/text', attribute: :username %>
+            <%= render 'shared/attributes/text', attribute: :bio %>
+            <%= render 'shared/attributes/number', attribute: :level %>
+            <%= render 'shared/attributes/number', attribute: :total_earnings %>
+            <%= render 'shared/attributes/number', attribute: :total_sales %>
+            <%= render 'shared/attributes/option', attribute: :verification_status %>
+            <%= render 'shared/attributes/date_and_time', attribute: :featured_until %>
+            <%= render 'shared/attributes/text', attribute: :slug %>
+            <%= render 'shared/attributes/text', attribute: :stripe_account_id %>
+            <%= render 'shared/attributes/email', attribute: :public_email %>
+            <%= render 'shared/attributes/text', attribute: :website_url %>
+            <%= render 'shared/attributes/text', attribute: :twitter_handle %>
+            <%= render 'shared/attributes/text', attribute: :github_username %>
+            <%# 🚅 super scaffolding will insert new fields above this line. %>
+          <% end %>
+        <% end %>
+
+        <% box.actions do %>
+          <%= link_to t('.buttons.edit'), [:edit, :account, @creator_profile], class: first_button_primary if can? :edit, @creator_profile %>
+          <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+          <%= button_to t('.buttons.destroy'), [:account, @creator_profile], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@creator_profile)) } if can? :destroy, @creator_profile %>
+          <%= link_to t('global.buttons.back'), [:account, @team, :creator_profiles], class: first_button_primary %>
+        <% end %>
+
+        <% box.raw_footer do %>
+          <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%# 🚅 super scaffolding will insert new children above this line. %>
+  <% end %>
+<% end %>

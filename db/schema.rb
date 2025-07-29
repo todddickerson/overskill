@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_28_232216) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_29_175131) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,42 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_232216) do
     t.index ["user_id"], name: "index_ahoy_visits_on_user_id"
     t.index ["visit_token"], name: "index_ahoy_visits_on_visit_token", unique: true
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
+  end
+
+  create_table "creator_profiles", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "membership_id", null: false
+    t.string "username", null: false
+    t.text "bio"
+    t.integer "level", default: 1, null: false
+    t.integer "total_earnings", default: 0
+    t.integer "total_sales", default: 0
+    t.string "verification_status", default: "unverified"
+    t.datetime "featured_until"
+    t.string "slug", null: false
+    t.string "stripe_account_id"
+    t.string "public_email"
+    t.string "website_url"
+    t.string "twitter_handle"
+    t.string "github_username"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["membership_id"], name: "index_creator_profiles_on_membership_id"
+    t.index ["slug"], name: "index_creator_profiles_on_slug", unique: true
+    t.index ["team_id"], name: "index_creator_profiles_on_team_id"
+    t.index ["username"], name: "index_creator_profiles_on_username", unique: true
+  end
+
+  create_table "follows", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "follower_id", null: false
+    t.bigint "followed_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["followed_id"], name: "index_follows_on_followed_id"
+    t.index ["follower_id", "followed_id"], name: "index_follows_on_follower_id_and_followed_id", unique: true
+    t.index ["follower_id"], name: "index_follows_on_follower_id"
+    t.index ["team_id"], name: "index_follows_on_team_id"
   end
 
   create_table "integrations_stripe_installations", force: :cascade do |t|
@@ -399,6 +435,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_232216) do
   add_foreign_key "account_onboarding_invitation_lists", "teams"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "creator_profiles", "memberships"
+  add_foreign_key "creator_profiles", "teams"
+  add_foreign_key "follows", "creator_profiles", column: "followed_id"
+  add_foreign_key "follows", "teams"
+  add_foreign_key "follows", "users", column: "follower_id"
   add_foreign_key "integrations_stripe_installations", "oauth_stripe_accounts"
   add_foreign_key "integrations_stripe_installations", "teams"
   add_foreign_key "invitations", "account_onboarding_invitation_lists", column: "invitation_list_id"

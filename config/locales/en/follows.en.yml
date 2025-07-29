@@ -1,0 +1,100 @@
+en:
+  follows: &follows
+    label: &label Follows
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New Follow
+      create: Create Follow
+      edit: Edit Follow
+      update: Update Follow
+      destroy: Remove Follow
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{follow_name}? This will also remove any child resources and can't be undone.
+    follow:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: Follow ID
+      team_id:
+        heading: Team ID
+      follower_id:
+        _: &follower_id Follower ID
+        label: *follower_id
+        heading: *follower_id
+        api_title: *follower_id
+        api_description: *follower_id
+      followed_id:
+        _: &followed_id Followed ID
+        label: *followed_id
+        heading: *followed_id
+        api_title: *followed_id
+        api_description: *followed_id
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for Follows"
+      index: "List Follows"
+      create: "Add a New Follow"
+      member_actions: "Actions for an Individual Follow"
+      show: "Retrieve a Follow"
+      update: "Update a Follow"
+      destroy: "Delete a Follow"
+      fields: *fields
+    index:
+      section: "%{teams_possessive} Follows"
+      contexts:
+        team:
+          header: Follows
+          description: Below is a list of Follows that have been added for %{team_name}.
+          description_empty: No Follows have been added for %{team_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{follow_name}"
+      header: Follow Details
+      description: Below are the details we have for %{follow_name}.
+      manage_description: You'll also find options for updating these details or removing %{follow_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New Follow for %{team_name}"
+      header: New Follow Details
+      description: Please provide the details of the new Follow you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{follow_name}"
+      header: Edit Follow Details
+      description: You can update the details or settings for %{follow_name} below.
+      form: *form
+    notifications:
+      created: Follow was successfully created.
+      updated: Follow was successfully updated.
+      destroyed: Follow was successfully destroyed.
+  account:
+    follows: *follows
+  activerecord:
+    attributes:
+      follow:
+        follower_id: *follower_id
+        followed_id: *followed_id
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

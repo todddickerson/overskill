@@ -77,6 +77,9 @@ Rails.application.routes.draw do
         namespace :integrations do
           # 🚅 super scaffolding will insert new integration installations above this line.
         end
+
+        resources :creator_profiles
+        resources :follows
       end
     end
   end

@@ -1,0 +1,10 @@
+<% if can? :read, Follow.new(team: current_team) %>
+  <%= render 'account/shared/menu/item', {
+    url: main_app.polymorphic_path([:account, current_team, :follows]),
+    label: t('follows.navigation.label'),
+  } do |p| %>
+    <% p.icon do %>
+      <i class="<%= t('follows.navigation.icon') %>"></i>
+    <% end %>
+  <% end %>
+<% end %>

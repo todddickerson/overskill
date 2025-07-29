@@ -1,0 +1,27 @@
+<% cancel_path ||= creator_profile.persisted? ? [:account, creator_profile] : [:account, @team, :creator_profiles] %>
+
+<%= form_with model: creator_profile, url: (creator_profile.persisted? ? [:account, creator_profile] : [:account, @team, :creator_profiles]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/text_field', method: :username, options: {autofocus: true} %>
+      <%= render 'shared/fields/text_area', method: :bio %>
+      <%= render 'shared/fields/number_field', method: :level %>
+      <%= render 'shared/fields/options', method: :verification_status %>
+      <%= render 'shared/fields/date_and_time_field', method: :featured_until %>
+      <%= render 'shared/fields/text_field', method: :slug %>
+      <%= render 'shared/fields/text_field', method: :stripe_account_id %>
+      <%= render 'shared/fields/email_field', method: :public_email %>
+      <%= render 'shared/fields/text_field', method: :website_url %>
+      <%= render 'shared/fields/text_field', method: :twitter_handle %>
+      <%= render 'shared/fields/text_field', method: :github_username %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

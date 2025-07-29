@@ -1,0 +1,8 @@
+<% creator_profile ||= @creator_profile %>
+<% team ||= @team || creator_profile&.team %>
+<%= render 'account/teams/breadcrumbs', team: team %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :creator_profiles] %>
+<% if creator_profile&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: creator_profile.label_string, url: [:account, creator_profile] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'creator_profiles' %>

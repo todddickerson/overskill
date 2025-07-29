@@ -1,0 +1,8 @@
+<% follow ||= @follow %>
+<% team ||= @team || follow&.team %>
+<%= render 'account/teams/breadcrumbs', team: team %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :follows] %>
+<% if follow&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: follow.label_string, url: [:account, follow] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'follows' %>

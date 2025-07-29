@@ -13,6 +13,13 @@ BulletTrain's super-scaffolding allows us to generate complete CRUD interfaces, 
 - Options field: `field:options{option1,option2,option3}`
 - Unique validation must be added manually to models (not a field option)
 
+### BulletTrain Super-Scaffolding Lessons Learned:
+1. **Quote complex field options**: Use quotes for fields with multiple options like `"level:number_field{required,default=1}"`
+2. **Vanilla option for non-FK fields**: Fields ending in `_id` need `{vanilla}` if they're not foreign keys (e.g., `stripe_account_id:text_field{vanilla}`)
+3. **Skip navbar prompt**: Use `--skip-navbar` to avoid interactive prompts during scaffolding
+4. **Membership reference**: The scaffolding needs manual updates to add membership reference after generation
+5. **Unique indexes**: Don't add unique index on fields that already have indexes from `references`
+
 ### BulletTrain Membership Pattern:
 - Use `Membership` (not `User`) for data that should persist after user deletion
 - `Membership` represents the User-Team relationship

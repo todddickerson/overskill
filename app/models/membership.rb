@@ -8,6 +8,7 @@ class Membership < ApplicationRecord
 
   # 🚅 add oauth providers above.
 
+  has_one :creator_profile, dependent: :destroy
   # 🚅 add has_one associations above.
 
   # 🚅 add scopes above.

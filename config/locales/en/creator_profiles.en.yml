@@ -1,0 +1,181 @@
+en:
+  creator_profiles: &creator_profiles
+    label: &label Creator Profiles
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New Creator Profile
+      create: Create Creator Profile
+      edit: Edit Creator Profile
+      update: Update Creator Profile
+      destroy: Remove Creator Profile
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{creator_profile_name}? This will also remove any child resources and can't be undone.
+    creator_profile:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: Creator Profile ID
+      team_id:
+        heading: Team ID
+      username:
+        _: &username Username
+        label: *username
+        heading: *username
+        api_title: *username
+        api_description: *username
+      bio:
+        _: &bio Bio
+        label: *bio
+        heading: *bio
+        api_title: *bio
+        api_description: *bio
+      level:
+        _: &level Level
+        label: *level
+        heading: *level
+        api_title: *level
+        api_description: *level
+      total_earnings:
+        _: &total_earnings Total Earnings
+        label: *total_earnings
+        heading: *total_earnings
+        api_title: *total_earnings
+        api_description: *total_earnings
+      total_sales:
+        _: &total_sales Total Sales
+        label: *total_sales
+        heading: *total_sales
+        api_title: *total_sales
+        api_description: *total_sales
+      verification_status:
+        _: &verification_status Verification Status
+        label: *verification_status
+        heading: *verification_status
+        api_title: *verification_status
+        api_description: *verification_status
+        options:
+          one: One
+          two: Two
+          three: Three
+      featured_until:
+        _: &featured_until Featured Until
+        label: *featured_until
+        heading: *featured_until
+        api_title: *featured_until
+        api_description: *featured_until
+      slug:
+        _: &slug Slug
+        label: *slug
+        heading: *slug
+        api_title: *slug
+        api_description: *slug
+      stripe_account_id:
+        _: &stripe_account_id Stripe Account ID
+        label: *stripe_account_id
+        heading: *stripe_account_id
+        api_title: *stripe_account_id
+        api_description: *stripe_account_id
+      public_email:
+        _: &public_email Public Email
+        label: *public_email
+        heading: *public_email
+        api_title: *public_email
+        api_description: *public_email
+      website_url:
+        _: &website_url Website Url
+        label: *website_url
+        heading: *website_url
+        api_title: *website_url
+        api_description: *website_url
+      twitter_handle:
+        _: &twitter_handle Twitter Handle
+        label: *twitter_handle
+        heading: *twitter_handle
+        api_title: *twitter_handle
+        api_description: *twitter_handle
+      github_username:
+        _: &github_username Github Username
+        label: *github_username
+        heading: *github_username
+        api_title: *github_username
+        api_description: *github_username
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for Creator Profiles"
+      index: "List Creator Profiles"
+      create: "Add a New Creator Profile"
+      member_actions: "Actions for an Individual Creator Profile"
+      show: "Retrieve a Creator Profile"
+      update: "Update a Creator Profile"
+      destroy: "Delete a Creator Profile"
+      fields: *fields
+    index:
+      section: "%{teams_possessive} Creator Profiles"
+      contexts:
+        team:
+          header: Creator Profiles
+          description: Below is a list of Creator Profiles that have been added for %{team_name}.
+          description_empty: No Creator Profiles have been added for %{team_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{creator_profile_name}"
+      header: Creator Profile Details
+      description: Below are the details we have for %{creator_profile_name}.
+      manage_description: You'll also find options for updating these details or removing %{creator_profile_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New Creator Profile for %{team_name}"
+      header: New Creator Profile Details
+      description: Please provide the details of the new Creator Profile you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{creator_profile_name}"
+      header: Edit Creator Profile Details
+      description: You can update the details or settings for %{creator_profile_name} below.
+      form: *form
+    notifications:
+      created: Creator Profile was successfully created.
+      updated: Creator Profile was successfully updated.
+      destroyed: Creator Profile was successfully destroyed.
+  account:
+    creator_profiles: *creator_profiles
+  activerecord:
+    attributes:
+      creator_profile:
+        username: *username
+        bio: *bio
+        level: *level
+        total_earnings: *total_earnings
+        total_sales: *total_sales
+        verification_status: *verification_status
+        featured_until: *featured_until
+        slug: *slug
+        stripe_account_id: *stripe_account_id
+        public_email: *public_email
+        website_url: *website_url
+        twitter_handle: *twitter_handle
+        github_username: *github_username
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at
