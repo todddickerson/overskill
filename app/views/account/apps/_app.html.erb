@@ -14,6 +14,9 @@
     <td><%= render 'shared/attributes/date_and_time', attribute: :created_at %></td>
     <td class="buttons">
       <% unless hide_actions %>
+        <% if app.generated? %>
+          <%= link_to "Editor", account_app_editor_path(app), class: 'button-primary button-smaller' %>
+        <% end %>
         <% if can? :edit, app %>
           <%= link_to t('.buttons.shorthand.edit'), [:edit, :account, app], class: 'button-secondary button-smaller' %>
         <% end %>

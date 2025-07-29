@@ -15,15 +15,20 @@ This document tracks all pending features and improvements for the OverSkill pla
 - [x] Add chat interface for iterative improvements
 - [x] Create ProcessAppUpdateJob for handling updates
 - [x] Implement version tracking for changes
+- [x] Create lovable.dev-style split UI layout
+- [x] Implement live preview iframe
+- [x] Add file browser/editor with syntax highlighting
+- [x] Add tab switching between Preview/Code/Files
+- [x] Dark theme professional editor experience
 
 ## Phase 2C: Testing & Enhancement
-- [ ] Test spec-based generation and chat updates
-- [ ] Implement app preview in iframe
-- [ ] Add one-click deployment to Cloudflare
+- [ ] Test the complete app generation and editing flow
+- [ ] Add one-click deployment to Cloudflare Workers
 - [ ] Create AI::SecurityScanner service
 - [ ] Add generation analytics and metrics
 - [ ] Implement collaborative editing features
 - [ ] Add app templates marketplace
+- [ ] Add export/download functionality
 
 ## Phase 3: Marketplace & Commerce
 - [ ] Scaffold Purchase model
