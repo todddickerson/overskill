@@ -80,7 +80,9 @@ Rails.application.routes.draw do
 
         resources :creator_profiles
         resources :follows
-        resources :apps
+        resources :apps do
+          resource :chat, controller: 'app_chats', only: [:show, :create]
+        end
         resources :app_generations
         resources :app_files
         resources :app_versions

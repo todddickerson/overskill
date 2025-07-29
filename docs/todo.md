@@ -10,21 +10,20 @@ This document tracks all pending features and improvements for the OverSkill pla
 - [x] Implement Turbo status updates
 - [x] Create basic generation UI
 - [x] Add generation status tracking
-- [x] Implement prompt template system (like lovable.dev)
-- [x] Create prompt templates for todo, game, landing, dashboard
-- [x] Add intelligent template selection based on prompts
+- [x] Implement spec-based generation (like lovable.dev)
+- [x] Create AI::AppSpecBuilder for consistent app structure
+- [x] Add chat interface for iterative improvements
+- [x] Create ProcessAppUpdateJob for handling updates
+- [x] Implement version tracking for changes
 
 ## Phase 2C: Testing & Enhancement
-- [ ] Test full app generation with various prompts
-- [ ] Add more prompt templates:
-  - [ ] Calculator app template
-  - [ ] Timer/countdown template
-  - [ ] Blog/content site template
-  - [ ] Chat app template
+- [ ] Test spec-based generation and chat updates
 - [ ] Implement app preview in iframe
 - [ ] Add one-click deployment to Cloudflare
 - [ ] Create AI::SecurityScanner service
 - [ ] Add generation analytics and metrics
+- [ ] Implement collaborative editing features
+- [ ] Add app templates marketplace
 
 ## Phase 3: Marketplace & Commerce
 - [ ] Scaffold Purchase model

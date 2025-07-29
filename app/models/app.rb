@@ -11,6 +11,7 @@ class App < ApplicationRecord
   has_many :app_files
   has_many :app_versions
   has_many :app_collaborators
+  has_many :app_chat_messages, dependent: :destroy
   # has_many :purchases # TODO: uncomment when Purchase model exists
   # has_many :app_reviews # TODO: uncomment when AppReview model exists
   # has_many :flash_sales # TODO: uncomment when FlashSale model exists

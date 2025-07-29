@@ -46,6 +46,9 @@
         <% end %>
 
         <% box.actions do %>
+          <% if @app.generated? %>
+            <%= link_to "AI Chat", account_app_chat_path(@app), class: "button-primary" %>
+          <% end %>
           <%= link_to t('.buttons.edit'), [:edit, :account, @app], class: first_button_primary if can? :edit, @app %>
           <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
           <%= button_to t('.buttons.destroy'), [:account, @app], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app)) } if can? :destroy, @app %>

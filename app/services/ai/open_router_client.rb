@@ -70,18 +70,27 @@ module AI
     end
 
     def generate_app(prompt, framework: "react", app_type: nil)
-      # Get appropriate system prompt from templates
-      system_prompt = AI::PromptTemplates::TemplateSelector.get_system_prompt(framework)
-      
-      # Enhance the user prompt based on detected template
-      enhanced_prompt = AI::PromptTemplates::TemplateSelector.enhance_prompt(prompt, app_type, framework)
+      # Build a detailed spec from the user's prompt
+      spec = AI::AppSpecBuilder.build_spec(prompt, framework)
       
       messages = [
-        { role: "system", content: system_prompt },
-        { role: "user", content: enhanced_prompt }
+        { role: "system", content: "You are an expert web developer. Follow the specifications exactly." },
+        { role: "user", content: spec }
       ]
       
       chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
+    end
+
+    def update_app(user_request, current_files, app_context)
+      # Build update spec
+      spec = AI::AppSpecBuilder.build_update_spec(user_request, current_files, app_context)
+      
+      messages = [
+        { role: "system", content: "You are an expert web developer. Make precise updates to the existing application." },
+        { role: "user", content: spec }
+      ]
+      
+      chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 8000)
     end
 
     private

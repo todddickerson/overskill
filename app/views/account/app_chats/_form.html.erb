@@ -1,0 +1,13 @@
+<%= form_with model: message, url: account_app_chat_path(app), class: "form" do |form| %>
+  <div class="flex gap-2">
+    <%= form.text_area :content, 
+        placeholder: "Describe what you want to change...", 
+        rows: 2,
+        class: "form-textarea flex-1",
+        data: { 
+          controller: "autosize",
+          action: "keydown.enter->autosize#submit:prevent"
+        } %>
+    <%= form.submit "Send", class: "button-primary self-end" %>
+  </div>
+<% end %>

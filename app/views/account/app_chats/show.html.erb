@@ -1,0 +1,91 @@
+<%= render 'account/shared/page' do |page| %>
+  <% page.title "#{@app.name} - AI Chat" %>
+  <% page.body do %>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Chat Interface -->
+      <div class="lg:col-span-2">
+        <%= render 'account/shared/box', divider: true do |box| %>
+          <% box.title "Chat with AI" %>
+          <% box.description do %>
+            Describe changes you want to make to your app
+          <% end %>
+          
+          <% box.body do %>
+            <%= turbo_stream_from "app_#{@app.id}_chat" %>
+            
+            <div id="chat_messages" class="space-y-4 mb-6 max-h-96 overflow-y-auto">
+              <% if @messages.any? %>
+                <% @messages.each do |message| %>
+                  <%= render 'message', message: message %>
+                <% end %>
+              <% else %>
+                <div class="text-center text-gray-500 py-8">
+                  <p>Start a conversation to modify your app!</p>
+                  <p class="text-sm mt-2">Try: "Add a dark mode toggle" or "Make the buttons bigger"</p>
+                </div>
+              <% end %>
+            </div>
+            
+            <div id="chat_form">
+              <%= render 'form', app: @app, message: @app.app_chat_messages.build %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+      
+      <!-- App Info Sidebar -->
+      <div>
+        <%= render 'account/shared/box' do |box| %>
+          <% box.title "App Details" %>
+          
+          <% box.body do %>
+            <dl class="space-y-3">
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Type</dt>
+                <dd class="text-sm text-gray-900"><%= @app.app_type.humanize %></dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Framework</dt>
+                <dd class="text-sm text-gray-900"><%= @app.framework.upcase %></dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Files</dt>
+                <dd class="text-sm text-gray-900"><%= @app.app_files.count %></dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Versions</dt>
+                <dd class="text-sm text-gray-900"><%= @app.app_versions.count %></dd>
+              </div>
+            </dl>
+          <% end %>
+          
+          <% box.actions do %>
+            <%= link_to "View App", [:account, @app], class: "button-secondary" %>
+            <% if @app.preview_url.present? %>
+              <%= link_to "Preview", @app.preview_url, target: "_blank", class: "button-secondary" %>
+            <% end %>
+          <% end %>
+        <% end %>
+        
+        <!-- Recent Changes -->
+        <% if @app.app_versions.any? %>
+          <%= render 'account/shared/box' do |box| %>
+            <% box.title "Recent Changes" %>
+            
+            <% box.body do %>
+              <div class="space-y-2">
+                <% @app.app_versions.order(created_at: :desc).limit(5).each do |version| %>
+                  <div class="text-sm">
+                    <div class="font-medium">v<%= version.version_number %></div>
+                    <div class="text-gray-600"><%= version.changes_summary %></div>
+                    <div class="text-xs text-gray-500"><%= time_ago_in_words(version.created_at) %> ago</div>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>
