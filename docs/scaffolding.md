@@ -8,17 +8,19 @@ BulletTrain's super-scaffolding allows us to generate complete CRUD interfaces, 
 
 ### Key Syntax Notes:
 - Parent model is always `Team` for multi-tenancy (can add `,User` for user association)
-- Field options: `{required}`, `{readonly}`, `{default=value}`, `{minimum=n}`, `{maximum=n}`
-- References: `{class_name=Model,required}`
-- Options field: `field:options{option1,option2,option3}`
+- Field options: `{required}`, `{readonly}`, `{multiple}`, `{vanilla}`, `{class_name=Model}`, `{label=field}`, `{source=method}`
+- Options field: `field:options{option1,option2,option3}` - NO quotes around options
+- **Important**: `default`, `minimum`, `maximum` are NOT supported - add these in migrations/models manually
 - Unique validation must be added manually to models (not a field option)
+- For associations use `super_select` not `references`
 
 ### BulletTrain Super-Scaffolding Lessons Learned:
-1. **Quote complex field options**: Use quotes for fields with multiple options like `"level:number_field{required,default=1}"`
-2. **Vanilla option for non-FK fields**: Fields ending in `_id` need `{vanilla}` if they're not foreign keys (e.g., `stripe_account_id:text_field{vanilla}`)
-3. **Skip navbar prompt**: Use `--skip-navbar` to avoid interactive prompts during scaffolding
-4. **Membership reference**: The scaffolding needs manual updates to add membership reference after generation
-5. **Unique indexes**: Don't add unique index on fields that already have indexes from `references`
+1. **Supported options**: `{required}`, `{readonly}`, `{multiple}`, `{vanilla}`, `{class_name=Model}`, `{label=field}`, `{source=method}`
+2. **NO default/minimum/maximum**: These database-level options are NOT supported - add them manually in migrations
+3. **Use super_select for associations**: Not `references` - e.g., `creator_id:super_select{class_name=Membership}`
+4. **Vanilla option for non-FK fields**: Fields ending in `_id` need `{vanilla}` if they're not foreign keys
+5. **Skip navbar prompt**: Use `--skip-navbar` to avoid interactive prompts
+6. **First attribute is auto-required**: The first field is automatically required, no need for `{required}`
 
 ### BulletTrain Membership Pattern:
 - Use `Membership` (not `User`) for data that should persist after user deletion
@@ -76,25 +78,25 @@ rails generate super_scaffold App Team \
   name:text_field{required} \
   slug:text_field{required} \
   description:text_area \
-  creator:references{class_name=Membership,required} \
+  creator_id:super_select{class_name=Membership} \
   prompt:text_area{required} \
   app_type:options{tool,saas,landing_page,dashboard,game,other} \
   framework:options{react,vue,nextjs,vanilla} \
   status:options{generating,generated,testing,ready,published,failed} \
   visibility:options{private,preview,public} \
-  base_price:number_field{required,default=0} \
-  stripe_product_id:text_field \
+  base_price:number_field{required} \
+  stripe_product_id:text_field{vanilla} \
   preview_url:text_field \
   production_url:text_field \
   github_repo:text_field \
-  total_users:number_field{readonly,default=0} \
-  total_revenue:number_field{readonly,default=0} \
-  rating:number_field{readonly,default=0} \
-  featured:boolean{default=false} \
+  total_users:number_field{readonly} \
+  total_revenue:number_field{readonly} \
+  rating:number_field{readonly} \
+  featured:boolean \
   featured_until:date_and_time_field \
   launch_date:date_and_time_field \
   ai_model:text_field{readonly} \
-  ai_cost:number_field{readonly,default=0}
+  ai_cost:number_field{readonly}
 ```
 
 #### 4. AppGeneration

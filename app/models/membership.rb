@@ -4,6 +4,7 @@ class Membership < ApplicationRecord
 
   # 🚅 add belongs_to associations above.
 
+  has_many :apps, foreign_key: :creator_id
   # 🚅 add has_many associations above.
 
   # 🚅 add oauth providers above.

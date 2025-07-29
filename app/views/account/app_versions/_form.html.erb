@@ -1,0 +1,29 @@
+<% cancel_path ||= app_version.persisted? ? [:account, app_version] : [:account, @team, :app_versions] %>
+
+<%= form_with model: app_version, url: (app_version.persisted? ? [:account, app_version] : [:account, @team, :app_versions]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/super_select', method: :app_id, options: {autofocus: true}, html_options: {autofocus: true},
+        choices: @app_version.valid_apps.map { |app| [app.label_string, app.id] } %>
+      <%= render 'shared/fields/super_select', method: :user_id, options: {}, html_options: {},
+        choices: @app_version.valid_users.map { |user| [user.label_string, user.id] } %>
+      <%= render 'shared/fields/text_field', method: :commit_sha %>
+      <%= render 'shared/fields/text_field', method: :commit_message %>
+      <%= render 'shared/fields/text_field', method: :version_number %>
+      <%= render 'shared/fields/text_area', method: :changelog %>
+      <%= render 'shared/fields/text_area', method: :files_snapshot %>
+      <%= render 'shared/fields/text_area', method: :changed_files %>
+      <%= render 'shared/fields/options', method: :external_commit %>
+      <%= render 'shared/fields/options', method: :deployed %>
+      <%= render 'shared/fields/date_and_time_field', method: :published_at %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

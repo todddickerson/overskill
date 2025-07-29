@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_29_175131) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_29_180753) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,111 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_29_175131) do
     t.index ["user_id"], name: "index_ahoy_visits_on_user_id"
     t.index ["visit_token"], name: "index_ahoy_visits_on_visit_token", unique: true
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
+  end
+
+  create_table "app_collaborators", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "app_id", null: false
+    t.bigint "membership_id", null: false
+    t.string "role", default: "viewer"
+    t.string "github_username"
+    t.boolean "permissions_synced", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_collaborators_on_app_id"
+    t.index ["membership_id"], name: "index_app_collaborators_on_membership_id"
+    t.index ["team_id"], name: "index_app_collaborators_on_team_id"
+  end
+
+  create_table "app_files", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "app_id", null: false
+    t.string "path", null: false
+    t.text "content", null: false
+    t.string "file_type"
+    t.integer "size_bytes"
+    t.string "checksum"
+    t.boolean "is_entry_point", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id", "path"], name: "index_app_files_on_app_id_and_path", unique: true
+    t.index ["app_id"], name: "index_app_files_on_app_id"
+    t.index ["team_id"], name: "index_app_files_on_team_id"
+  end
+
+  create_table "app_generations", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "app_id", null: false
+    t.text "prompt", null: false
+    t.text "enhanced_prompt"
+    t.string "status", default: "processing"
+    t.string "ai_model", default: "kimi-k2"
+    t.datetime "started_at", null: false
+    t.datetime "completed_at"
+    t.integer "duration_seconds"
+    t.integer "input_tokens"
+    t.integer "output_tokens"
+    t.integer "total_cost"
+    t.text "error_message"
+    t.integer "retry_count", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_generations_on_app_id"
+    t.index ["team_id"], name: "index_app_generations_on_team_id"
+  end
+
+  create_table "app_versions", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "app_id", null: false
+    t.bigint "user_id"
+    t.string "commit_sha"
+    t.string "commit_message"
+    t.string "version_number", null: false
+    t.text "changelog"
+    t.text "files_snapshot"
+    t.text "changed_files"
+    t.boolean "external_commit", default: false
+    t.boolean "deployed", default: false
+    t.datetime "published_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_versions_on_app_id"
+    t.index ["team_id"], name: "index_app_versions_on_team_id"
+    t.index ["user_id"], name: "index_app_versions_on_user_id"
+  end
+
+  create_table "apps", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.text "description"
+    t.bigint "creator_id", null: false
+    t.text "prompt", null: false
+    t.string "app_type", default: "tool"
+    t.string "framework", default: "react"
+    t.string "status", default: "generating"
+    t.string "visibility", default: "private"
+    t.integer "base_price", default: 0, null: false
+    t.string "stripe_product_id"
+    t.string "preview_url"
+    t.string "production_url"
+    t.string "github_repo"
+    t.integer "total_users", default: 0
+    t.integer "total_revenue", default: 0
+    t.integer "rating", default: 0
+    t.boolean "featured", default: false
+    t.datetime "featured_until"
+    t.datetime "launch_date"
+    t.string "ai_model"
+    t.integer "ai_cost", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["creator_id"], name: "index_apps_on_creator_id"
+    t.index ["featured"], name: "index_apps_on_featured"
+    t.index ["slug"], name: "index_apps_on_slug", unique: true
+    t.index ["status"], name: "index_apps_on_status"
+    t.index ["team_id"], name: "index_apps_on_team_id"
+    t.index ["visibility"], name: "index_apps_on_visibility"
   end
 
   create_table "creator_profiles", force: :cascade do |t|
@@ -435,6 +540,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_29_175131) do
   add_foreign_key "account_onboarding_invitation_lists", "teams"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "app_collaborators", "apps"
+  add_foreign_key "app_collaborators", "memberships"
+  add_foreign_key "app_collaborators", "teams"
+  add_foreign_key "app_files", "apps"
+  add_foreign_key "app_files", "teams"
+  add_foreign_key "app_generations", "apps"
+  add_foreign_key "app_generations", "teams"
+  add_foreign_key "app_versions", "apps"
+  add_foreign_key "app_versions", "teams"
+  add_foreign_key "app_versions", "users"
+  add_foreign_key "apps", "memberships", column: "creator_id"
+  add_foreign_key "apps", "teams"
   add_foreign_key "creator_profiles", "memberships"
   add_foreign_key "creator_profiles", "teams"
   add_foreign_key "follows", "creator_profiles", column: "followed_id"

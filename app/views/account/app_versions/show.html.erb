@@ -1,0 +1,44 @@
+<%= render 'account/shared/page' do |page| %>
+  <% page.title t('.section') %>
+  <% page.body do %>
+    <%= cable_ready_updates_for @app_version do %>
+      <%= render 'account/shared/box', divider: true do |box| %>
+        <% box.title t('.header') %>
+        <% box.description do %>
+          <%= t('.description') %>
+          <%= t('.manage_description') if can? :manage, @app_version %>
+        <% end %>
+
+        <% box.body do %>
+          <% with_attribute_settings object: @app_version, strategy: :label do %>
+            <%= render 'shared/attributes/belongs_to', attribute: :app %>
+            <%= render 'shared/attributes/belongs_to', attribute: :user %>
+            <%= render 'shared/attributes/text', attribute: :commit_sha %>
+            <%= render 'shared/attributes/text', attribute: :commit_message %>
+            <%= render 'shared/attributes/text', attribute: :version_number %>
+            <%= render 'shared/attributes/text', attribute: :changelog %>
+            <%= render 'shared/attributes/text', attribute: :files_snapshot %>
+            <%= render 'shared/attributes/text', attribute: :changed_files %>
+            <%= render 'shared/attributes/option', attribute: :external_commit %>
+            <%= render 'shared/attributes/option', attribute: :deployed %>
+            <%= render 'shared/attributes/date_and_time', attribute: :published_at %>
+            <%# 🚅 super scaffolding will insert new fields above this line. %>
+          <% end %>
+        <% end %>
+
+        <% box.actions do %>
+          <%= link_to t('.buttons.edit'), [:edit, :account, @app_version], class: first_button_primary if can? :edit, @app_version %>
+          <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+          <%= button_to t('.buttons.destroy'), [:account, @app_version], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app_version)) } if can? :destroy, @app_version %>
+          <%= link_to t('global.buttons.back'), [:account, @team, :app_versions], class: first_button_primary %>
+        <% end %>
+
+        <% box.raw_footer do %>
+          <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%# 🚅 super scaffolding will insert new children above this line. %>
+  <% end %>
+<% end %>

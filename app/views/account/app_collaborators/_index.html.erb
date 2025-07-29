@@ -1,0 +1,66 @@
+<% app_collaborators = app_collaborators.accessible_by(current_ability) %>
+<% team = @team %>
+<% context ||= team %>
+<% collection ||= :app_collaborators %>
+<% hide_actions ||= false %>
+<% hide_back ||= false %>
+
+<% pagy ||= nil %>
+<% pagy, app_collaborators = pagy(app_collaborators, page_param: :app_collaborators_page) unless pagy %>
+
+<%= action_model_select_controller do %>
+  <% cable_ready_updates_for context, collection do %>
+    <%= render 'account/shared/box', pagy: pagy do |box| %>
+      <% box.title t(".contexts.#{context.class.name.underscore}.header") %>
+      <% box.description do %>
+        <%= t(".contexts.#{context.class.name.underscore}.description#{"_empty" unless app_collaborators.any?}") %>
+        <%= render "shared/limits/index", model: app_collaborators.model %>
+      <% end %>
+
+      <% box.table do %>
+        <% if app_collaborators.any? %>
+          <table class="table">
+            <thead>
+              <tr>
+                <%= render "shared/tables/select_all" %>
+                <th><%= t('.fields.app.heading') %></th>
+                <th><%= t('.fields.membership.heading') %></th>
+                <th><%= t('.fields.role.heading') %></th>
+                <th><%= t('.fields.github_username.heading') %></th>
+                <th  class="text-center"><%= t('.fields.permissions_synced.heading') %></th>
+                <%# 🚅 super scaffolding will insert new field headers above this line. %>
+                <th><%= t('.fields.created_at.heading') %></th>
+                <th class="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= render partial: 'account/app_collaborators/app_collaborator', collection: app_collaborators %>
+            </tbody>
+          </table>
+        <% end %>
+      <% end %>
+
+      <% box.actions do %>
+        <% unless hide_actions %>
+          <% if context == team %>
+            <% if can? :create, AppCollaborator.new(team: team) %>
+              <%= link_to t('.buttons.new'), [:new, :account, team, :app_collaborator], class: "#{first_button_primary(:app_collaborator)} new" %>
+            <% end %>
+          <% end %>
+
+          <%# 🚅 super scaffolding will insert new targets one parent action model buttons above this line. %>
+          <%# 🚅 super scaffolding will insert new bulk action model buttons above this line. %>
+          <%= render "shared/bulk_action_select" if app_collaborators.any? %>
+
+          <% unless hide_back %>
+            <%= link_to t('global.buttons.back'), [:account, context], class: "#{first_button_primary(:app_collaborator)} back" %>
+          <% end %>
+        <% end %>
+      <% end %>
+
+      <% box.raw_footer do %>
+        <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

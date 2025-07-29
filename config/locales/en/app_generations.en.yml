@@ -1,0 +1,187 @@
+en:
+  app_generations: &app_generations
+    label: &label App Generations
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App Generation
+      create: Create App Generation
+      edit: Edit App Generation
+      update: Update App Generation
+      destroy: Remove App Generation
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_generation_name}? This will also remove any child resources and can't be undone.
+    app_generation:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App Generation ID
+      team_id:
+        heading: Team ID
+      app_id: &app
+        _: &app_id App
+        label: *app_id
+        heading: *app_id
+        api_title: *app_id
+        api_description: *app_id
+        placeholder: Select
+      app: *app
+      prompt:
+        _: &prompt Prompt
+        label: *prompt
+        heading: *prompt
+        api_title: *prompt
+        api_description: *prompt
+      enhanced_prompt:
+        _: &enhanced_prompt Enhanced Prompt
+        label: *enhanced_prompt
+        heading: *enhanced_prompt
+        api_title: *enhanced_prompt
+        api_description: *enhanced_prompt
+      status:
+        _: &status Status
+        label: *status
+        heading: *status
+        api_title: *status
+        api_description: *status
+        options:
+          one: One
+          two: Two
+          three: Three
+      ai_model:
+        _: &ai_model Ai Model
+        label: *ai_model
+        heading: *ai_model
+        api_title: *ai_model
+        api_description: *ai_model
+        options:
+          one: One
+          two: Two
+          three: Three
+      started_at:
+        _: &started_at Started At
+        label: *started_at
+        heading: *started_at
+        api_title: *started_at
+        api_description: *started_at
+      completed_at:
+        _: &completed_at Completed At
+        label: *completed_at
+        heading: *completed_at
+        api_title: *completed_at
+        api_description: *completed_at
+      duration_seconds:
+        _: &duration_seconds Duration Seconds
+        label: *duration_seconds
+        heading: *duration_seconds
+        api_title: *duration_seconds
+        api_description: *duration_seconds
+      input_tokens:
+        _: &input_tokens Input Tokens
+        label: *input_tokens
+        heading: *input_tokens
+        api_title: *input_tokens
+        api_description: *input_tokens
+      output_tokens:
+        _: &output_tokens Output Tokens
+        label: *output_tokens
+        heading: *output_tokens
+        api_title: *output_tokens
+        api_description: *output_tokens
+      total_cost:
+        _: &total_cost Total Cost
+        label: *total_cost
+        heading: *total_cost
+        api_title: *total_cost
+        api_description: *total_cost
+      error_message:
+        _: &error_message Error Message
+        label: *error_message
+        heading: *error_message
+        api_title: *error_message
+        api_description: *error_message
+      retry_count:
+        _: &retry_count Retry Count
+        label: *retry_count
+        heading: *retry_count
+        api_title: *retry_count
+        api_description: *retry_count
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for App Generations"
+      index: "List App Generations"
+      create: "Add a New App Generation"
+      member_actions: "Actions for an Individual App Generation"
+      show: "Retrieve a App Generation"
+      update: "Update a App Generation"
+      destroy: "Delete a App Generation"
+      fields: *fields
+    index:
+      section: "%{teams_possessive} App Generations"
+      contexts:
+        team:
+          header: App Generations
+          description: Below is a list of App Generations that have been added for %{team_name}.
+          description_empty: No App Generations have been added for %{team_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_generation_name}"
+      header: App Generation Details
+      description: Below are the details we have for %{app_generation_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_generation_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App Generation for %{team_name}"
+      header: New App Generation Details
+      description: Please provide the details of the new App Generation you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{app_generation_name}"
+      header: Edit App Generation Details
+      description: You can update the details or settings for %{app_generation_name} below.
+      form: *form
+    notifications:
+      created: App Generation was successfully created.
+      updated: App Generation was successfully updated.
+      destroyed: App Generation was successfully destroyed.
+  account:
+    app_generations: *app_generations
+  activerecord:
+    attributes:
+      app_generation:
+        app_id: *app_id
+        prompt: *prompt
+        enhanced_prompt: *enhanced_prompt
+        status: *status
+        ai_model: *ai_model
+        started_at: *started_at
+        completed_at: *completed_at
+        duration_seconds: *duration_seconds
+        input_tokens: *input_tokens
+        output_tokens: *output_tokens
+        total_cost: *total_cost
+        error_message: *error_message
+        retry_count: *retry_count
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

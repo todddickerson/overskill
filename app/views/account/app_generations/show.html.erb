@@ -1,0 +1,46 @@
+<%= render 'account/shared/page' do |page| %>
+  <% page.title t('.section') %>
+  <% page.body do %>
+    <%= cable_ready_updates_for @app_generation do %>
+      <%= render 'account/shared/box', divider: true do |box| %>
+        <% box.title t('.header') %>
+        <% box.description do %>
+          <%= t('.description') %>
+          <%= t('.manage_description') if can? :manage, @app_generation %>
+        <% end %>
+
+        <% box.body do %>
+          <% with_attribute_settings object: @app_generation, strategy: :label do %>
+            <%= render 'shared/attributes/belongs_to', attribute: :app %>
+            <%= render 'shared/attributes/text', attribute: :prompt %>
+            <%= render 'shared/attributes/text', attribute: :enhanced_prompt %>
+            <%= render 'shared/attributes/option', attribute: :status %>
+            <%= render 'shared/attributes/option', attribute: :ai_model %>
+            <%= render 'shared/attributes/date_and_time', attribute: :started_at %>
+            <%= render 'shared/attributes/date_and_time', attribute: :completed_at %>
+            <%= render 'shared/attributes/number', attribute: :duration_seconds %>
+            <%= render 'shared/attributes/number', attribute: :input_tokens %>
+            <%= render 'shared/attributes/number', attribute: :output_tokens %>
+            <%= render 'shared/attributes/number', attribute: :total_cost %>
+            <%= render 'shared/attributes/text', attribute: :error_message %>
+            <%= render 'shared/attributes/number', attribute: :retry_count %>
+            <%# 🚅 super scaffolding will insert new fields above this line. %>
+          <% end %>
+        <% end %>
+
+        <% box.actions do %>
+          <%= link_to t('.buttons.edit'), [:edit, :account, @app_generation], class: first_button_primary if can? :edit, @app_generation %>
+          <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+          <%= button_to t('.buttons.destroy'), [:account, @app_generation], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app_generation)) } if can? :destroy, @app_generation %>
+          <%= link_to t('global.buttons.back'), [:account, @team, :app_generations], class: first_button_primary %>
+        <% end %>
+
+        <% box.raw_footer do %>
+          <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%# 🚅 super scaffolding will insert new children above this line. %>
+  <% end %>
+<% end %>

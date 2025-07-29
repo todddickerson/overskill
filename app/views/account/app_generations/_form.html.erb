@@ -1,0 +1,29 @@
+<% cancel_path ||= app_generation.persisted? ? [:account, app_generation] : [:account, @team, :app_generations] %>
+
+<%= form_with model: app_generation, url: (app_generation.persisted? ? [:account, app_generation] : [:account, @team, :app_generations]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/super_select', method: :app_id, options: {autofocus: true}, html_options: {autofocus: true},
+        choices: @app_generation.valid_apps.map { |app| [app.label_string, app.id] } %>
+      <%= render 'shared/fields/text_area', method: :prompt %>
+      <%= render 'shared/fields/options', method: :status %>
+      <%= render 'shared/fields/options', method: :ai_model %>
+      <%= render 'shared/fields/date_and_time_field', method: :started_at %>
+      <%= render 'shared/fields/date_and_time_field', method: :completed_at %>
+      <%= render 'shared/fields/number_field', method: :duration_seconds %>
+      <%= render 'shared/fields/number_field', method: :input_tokens %>
+      <%= render 'shared/fields/number_field', method: :output_tokens %>
+      <%= render 'shared/fields/number_field', method: :total_cost %>
+      <%= render 'shared/fields/text_area', method: :error_message %>
+      <%= render 'shared/fields/number_field', method: :retry_count %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

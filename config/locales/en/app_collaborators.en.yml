@@ -1,0 +1,132 @@
+en:
+  app_collaborators: &app_collaborators
+    label: &label App Collaborators
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App Collaborator
+      create: Create App Collaborator
+      edit: Edit App Collaborator
+      update: Update App Collaborator
+      destroy: Remove App Collaborator
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_collaborator_name}? This will also remove any child resources and can't be undone.
+    app_collaborator:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App Collaborator ID
+      team_id:
+        heading: Team ID
+      app_id: &app
+        _: &app_id App
+        label: *app_id
+        heading: *app_id
+        api_title: *app_id
+        api_description: *app_id
+        placeholder: Select
+      app: *app
+      membership_id: &membership
+        _: &membership_id Membership
+        label: *membership_id
+        heading: *membership_id
+        api_title: *membership_id
+        api_description: *membership_id
+        placeholder: None
+      membership: *membership
+      role:
+        _: &role Role
+        label: *role
+        heading: *role
+        api_title: *role
+        api_description: *role
+        options:
+          one: One
+          two: Two
+          three: Three
+      github_username:
+        _: &github_username Github Username
+        label: *github_username
+        heading: *github_username
+        api_title: *github_username
+        api_description: *github_username
+      permissions_synced:
+        _: &permissions_synced Permissions Synced
+        label: *permissions_synced
+        heading: *permissions_synced
+        api_title: *permissions_synced
+        api_description: *permissions_synced
+        options:
+          yes: "Yes"
+          no: "No"
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for App Collaborators"
+      index: "List App Collaborators"
+      create: "Add a New App Collaborator"
+      member_actions: "Actions for an Individual App Collaborator"
+      show: "Retrieve a App Collaborator"
+      update: "Update a App Collaborator"
+      destroy: "Delete a App Collaborator"
+      fields: *fields
+    index:
+      section: "%{teams_possessive} App Collaborators"
+      contexts:
+        team:
+          header: App Collaborators
+          description: Below is a list of App Collaborators that have been added for %{team_name}.
+          description_empty: No App Collaborators have been added for %{team_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_collaborator_name}"
+      header: App Collaborator Details
+      description: Below are the details we have for %{app_collaborator_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_collaborator_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App Collaborator for %{team_name}"
+      header: New App Collaborator Details
+      description: Please provide the details of the new App Collaborator you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{app_collaborator_name}"
+      header: Edit App Collaborator Details
+      description: You can update the details or settings for %{app_collaborator_name} below.
+      form: *form
+    notifications:
+      created: App Collaborator was successfully created.
+      updated: App Collaborator was successfully updated.
+      destroyed: App Collaborator was successfully destroyed.
+  account:
+    app_collaborators: *app_collaborators
+  activerecord:
+    attributes:
+      app_collaborator:
+        app_id: *app_id
+        membership_id: *membership_id
+        role: *role
+        github_username: *github_username
+        permissions_synced: *permissions_synced
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

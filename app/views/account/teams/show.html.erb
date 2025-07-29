@@ -4,6 +4,11 @@
   <% p.content_for :body do %>
     <%= render 'account/creator_profiles/index', creator_profiles: @team.creator_profiles, hide_back: true %>
     <%= render 'account/follows/index', follows: @team.follows, hide_back: true %>
+    <%= render 'account/apps/index', apps: @team.apps, hide_back: true %>
+    <%= render 'account/app_generations/index', app_generations: @team.app_generations, hide_back: true %>
+    <%= render 'account/app_files/index', app_files: @team.app_files, hide_back: true %>
+    <%= render 'account/app_versions/index', app_versions: @team.app_versions, hide_back: true %>
+    <%= render 'account/app_collaborators/index', app_collaborators: @team.app_collaborators, hide_back: true %>
     <%# 🚅 super scaffolding will insert new children above this line. %>
     
     <%= render 'account/scaffolding/absolutely_abstract/creative_concepts/index', creative_concepts: @team.scaffolding_absolutely_abstract_creative_concepts, hide_back: true unless scaffolding_things_disabled? %>

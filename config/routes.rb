@@ -80,6 +80,11 @@ Rails.application.routes.draw do
 
         resources :creator_profiles
         resources :follows
+        resources :apps
+        resources :app_generations
+        resources :app_files
+        resources :app_versions
+        resources :app_collaborators
       end
     end
   end

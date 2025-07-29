@@ -1,0 +1,23 @@
+<% cancel_path ||= app_collaborator.persisted? ? [:account, app_collaborator] : [:account, @team, :app_collaborators] %>
+
+<%= form_with model: app_collaborator, url: (app_collaborator.persisted? ? [:account, app_collaborator] : [:account, @team, :app_collaborators]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/super_select', method: :app_id, options: {autofocus: true}, html_options: {autofocus: true},
+        choices: @app_collaborator.valid_apps.map { |app| [app.label_string, app.id] } %>
+      <%= render 'shared/fields/super_select', method: :membership_id, options: {}, html_options: {},
+        choices: @app_collaborator.valid_memberships.map { |membership| [membership.label_string, membership.id] } %>
+      <%= render 'shared/fields/options', method: :role %>
+      <%= render 'shared/fields/text_field', method: :github_username %>
+      <%= render 'shared/fields/options', method: :permissions_synced %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

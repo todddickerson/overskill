@@ -1,0 +1,34 @@
+<% cancel_path ||= app.persisted? ? [:account, app] : [:account, @team, :apps] %>
+
+<%= form_with model: app, url: (app.persisted? ? [:account, app] : [:account, @team, :apps]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/text_field', method: :name, options: {autofocus: true} %>
+      <%= render 'shared/fields/text_field', method: :slug %>
+      <%= render 'shared/fields/text_area', method: :description %>
+      <%= render 'shared/fields/super_select', method: :creator_id, options: {}, html_options: {},
+        choices: @app.valid_creators.map { |membership| [membership.label_string, membership.id] } %>
+      <%= render 'shared/fields/text_area', method: :prompt %>
+      <%= render 'shared/fields/options', method: :app_type %>
+      <%= render 'shared/fields/options', method: :framework %>
+      <%= render 'shared/fields/options', method: :status %>
+      <%= render 'shared/fields/options', method: :visibility %>
+      <%= render 'shared/fields/number_field', method: :base_price %>
+      <%= render 'shared/fields/text_field', method: :stripe_product_id %>
+      <%= render 'shared/fields/text_field', method: :preview_url %>
+      <%= render 'shared/fields/text_field', method: :production_url %>
+      <%= render 'shared/fields/text_field', method: :github_repo %>
+      <%= render 'shared/fields/options', method: :featured %>
+      <%= render 'shared/fields/date_and_time_field', method: :featured_until %>
+      <%= render 'shared/fields/date_and_time_field', method: :launch_date %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

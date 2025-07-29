@@ -1,0 +1,8 @@
+<% app_generation ||= @app_generation %>
+<% team ||= @team || app_generation&.team %>
+<%= render 'account/teams/breadcrumbs', team: team %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :app_generations] %>
+<% if app_generation&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: app_generation.label_string, url: [:account, app_generation] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'app_generations' %>

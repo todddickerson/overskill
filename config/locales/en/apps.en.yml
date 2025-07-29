@@ -1,0 +1,260 @@
+en:
+  apps: &apps
+    label: &label Apps
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App
+      create: Create App
+      edit: Edit App
+      update: Update App
+      destroy: Remove App
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_name}? This will also remove any child resources and can't be undone.
+    app:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App ID
+      team_id:
+        heading: Team ID
+      name:
+        _: &name Name
+        label: *name
+        heading: *name
+        api_title: *name
+        api_description: *name
+      slug:
+        _: &slug Slug
+        label: *slug
+        heading: *slug
+        api_title: *slug
+        api_description: *slug
+      description:
+        _: &description Description
+        label: *description
+        heading: *description
+        api_title: *description
+        api_description: *description
+      creator_id: &creator
+        _: &creator_id Creator
+        label: *creator_id
+        heading: *creator_id
+        api_title: *creator_id
+        api_description: *creator_id
+        placeholder: None
+      creator: *creator
+      prompt:
+        _: &prompt Prompt
+        label: *prompt
+        heading: *prompt
+        api_title: *prompt
+        api_description: *prompt
+      app_type:
+        _: &app_type App Type
+        label: *app_type
+        heading: *app_type
+        api_title: *app_type
+        api_description: *app_type
+        options:
+          one: One
+          two: Two
+          three: Three
+      framework:
+        _: &framework Framework
+        label: *framework
+        heading: *framework
+        api_title: *framework
+        api_description: *framework
+        options:
+          one: One
+          two: Two
+          three: Three
+      status:
+        _: &status Status
+        label: *status
+        heading: *status
+        api_title: *status
+        api_description: *status
+        options:
+          one: One
+          two: Two
+          three: Three
+      visibility:
+        _: &visibility Visibility
+        label: *visibility
+        heading: *visibility
+        api_title: *visibility
+        api_description: *visibility
+        options:
+          one: One
+          two: Two
+          three: Three
+      base_price:
+        _: &base_price Base Price
+        label: *base_price
+        heading: *base_price
+        api_title: *base_price
+        api_description: *base_price
+      stripe_product_id:
+        _: &stripe_product_id Stripe Product ID
+        label: *stripe_product_id
+        heading: *stripe_product_id
+        api_title: *stripe_product_id
+        api_description: *stripe_product_id
+      preview_url:
+        _: &preview_url Preview Url
+        label: *preview_url
+        heading: *preview_url
+        api_title: *preview_url
+        api_description: *preview_url
+      production_url:
+        _: &production_url Production Url
+        label: *production_url
+        heading: *production_url
+        api_title: *production_url
+        api_description: *production_url
+      github_repo:
+        _: &github_repo Github Repo
+        label: *github_repo
+        heading: *github_repo
+        api_title: *github_repo
+        api_description: *github_repo
+      total_users:
+        _: &total_users Total Users
+        label: *total_users
+        heading: *total_users
+        api_title: *total_users
+        api_description: *total_users
+      total_revenue:
+        _: &total_revenue Total Revenue
+        label: *total_revenue
+        heading: *total_revenue
+        api_title: *total_revenue
+        api_description: *total_revenue
+      rating:
+        _: &rating Rating
+        label: *rating
+        heading: *rating
+        api_title: *rating
+        api_description: *rating
+      featured:
+        _: &featured Featured
+        label: *featured
+        heading: *featured
+        api_title: *featured
+        api_description: *featured
+        options:
+          yes: "Yes"
+          no: "No"
+      featured_until:
+        _: &featured_until Featured Until
+        label: *featured_until
+        heading: *featured_until
+        api_title: *featured_until
+        api_description: *featured_until
+      launch_date:
+        _: &launch_date Launch Date
+        label: *launch_date
+        heading: *launch_date
+        api_title: *launch_date
+        api_description: *launch_date
+      ai_model:
+        _: &ai_model Ai Model
+        label: *ai_model
+        heading: *ai_model
+        api_title: *ai_model
+        api_description: *ai_model
+      ai_cost:
+        _: &ai_cost Ai Cost
+        label: *ai_cost
+        heading: *ai_cost
+        api_title: *ai_cost
+        api_description: *ai_cost
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for Apps"
+      index: "List Apps"
+      create: "Add a New App"
+      member_actions: "Actions for an Individual App"
+      show: "Retrieve a App"
+      update: "Update a App"
+      destroy: "Delete a App"
+      fields: *fields
+    index:
+      section: "%{teams_possessive} Apps"
+      contexts:
+        team:
+          header: Apps
+          description: Below is a list of Apps that have been added for %{team_name}.
+          description_empty: No Apps have been added for %{team_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_name}"
+      header: App Details
+      description: Below are the details we have for %{app_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App for %{team_name}"
+      header: New App Details
+      description: Please provide the details of the new App you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{app_name}"
+      header: Edit App Details
+      description: You can update the details or settings for %{app_name} below.
+      form: *form
+    notifications:
+      created: App was successfully created.
+      updated: App was successfully updated.
+      destroyed: App was successfully destroyed.
+  account:
+    apps: *apps
+  activerecord:
+    attributes:
+      app:
+        name: *name
+        slug: *slug
+        creator_id: *creator_id
+        prompt: *prompt
+        app_type: *app_type
+        framework: *framework
+        status: *status
+        visibility: *visibility
+        base_price: *base_price
+        stripe_product_id: *stripe_product_id
+        preview_url: *preview_url
+        production_url: *production_url
+        github_repo: *github_repo
+        total_users: *total_users
+        total_revenue: *total_revenue
+        rating: *rating
+        featured: *featured
+        featured_until: *featured_until
+        launch_date: *launch_date
+        ai_model: *ai_model
+        ai_cost: *ai_cost
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

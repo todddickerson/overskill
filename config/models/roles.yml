@@ -1,5 +1,10 @@
 default:
   models:
+    AppCollaborator: read
+    AppVersion: read
+    AppFile: read
+    AppGeneration: read
+    App: read
     Follow: read
     CreatorProfile: read
     Team: read
@@ -30,6 +35,11 @@ admin:
     - admin
     - editor
   models:
+    AppCollaborator: manage
+    AppVersion: manage
+    AppFile: manage
+    AppGeneration: manage
+    App: manage
     Follow: manage
     CreatorProfile: manage
     Team: manage

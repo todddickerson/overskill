@@ -1,0 +1,55 @@
+<%= render 'account/shared/page' do |page| %>
+  <% page.title t('.section') %>
+  <% page.body do %>
+    <%= cable_ready_updates_for @app do %>
+      <%= render 'account/shared/box', divider: true do |box| %>
+        <% box.title t('.header') %>
+        <% box.description do %>
+          <%= t('.description') %>
+          <%= t('.manage_description') if can? :manage, @app %>
+        <% end %>
+
+        <% box.body do %>
+          <% with_attribute_settings object: @app, strategy: :label do %>
+            <%= render 'shared/attributes/text', attribute: :name %>
+            <%= render 'shared/attributes/text', attribute: :slug %>
+            <%= render 'shared/attributes/text', attribute: :description %>
+            <%= render 'shared/attributes/belongs_to', attribute: :creator %>
+            <%= render 'shared/attributes/text', attribute: :prompt %>
+            <%= render 'shared/attributes/option', attribute: :app_type %>
+            <%= render 'shared/attributes/option', attribute: :framework %>
+            <%= render 'shared/attributes/option', attribute: :status %>
+            <%= render 'shared/attributes/option', attribute: :visibility %>
+            <%= render 'shared/attributes/number', attribute: :base_price %>
+            <%= render 'shared/attributes/text', attribute: :stripe_product_id %>
+            <%= render 'shared/attributes/text', attribute: :preview_url %>
+            <%= render 'shared/attributes/text', attribute: :production_url %>
+            <%= render 'shared/attributes/text', attribute: :github_repo %>
+            <%= render 'shared/attributes/number', attribute: :total_users %>
+            <%= render 'shared/attributes/number', attribute: :total_revenue %>
+            <%= render 'shared/attributes/number', attribute: :rating %>
+            <%= render 'shared/attributes/option', attribute: :featured %>
+            <%= render 'shared/attributes/date_and_time', attribute: :featured_until %>
+            <%= render 'shared/attributes/date_and_time', attribute: :launch_date %>
+            <%= render 'shared/attributes/text', attribute: :ai_model %>
+            <%= render 'shared/attributes/number', attribute: :ai_cost %>
+            <%# 🚅 super scaffolding will insert new fields above this line. %>
+          <% end %>
+        <% end %>
+
+        <% box.actions do %>
+          <%= link_to t('.buttons.edit'), [:edit, :account, @app], class: first_button_primary if can? :edit, @app %>
+          <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+          <%= button_to t('.buttons.destroy'), [:account, @app], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app)) } if can? :destroy, @app %>
+          <%= link_to t('global.buttons.back'), [:account, @team, :apps], class: first_button_primary %>
+        <% end %>
+
+        <% box.raw_footer do %>
+          <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%# 🚅 super scaffolding will insert new children above this line. %>
+  <% end %>
+<% end %>

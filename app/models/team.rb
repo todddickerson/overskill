@@ -7,6 +7,11 @@ class Team < ApplicationRecord
 
   has_many :creator_profiles, dependent: :destroy
   has_many :follows, dependent: :destroy
+  has_many :apps, dependent: :destroy
+  has_many :app_generations, dependent: :destroy
+  has_many :app_files, dependent: :destroy
+  has_many :app_versions, dependent: :destroy
+  has_many :app_collaborators, dependent: :destroy
   # 🚅 add has_many associations above.
 
   # 🚅 add oauth providers above.

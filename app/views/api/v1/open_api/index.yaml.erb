@@ -24,6 +24,11 @@ components:
     <%= automatic_components_for Scaffolding::CompletelyConcrete::TangibleThing unless scaffolding_things_disabled? %>
     <%= automatic_components_for CreatorProfile %>
     <%= automatic_components_for Follow %>
+    <%= automatic_components_for App %>
+    <%= automatic_components_for AppGeneration %>
+    <%= automatic_components_for AppFile %>
+    <%= automatic_components_for AppVersion %>
+    <%= automatic_components_for AppCollaborator %>
     <%# 🚅 super scaffolding will insert new components above this line. %>
   parameters:
     id:
@@ -60,4 +65,9 @@ paths:
   <%= automatic_paths_for Scaffolding::CompletelyConcrete::TangibleThing, Scaffolding::AbsolutelyAbstract::CreativeConcept unless scaffolding_things_disabled? %>
   <%= automatic_paths_for CreatorProfile, Team %>
   <%= automatic_paths_for Follow, Team %>
+  <%= automatic_paths_for App, Team %>
+  <%= automatic_paths_for AppGeneration, Team %>
+  <%= automatic_paths_for AppFile, Team %>
+  <%= automatic_paths_for AppVersion, Team %>
+  <%= automatic_paths_for AppCollaborator, Team %>
   <%# 🚅 super scaffolding will insert new paths above this line. %>
