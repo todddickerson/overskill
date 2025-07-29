@@ -1,4 +1,4 @@
-# Testing AI App Generation v1 - Hello World Apps
+# Testing AI App Generation - Full App Creation
 
 ## Setup Steps
 
@@ -6,35 +6,53 @@
 2. Start Sidekiq for background jobs: `bundle exec sidekiq`
 3. Ensure you have OPENROUTER_API_KEY in .env.development.local
 
-## v1 Test Scenarios
+## Test Scenarios
 
-### Basic Hello World
+### Todo List App
 1. Navigate to http://localhost:3000
 2. Sign in/sign up 
 3. Go to Apps section
 4. Click "New App"
-5. Try the quick examples or enter:
-   - Name: "Birthday Countdown"
-   - Prompt: "Create a birthday countdown app with confetti colors and party theme"
+5. Enter:
+   - Name: "Task Master"
+   - Prompt: "Create a todo list app with categories, due dates, and priority levels. Use a modern purple theme."
    - App Type: tool
-   - Framework: vanilla or react
+   - Framework: react or vanilla
    - Base Price: 0
 
-### Test Different Prompts
-- "Make a meditation timer with calming blue colors"
-- "Build a motivational quote app with energetic orange theme"
-- "Create a simple counter with a space theme and purple colors"
-- "Make a hello world app for a bakery with warm brown colors"
+### Game App
+- Name: "Memory Match"
+- Prompt: "Build a memory card matching game with emojis. Include score tracking, timer, and difficulty levels."
+- App Type: game
+- Framework: vanilla
 
-## What v1 Does
-- Takes your prompt and extracts customization ideas
-- Uses Kimi K2 to intelligently customize a hello world template
-- Generates a working interactive app with:
-  - Custom colors based on your theme
-  - Custom text and messages
-  - Interactive counter functionality
-  - Responsive design
-  - Your chosen framework (vanilla JS or React)
+### Landing Page
+- Name: "SaaS Landing"
+- Prompt: "Create a landing page for a project management SaaS tool. Include hero section, features, pricing table, and testimonials."
+- App Type: landing_page
+- Framework: vanilla or react
+
+### Dashboard
+- Name: "Sales Dashboard"
+- Prompt: "Build an analytics dashboard showing revenue charts, customer metrics, and growth trends. Dark theme with interactive filters."
+- App Type: dashboard
+- Framework: react
+
+## What the System Does
+- Analyzes your prompt to determine app type
+- Uses specialized prompt templates for better results
+- Generates complete, working applications with:
+  - All necessary HTML, CSS, and JavaScript files
+  - Modern, professional design
+  - Responsive layout for all devices
+  - Interactive features specific to the app type
+  - Proper code organization and comments
+
+## Expected Results
+- Todo apps: Full CRUD operations, localStorage, categories
+- Games: Game loop, scoring, levels, smooth animations
+- Landing pages: Sections, animations, forms, responsive
+- Dashboards: Charts, data visualizations, filters
 
 ## What to Check
 

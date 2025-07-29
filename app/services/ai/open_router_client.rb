@@ -69,60 +69,22 @@ module AI
       }
     end
 
-    def generate_app(prompt, framework: "react")
-      system_prompt = build_app_generation_prompt(framework)
+    def generate_app(prompt, framework: "react", app_type: nil)
+      # Get appropriate system prompt from templates
+      system_prompt = AI::PromptTemplates::TemplateSelector.get_system_prompt(framework)
+      
+      # Enhance the user prompt based on detected template
+      enhanced_prompt = AI::PromptTemplates::TemplateSelector.enhance_prompt(prompt, app_type, framework)
       
       messages = [
         { role: "system", content: system_prompt },
-        { role: "user", content: prompt }
+        { role: "user", content: enhanced_prompt }
       ]
       
       chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
     end
 
     private
-
-    def build_app_generation_prompt(framework)
-      <<~PROMPT
-        You are an expert web application developer. Generate a complete, working #{framework} application based on the user's requirements.
-        
-        Your response must be in the following JSON format:
-        {
-          "app": {
-            "name": "App Name",
-            "description": "Brief description",
-            "type": "tool|saas|landing_page|dashboard|game|other",
-            "features": ["feature1", "feature2"],
-            "tech_stack": ["react", "tailwind", "etc"]
-          },
-          "files": [
-            {
-              "path": "index.html",
-              "content": "<!DOCTYPE html>...",
-              "type": "html"
-            },
-            {
-              "path": "app.js", 
-              "content": "// JavaScript code...",
-              "type": "javascript"
-            }
-          ],
-          "instructions": "How to use the app",
-          "deployment_notes": "Any special deployment considerations"
-        }
-
-        Requirements:
-        1. Generate a COMPLETE, working application - not just snippets
-        2. Use modern best practices for #{framework}
-        3. Include all necessary files (HTML, CSS, JS, etc)
-        4. Make it visually appealing with proper styling
-        5. Ensure the app is responsive and works on mobile
-        6. Include error handling and edge cases
-        7. Keep it simple but functional
-        
-        The app should work immediately when the files are served.
-      PROMPT
-    end
 
     def calculate_cost(usage, model_id)
       # Cost estimates per 1M tokens from OpenRouter

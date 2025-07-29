@@ -90,37 +90,9 @@ module AI
     end
 
     def generate_with_ai(enhanced_prompt)
-      # For v1, use the simple customizer
-      customizer = AI::SimpleCustomizerService.new(enhanced_prompt, app.framework)
-      result = customizer.generate
-      
-      if result[:success]
-        # Format response to match expected structure
-        {
-          success: true,
-          content: format_as_json_response(result),
-          model: result[:ai_model],
-          usage: result[:usage]
-        }
-      else
-        result
-      end
-    end
-    
-    def format_as_json_response(result)
-      # Format the result as JSON that parse_ai_response expects
-      {
-        app: {
-          name: result[:customizations]["APP_NAME"] || app.name,
-          description: "A customized hello world app",
-          type: app.app_type,
-          features: ["Interactive counter", "Customized styling", "Responsive design"],
-          tech_stack: [app.framework]
-        },
-        files: result[:files],
-        instructions: "Open index.html in a web browser to run your app!",
-        deployment_notes: "This is a static site that can be hosted anywhere."
-      }.to_json
+      # Use the OpenRouter client with prompt templates
+      client = AI::OpenRouterClient.new
+      client.generate_app(enhanced_prompt, framework: app.framework, app_type: app.app_type)
     end
 
     def parse_ai_response(content)
