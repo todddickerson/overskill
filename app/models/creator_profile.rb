@@ -8,7 +8,7 @@ class CreatorProfile < ApplicationRecord
   # 🚅 add belongs_to associations above.
 
   has_many :apps, through: :membership
-  has_many :posts, through: :membership
+  # has_many :posts, through: :membership # TODO: uncomment when Post model exists
   has_many :passive_follows, class_name: "Follow", foreign_key: "followed_id"
   has_many :followers, through: :passive_follows, source: :follower
   # 🚅 add has_many associations above.

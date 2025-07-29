@@ -26,6 +26,16 @@ class Account::AppsController < Account::ApplicationController
   def create
     respond_to do |format|
       if @app.save
+        # Trigger AI generation if this is a new app
+        if @app.prompt.present?
+          generation = @app.app_generations.create!(
+            prompt: @app.prompt,
+            status: "pending",
+            started_at: Time.current
+          )
+          AppGenerationJob.perform_later(generation)
+        end
+        
         format.html { redirect_to [:account, @app], notice: I18n.t("apps.notifications.created") }
         format.json { render :show, status: :created, location: [:account, @app] }
       else

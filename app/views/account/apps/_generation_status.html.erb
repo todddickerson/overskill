@@ -1,0 +1,78 @@
+<div class="bg-white shadow rounded-lg p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-lg font-semibold">AI Generation Status</h3>
+    <%= render 'account/apps/status_badge', app: app %>
+  </div>
+  
+  <% case status %>
+  <% when "generating" %>
+    <div class="flex items-center space-x-3">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      <div>
+        <p class="text-gray-700">Generating your app with AI...</p>
+        <p class="text-sm text-gray-500">This may take a minute or two. You can safely leave this page.</p>
+      </div>
+    </div>
+    
+    <% if app.app_generations.last %>
+      <div class="mt-4 p-4 bg-gray-50 rounded">
+        <p class="text-sm text-gray-600 font-medium">Prompt:</p>
+        <p class="text-sm text-gray-700 mt-1"><%= app.app_generations.last.prompt %></p>
+      </div>
+    <% end %>
+    
+  <% when "generated" %>
+    <div class="flex items-center space-x-3">
+      <svg class="h-8 w-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div>
+        <p class="text-gray-700 font-medium">App generated successfully!</p>
+        <p class="text-sm text-gray-500"><%= message || "Your app is ready to preview." %></p>
+      </div>
+    </div>
+    
+    <% if app.app_files.any? %>
+      <div class="mt-4">
+        <p class="text-sm text-gray-600 mb-2">Generated <%= pluralize(app.app_files.count, 'file') %>:</p>
+        <ul class="space-y-1">
+          <% app.app_files.limit(5).each do |file| %>
+            <li class="text-sm text-gray-700">
+              <span class="font-mono bg-gray-100 px-1 rounded"><%= file.path %></span>
+              <span class="text-gray-500">(<%= number_to_human_size(file.size) %>)</span>
+            </li>
+          <% end %>
+          <% if app.app_files.count > 5 %>
+            <li class="text-sm text-gray-500">... and <%= app.app_files.count - 5 %> more files</li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+    
+  <% when "failed" %>
+    <div class="flex items-center space-x-3">
+      <svg class="h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div>
+        <p class="text-gray-700 font-medium">Generation failed</p>
+        <p class="text-sm text-gray-500"><%= message || app.app_generations.last&.error_message || "Please try again with a different prompt." %></p>
+      </div>
+    </div>
+    
+    <div class="mt-4">
+      <%= link_to "Try Again", [:edit, :account, app], class: "button-primary" %>
+    </div>
+  <% end %>
+  
+  <% if app.ai_cost && app.ai_cost > 0 %>
+    <div class="mt-4 pt-4 border-t">
+      <p class="text-xs text-gray-500">
+        AI Generation Cost: $<%= "%.4f" % app.ai_cost %>
+        <% if app.ai_model.present? %>
+          • Model: <%= app.ai_model.split("/").last %>
+        <% end %>
+      </p>
+    </div>
+  <% end %>
+</div>

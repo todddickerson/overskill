@@ -68,7 +68,7 @@ rails generate super_scaffold Follow Team,User \
 # add_index :follows, :followed_id
 ```
 
-### Phase 2: App Generation & Management
+### Phase 2: App Generation & Management (Models)
 
 #### 3. App Model
 Core model for generated applications.
@@ -162,6 +162,45 @@ rails generate super_scaffold AppCollaborator Team \
   github_username:text_field \
   permissions_synced:boolean{default=false}
 ```
+
+### Phase 2B: AI App Generation Implementation
+
+#### Implementation Details:
+This phase implements the actual AI-powered app generation workflow using OpenRouter with Kimi K2 as the primary model.
+
+##### Key Components:
+1. **AI Service Integration**
+   - OpenRouter API client for Kimi K2 model
+   - Prompt enhancement and templating
+   - Code generation and parsing
+   - Security scanning for generated code
+
+2. **Background Job Processing**
+   - AppGenerationJob for async generation
+   - Status updates via ActionCable/Turbo
+   - File creation and storage
+   - Error handling and retries
+
+3. **File Storage & Deployment**
+   - Store generated files in AppFile records
+   - Deploy to Cloudflare Workers + R2
+   - Generate preview URLs
+   - Version control integration
+
+4. **Generation Flow**:
+   ```
+   User Input → Enhance Prompt → AI Generation → Parse Response → 
+   Security Scan → Store Files → Deploy Preview → Update Status
+   ```
+
+##### Services to Implement:
+- `AI::OpenRouterClient` - API wrapper for OpenRouter
+- `AI::AppGeneratorService` - Main generation orchestrator
+- `AI::PromptEnhancer` - Improves user prompts
+- `AI::CodeParser` - Extracts files from AI response
+- `AI::SecurityScanner` - Validates generated code
+- `Deployment::CloudflareDeployer` - Deploys to edge
+- `Deployment::PreviewBuilder` - Creates preview environments
 
 ### Phase 3: Marketplace & Commerce
 

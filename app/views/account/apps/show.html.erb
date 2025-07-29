@@ -1,6 +1,14 @@
 <%= render 'account/shared/page' do |page| %>
   <% page.title t('.section') %>
   <% page.body do %>
+    <%# Show generation status if app is being generated %>
+    <% if @app.status.in?(["generating", "failed"]) %>
+      <%= turbo_stream_from "app_#{@app.id}_generation" %>
+      <div id="app_generation_status" class="mb-8">
+        <%= render 'account/apps/generation_status', app: @app, status: @app.status, message: nil %>
+      </div>
+    <% end %>
+    
     <%= cable_ready_updates_for @app do %>
       <%= render 'account/shared/box', divider: true do |box| %>
         <% box.title t('.header') %>
@@ -50,6 +58,44 @@
       <% end %>
     <% end %>
 
+    <%# Show generated files if app has been generated %>
+    <% if @app.app_files.any? %>
+      <%= render 'account/shared/box', divider: true do |box| %>
+        <% box.title "Generated Files" %>
+        <% box.description do %>
+          <%= pluralize(@app.app_files.count, 'file') %> generated • 
+          Total size: <%= number_to_human_size(@app.app_files.sum(:size)) %>
+        <% end %>
+        
+        <% box.body do %>
+          <div class="space-y-4">
+            <% @app.app_files.order(:path).each do |file| %>
+              <div class="border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-mono text-sm font-medium"><%= file.path %></h4>
+                  <span class="text-xs text-gray-500">
+                    <%= file.file_type %> • <%= number_to_human_size(file.size) %>
+                  </span>
+                </div>
+                <details class="group">
+                  <summary class="cursor-pointer text-sm text-primary-600 hover:text-primary-700">
+                    View code
+                  </summary>
+                  <pre class="mt-2 p-3 bg-gray-50 rounded text-xs overflow-x-auto"><code><%= file.content %></code></pre>
+                </details>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+        
+        <% box.actions do %>
+          <% if @app.preview_url.present? %>
+            <%= link_to "Preview App", @app.preview_url, target: "_blank", class: "button-primary" %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+    
     <%# 🚅 super scaffolding will insert new children above this line. %>
   <% end %>
 <% end %>

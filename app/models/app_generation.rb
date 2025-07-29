@@ -26,5 +26,17 @@ class AppGeneration < ApplicationRecord
     team.apps
   end
 
+  def completed?
+    status == "completed"
+  end
+
+  def failed?
+    status == "failed"
+  end
+
+  def generating?
+    status == "generating"
+  end
+
   # 🚅 add methods above.
 end

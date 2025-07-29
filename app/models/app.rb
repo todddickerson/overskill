@@ -11,11 +11,11 @@ class App < ApplicationRecord
   has_many :app_files
   has_many :app_versions
   has_many :app_collaborators
-  has_many :purchases
-  has_many :app_reviews
-  has_many :flash_sales
-  has_many :app_analytics
-  has_many :posts
+  # has_many :purchases # TODO: uncomment when Purchase model exists
+  # has_many :app_reviews # TODO: uncomment when AppReview model exists
+  # has_many :flash_sales # TODO: uncomment when FlashSale model exists
+  # has_many :app_analytics # TODO: uncomment when AppAnalytic model exists
+  # has_many :posts # TODO: uncomment when Post model exists
   # 🚅 add has_many associations above.
 
   # 🚅 add has_one associations above.
@@ -32,7 +32,6 @@ class App < ApplicationRecord
   # 🚅 add validations above.
 
   before_validation :generate_slug
-  after_create :create_initial_generation
   # 🚅 add callbacks above.
 
   # 🚅 add delegations above.
@@ -41,19 +40,22 @@ class App < ApplicationRecord
     team.memberships.current_and_invited
   end
 
+  def generated?
+    status == "generated"
+  end
+
+  def generating?
+    status == "generating"
+  end
+
+  def failed?
+    status == "failed"
+  end
+
   private
 
   def generate_slug
     self.slug ||= name&.parameterize
-  end
-
-  def create_initial_generation
-    app_generations.create!(
-      prompt: prompt,
-      status: 'processing',
-      ai_model: 'kimi-k2',
-      started_at: Time.current
-    )
   end
 
   # 🚅 add methods above.

@@ -5,24 +5,39 @@
     <%= render 'account/shared/forms/errors', form: form %>
 
     <% with_field_settings form: form do %>
-      <%= render 'shared/fields/text_field', method: :name, options: {autofocus: true} %>
-      <%= render 'shared/fields/text_field', method: :slug %>
-      <%= render 'shared/fields/text_area', method: :description %>
-      <%= render 'shared/fields/super_select', method: :creator_id, options: {}, html_options: {},
-        choices: @app.valid_creators.map { |membership| [membership.label_string, membership.id] } %>
-      <%= render 'shared/fields/text_area', method: :prompt %>
-      <%= render 'shared/fields/options', method: :app_type %>
-      <%= render 'shared/fields/options', method: :framework %>
-      <%= render 'shared/fields/options', method: :status %>
-      <%= render 'shared/fields/options', method: :visibility %>
-      <%= render 'shared/fields/number_field', method: :base_price %>
-      <%= render 'shared/fields/text_field', method: :stripe_product_id %>
-      <%= render 'shared/fields/text_field', method: :preview_url %>
-      <%= render 'shared/fields/text_field', method: :production_url %>
-      <%= render 'shared/fields/text_field', method: :github_repo %>
-      <%= render 'shared/fields/options', method: :featured %>
-      <%= render 'shared/fields/date_and_time_field', method: :featured_until %>
-      <%= render 'shared/fields/date_and_time_field', method: :launch_date %>
+      <% if app.new_record? %>
+        <%# For new apps, only show generation fields %>
+        <%= render 'shared/fields/text_field', method: :name, options: {autofocus: true, placeholder: "My Awesome App"} %>
+        <%= render 'shared/fields/text_area', method: :prompt, options: {rows: 8, placeholder: "Create a todo list app with the ability to add, edit, and delete tasks. Include categories and due dates."} %>
+        <%= render 'shared/fields/options', method: :app_type, options: {include_blank: false} %>
+        <%= render 'shared/fields/options', method: :framework, options: {include_blank: false} %>
+        <%= render 'shared/fields/number_field', method: :base_price, options: {value: 0} %>
+        
+        <%# Hidden fields with defaults %>
+        <%= form.hidden_field :creator_id, value: current_membership.id %>
+        <%= form.hidden_field :status, value: "generating" %>
+        <%= form.hidden_field :visibility, value: "private" %>
+      <% else %>
+        <%# For existing apps, show all fields %>
+        <%= render 'shared/fields/text_field', method: :name, options: {autofocus: true} %>
+        <%= render 'shared/fields/text_field', method: :slug %>
+        <%= render 'shared/fields/text_area', method: :description %>
+        <%= render 'shared/fields/super_select', method: :creator_id, options: {}, html_options: {},
+          choices: @app.valid_creators.map { |membership| [membership.label_string, membership.id] } %>
+        <%= render 'shared/fields/text_area', method: :prompt %>
+        <%= render 'shared/fields/options', method: :app_type %>
+        <%= render 'shared/fields/options', method: :framework %>
+        <%= render 'shared/fields/options', method: :status %>
+        <%= render 'shared/fields/options', method: :visibility %>
+        <%= render 'shared/fields/number_field', method: :base_price %>
+        <%= render 'shared/fields/text_field', method: :stripe_product_id %>
+        <%= render 'shared/fields/text_field', method: :preview_url %>
+        <%= render 'shared/fields/text_field', method: :production_url %>
+        <%= render 'shared/fields/text_field', method: :github_repo %>
+        <%= render 'shared/fields/options', method: :featured %>
+        <%= render 'shared/fields/date_and_time_field', method: :featured_until %>
+        <%= render 'shared/fields/date_and_time_field', method: :launch_date %>
+      <% end %>
       <%# 🚅 super scaffolding will insert new fields above this line. %>
     <% end %>
 

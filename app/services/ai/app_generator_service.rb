@@ -1,0 +1,217 @@
+module AI
+  class AppGeneratorService
+    class GenerationError < StandardError; end
+
+    attr_reader :app, :generation, :errors
+
+    def initialize(app, generation = nil)
+      @app = app
+      @generation = generation || app.app_generations.last
+      @errors = []
+    end
+
+    def generate!
+      Rails.logger.info "[AppGenerator] Starting generation for App ##{app.id}"
+      
+      # Update generation status
+      generation.update!(
+        started_at: Time.current,
+        status: "generating"
+      )
+      
+      # Update app status
+      app.update!(status: "generating")
+      
+      # Step 1: Enhance the prompt
+      enhanced_prompt = enhance_prompt(generation.prompt)
+      
+      # Step 2: Call AI to generate the app
+      ai_response = generate_with_ai(enhanced_prompt)
+      
+      if ai_response[:success]
+        # Step 3: Parse the AI response
+        parsed_data = parse_ai_response(ai_response[:content])
+        
+        if parsed_data
+          # Step 4: Security scan
+          if security_scan_passed?(parsed_data[:files])
+            # Step 5: Create app files
+            create_app_files(parsed_data[:files])
+            
+            # Step 6: Update app metadata
+            update_app_metadata(parsed_data[:app])
+            
+            # Step 7: Mark generation as complete
+            generation.update!(
+              completed_at: Time.current,
+              status: "completed",
+              ai_model: ai_response[:model],
+              ai_response: ai_response[:content],
+              ai_cost: calculate_cost(ai_response[:usage])
+            )
+            
+            app.update!(
+              status: "generated",
+              ai_model: ai_response[:model],
+              ai_cost: calculate_cost(ai_response[:usage])
+            )
+            
+            Rails.logger.info "[AppGenerator] Successfully generated App ##{app.id}"
+            true
+          else
+            handle_error("Security scan failed - potentially unsafe code detected")
+          end
+        else
+          handle_error("Failed to parse AI response")
+        end
+      else
+        handle_error("AI generation failed: #{ai_response[:error]}")
+      end
+    rescue => e
+      handle_error("Generation error: #{e.message}")
+      raise GenerationError, e.message
+    end
+
+    private
+
+    def enhance_prompt(original_prompt)
+      # For MVP, just add some context. Later we can make this smarter.
+      <<~PROMPT
+        Create a #{app.app_type} application with the following requirements:
+        
+        #{original_prompt}
+        
+        Additional context:
+        - Framework preference: #{app.framework}
+        - The app should be production-ready and polished
+        - Include proper error handling
+        - Make it visually appealing and responsive
+      PROMPT
+    end
+
+    def generate_with_ai(enhanced_prompt)
+      client = AI::OpenRouterClient.new
+      client.generate_app(enhanced_prompt, framework: app.framework)
+    end
+
+    def parse_ai_response(content)
+      # Try to parse as JSON
+      data = JSON.parse(content)
+      
+      # Validate required fields
+      return nil unless data["app"] && data["files"]
+      
+      {
+        app: data["app"],
+        files: data["files"],
+        instructions: data["instructions"],
+        deployment_notes: data["deployment_notes"]
+      }
+    rescue JSON::ParserError => e
+      Rails.logger.error "[AppGenerator] Failed to parse AI response as JSON: #{e.message}"
+      
+      # Try to extract JSON from markdown code blocks
+      json_match = content.match(/```json\n(.*?)\n```/m)
+      if json_match
+        retry_content = json_match[1]
+        retry
+      end
+      
+      nil
+    end
+
+    def security_scan_passed?(files)
+      # For MVP, just check for obvious dangerous patterns
+      # Later we'll use AI::SecurityScanner service
+      
+      dangerous_patterns = [
+        /eval\s*\(/,
+        /exec\s*\(/,
+        /<script[^>]*src\s*=\s*["']https?:\/\/[^"']*malware/i,
+        /document\.write\s*\(/,
+        /\.innerHTML\s*=.*<script/i
+      ]
+      
+      files.each do |file|
+        content = file["content"] || file[:content]
+        dangerous_patterns.each do |pattern|
+          if content.match?(pattern)
+            Rails.logger.warn "[AppGenerator] Security scan failed - found dangerous pattern"
+            return false
+          end
+        end
+      end
+      
+      true
+    end
+
+    def create_app_files(files)
+      files.each do |file_data|
+        app.app_files.create!(
+          path: file_data["path"] || file_data[:path],
+          content: file_data["content"] || file_data[:content],
+          file_type: determine_file_type(file_data["path"] || file_data[:path]),
+          size: (file_data["content"] || file_data[:content]).bytesize
+        )
+      end
+    end
+
+    def determine_file_type(path)
+      extension = File.extname(path).downcase.delete(".")
+      
+      case extension
+      when "html", "htm" then "html"
+      when "js", "jsx" then "javascript"
+      when "css", "scss", "sass" then "css"
+      when "json" then "json"
+      when "md", "markdown" then "markdown"
+      when "tsx", "ts" then "typescript"
+      when "vue" then "vue"
+      else "other"
+      end
+    end
+
+    def update_app_metadata(app_data)
+      updates = {}
+      
+      updates[:name] = app_data["name"] if app_data["name"].present?
+      updates[:description] = app_data["description"] if app_data["description"].present?
+      
+      # Generate slug from name if needed
+      if updates[:name] && app.slug.blank?
+        updates[:slug] = updates[:name].parameterize
+      end
+      
+      app.update!(updates) if updates.any?
+    end
+
+    def calculate_cost(usage)
+      return 0.0 unless usage
+      
+      # Rough estimate - can be refined based on actual OpenRouter pricing
+      prompt_tokens = usage["prompt_tokens"] || 0
+      completion_tokens = usage["completion_tokens"] || 0
+      
+      # Kimi K2 pricing estimate (per 1M tokens)
+      prompt_cost = (prompt_tokens / 1_000_000.0) * 3.0  # $3 per 1M prompt tokens
+      completion_cost = (completion_tokens / 1_000_000.0) * 10.0  # $10 per 1M completion tokens
+      
+      prompt_cost + completion_cost
+    end
+
+    def handle_error(message)
+      Rails.logger.error "[AppGenerator] #{message}"
+      @errors << message
+      
+      generation.update!(
+        completed_at: Time.current,
+        status: "failed",
+        error_message: message
+      )
+      
+      app.update!(status: "failed")
+      
+      false
+    end
+  end
+end
