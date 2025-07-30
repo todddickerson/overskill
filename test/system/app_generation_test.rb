@@ -164,6 +164,6 @@ class AppGenerationTest < ApplicationSystemTestCase
   private
 
   def create_user
-    create(:user)
+    create(:onboarded_user)
   end
 end
