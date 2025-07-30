@@ -52,15 +52,34 @@ bundle exec brakeman
 
 ### BulletTrain Super Scaffolding
 ```bash
-# Generate new model with full UI
+# Generate model directly under Team
 rails generate super_scaffold ModelName Team field:type{options}
 
-# Example:
+# Generate nested model (belongs to another model)
+rails generate super_scaffold ChildModel ParentModel,Team field:type{options}
+
+# Examples:
 rails generate super_scaffold App Team \
   name:text_field{required} \
   prompt:text_area{required} \
   status:options{draft,generating,published,failed}
+
+# Nested example (AppVersion belongs to App belongs to Team):
+rails generate super_scaffold AppVersion App,Team \
+  version_number:text_field{required} \
+  changelog:text_area \
+  published_at:date_and_time_field
+
+# Three-level nesting example:
+rails generate super_scaffold Comment Post,App,Team \
+  content:text_area{required} \
+  author:references
 ```
+
+**IMPORTANT**: Always specify the complete ownership chain from immediate parent to Team:
+- `ModelName Team` - Direct child of Team
+- `ChildModel ParentModel,Team` - Child → Parent → Team  
+- `GrandChild Parent,GrandParent,Team` - Three levels deep
 
 ## Architecture
 
