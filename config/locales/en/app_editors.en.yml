@@ -1,0 +1,14 @@
+en:
+  app_editors: &app_editors
+    label: &label Editor
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-edit
+    show:
+      section: "%{app_name} Editor"
+      header: App Editor
+      description: Build and customize your app with AI assistance
+  account:
+    app_editors: *app_editors
