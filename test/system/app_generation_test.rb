@@ -35,8 +35,7 @@ class AppGenerationTest < ApplicationSystemTestCase
   end
 
   test "viewing app editor for generated app" do
-    app = apps(:generated_app)
-    app.update!(team: @team)
+    app = create(:app, :generated, team: @team)
 
     # Create some test files
     app.app_files.create!(
@@ -63,8 +62,7 @@ class AppGenerationTest < ApplicationSystemTestCase
   end
 
   test "sending chat message in editor" do
-    app = apps(:generated_app)
-    app.update!(team: @team)
+    app = create(:app, :generated, team: @team)
 
     visit account_app_editor_path(app)
 
@@ -82,8 +80,7 @@ class AppGenerationTest < ApplicationSystemTestCase
   end
 
   test "switching between tabs in editor" do
-    app = apps(:generated_app)
-    app.update!(team: @team)
+    app = create(:app, :generated, team: @team)
 
     app.app_files.create!(
       path: "app.js",
@@ -109,8 +106,7 @@ class AppGenerationTest < ApplicationSystemTestCase
   end
 
   test "editing code in editor" do
-    app = apps(:generated_app)
-    app.update!(team: @team)
+    app = create(:app, :generated, team: @team)
 
     file = app.app_files.create!(
       path: "index.html",
@@ -141,8 +137,7 @@ class AppGenerationTest < ApplicationSystemTestCase
   end
 
   test "app generation status updates via turbo" do
-    app = apps(:one)
-    app.update!(team: @team, status: "generating")
+    app = create(:app, :generating, team: @team)
 
     visit account_app_path(app)
 
@@ -169,8 +164,6 @@ class AppGenerationTest < ApplicationSystemTestCase
   private
 
   def create_user
-    user = users(:one)
-    user.update!(password: "password123")
-    user
+    create(:user)
   end
 end

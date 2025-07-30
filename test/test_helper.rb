@@ -13,6 +13,9 @@ ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 
+# Configure ActiveJob to use test adapter for testing
+ActiveJob::Base.queue_adapter = :test
+
 # Set the default language we test in to English.
 I18n.default_locale = :en
 

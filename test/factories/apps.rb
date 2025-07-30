@@ -4,12 +4,15 @@ FactoryBot.define do
     name { "Test App #{SecureRandom.hex(3)}" }
     sequence(:slug) { |n| "test-app-#{n}" }
     description { "A test application" }
-    association :creator, factory: :membership
     prompt { "Create a simple test app" }
     app_type { "utility" }
     framework { "react" }
     status { "draft" }
     visibility { "private" }
+    
+    after(:build) do |app|
+      app.creator ||= create(:membership, team: app.team)
+    end
     base_price { 0.0 }
     stripe_product_id { nil }
     preview_url { nil }

@@ -1,11 +1,10 @@
 require "test_helper"
+require "minitest/mock"
 
 class ProcessAppUpdateJobTest < ActiveJob::TestCase
   setup do
-    @app = apps(:one)
-    @app.update!(status: "generated")
-    @chat_message = app_chat_messages(:one)
-    @chat_message.update!(app: @app, role: "user", content: "Add a button", status: "pending")
+    @app = create(:app, :generated)
+    @chat_message = create(:app_chat_message, app: @app, role: "user", content: "Add a button", status: "pending")
   end
 
   test "should enqueue job" do
