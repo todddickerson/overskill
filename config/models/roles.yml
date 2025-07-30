@@ -4,7 +4,7 @@ default:
     AppVersion: read
     AppFile: read
     AppGeneration: read
-    App: read
+    App: manage
     Follow: read
     CreatorProfile: read
     Team: read
