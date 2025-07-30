@@ -20,7 +20,8 @@ module AI
           "HTTP-Referer" => ENV.fetch("OPENROUTER_REFERER", "https://overskill.app"),
           "X-Title" => "OverSkill Platform",
           "Content-Type" => "application/json"
-        }
+        },
+        timeout: 120  # 2 minute timeout for long generation requests
       }
     end
 

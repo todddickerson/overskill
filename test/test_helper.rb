@@ -21,6 +21,9 @@ I18n.default_locale = :en
 # of setup for things like the plans available for subscriptions and which outgoing webhooks are available to users.
 require File.expand_path("../../db/seeds", __FILE__)
 
+# Ensure AI services are loaded for tests
+Dir[Rails.root.join("app/services/ai/**/*.rb")].each { |f| require f }
+
 if ENV["KNAPSACK_PRO_CI_NODE_INDEX"].present?
   require "knapsack_pro"
   knapsack_pro_adapter = KnapsackPro::Adapters::MinitestAdapter.bind

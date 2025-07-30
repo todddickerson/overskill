@@ -2,7 +2,7 @@ class AppGenerationJob < ApplicationJob
   queue_as :ai_generation
   
   # Retry up to 3 times with exponential backoff
-  retry_on StandardError, wait: :exponentially_longer, attempts: 3
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
   def perform(app_generation)
     Rails.logger.info "[AppGenerationJob] Processing generation ##{app_generation.id}"

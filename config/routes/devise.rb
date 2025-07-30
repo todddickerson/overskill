@@ -1,6 +1,6 @@
 devise_for :users, controllers: {
-  registrations: "registrations",
   sessions: "sessions",
+  registrations: "registrations",
   omniauth_callbacks: "account/oauth/omniauth_callbacks"
 }
 

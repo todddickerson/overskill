@@ -9,11 +9,16 @@ SecureHeaders::Configuration.default do |config|
   config.csp = SecureHeaders::OPT_OUT
   
   # Basic cookie security
-  config.cookies = {
-    secure: true,
-    httponly: true,
-    samesite: {
-      lax: true
+  if Rails.env.production?
+    config.cookies = {
+      secure: true,
+      httponly: true,
+      samesite: {
+        lax: true
+      }
     }
-  }
+  else
+    # In development, disable SecureHeaders cookie modification
+    config.cookies = SecureHeaders::OPT_OUT
+  end
 end

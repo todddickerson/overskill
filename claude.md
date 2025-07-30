@@ -244,6 +244,37 @@ Sidekiq::Queue.new.size    # Queue size
 Sidekiq::RetrySet.new.size # Failed jobs
 ```
 
+## Module Loading & Testing Notes
+
+### AI Services Module Naming
+The AI services are defined with uppercase `AI` module but Rails/Zeitwerk may have loading issues:
+- Services are located in `app/services/ai/`
+- Module is defined as `module AI` (uppercase)
+- When testing, may need explicit requires:
+  ```ruby
+  require_relative 'app/services/ai/open_router_client'
+  require_relative 'app/services/ai/app_spec_builder'
+  require_relative 'app/services/ai/app_generator_service'
+  ```
+
+### Testing App Generation
+To test the app generation flow:
+1. Ensure `OPENROUTER_API_KEY` is set in `.env.development.local`
+2. Use the test scripts in project root:
+   - `test_app_generation_detailed.rb` - Full generation test
+   - `test_openrouter_api.rb` - API connectivity test
+   - `test_simple_api.rb` - Direct HTTP test
+
+### Current Status (Phase 2B Complete)
+- ✅ Lovable.dev-style UI implemented (split screen, chat, preview, code editor)
+- ✅ App generation models and services created
+- ✅ Chat-based iterative improvement system
+- ✅ Live preview with iframe rendering
+- ✅ File browser with syntax highlighting
+- ✅ Dark theme professional editor experience
+- ⚠️ API connectivity needs testing with proper credentials
+- ⚠️ Module loading may require explicit requires in some contexts
+
 ## Additional Documentation
 
 - Main docs: `/docs/` directory
