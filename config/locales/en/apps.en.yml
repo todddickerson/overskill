@@ -64,9 +64,12 @@ en:
         api_title: *app_type
         api_description: *app_type
         options:
-          one: One
-          two: Two
-          three: Three
+          utility: Utility
+          productivity: Productivity
+          game: Game
+          business: Business
+          creative: Creative
+          educational: Educational
       framework:
         _: &framework Framework
         label: *framework
@@ -74,9 +77,10 @@ en:
         api_title: *framework
         api_description: *framework
         options:
-          one: One
-          two: Two
-          three: Three
+          react: React
+          vue: Vue
+          vanilla: Vanilla JavaScript
+          html: HTML/CSS
       status:
         _: &status Status
         label: *status
@@ -84,9 +88,11 @@ en:
         api_title: *status
         api_description: *status
         options:
-          one: One
-          two: Two
-          three: Three
+          draft: Draft
+          generating: Generating
+          generated: Generated
+          published: Published
+          failed: Failed
       visibility:
         _: &visibility Visibility
         label: *visibility
@@ -94,9 +100,8 @@ en:
         api_title: *visibility
         api_description: *visibility
         options:
-          one: One
-          two: Two
-          three: Three
+          private: Private
+          public: Public
       base_price:
         _: &base_price Base Price
         label: *base_price

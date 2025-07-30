@@ -2,12 +2,12 @@
   <!-- Header -->
   <div class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
     <div class="flex items-center space-x-4">
-      <%= link_to account_apps_path, class: "text-gray-400 hover:text-white" do %>
+      <%= link_to account_team_apps_path(@app.team), class: "text-gray-400 hover:text-white" do %>
         <i class="fas fa-arrow-left"></i>
       <% end %>
       <h1 class="text-white font-semibold"><%= @app.name %></h1>
       <span class="text-xs text-gray-500">
-        <%= @app.framework.upcase %> • <%= @app.app_type.humanize %>
+        <%= @app.framework.upcase %> • <%= @app.app_type&.humanize %>
       </span>
     </div>
     
@@ -149,7 +149,7 @@
                         </div>
                       </td>
                       <td class="px-4 py-3 text-sm text-gray-400"><%= file.file_type %></td>
-                      <td class="px-4 py-3 text-sm text-gray-400"><%= number_to_human_size(file.size) %></td>
+                      <td class="px-4 py-3 text-sm text-gray-400"><%= number_to_human_size(file.size_bytes) %></td>
                       <td class="px-4 py-3 text-sm text-gray-400"><%= time_ago_in_words(file.updated_at) %> ago</td>
                     </tr>
                   <% end %>
