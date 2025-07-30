@@ -25,11 +25,11 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       success: true,
       content: '{"changes": {"summary": "Added button"}, "files": []}'
     }, [String, Array, Hash])
-    
+
     AI::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
-    
+
     @chat_message.reload
     assert_not_equal "pending", @chat_message.status
   end
@@ -51,16 +51,16 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
         ]
       })
     }
-    
+
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
-    
+
     assert_difference "AppChatMessage.count", 1 do
       AI::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
-    
+
     assistant_message = AppChatMessage.last
     assert_equal "assistant", assistant_message.role
     assert_equal "completed", assistant_message.status
@@ -75,11 +75,11 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       file_type: "html",
       size_bytes: 17
     )
-    
+
     mock_response = {
       success: true,
       content: JSON.generate({
-        changes: { summary: "Updated HTML" },
+        changes: {summary: "Updated HTML"},
         files: [
           {
             action: "update",
@@ -89,14 +89,14 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
         ]
       })
     }
-    
+
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
-    
+
     AI::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
-    
+
     file = @app.app_files.find_by(path: "index.html")
     assert_match "Updated", file.content
     assert_match "New Button", file.content
@@ -106,7 +106,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_response = {
       success: true,
       content: JSON.generate({
-        changes: { summary: "Added new file" },
+        changes: {summary: "Added new file"},
         files: [
           {
             action: "create",
@@ -117,16 +117,16 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
         ]
       })
     }
-    
+
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
-    
+
     assert_difference "AppFile.count", 1 do
       AI::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
-    
+
     new_file = AppFile.last
     assert_equal "new.js", new_file.path
     assert_equal "javascript", new_file.file_type
@@ -139,11 +139,11 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       file_type: "html",
       size_bytes: 9
     )
-    
+
     mock_response = {
       success: true,
       content: JSON.generate({
-        changes: { summary: "Deleted file" },
+        changes: {summary: "Deleted file"},
         files: [
           {
             action: "delete",
@@ -152,16 +152,16 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
         ]
       })
     }
-    
+
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
-    
+
     assert_difference "AppFile.count", -1 do
       AI::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
-    
+
     assert_nil AppFile.find_by(id: file.id)
   end
 
@@ -176,16 +176,16 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
         files: []
       })
     }
-    
+
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
-    
+
     assert_difference "AppVersion.count", 1 do
       AI::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
-    
+
     version = AppVersion.last
     assert_equal "1.0.0", version.version_number
     assert_equal "Updated app", version.changes_summary
@@ -197,15 +197,15 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       success: false,
       error: "API rate limit exceeded"
     }, [String, Array, Hash])
-    
+
     AI::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
-    
+
     @chat_message.reload
     assert_equal "failed", @chat_message.status
     assert_equal "API rate limit exceeded", @chat_message.response
-    
+
     # Should create error message
     error_message = AppChatMessage.last
     assert_equal "assistant", error_message.role
@@ -217,14 +217,14 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_response = {
       success: true,
       content: JSON.generate({
-        changes: { summary: "Updated" },
+        changes: {summary: "Updated"},
         files: []
       })
     }
-    
+
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
-    
+
     # Should broadcast processing, completion, and preview refresh
     assert_broadcasts("app_#{@app.id}_chat", 3) do
       AI::OpenRouterClient.stub(:new, mock_client) do
@@ -239,11 +239,11 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       success: true,
       content: "Not valid JSON"
     }, [String, Array, Hash])
-    
+
     AI::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
-    
+
     @chat_message.reload
     assert_equal "failed", @chat_message.status
     assert_match "Failed to parse AI response", @chat_message.response

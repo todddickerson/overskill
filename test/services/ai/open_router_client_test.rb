@@ -24,7 +24,7 @@ module AI
     test "should have correct headers" do
       options = @client.instance_variable_get(:@options)
       headers = options[:headers]
-      
+
       assert_equal "Bearer test-api-key", headers["Authorization"]
       assert_equal "application/json", headers["Content-Type"]
       assert headers.key?("HTTP-Referer")
@@ -55,8 +55,8 @@ module AI
       })
 
       AI::OpenRouterClient.stub(:post, mock_response) do
-        result = @client.chat([{ role: "user", content: "Say hello" }])
-        
+        result = @client.chat([{role: "user", content: "Say hello"}])
+
         assert result[:success]
         assert_equal "Hello, world!", result[:content]
         assert_equal 10, result[:usage]["prompt_tokens"]
@@ -68,11 +68,11 @@ module AI
       mock_response.expect(:success?, false)
       mock_response.expect(:code, 400)
       mock_response.expect(:body, '{"error": "Bad request"}')
-      mock_response.expect(:parsed_response, { "error" => "Bad request" })
+      mock_response.expect(:parsed_response, {"error" => "Bad request"})
 
       AI::OpenRouterClient.stub(:post, mock_response) do
-        result = @client.chat([{ role: "user", content: "Say hello" }])
-        
+        result = @client.chat([{role: "user", content: "Say hello"}])
+
         assert_not result[:success]
         assert_equal "Bad request", result[:error]
         assert_equal 400, result[:code]
@@ -81,8 +81,8 @@ module AI
 
     test "should handle exceptions gracefully" do
       AI::OpenRouterClient.stub(:post, ->(*args) { raise StandardError, "Network error" }) do
-        result = @client.chat([{ role: "user", content: "Say hello" }])
-        
+        result = @client.chat([{role: "user", content: "Say hello"}])
+
         assert_not result[:success]
         assert_equal "Network error", result[:error]
       end
@@ -92,13 +92,13 @@ module AI
       mock_response = Minitest::Mock.new
       mock_response.expect(:success?, true)
       mock_response.expect(:parsed_response, {
-        "choices" => [{ "message" => { "content" => "{}" } }],
+        "choices" => [{"message" => {"content" => "{}"}}],
         "usage" => {}
       })
 
       AI::OpenRouterClient.stub(:post, mock_response) do
         @client.generate_app("Create an app", framework: "react")
-        
+
         # Verify the correct model was used
         assert true # The test passes if no exception is raised
       end
@@ -112,7 +112,7 @@ module AI
 
       # Test with Kimi K2 model pricing
       cost = @client.send(:calculate_cost, usage, "moonshotai/kimi-k2")
-      
+
       # Kimi K2: $0.012 per 1K prompt, $0.012 per 1K completion
       expected_cost = (1000 * 0.012 / 1000) + (500 * 0.012 / 1000)
       assert_in_delta expected_cost, cost, 0.001

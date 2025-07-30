@@ -156,7 +156,7 @@ gem "sidekiq-status" # Job status tracking
 gem "mini_magick" # Image processing
 gem "streamio-ffmpeg" # Video processing (optional)
 
-# Social Features  
+# Social Features
 gem "acts_as_follower", github: "tcocca/acts_as_follower" # Following system
 gem "acts_as_votable" # Likes/reactions
 
@@ -176,26 +176,26 @@ gem "secure_headers" # Security headers
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[mri mingw x64_mingw]
-  
+
   # Load environment variables from .env files
   gem "dotenv-rails"
-  
+
   # A great debugger.
   gem "pry"
-  
+
   # A gem for generating test coverage results in your browser.
   gem "simplecov", require: false
   gem "simplecov-json", require: false
-  
+
   # Generate test objects.
   # 6.3.0 and 6.4.0 have a bug https://github.com/thoughtbot/factory_bot_rails/issues/433
   # And now 6.4.1 and 6.4.2 break some things: https://github.com/bullet-train-co/bullet_train-core/issues/707
   gem "factory_bot_rails", "~> 6.2", "!= 6.3.0", "!= 6.4.0", "!= 6.4.1", "!= 6.4.2"
-  
+
   # In CI we use parallel tests to help increase test speed while keeping the number of
   # test runners down. You can tweak the workflow to adjust your parallelism as needed.
   gem "parallel_tests"
-  
+
   # Testing utilities
   gem "faker" # Fake data generation
   gem "vcr" # Record HTTP interactions for tests
@@ -205,42 +205,42 @@ end
 group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
-  
+
   # Add speed badges [https://github.com/MiniProfiler/rack-mini-profiler]
   gem "rack-mini-profiler"
-  
+
   # Speed up commands on slow machines / big apps [https://github.com/rails/spring]
   # gem "spring"
-  
+
   # Workaround to get image process to behave on a Mac in development
   # https://github.com/libvips/ruby-vips/issues/155#issuecomment-1047370993
   gem "ruby-vips"
-  
+
   # Generate a diagram of all the models in the app by running:
   # bundle exec erd
   gem "rails-erd"
-  
+
   # Open any sent emails in your browser instead of having to setup an SMTP trap.
   gem "letter_opener"
-  
+
   # Ruby formatter. Try `standardrb --fix`.
   gem "standard"
-  
+
   # Similar to standard for correcting format.
   gem "rails_best_practices"
-  
+
   # Rails doesn't include this by default, but we depend on it.
   gem "foreman"
-  
+
   # For colorizing text in command line scripts.
   gem "colorize"
-  
+
   # derailed_benchmarks and stackprof are used to find opportunities for performance/memory improvements
   # See the derailed_benchmarks docs for details: https://github.com/zombocom/derailed_benchmarks
   gem "derailed_benchmarks"
   # stackprof has some native components and it may be harder to compile locally, so we leave it as optional
   # gem "stackprof"
-  
+
   # Code Quality & Security
   gem "annotate" # Add schema info to models
   gem "brakeman" # Security scanner
@@ -250,11 +250,11 @@ end
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara", "~> 3.39"
-  
+
   # Synchronize Capybara commands with client-side JavaScript and AJAX requests to greatly improve
   # system test stability. Only works on the Selenium Driver though.
   gem "capybara-lockstep"
-  
+
   # Selenium is the default default Capybara driver for system tests that ships with
   # Rails. Cuprite is an alternative driver that uses Chrome's native DevTools protocol
   # and offers improved speed and reliability, but only works with Chrome. If you want
@@ -263,19 +263,19 @@ group :test do
   # the correct configuration based on which gem is included.
   gem "selenium-webdriver"
   # gem "cuprite"
-  
+
   # Helps smooth over flakiness in system tests.
   gem "minitest-retry"
-  
+
   # Better test output
   gem "minitest-reporters"
-  
+
   # Interact with emails during testing.
   gem "capybara-email"
-  
+
   # Write system tests by pointing and clicking in your browser.
   gem "magic_test"
-  
+
   # Increase parallelism to run CI tests across multiple nodes
   # Note: You need to ensure that ENV["KNAPSACK_PRO_CI_NODE_INDEX"] is set if you want to use this.
   # See test/test_helper.rb for additional context around that env var.
@@ -285,21 +285,21 @@ end
 group :production do
   # We suggest using Postmark for email deliverability.
   # gem "postmark-rails"
-  
+
   # If you're hosting on Heroku, this service is highly recommended for autoscaling of dynos.
   # gem "rails_autoscale_agent"
-  
+
   # Exception tracking, uptime monitoring, and status page service with a generous free tier.
   # gem "honeybadger"
-  
+
   # Another exception tracking service.
   # gem "sentry-ruby"
   # gem "sentry-rails"
   # gem "sentry-sidekiq"
-  
+
   # Use S3 for Active Storage by default.
   # gem "aws-sdk-s3", require: false
-  
+
   # terser is used to compress assets during precompilation
   gem "terser"
 end

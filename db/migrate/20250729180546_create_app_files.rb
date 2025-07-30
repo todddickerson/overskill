@@ -8,7 +8,7 @@ class CreateAppFiles < ActiveRecord::Migration[8.0]
       t.string :file_type
       t.integer :size_bytes
       t.string :checksum
-      t.boolean :is_entry_point, default: false
+      t.boolean :is_entry_point, default: false, default: false
 
       t.timestamps
     end

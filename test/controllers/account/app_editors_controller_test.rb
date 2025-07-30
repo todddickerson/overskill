@@ -6,18 +6,18 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
     @team = teams(:one)
     @app = apps(:one)
     @app.update!(team: @team, status: "generated")
-    
+
     # Create test files
     @app_file = app_files(:one)
     @app_file.update!(app: @app, path: "index.html", content: "<h1>Test</h1>")
-    
+
     sign_in @user
   end
 
   test "should get show for generated app" do
     get account_app_editor_url(@app)
     assert_response :success
-    
+
     # Check that necessary instance variables are set
     assert_not_nil assigns(:app)
     assert_not_nil assigns(:chat_messages)
@@ -26,7 +26,7 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
 
   test "should redirect if app not generated" do
     @app.update!(status: "generating")
-    
+
     get account_app_editor_url(@app)
     assert_redirected_to account_app_path(@app)
     assert_equal "App is still being generated. Please wait...", flash[:alert]
@@ -38,9 +38,9 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
         message: "Add a button"
       }, as: :turbo_stream
     end
-    
+
     assert_response :success
-    
+
     message = AppChatMessage.last
     assert_equal "user", message.role
     assert_equal "Add a button", message.content
@@ -51,12 +51,12 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
     patch account_app_file_url(@app, @app_file), params: {
       content: "<h1>Updated</h1>"
     }, as: :json
-    
+
     assert_response :success
-    
+
     @app_file.reload
     assert_equal "<h1>Updated</h1>", @app_file.content
-    
+
     json_response = JSON.parse(response.body)
     assert json_response["success"]
     assert_equal "File updated", json_response["message"]
@@ -67,9 +67,9 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
     patch account_app_file_url(@app, @app_file), params: {
       content: nil
     }, as: :json
-    
+
     assert_response :unprocessable_entity
-    
+
     json_response = JSON.parse(response.body)
     assert_not json_response["success"]
     assert json_response["error"]
@@ -77,7 +77,7 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
 
   test "should require authentication" do
     sign_out @user
-    
+
     get account_app_editor_url(@app)
     assert_redirected_to new_user_session_path
   end
@@ -86,14 +86,14 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
     other_team = teams(:two)
     other_app = apps(:two)
     other_app.update!(team: other_team)
-    
+
     get account_app_editor_url(other_app)
     assert_response :not_found
   end
 
   test "should show preview for HTML files" do
     get account_app_editor_url(@app)
-    
+
     assert_select "#preview_frame"
     assert_select "iframe[src*='preview']"
   end
@@ -106,16 +106,16 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
       file_type: "javascript",
       size_bytes: 20
     )
-    
+
     @app.app_files.create!(
       path: "styles.css",
       content: "body { margin: 0; }",
       file_type: "css",
       size_bytes: 19
     )
-    
+
     get account_app_editor_url(@app)
-    
+
     assert_select "#files_list" do
       assert_select "[data-file-path='index.html']"
       assert_select "[data-file-path='app.js']"
@@ -124,8 +124,8 @@ class Account::AppEditorsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should handle turbo frame requests" do
-    get account_app_editor_url(@app), headers: { "Turbo-Frame" => "preview_frame" }
-    
+    get account_app_editor_url(@app), headers: {"Turbo-Frame" => "preview_frame"}
+
     assert_response :success
     assert_match %r{<turbo-frame id="preview_frame">}, response.body
   end

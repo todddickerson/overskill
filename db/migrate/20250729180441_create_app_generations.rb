@@ -5,8 +5,8 @@ class CreateAppGenerations < ActiveRecord::Migration[8.0]
       t.references :app, null: false, foreign_key: true
       t.text :prompt, null: false
       t.text :enhanced_prompt
-      t.string :status, default: 'processing'
-      t.string :ai_model, default: 'kimi-k2'
+      t.string :status, default: "processing"
+      t.string :ai_model, default: "kimi-k2"
       t.datetime :started_at, null: false
       t.datetime :completed_at
       t.integer :duration_seconds

@@ -1,15 +1,15 @@
-<% cancel_path ||= app_file.persisted? ? [:account, app_file] : [:account, @team, :app_files] %>
+<% cancel_path ||= app_file.persisted? ? [:account, app_file] : [:account, @app, :app_files] %>
 
-<%= form_with model: app_file, url: (app_file.persisted? ? [:account, app_file] : [:account, @team, :app_files]), class: 'form' do |form| %>
+<%= form_with model: app_file, url: (app_file.persisted? ? [:account, app_file] : [:account, @app, :app_files]), class: 'form' do |form| %>
   <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
     <%= render 'account/shared/forms/errors', form: form %>
 
     <% with_field_settings form: form do %>
-      <%= render 'shared/fields/super_select', method: :app_id, options: {autofocus: true}, html_options: {autofocus: true},
-        choices: @app_file.valid_apps.map { |app| [app.label_string, app.id] } %>
-      <%= render 'shared/fields/text_field', method: :path %>
+      <%= render 'shared/fields/text_field', method: :path, options: {autofocus: true} %>
       <%= render 'shared/fields/text_area', method: :content %>
-      <%= render 'shared/fields/options', method: :file_type %>
+      <%= render 'shared/fields/text_field', method: :file_type %>
+      <%= render 'shared/fields/number_field', method: :size_bytes %>
+      <%= render 'shared/fields/text_field', method: :checksum %>
       <%= render 'shared/fields/options', method: :is_entry_point %>
       <%# 🚅 super scaffolding will insert new fields above this line. %>
     <% end %>

@@ -23,16 +23,20 @@ en:
     fields: &fields
       id:
         heading: App Generation ID
-      team_id:
-        heading: Team ID
-      app_id: &app
-        _: &app_id App
-        label: *app_id
-        heading: *app_id
-        api_title: *app_id
-        api_description: *app_id
-        placeholder: Select
-      app: *app
+      app_id:
+        heading: App ID
+      status:
+        _: &status Status
+        label: *status
+        heading: *status
+        api_title: *status
+        api_description: *status
+      ai_model:
+        _: &ai_model Ai Model
+        label: *ai_model
+        heading: *ai_model
+        api_title: *ai_model
+        api_description: *ai_model
       prompt:
         _: &prompt Prompt
         label: *prompt
@@ -45,26 +49,6 @@ en:
         heading: *enhanced_prompt
         api_title: *enhanced_prompt
         api_description: *enhanced_prompt
-      status:
-        _: &status Status
-        label: *status
-        heading: *status
-        api_title: *status
-        api_description: *status
-        options:
-          one: One
-          two: Two
-          three: Three
-      ai_model:
-        _: &ai_model Ai Model
-        label: *ai_model
-        heading: *ai_model
-        api_title: *ai_model
-        api_description: *ai_model
-        options:
-          one: One
-          two: Two
-          three: Three
       started_at:
         _: &started_at Started At
         label: *started_at
@@ -132,28 +116,28 @@ en:
       destroy: "Delete a App Generation"
       fields: *fields
     index:
-      section: "%{teams_possessive} App Generations"
+      section: "%{apps_possessive} App Generations"
       contexts:
-        team:
+        app:
           header: App Generations
-          description: Below is a list of App Generations that have been added for %{team_name}.
-          description_empty: No App Generations have been added for %{team_name}.
+          description: Below is a list of App Generations that have been added for %{app_name}.
+          description_empty: No App Generations have been added for %{app_name}.
       fields: *fields
       buttons: *buttons
     show:
       section: "%{app_generation_name}"
       header: App Generation Details
       description: Below are the details we have for %{app_generation_name}.
-      manage_description: You'll also find options for updating these details or removing %{app_generation_name} from %{team_name} entirely.
+      manage_description: You'll also find options for updating these details or removing %{app_generation_name} from %{app_name} entirely.
       fields: *fields
       buttons: *buttons
     form: &form
       buttons: *buttons
       fields: *fields
     new:
-      section: "New App Generation for %{team_name}"
+      section: "New App Generation for %{app_name}"
       header: New App Generation Details
-      description: Please provide the details of the new App Generation you'd like to add to %{team_name}.
+      description: Please provide the details of the new App Generation you'd like to add to %{app_name}.
       form: *form
     edit:
       section: "%{app_generation_name}"
@@ -169,11 +153,10 @@ en:
   activerecord:
     attributes:
       app_generation:
-        app_id: *app_id
-        prompt: *prompt
-        enhanced_prompt: *enhanced_prompt
         status: *status
         ai_model: *ai_model
+        prompt: *prompt
+        enhanced_prompt: *enhanced_prompt
         started_at: *started_at
         completed_at: *completed_at
         duration_seconds: *duration_seconds

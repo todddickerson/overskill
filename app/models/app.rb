@@ -7,10 +7,10 @@ class App < ApplicationRecord
   belongs_to :creator, class_name: "Membership"
   # 🚅 add belongs_to associations above.
 
-  has_many :app_generations
-  has_many :app_files
-  has_many :app_versions
-  has_many :app_collaborators
+  has_many :app_versions, dependent: :destroy
+  has_many :app_files, dependent: :destroy
+  has_many :app_generations, dependent: :destroy
+  has_many :app_collaborators, dependent: :destroy
   has_many :app_chat_messages, dependent: :destroy
   # has_many :purchases # TODO: uncomment when Purchase model exists
   # has_many :app_reviews # TODO: uncomment when AppReview model exists
@@ -21,15 +21,15 @@ class App < ApplicationRecord
 
   # 🚅 add has_one associations above.
 
-  scope :published, -> { where(status: 'published', visibility: 'public') }
-  scope :featured, -> { where(featured: true).where('featured_until > ?', Time.current) }
+  scope :published, -> { where(status: "published", visibility: "public") }
+  scope :featured, -> { where(featured: true).where("featured_until > ?", Time.current) }
   # 🚅 add scopes above.
 
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true
   validates :creator, scope: true
   validates :prompt, presence: true
-  validates :base_price, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :base_price, presence: true, numericality: {greater_than_or_equal_to: 0}
   # 🚅 add validations above.
 
   before_validation :generate_slug

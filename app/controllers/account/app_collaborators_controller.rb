@@ -1,8 +1,8 @@
 class Account::AppCollaboratorsController < Account::ApplicationController
-  account_load_and_authorize_resource :app_collaborator, through: :team, through_association: :app_collaborators
+  account_load_and_authorize_resource :app_collaborator, through: :app, through_association: :app_collaborators
 
-  # GET /account/teams/:team_id/app_collaborators
-  # GET /account/teams/:team_id/app_collaborators.json
+  # GET /account/apps/:app_id/app_collaborators
+  # GET /account/apps/:app_id/app_collaborators.json
   def index
     delegate_json_to_api
   end
@@ -13,7 +13,7 @@ class Account::AppCollaboratorsController < Account::ApplicationController
     delegate_json_to_api
   end
 
-  # GET /account/teams/:team_id/app_collaborators/new
+  # GET /account/apps/:app_id/app_collaborators/new
   def new
   end
 
@@ -21,8 +21,8 @@ class Account::AppCollaboratorsController < Account::ApplicationController
   def edit
   end
 
-  # POST /account/teams/:team_id/app_collaborators
-  # POST /account/teams/:team_id/app_collaborators.json
+  # POST /account/apps/:app_id/app_collaborators
+  # POST /account/apps/:app_id/app_collaborators.json
   def create
     respond_to do |format|
       if @app_collaborator.save
@@ -54,7 +54,7 @@ class Account::AppCollaboratorsController < Account::ApplicationController
   def destroy
     @app_collaborator.destroy
     respond_to do |format|
-      format.html { redirect_to [:account, @team, :app_collaborators], notice: I18n.t("app_collaborators.notifications.destroyed") }
+      format.html { redirect_to [:account, @app, :app_collaborators], notice: I18n.t("app_collaborators.notifications.destroyed") }
       format.json { head :no_content }
     end
   end

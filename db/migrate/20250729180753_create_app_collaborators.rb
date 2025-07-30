@@ -4,7 +4,7 @@ class CreateAppCollaborators < ActiveRecord::Migration[8.0]
       t.references :team, null: false, foreign_key: true
       t.references :app, null: false, foreign_key: true
       t.references :membership, null: true, foreign_key: true
-      t.string :role, default: 'viewer'
+      t.string :role, default: "viewer"
       t.string :github_username
       t.boolean :permissions_synced, default: false
 

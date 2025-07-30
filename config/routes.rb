@@ -23,7 +23,7 @@ Rails.application.routes.draw do
   end
 
   # Admin analytics dashboard (protected)
-  authenticate :user, ->(user) { user.email == ENV['SUPER_ADMIN_EMAIL'] } do
+  authenticate :user, ->(user) { user.email == ENV["SUPER_ADMIN_EMAIL"] } do
     mount AhoyCaptain::Engine, at: "/admin/analytics"
   end
 
@@ -81,16 +81,17 @@ Rails.application.routes.draw do
         resources :creator_profiles
         resources :follows
         resources :apps do
-          resource :chat, controller: 'app_chats', only: [:show, :create]
-          resource :editor, controller: 'app_editors', only: [:show] do
+          resource :chat, controller: "app_chats", only: [:show, :create]
+          resource :editor, controller: "app_editors", only: [:show] do
             post :create_message
-            patch 'files/:file_id', action: :update_file, as: :file
+            patch "files/:file_id", action: :update_file, as: :file
           end
+
+          resources :app_versions
+          resources :app_files
+          resources :app_generations
+          resources :app_collaborators
         end
-        resources :app_generations
-        resources :app_files
-        resources :app_versions
-        resources :app_collaborators
       end
     end
   end

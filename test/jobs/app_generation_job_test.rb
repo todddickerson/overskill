@@ -19,13 +19,13 @@ class AppGenerationJobTest < ActiveJob::TestCase
 
   test "should not process already completed generation" do
     @generation.update!(status: "completed")
-    
+
     # Mock the service to ensure it's not called
     mock_service = Minitest::Mock.new
-    
+
     AI::AppGeneratorService.stub(:new, mock_service) do
       AppGenerationJob.perform_now(@generation)
-      
+
       # Service should not be instantiated for completed generation
       mock_service.verify
     end
@@ -34,15 +34,15 @@ class AppGenerationJobTest < ActiveJob::TestCase
   test "should update app and generation status on success" do
     # Mock successful generation
     mock_service = Minitest::Mock.new
-    mock_service.expect(:generate!, { success: true })
-    
+    mock_service.expect(:generate!, {success: true})
+
     AI::AppGeneratorService.stub(:new, mock_service) do
       AppGenerationJob.perform_now(@generation)
     end
-    
+
     @app.reload
     @generation.reload
-    
+
     assert_equal "generated", @app.status
     assert_equal "completed", @generation.status
   end
@@ -50,15 +50,15 @@ class AppGenerationJobTest < ActiveJob::TestCase
   test "should handle generation failure" do
     # Mock failed generation
     mock_service = Minitest::Mock.new
-    mock_service.expect(:generate!, { success: false, error: "Test error" })
-    
+    mock_service.expect(:generate!, {success: false, error: "Test error"})
+
     AI::AppGeneratorService.stub(:new, mock_service) do
       AppGenerationJob.perform_now(@generation)
     end
-    
+
     @app.reload
     @generation.reload
-    
+
     assert_equal "failed", @app.status
     assert_equal "failed", @generation.status
     assert_equal "Test error", @generation.error_message
@@ -66,8 +66,8 @@ class AppGenerationJobTest < ActiveJob::TestCase
 
   test "should broadcast status updates" do
     mock_service = Minitest::Mock.new
-    mock_service.expect(:generate!, { success: true })
-    
+    mock_service.expect(:generate!, {success: true})
+
     assert_broadcasts("app_#{@app.id}_generation", 1) do
       AI::AppGeneratorService.stub(:new, mock_service) do
         AppGenerationJob.perform_now(@generation)
@@ -84,14 +84,14 @@ class AppGenerationJobTest < ActiveJob::TestCase
   test "should handle exceptions during generation" do
     # Mock service that raises exception
     mock_service = Minitest::Mock.new
-    mock_service.expect(:generate!, ->{ raise StandardError, "Unexpected error" })
-    
+    mock_service.expect(:generate!, -> { raise StandardError, "Unexpected error" })
+
     AI::AppGeneratorService.stub(:new, mock_service) do
       assert_raises(StandardError) do
         AppGenerationJob.perform_now(@generation)
       end
     end
-    
+
     @generation.reload
     assert_equal "failed", @generation.status
     assert_match "Unexpected error", @generation.error_message

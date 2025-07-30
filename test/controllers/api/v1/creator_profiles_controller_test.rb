@@ -31,19 +31,19 @@ class Api::V1::CreatorProfilesControllerTest < Api::Test
     # Fetch the creator_profile in question and prepare to compare it's attributes.
     creator_profile = CreatorProfile.find(creator_profile_data["id"])
 
-    assert_equal_or_nil creator_profile_data['username'], creator_profile.username
-    assert_equal_or_nil creator_profile_data['bio'], creator_profile.bio
-    assert_equal_or_nil creator_profile_data['level'], creator_profile.level
-    assert_equal_or_nil creator_profile_data['total_earnings'], creator_profile.total_earnings
-    assert_equal_or_nil creator_profile_data['total_sales'], creator_profile.total_sales
-    assert_equal_or_nil creator_profile_data['verification_status'], creator_profile.verification_status
-    assert_equal_or_nil DateTime.parse(creator_profile_data['featured_until']), creator_profile.featured_until
-    assert_equal_or_nil creator_profile_data['slug'], creator_profile.slug
-    assert_equal_or_nil creator_profile_data['stripe_account_id'], creator_profile.stripe_account_id
-    assert_equal_or_nil creator_profile_data['public_email'], creator_profile.public_email
-    assert_equal_or_nil creator_profile_data['website_url'], creator_profile.website_url
-    assert_equal_or_nil creator_profile_data['twitter_handle'], creator_profile.twitter_handle
-    assert_equal_or_nil creator_profile_data['github_username'], creator_profile.github_username
+    assert_equal_or_nil creator_profile_data["username"], creator_profile.username
+    assert_equal_or_nil creator_profile_data["bio"], creator_profile.bio
+    assert_equal_or_nil creator_profile_data["level"], creator_profile.level
+    assert_equal_or_nil creator_profile_data["total_earnings"], creator_profile.total_earnings
+    assert_equal_or_nil creator_profile_data["total_sales"], creator_profile.total_sales
+    assert_equal_or_nil creator_profile_data["verification_status"], creator_profile.verification_status
+    assert_equal_or_nil DateTime.parse(creator_profile_data["featured_until"]), creator_profile.featured_until
+    assert_equal_or_nil creator_profile_data["slug"], creator_profile.slug
+    assert_equal_or_nil creator_profile_data["stripe_account_id"], creator_profile.stripe_account_id
+    assert_equal_or_nil creator_profile_data["public_email"], creator_profile.public_email
+    assert_equal_or_nil creator_profile_data["website_url"], creator_profile.website_url
+    assert_equal_or_nil creator_profile_data["twitter_handle"], creator_profile.twitter_handle
+    assert_equal_or_nil creator_profile_data["github_username"], creator_profile.github_username
     # 🚅 super scaffolding will insert new fields above this line.
 
     assert_equal creator_profile_data["team_id"], creator_profile.team_id
@@ -102,14 +102,14 @@ class Api::V1::CreatorProfilesControllerTest < Api::Test
     put "/api/v1/creator_profiles/#{@creator_profile.id}", params: {
       access_token: access_token,
       creator_profile: {
-        username: 'Alternative String Value',
-        bio: 'Alternative String Value',
-        slug: 'Alternative String Value',
-        stripe_account_id: 'Alternative String Value',
-        public_email: 'another.email@test.com',
-        website_url: 'Alternative String Value',
-        twitter_handle: 'Alternative String Value',
-        github_username: 'Alternative String Value',
+        username: "Alternative String Value",
+        bio: "Alternative String Value",
+        slug: "Alternative String Value",
+        stripe_account_id: "Alternative String Value",
+        public_email: "another.email@test.com",
+        website_url: "Alternative String Value",
+        twitter_handle: "Alternative String Value",
+        github_username: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -121,14 +121,14 @@ class Api::V1::CreatorProfilesControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @creator_profile.reload
-    assert_equal @creator_profile.username, 'Alternative String Value'
-    assert_equal @creator_profile.bio, 'Alternative String Value'
-    assert_equal @creator_profile.slug, 'Alternative String Value'
-    assert_equal @creator_profile.stripe_account_id, 'Alternative String Value'
-    assert_equal @creator_profile.public_email, 'another.email@test.com'
-    assert_equal @creator_profile.website_url, 'Alternative String Value'
-    assert_equal @creator_profile.twitter_handle, 'Alternative String Value'
-    assert_equal @creator_profile.github_username, 'Alternative String Value'
+    assert_equal @creator_profile.username, "Alternative String Value"
+    assert_equal @creator_profile.bio, "Alternative String Value"
+    assert_equal @creator_profile.slug, "Alternative String Value"
+    assert_equal @creator_profile.stripe_account_id, "Alternative String Value"
+    assert_equal @creator_profile.public_email, "another.email@test.com"
+    assert_equal @creator_profile.website_url, "Alternative String Value"
+    assert_equal @creator_profile.twitter_handle, "Alternative String Value"
+    assert_equal @creator_profile.github_username, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

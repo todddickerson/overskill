@@ -1,7 +1,7 @@
 FactoryBot.define do
   factory :app_generation do
     association :team
-    app { nil }
+    association :app
     prompt { "MyText" }
     enhanced_prompt { "MyText" }
     status { "MyString" }

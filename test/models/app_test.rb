@@ -64,7 +64,7 @@ class AppTest < ActiveSupport::TestCase
   test "published scope returns only published apps" do
     create(:app, :published, team: @team, creator: @membership)
     create(:app, status: "draft", team: @team, creator: @membership)
-    
+
     published_apps = App.published
     assert_equal 1, published_apps.count
     assert_equal "published", published_apps.first.status
@@ -74,7 +74,7 @@ class AppTest < ActiveSupport::TestCase
     create(:app, :featured, team: @team, creator: @membership)
     create(:app, featured: true, featured_until: 1.day.ago, team: @team, creator: @membership)
     create(:app, featured: false, team: @team, creator: @membership)
-    
+
     featured_apps = App.featured
     assert_equal 1, featured_apps.count
     assert featured_apps.first.featured?

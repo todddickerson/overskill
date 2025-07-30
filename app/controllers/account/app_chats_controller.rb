@@ -1,42 +1,42 @@
 class Account::AppChatsController < Account::ApplicationController
   before_action :set_app
-  
+
   def show
     # Show the chat interface for the app
     @messages = @app.app_chat_messages.order(created_at: :asc)
   end
-  
+
   def create
     @message = @app.app_chat_messages.build(message_params)
     @message.role = "user"
-    
+
     if @message.save
       # Process the request with AI
       ProcessAppUpdateJob.perform_later(@message)
-      
+
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: [
-            turbo_stream.append("chat_messages", partial: "account/app_chats/message", locals: { message: @message }),
-            turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: { app: @app, message: @app.app_chat_messages.build })
+            turbo_stream.append("chat_messages", partial: "account/app_chats/message", locals: {message: @message}),
+            turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: {app: @app, message: @app.app_chat_messages.build})
           ]
         end
         format.html { redirect_to account_app_chat_path(@app) }
       end
     else
       respond_to do |format|
-        format.turbo_stream { render turbo_stream: turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: { app: @app, message: @message }) }
+        format.turbo_stream { render turbo_stream: turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: {app: @app, message: @message}) }
         format.html { render :show }
       end
     end
   end
-  
+
   private
-  
+
   def set_app
     @app = current_team.apps.find(params[:app_id])
   end
-  
+
   def message_params
     params.require(:app_chat_message).permit(:content)
   end

@@ -12,35 +12,35 @@ module AI
 
     def generate!
       Rails.logger.info "[AppGenerator] Starting generation for App ##{app.id}"
-      
+
       # Update generation status
       generation.update!(
         started_at: Time.current,
         status: "generating"
       )
-      
+
       # Update app status
       app.update!(status: "generating")
-      
+
       # Step 1: Enhance the prompt
       enhanced_prompt = enhance_prompt(generation.prompt)
-      
+
       # Step 2: Call AI to generate the app
       ai_response = generate_with_ai(enhanced_prompt)
-      
+
       if ai_response[:success]
         # Step 3: Parse the AI response
         parsed_data = parse_ai_response(ai_response[:content])
-        
+
         if parsed_data
           # Step 4: Security scan
           if security_scan_passed?(parsed_data[:files])
             # Step 5: Create app files
             create_app_files(parsed_data[:files])
-            
+
             # Step 6: Update app metadata
             update_app_metadata(parsed_data[:app])
-            
+
             # Step 7: Mark generation as complete
             generation.update!(
               completed_at: Time.current,
@@ -49,13 +49,13 @@ module AI
               ai_response: ai_response[:content],
               ai_cost: calculate_cost(ai_response[:usage])
             )
-            
+
             app.update!(
               status: "generated",
               ai_model: ai_response[:model],
               ai_cost: calculate_cost(ai_response[:usage])
             )
-            
+
             Rails.logger.info "[AppGenerator] Successfully generated App ##{app.id}"
             true
           else
@@ -98,10 +98,10 @@ module AI
     def parse_ai_response(content)
       # Try to parse as JSON
       data = JSON.parse(content)
-      
+
       # Validate required fields
       return nil unless data["app"] && data["files"]
-      
+
       {
         app: data["app"],
         files: data["files"],
@@ -110,21 +110,21 @@ module AI
       }
     rescue JSON::ParserError => e
       Rails.logger.error "[AppGenerator] Failed to parse AI response as JSON: #{e.message}"
-      
+
       # Try to extract JSON from markdown code blocks
       json_match = content.match(/```json\n(.*?)\n```/m)
       if json_match
-        retry_content = json_match[1]
+        json_match[1]
         retry
       end
-      
+
       nil
     end
 
     def security_scan_passed?(files)
       # For MVP, just check for obvious dangerous patterns
       # Later we'll use AI::SecurityScanner service
-      
+
       dangerous_patterns = [
         /eval\s*\(/,
         /exec\s*\(/,
@@ -132,7 +132,7 @@ module AI
         /document\.write\s*\(/,
         /\.innerHTML\s*=.*<script/i
       ]
-      
+
       files.each do |file|
         content = file["content"] || file[:content]
         dangerous_patterns.each do |pattern|
@@ -142,7 +142,7 @@ module AI
           end
         end
       end
-      
+
       true
     end
 
@@ -159,7 +159,7 @@ module AI
 
     def determine_file_type(path)
       extension = File.extname(path).downcase.delete(".")
-      
+
       case extension
       when "html", "htm" then "html"
       when "js", "jsx" then "javascript"
@@ -174,44 +174,44 @@ module AI
 
     def update_app_metadata(app_data)
       updates = {}
-      
+
       updates[:name] = app_data["name"] if app_data["name"].present?
       updates[:description] = app_data["description"] if app_data["description"].present?
-      
+
       # Generate slug from name if needed
       if updates[:name] && app.slug.blank?
         updates[:slug] = updates[:name].parameterize
       end
-      
+
       app.update!(updates) if updates.any?
     end
 
     def calculate_cost(usage)
       return 0.0 unless usage
-      
+
       # Using Kimi K2 for all generation
       prompt_tokens = usage["prompt_tokens"] || 0
       completion_tokens = usage["completion_tokens"] || 0
-      
+
       # Kimi K2 pricing (per 1M tokens)
       prompt_cost = (prompt_tokens / 1_000_000.0) * 0.30  # $0.30 per 1M tokens
       completion_cost = (completion_tokens / 1_000_000.0) * 0.30  # $0.30 per 1M tokens
-      
+
       prompt_cost + completion_cost
     end
 
     def handle_error(message)
       Rails.logger.error "[AppGenerator] #{message}"
       @errors << message
-      
+
       generation.update!(
         completed_at: Time.current,
         status: "failed",
         error_message: message
       )
-      
+
       app.update!(status: "failed")
-      
+
       false
     end
   end

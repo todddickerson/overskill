@@ -10,6 +10,7 @@ class AppVersion < ApplicationRecord
 
   # 🚅 add has_many associations above.
 
+  has_one :team, through: :app
   # 🚅 add has_one associations above.
 
   # 🚅 add scopes above.
@@ -17,6 +18,7 @@ class AppVersion < ApplicationRecord
   validates :app, scope: true
   validates :user, scope: true
   validates :version_number, presence: true
+  validates :user, presence: true
   # 🚅 add validations above.
 
   # 🚅 add callbacks above.

@@ -2,12 +2,12 @@ class Ahoy::Store < Ahoy::DatabaseStore
   # Associate visits and events with teams for multi-tenant tracking
   def track_visit(data)
     data[:team_id] = controller.current_team&.id if controller.respond_to?(:current_team)
-    super(data)
+    super
   end
 
   def track_event(data)
     data[:team_id] = controller.current_team&.id if controller.respond_to?(:current_team)
-    super(data)
+    super
   end
 end
 

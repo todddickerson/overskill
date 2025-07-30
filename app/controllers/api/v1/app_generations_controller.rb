@@ -4,9 +4,9 @@
 # We wrap this class in an `if` statement to circumvent this issue.
 if defined?(Api::V1::ApplicationController)
   class Api::V1::AppGenerationsController < Api::V1::ApplicationController
-    account_load_and_authorize_resource :app_generation, through: :team, through_association: :app_generations
+    account_load_and_authorize_resource :app_generation, through: :app, through_association: :app_generations
 
-    # GET /api/v1/teams/:team_id/app_generations
+    # GET /api/v1/apps/:app_id/app_generations
     def index
     end
 
@@ -14,7 +14,7 @@ if defined?(Api::V1::ApplicationController)
     def show
     end
 
-    # POST /api/v1/teams/:team_id/app_generations
+    # POST /api/v1/apps/:app_id/app_generations
     def create
       if @app_generation.save
         render :show, status: :created, location: [:api, :v1, @app_generation]
@@ -44,10 +44,10 @@ if defined?(Api::V1::ApplicationController)
       def app_generation_params
         strong_params = params.require(:app_generation).permit(
           *permitted_fields,
-          :app_id,
-          :prompt,
           :status,
           :ai_model,
+          :prompt,
+          :enhanced_prompt,
           :started_at,
           :completed_at,
           :duration_seconds,

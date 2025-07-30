@@ -8,7 +8,7 @@ class CreateCreatorProfiles < ActiveRecord::Migration[8.0]
       t.integer :level, default: 1, null: false
       t.integer :total_earnings, default: 0
       t.integer :total_sales, default: 0
-      t.string :verification_status, default: 'unverified'
+      t.string :verification_status, default: "unverified"
       t.datetime :featured_until
       t.string :slug, null: false
       t.string :stripe_account_id

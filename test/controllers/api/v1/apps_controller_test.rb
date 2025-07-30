@@ -29,28 +29,28 @@ class Api::V1::AppsControllerTest < Api::Test
     # Fetch the app in question and prepare to compare it's attributes.
     app = App.find(app_data["id"])
 
-    assert_equal_or_nil app_data['name'], app.name
-    assert_equal_or_nil app_data['slug'], app.slug
-    assert_equal_or_nil app_data['description'], app.description
-    assert_equal_or_nil app_data['creator_id'], app.creator_id
-    assert_equal_or_nil app_data['prompt'], app.prompt
-    assert_equal_or_nil app_data['app_type'], app.app_type
-    assert_equal_or_nil app_data['framework'], app.framework
-    assert_equal_or_nil app_data['status'], app.status
-    assert_equal_or_nil app_data['visibility'], app.visibility
-    assert_equal_or_nil app_data['base_price'], app.base_price
-    assert_equal_or_nil app_data['stripe_product_id'], app.stripe_product_id
-    assert_equal_or_nil app_data['preview_url'], app.preview_url
-    assert_equal_or_nil app_data['production_url'], app.production_url
-    assert_equal_or_nil app_data['github_repo'], app.github_repo
-    assert_equal_or_nil app_data['total_users'], app.total_users
-    assert_equal_or_nil app_data['total_revenue'], app.total_revenue
-    assert_equal_or_nil app_data['rating'], app.rating
-    assert_equal_or_nil app_data['featured'], app.featured
-    assert_equal_or_nil DateTime.parse(app_data['featured_until']), app.featured_until
-    assert_equal_or_nil DateTime.parse(app_data['launch_date']), app.launch_date
-    assert_equal_or_nil app_data['ai_model'], app.ai_model
-    assert_equal_or_nil app_data['ai_cost'], app.ai_cost
+    assert_equal_or_nil app_data["name"], app.name
+    assert_equal_or_nil app_data["slug"], app.slug
+    assert_equal_or_nil app_data["description"], app.description
+    assert_equal_or_nil app_data["creator_id"], app.creator_id
+    assert_equal_or_nil app_data["prompt"], app.prompt
+    assert_equal_or_nil app_data["app_type"], app.app_type
+    assert_equal_or_nil app_data["framework"], app.framework
+    assert_equal_or_nil app_data["status"], app.status
+    assert_equal_or_nil app_data["visibility"], app.visibility
+    assert_equal_or_nil app_data["base_price"], app.base_price
+    assert_equal_or_nil app_data["stripe_product_id"], app.stripe_product_id
+    assert_equal_or_nil app_data["preview_url"], app.preview_url
+    assert_equal_or_nil app_data["production_url"], app.production_url
+    assert_equal_or_nil app_data["github_repo"], app.github_repo
+    assert_equal_or_nil app_data["total_users"], app.total_users
+    assert_equal_or_nil app_data["total_revenue"], app.total_revenue
+    assert_equal_or_nil app_data["rating"], app.rating
+    assert_equal_or_nil app_data["featured"], app.featured
+    assert_equal_or_nil DateTime.parse(app_data["featured_until"]), app.featured_until
+    assert_equal_or_nil DateTime.parse(app_data["launch_date"]), app.launch_date
+    assert_equal_or_nil app_data["ai_model"], app.ai_model
+    assert_equal_or_nil app_data["ai_cost"], app.ai_cost
     # 🚅 super scaffolding will insert new fields above this line.
 
     assert_equal app_data["team_id"], app.team_id
@@ -109,14 +109,14 @@ class Api::V1::AppsControllerTest < Api::Test
     put "/api/v1/apps/#{@app.id}", params: {
       access_token: access_token,
       app: {
-        name: 'Alternative String Value',
-        slug: 'Alternative String Value',
-        description: 'Alternative String Value',
-        prompt: 'Alternative String Value',
-        stripe_product_id: 'Alternative String Value',
-        preview_url: 'Alternative String Value',
-        production_url: 'Alternative String Value',
-        github_repo: 'Alternative String Value',
+        name: "Alternative String Value",
+        slug: "Alternative String Value",
+        description: "Alternative String Value",
+        prompt: "Alternative String Value",
+        stripe_product_id: "Alternative String Value",
+        preview_url: "Alternative String Value",
+        production_url: "Alternative String Value",
+        github_repo: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -128,14 +128,14 @@ class Api::V1::AppsControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @app.reload
-    assert_equal @app.name, 'Alternative String Value'
-    assert_equal @app.slug, 'Alternative String Value'
-    assert_equal @app.description, 'Alternative String Value'
-    assert_equal @app.prompt, 'Alternative String Value'
-    assert_equal @app.stripe_product_id, 'Alternative String Value'
-    assert_equal @app.preview_url, 'Alternative String Value'
-    assert_equal @app.production_url, 'Alternative String Value'
-    assert_equal @app.github_repo, 'Alternative String Value'
+    assert_equal @app.name, "Alternative String Value"
+    assert_equal @app.slug, "Alternative String Value"
+    assert_equal @app.description, "Alternative String Value"
+    assert_equal @app.prompt, "Alternative String Value"
+    assert_equal @app.stripe_product_id, "Alternative String Value"
+    assert_equal @app.preview_url, "Alternative String Value"
+    assert_equal @app.production_url, "Alternative String Value"
+    assert_equal @app.github_repo, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

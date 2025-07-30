@@ -11,11 +11,10 @@
 
         <% box.body do %>
           <% with_attribute_settings object: @app_generation, strategy: :label do %>
-            <%= render 'shared/attributes/belongs_to', attribute: :app %>
+            <%= render 'shared/attributes/text', attribute: :status %>
+            <%= render 'shared/attributes/text', attribute: :ai_model %>
             <%= render 'shared/attributes/text', attribute: :prompt %>
             <%= render 'shared/attributes/text', attribute: :enhanced_prompt %>
-            <%= render 'shared/attributes/option', attribute: :status %>
-            <%= render 'shared/attributes/option', attribute: :ai_model %>
             <%= render 'shared/attributes/date_and_time', attribute: :started_at %>
             <%= render 'shared/attributes/date_and_time', attribute: :completed_at %>
             <%= render 'shared/attributes/number', attribute: :duration_seconds %>
@@ -32,7 +31,7 @@
           <%= link_to t('.buttons.edit'), [:edit, :account, @app_generation], class: first_button_primary if can? :edit, @app_generation %>
           <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
           <%= button_to t('.buttons.destroy'), [:account, @app_generation], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app_generation)) } if can? :destroy, @app_generation %>
-          <%= link_to t('global.buttons.back'), [:account, @team, :app_generations], class: first_button_primary %>
+          <%= link_to t('global.buttons.back'), [:account, @app, :app_generations], class: first_button_primary %>
         <% end %>
 
         <% box.raw_footer do %>

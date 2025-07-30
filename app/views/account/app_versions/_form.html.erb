@@ -1,14 +1,11 @@
-<% cancel_path ||= app_version.persisted? ? [:account, app_version] : [:account, @team, :app_versions] %>
+<% cancel_path ||= app_version.persisted? ? [:account, app_version] : [:account, @app, :app_versions] %>
 
-<%= form_with model: app_version, url: (app_version.persisted? ? [:account, app_version] : [:account, @team, :app_versions]), class: 'form' do |form| %>
+<%= form_with model: app_version, url: (app_version.persisted? ? [:account, app_version] : [:account, @app, :app_versions]), class: 'form' do |form| %>
   <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
     <%= render 'account/shared/forms/errors', form: form %>
 
     <% with_field_settings form: form do %>
-      <%= render 'shared/fields/super_select', method: :app_id, options: {autofocus: true}, html_options: {autofocus: true},
-        choices: @app_version.valid_apps.map { |app| [app.label_string, app.id] } %>
-      <%= render 'shared/fields/super_select', method: :user_id, options: {}, html_options: {},
-        choices: @app_version.valid_users.map { |user| [user.label_string, user.id] } %>
+      <%= render 'shared/fields/super_select', method: :user, html_options: {autofocus: true} %>
       <%= render 'shared/fields/text_field', method: :commit_sha %>
       <%= render 'shared/fields/text_field', method: :commit_message %>
       <%= render 'shared/fields/text_field', method: :version_number %>

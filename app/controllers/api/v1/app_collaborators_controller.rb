@@ -4,9 +4,9 @@
 # We wrap this class in an `if` statement to circumvent this issue.
 if defined?(Api::V1::ApplicationController)
   class Api::V1::AppCollaboratorsController < Api::V1::ApplicationController
-    account_load_and_authorize_resource :app_collaborator, through: :team, through_association: :app_collaborators
+    account_load_and_authorize_resource :app_collaborator, through: :app, through_association: :app_collaborators
 
-    # GET /api/v1/teams/:team_id/app_collaborators
+    # GET /api/v1/apps/:app_id/app_collaborators
     def index
     end
 
@@ -14,7 +14,7 @@ if defined?(Api::V1::ApplicationController)
     def show
     end
 
-    # POST /api/v1/teams/:team_id/app_collaborators
+    # POST /api/v1/apps/:app_id/app_collaborators
     def create
       if @app_collaborator.save
         render :show, status: :created, location: [:api, :v1, @app_collaborator]
@@ -44,8 +44,7 @@ if defined?(Api::V1::ApplicationController)
       def app_collaborator_params
         strong_params = params.require(:app_collaborator).permit(
           *permitted_fields,
-          :app_id,
-          :membership_id,
+          :membership,
           :role,
           :github_username,
           :permissions_synced,

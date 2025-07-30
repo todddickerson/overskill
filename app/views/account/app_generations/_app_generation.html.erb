@@ -1,5 +1,5 @@
-<% team = @team || @team %>
-<% context ||= team %>
+<% app = @app || @app %>
+<% context ||= app %>
 <% collection ||= :app_generations %>
 <% hide_actions ||= false %>
 <% hide_back ||= false %>
@@ -7,7 +7,8 @@
 <% with_attribute_settings object: app_generation do %>
   <tr data-id="<%= app_generation.id %>">
     <%= render "shared/tables/checkbox", object: app_generation %>
-    <td><%= render 'shared/attributes/belongs_to', attribute: :app, url: [:account, app_generation] %></td>
+    <td><%= render 'shared/attributes/text', attribute: :status, url: [:account, app_generation] %></td>
+    <td><%= render 'shared/attributes/text', attribute: :ai_model %></td>
     <%# 🚅 super scaffolding will insert new fields above this line. %>
     <td><%= render 'shared/attributes/date_and_time', attribute: :created_at %></td>
     <td class="buttons">

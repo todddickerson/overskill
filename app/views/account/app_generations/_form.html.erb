@@ -1,15 +1,14 @@
-<% cancel_path ||= app_generation.persisted? ? [:account, app_generation] : [:account, @team, :app_generations] %>
+<% cancel_path ||= app_generation.persisted? ? [:account, app_generation] : [:account, @app, :app_generations] %>
 
-<%= form_with model: app_generation, url: (app_generation.persisted? ? [:account, app_generation] : [:account, @team, :app_generations]), class: 'form' do |form| %>
+<%= form_with model: app_generation, url: (app_generation.persisted? ? [:account, app_generation] : [:account, @app, :app_generations]), class: 'form' do |form| %>
   <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
     <%= render 'account/shared/forms/errors', form: form %>
 
     <% with_field_settings form: form do %>
-      <%= render 'shared/fields/super_select', method: :app_id, options: {autofocus: true}, html_options: {autofocus: true},
-        choices: @app_generation.valid_apps.map { |app| [app.label_string, app.id] } %>
+      <%= render 'shared/fields/text_field', method: :status, options: {autofocus: true} %>
+      <%= render 'shared/fields/text_field', method: :ai_model %>
       <%= render 'shared/fields/text_area', method: :prompt %>
-      <%= render 'shared/fields/options', method: :status %>
-      <%= render 'shared/fields/options', method: :ai_model %>
+      <%= render 'shared/fields/text_area', method: :enhanced_prompt %>
       <%= render 'shared/fields/date_and_time_field', method: :started_at %>
       <%= render 'shared/fields/date_and_time_field', method: :completed_at %>
       <%= render 'shared/fields/number_field', method: :duration_seconds %>

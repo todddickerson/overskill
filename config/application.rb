@@ -3,8 +3,8 @@ require_relative "boot"
 require "rails/all"
 
 # Load dotenv BEFORE bundler requires other gems
-if ['development', 'test'].include?(ENV['RAILS_ENV'])
-  require 'dotenv/load'
+if ["development", "test"].include?(ENV["RAILS_ENV"])
+  require "dotenv/load"
 end
 
 # Require the gems listed in Gemfile, including any gems

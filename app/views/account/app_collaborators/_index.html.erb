@@ -1,6 +1,6 @@
 <% app_collaborators = app_collaborators.accessible_by(current_ability) %>
-<% team = @team %>
-<% context ||= team %>
+<% app = @app %>
+<% context ||= app %>
 <% collection ||= :app_collaborators %>
 <% hide_actions ||= false %>
 <% hide_back ||= false %>
@@ -23,7 +23,6 @@
             <thead>
               <tr>
                 <%= render "shared/tables/select_all" %>
-                <th><%= t('.fields.app.heading') %></th>
                 <th><%= t('.fields.membership.heading') %></th>
                 <th><%= t('.fields.role.heading') %></th>
                 <th><%= t('.fields.github_username.heading') %></th>
@@ -42,9 +41,9 @@
 
       <% box.actions do %>
         <% unless hide_actions %>
-          <% if context == team %>
-            <% if can? :create, AppCollaborator.new(team: team) %>
-              <%= link_to t('.buttons.new'), [:new, :account, team, :app_collaborator], class: "#{first_button_primary(:app_collaborator)} new" %>
+          <% if context == app %>
+            <% if can? :create, AppCollaborator.new(app: app) %>
+              <%= link_to t('.buttons.new'), [:new, :account, app, :app_collaborator], class: "#{first_button_primary(:app_collaborator)} new" %>
             <% end %>
           <% end %>
 

@@ -4,9 +4,9 @@
 # We wrap this class in an `if` statement to circumvent this issue.
 if defined?(Api::V1::ApplicationController)
   class Api::V1::AppVersionsController < Api::V1::ApplicationController
-    account_load_and_authorize_resource :app_version, through: :team, through_association: :app_versions
+    account_load_and_authorize_resource :app_version, through: :app, through_association: :app_versions
 
-    # GET /api/v1/teams/:team_id/app_versions
+    # GET /api/v1/apps/:app_id/app_versions
     def index
     end
 
@@ -14,7 +14,7 @@ if defined?(Api::V1::ApplicationController)
     def show
     end
 
-    # POST /api/v1/teams/:team_id/app_versions
+    # POST /api/v1/apps/:app_id/app_versions
     def create
       if @app_version.save
         render :show, status: :created, location: [:api, :v1, @app_version]
@@ -44,8 +44,7 @@ if defined?(Api::V1::ApplicationController)
       def app_version_params
         strong_params = params.require(:app_version).permit(
           *permitted_fields,
-          :app_id,
-          :user_id,
+          :user,
           :commit_sha,
           :commit_message,
           :version_number,

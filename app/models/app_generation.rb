@@ -9,6 +9,7 @@ class AppGeneration < ApplicationRecord
 
   # 🚅 add has_many associations above.
 
+  has_one :team, through: :app
   # 🚅 add has_one associations above.
 
   # 🚅 add scopes above.
@@ -16,6 +17,7 @@ class AppGeneration < ApplicationRecord
   validates :app, scope: true
   validates :prompt, presence: true
   validates :started_at, presence: true
+  validates :status, presence: true
   # 🚅 add validations above.
 
   # 🚅 add callbacks above.

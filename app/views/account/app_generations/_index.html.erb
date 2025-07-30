@@ -1,6 +1,6 @@
 <% app_generations = app_generations.accessible_by(current_ability) %>
-<% team = @team %>
-<% context ||= team %>
+<% app = @app %>
+<% context ||= app %>
 <% collection ||= :app_generations %>
 <% hide_actions ||= false %>
 <% hide_back ||= false %>
@@ -23,7 +23,8 @@
             <thead>
               <tr>
                 <%= render "shared/tables/select_all" %>
-                <th><%= t('.fields.app.heading') %></th>
+                <th><%= t('.fields.status.heading') %></th>
+                <th><%= t('.fields.ai_model.heading') %></th>
                 <%# 🚅 super scaffolding will insert new field headers above this line. %>
                 <th><%= t('.fields.created_at.heading') %></th>
                 <th class="text-right"></th>
@@ -38,9 +39,9 @@
 
       <% box.actions do %>
         <% unless hide_actions %>
-          <% if context == team %>
-            <% if can? :create, AppGeneration.new(team: team) %>
-              <%= link_to t('.buttons.new'), [:new, :account, team, :app_generation], class: "#{first_button_primary(:app_generation)} new" %>
+          <% if context == app %>
+            <% if can? :create, AppGeneration.new(app: app) %>
+              <%= link_to t('.buttons.new'), [:new, :account, app, :app_generation], class: "#{first_button_primary(:app_generation)} new" %>
             <% end %>
           <% end %>
 

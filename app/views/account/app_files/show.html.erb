@@ -11,10 +11,9 @@
 
         <% box.body do %>
           <% with_attribute_settings object: @app_file, strategy: :label do %>
-            <%= render 'shared/attributes/belongs_to', attribute: :app %>
             <%= render 'shared/attributes/text', attribute: :path %>
             <%= render 'shared/attributes/text', attribute: :content %>
-            <%= render 'shared/attributes/option', attribute: :file_type %>
+            <%= render 'shared/attributes/text', attribute: :file_type %>
             <%= render 'shared/attributes/number', attribute: :size_bytes %>
             <%= render 'shared/attributes/text', attribute: :checksum %>
             <%= render 'shared/attributes/option', attribute: :is_entry_point %>
@@ -26,7 +25,7 @@
           <%= link_to t('.buttons.edit'), [:edit, :account, @app_file], class: first_button_primary if can? :edit, @app_file %>
           <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
           <%= button_to t('.buttons.destroy'), [:account, @app_file], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app_file)) } if can? :destroy, @app_file %>
-          <%= link_to t('global.buttons.back'), [:account, @team, :app_files], class: first_button_primary %>
+          <%= link_to t('global.buttons.back'), [:account, @app, :app_files], class: first_button_primary %>
         <% end %>
 
         <% box.raw_footer do %>

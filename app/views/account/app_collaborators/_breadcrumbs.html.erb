@@ -1,7 +1,7 @@
 <% app_collaborator ||= @app_collaborator %>
-<% team ||= @team || app_collaborator&.team %>
-<%= render 'account/teams/breadcrumbs', team: team %>
-<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :app_collaborators] %>
+<% app ||= @app || app_collaborator&.app %>
+<%= render 'account/apps/breadcrumbs', app: app %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, app, :app_collaborators] %>
 <% if app_collaborator&.persisted? %>
   <%= render 'account/shared/breadcrumb', label: app_collaborator.label_string, url: [:account, app_collaborator] %>
 <% end %>

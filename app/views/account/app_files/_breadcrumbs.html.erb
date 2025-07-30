@@ -1,7 +1,7 @@
 <% app_file ||= @app_file %>
-<% team ||= @team || app_file&.team %>
-<%= render 'account/teams/breadcrumbs', team: team %>
-<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :app_files] %>
+<% app ||= @app || app_file&.app %>
+<%= render 'account/apps/breadcrumbs', app: app %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, app, :app_files] %>
 <% if app_file&.persisted? %>
   <%= render 'account/shared/breadcrumb', label: app_file.label_string, url: [:account, app_file] %>
 <% end %>

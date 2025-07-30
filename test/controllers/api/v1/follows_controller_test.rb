@@ -29,8 +29,8 @@ class Api::V1::FollowsControllerTest < Api::Test
     # Fetch the follow in question and prepare to compare it's attributes.
     follow = Follow.find(follow_data["id"])
 
-    assert_equal_or_nil follow_data['follower_id'], follow.follower_id
-    assert_equal_or_nil follow_data['followed_id'], follow.followed_id
+    assert_equal_or_nil follow_data["follower_id"], follow.follower_id
+    assert_equal_or_nil follow_data["followed_id"], follow.followed_id
     # 🚅 super scaffolding will insert new fields above this line.
 
     assert_equal follow_data["team_id"], follow.team_id
@@ -89,8 +89,8 @@ class Api::V1::FollowsControllerTest < Api::Test
     put "/api/v1/follows/#{@follow.id}", params: {
       access_token: access_token,
       follow: {
-        follower_id: 'Alternative String Value',
-        followed_id: 'Alternative String Value',
+        follower_id: "Alternative String Value",
+        followed_id: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -102,8 +102,8 @@ class Api::V1::FollowsControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @follow.reload
-    assert_equal @follow.follower_id, 'Alternative String Value'
-    assert_equal @follow.followed_id, 'Alternative String Value'
+    assert_equal @follow.follower_id, "Alternative String Value"
+    assert_equal @follow.followed_id, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

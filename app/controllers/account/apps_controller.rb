@@ -35,7 +35,7 @@ class Account::AppsController < Account::ApplicationController
           )
           AppGenerationJob.perform_later(generation)
         end
-        
+
         format.html { redirect_to [:account, @app], notice: I18n.t("apps.notifications.created") }
         format.json { render :show, status: :created, location: [:account, @app] }
       else

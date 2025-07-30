@@ -1,9 +1,9 @@
 class SessionsController < Devise::SessionsController
   include Sessions::ControllerBase
-  
+
   # Explicitly skip CSRF for create action
   skip_before_action :verify_authenticity_token, only: [:create]
-  
+
   def create
     Rails.logger.info "=== Session Create Debug ==="
     Rails.logger.info "Session ID: #{session.id}"

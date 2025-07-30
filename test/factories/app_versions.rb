@@ -1,7 +1,7 @@
 FactoryBot.define do
   factory :app_version do
     association :team
-    app { nil }
+    association :app
     user { nil }
     commit_sha { "MyString" }
     commit_message { "MyString" }

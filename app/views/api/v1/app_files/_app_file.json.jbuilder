@@ -1,6 +1,5 @@
 json.extract! app_file,
   :id,
-  :team_id,
   :app_id,
   :path,
   :content,

@@ -4,9 +4,9 @@
 # We wrap this class in an `if` statement to circumvent this issue.
 if defined?(Api::V1::ApplicationController)
   class Api::V1::AppFilesController < Api::V1::ApplicationController
-    account_load_and_authorize_resource :app_file, through: :team, through_association: :app_files
+    account_load_and_authorize_resource :app_file, through: :app, through_association: :app_files
 
-    # GET /api/v1/teams/:team_id/app_files
+    # GET /api/v1/apps/:app_id/app_files
     def index
     end
 
@@ -14,7 +14,7 @@ if defined?(Api::V1::ApplicationController)
     def show
     end
 
-    # POST /api/v1/teams/:team_id/app_files
+    # POST /api/v1/apps/:app_id/app_files
     def create
       if @app_file.save
         render :show, status: :created, location: [:api, :v1, @app_file]
@@ -44,10 +44,11 @@ if defined?(Api::V1::ApplicationController)
       def app_file_params
         strong_params = params.require(:app_file).permit(
           *permitted_fields,
-          :app_id,
           :path,
           :content,
           :file_type,
+          :size_bytes,
+          :checksum,
           :is_entry_point,
           # 🚅 super scaffolding will insert new fields above this line.
           *permitted_arrays,

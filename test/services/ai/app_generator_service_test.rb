@@ -17,7 +17,7 @@ module AI
     test "should enhance prompt with context" do
       prompt = "Create a todo app"
       enhanced = @service.send(:enhance_prompt, prompt)
-      
+
       assert enhanced.length > prompt.length
       assert enhanced.include?("todo app")
     end
@@ -38,7 +38,7 @@ module AI
       }.to_json
 
       result = @service.send(:parse_ai_response, json_response)
-      
+
       assert_not_nil result
       assert_equal "Test App", result[:app]["name"]
       assert_equal 1, result[:files].length
@@ -57,15 +57,15 @@ module AI
       MARKDOWN
 
       result = @service.send(:parse_ai_response, markdown_response)
-      
+
       assert_not_nil result
       assert_equal "Test App", result[:app]["name"]
     end
 
     test "should validate security scan passes for safe code" do
       files = [
-        { "path" => "index.html", "content" => "<h1>Hello</h1>" },
-        { "path" => "app.js", "content" => "console.log('safe');" }
+        {"path" => "index.html", "content" => "<h1>Hello</h1>"},
+        {"path" => "app.js", "content" => "console.log('safe');"}
       ]
 
       assert @service.send(:security_scan_passed?, files)
@@ -80,7 +80,7 @@ module AI
         }
       ]
 
-      assert_difference 'AppFile.count', 1 do
+      assert_difference "AppFile.count", 1 do
         @service.send(:create_app_files, files_data)
       end
 
@@ -106,9 +106,9 @@ module AI
 
     test "should handle generation failure gracefully" do
       # Mock a failed AI response
-      @service.stub(:generate_with_ai, { success: false, error: "API Error" }) do
+      @service.stub(:generate_with_ai, {success: false, error: "API Error"}) do
         result = @service.generate!
-        
+
         assert_not result[:success]
         assert_equal "AI generation failed: API Error", result[:error]
         assert_equal "failed", @generation.reload.status

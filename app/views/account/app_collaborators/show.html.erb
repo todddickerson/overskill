@@ -11,9 +11,8 @@
 
         <% box.body do %>
           <% with_attribute_settings object: @app_collaborator, strategy: :label do %>
-            <%= render 'shared/attributes/belongs_to', attribute: :app %>
-            <%= render 'shared/attributes/belongs_to', attribute: :membership %>
-            <%= render 'shared/attributes/option', attribute: :role %>
+            <%= render 'shared/attributes/option', attribute: :membership %>
+            <%= render 'shared/attributes/text', attribute: :role %>
             <%= render 'shared/attributes/text', attribute: :github_username %>
             <%= render 'shared/attributes/option', attribute: :permissions_synced %>
             <%# 🚅 super scaffolding will insert new fields above this line. %>
@@ -24,7 +23,7 @@
           <%= link_to t('.buttons.edit'), [:edit, :account, @app_collaborator], class: first_button_primary if can? :edit, @app_collaborator %>
           <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
           <%= button_to t('.buttons.destroy'), [:account, @app_collaborator], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app_collaborator)) } if can? :destroy, @app_collaborator %>
-          <%= link_to t('global.buttons.back'), [:account, @team, :app_collaborators], class: first_button_primary %>
+          <%= link_to t('global.buttons.back'), [:account, @app, :app_collaborators], class: first_button_primary %>
         <% end %>
 
         <% box.raw_footer do %>

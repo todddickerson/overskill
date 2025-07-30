@@ -23,24 +23,19 @@ en:
     fields: &fields
       id:
         heading: App Version ID
-      team_id:
-        heading: Team ID
-      app_id: &app
-        _: &app_id App
-        label: *app_id
-        heading: *app_id
-        api_title: *app_id
-        api_description: *app_id
+      app_id:
+        heading: App ID
+      user:
+        _: &user User
+        label: *user
+        heading: *user
+        api_title: *user
+        api_description: *user
         placeholder: Select
-      app: *app
-      user_id: &user
-        _: &user_id User
-        label: *user_id
-        heading: *user_id
-        api_title: *user_id
-        api_description: *user_id
-        placeholder: None
-      user: *user
+        options:
+          one: One
+          two: Two
+          three: Three
       commit_sha:
         _: &commit_sha Commit Sha
         label: *commit_sha
@@ -120,28 +115,28 @@ en:
       destroy: "Delete a App Version"
       fields: *fields
     index:
-      section: "%{teams_possessive} App Versions"
+      section: "%{apps_possessive} App Versions"
       contexts:
-        team:
+        app:
           header: App Versions
-          description: Below is a list of App Versions that have been added for %{team_name}.
-          description_empty: No App Versions have been added for %{team_name}.
+          description: Below is a list of App Versions that have been added for %{app_name}.
+          description_empty: No App Versions have been added for %{app_name}.
       fields: *fields
       buttons: *buttons
     show:
       section: "%{app_version_name}"
       header: App Version Details
       description: Below are the details we have for %{app_version_name}.
-      manage_description: You'll also find options for updating these details or removing %{app_version_name} from %{team_name} entirely.
+      manage_description: You'll also find options for updating these details or removing %{app_version_name} from %{app_name} entirely.
       fields: *fields
       buttons: *buttons
     form: &form
       buttons: *buttons
       fields: *fields
     new:
-      section: "New App Version for %{team_name}"
+      section: "New App Version for %{app_name}"
       header: New App Version Details
-      description: Please provide the details of the new App Version you'd like to add to %{team_name}.
+      description: Please provide the details of the new App Version you'd like to add to %{app_name}.
       form: *form
     edit:
       section: "%{app_version_name}"
@@ -157,8 +152,7 @@ en:
   activerecord:
     attributes:
       app_version:
-        app_id: *app_id
-        user_id: *user_id
+        user: *user
         commit_sha: *commit_sha
         commit_message: *commit_message
         version_number: *version_number

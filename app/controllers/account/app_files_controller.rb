@@ -1,8 +1,8 @@
 class Account::AppFilesController < Account::ApplicationController
-  account_load_and_authorize_resource :app_file, through: :team, through_association: :app_files
+  account_load_and_authorize_resource :app_file, through: :app, through_association: :app_files
 
-  # GET /account/teams/:team_id/app_files
-  # GET /account/teams/:team_id/app_files.json
+  # GET /account/apps/:app_id/app_files
+  # GET /account/apps/:app_id/app_files.json
   def index
     delegate_json_to_api
   end
@@ -13,7 +13,7 @@ class Account::AppFilesController < Account::ApplicationController
     delegate_json_to_api
   end
 
-  # GET /account/teams/:team_id/app_files/new
+  # GET /account/apps/:app_id/app_files/new
   def new
   end
 
@@ -21,8 +21,8 @@ class Account::AppFilesController < Account::ApplicationController
   def edit
   end
 
-  # POST /account/teams/:team_id/app_files
-  # POST /account/teams/:team_id/app_files.json
+  # POST /account/apps/:app_id/app_files
+  # POST /account/apps/:app_id/app_files.json
   def create
     respond_to do |format|
       if @app_file.save
@@ -54,7 +54,7 @@ class Account::AppFilesController < Account::ApplicationController
   def destroy
     @app_file.destroy
     respond_to do |format|
-      format.html { redirect_to [:account, @team, :app_files], notice: I18n.t("app_files.notifications.destroyed") }
+      format.html { redirect_to [:account, @app, :app_files], notice: I18n.t("app_files.notifications.destroyed") }
       format.json { head :no_content }
     end
   end

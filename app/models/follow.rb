@@ -4,8 +4,8 @@ class Follow < ApplicationRecord
   # 🚅 add attribute accessors above.
 
   belongs_to :team
-  belongs_to :follower, class_name: 'User'
-  belongs_to :followed, class_name: 'CreatorProfile'
+  belongs_to :follower, class_name: "User"
+  belongs_to :followed, class_name: "CreatorProfile"
   # 🚅 add belongs_to associations above.
 
   # 🚅 add has_many associations above.
@@ -16,7 +16,7 @@ class Follow < ApplicationRecord
 
   validates :follower_id, presence: true
   validates :followed_id, presence: true
-  validates :follower_id, uniqueness: { scope: :followed_id }
+  validates :follower_id, uniqueness: {scope: :followed_id}
   # 🚅 add validations above.
 
   # 🚅 add callbacks above.

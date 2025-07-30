@@ -7,10 +7,10 @@ class CreateApps < ActiveRecord::Migration[8.0]
       t.text :description
       t.references :creator, null: false, foreign_key: {to_table: "memberships"}
       t.text :prompt, null: false
-      t.string :app_type, default: 'tool'
-      t.string :framework, default: 'react'
-      t.string :status, default: 'generating'
-      t.string :visibility, default: 'private'
+      t.string :app_type, default: "tool"
+      t.string :framework, default: "react"
+      t.string :status, default: "generating"
+      t.string :visibility, default: "private"
       t.integer :base_price, null: false, default: 0
       t.string :stripe_product_id
       t.string :preview_url

@@ -10,8 +10,8 @@ class CreateAppVersions < ActiveRecord::Migration[8.0]
       t.text :changelog
       t.text :files_snapshot
       t.text :changed_files
-      t.boolean :external_commit, default: false
-      t.boolean :deployed, default: false
+      t.boolean :external_commit, default: false, default: false
+      t.boolean :deployed, default: false, default: false
       t.datetime :published_at
 
       t.timestamps

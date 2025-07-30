@@ -4,10 +4,11 @@ class Api::V1::AppCollaboratorsControllerTest < Api::Test
   setup do
     # See `test/controllers/api/test.rb` for common set up for API tests.
 
-    @app_collaborator = build(:app_collaborator, team: @team)
+    @app = create(:app, team: @team)
+    @app_collaborator = build(:app_collaborator, app: @app)
     @other_app_collaborators = create_list(:app_collaborator, 3)
 
-    @another_app_collaborator = create(:app_collaborator, team: @team)
+    @another_app_collaborator = create(:app_collaborator, app: @app)
 
     # 🚅 super scaffolding will insert file-related logic above this line.
     @app_collaborator.save
@@ -29,19 +30,18 @@ class Api::V1::AppCollaboratorsControllerTest < Api::Test
     # Fetch the app_collaborator in question and prepare to compare it's attributes.
     app_collaborator = AppCollaborator.find(app_collaborator_data["id"])
 
-    assert_equal_or_nil app_collaborator_data['app_id'], app_collaborator.app_id
-    assert_equal_or_nil app_collaborator_data['membership_id'], app_collaborator.membership_id
-    assert_equal_or_nil app_collaborator_data['role'], app_collaborator.role
-    assert_equal_or_nil app_collaborator_data['github_username'], app_collaborator.github_username
-    assert_equal_or_nil app_collaborator_data['permissions_synced'], app_collaborator.permissions_synced
+    assert_equal_or_nil app_collaborator_data["membership"], app_collaborator.membership
+    assert_equal_or_nil app_collaborator_data["role"], app_collaborator.role
+    assert_equal_or_nil app_collaborator_data["github_username"], app_collaborator.github_username
+    assert_equal_or_nil app_collaborator_data["permissions_synced"], app_collaborator.permissions_synced
     # 🚅 super scaffolding will insert new fields above this line.
 
-    assert_equal app_collaborator_data["team_id"], app_collaborator.team_id
+    assert_equal app_collaborator_data["app_id"], app_collaborator.app_id
   end
 
   test "index" do
     # Fetch and ensure nothing is seriously broken.
-    get "/api/v1/teams/#{@team.id}/app_collaborators", params: {access_token: access_token}
+    get "/api/v1/apps/#{@app.id}/app_collaborators", params: {access_token: access_token}
     assert_response :success
 
     # Make sure it's returning our resources.
@@ -71,18 +71,18 @@ class Api::V1::AppCollaboratorsControllerTest < Api::Test
   test "create" do
     # Use the serializer to generate a payload, but strip some attributes out.
     params = {access_token: access_token}
-    app_collaborator_data = JSON.parse(build(:app_collaborator, team: nil).api_attributes.to_json)
-    app_collaborator_data.except!("id", "team_id", "created_at", "updated_at")
+    app_collaborator_data = JSON.parse(build(:app_collaborator, app: nil).api_attributes.to_json)
+    app_collaborator_data.except!("id", "app_id", "created_at", "updated_at")
     params[:app_collaborator] = app_collaborator_data
 
-    post "/api/v1/teams/#{@team.id}/app_collaborators", params: params
+    post "/api/v1/apps/#{@app.id}/app_collaborators", params: params
     assert_response :success
 
     # # Ensure all the required data is returned properly.
     assert_proper_object_serialization response.parsed_body
 
     # Also ensure we can't do that same action as another user.
-    post "/api/v1/teams/#{@team.id}/app_collaborators",
+    post "/api/v1/apps/#{@app.id}/app_collaborators",
       params: params.merge({access_token: another_access_token})
     assert_response :not_found
   end
@@ -92,7 +92,8 @@ class Api::V1::AppCollaboratorsControllerTest < Api::Test
     put "/api/v1/app_collaborators/#{@app_collaborator.id}", params: {
       access_token: access_token,
       app_collaborator: {
-        github_username: 'Alternative String Value',
+        role: "Alternative String Value",
+        github_username: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -104,7 +105,8 @@ class Api::V1::AppCollaboratorsControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @app_collaborator.reload
-    assert_equal @app_collaborator.github_username, 'Alternative String Value'
+    assert_equal @app_collaborator.role, "Alternative String Value"
+    assert_equal @app_collaborator.github_username, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

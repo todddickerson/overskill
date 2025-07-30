@@ -1,8 +1,8 @@
 class Account::AppVersionsController < Account::ApplicationController
-  account_load_and_authorize_resource :app_version, through: :team, through_association: :app_versions
+  account_load_and_authorize_resource :app_version, through: :app, through_association: :app_versions
 
-  # GET /account/teams/:team_id/app_versions
-  # GET /account/teams/:team_id/app_versions.json
+  # GET /account/apps/:app_id/app_versions
+  # GET /account/apps/:app_id/app_versions.json
   def index
     delegate_json_to_api
   end
@@ -13,7 +13,7 @@ class Account::AppVersionsController < Account::ApplicationController
     delegate_json_to_api
   end
 
-  # GET /account/teams/:team_id/app_versions/new
+  # GET /account/apps/:app_id/app_versions/new
   def new
   end
 
@@ -21,8 +21,8 @@ class Account::AppVersionsController < Account::ApplicationController
   def edit
   end
 
-  # POST /account/teams/:team_id/app_versions
-  # POST /account/teams/:team_id/app_versions.json
+  # POST /account/apps/:app_id/app_versions
+  # POST /account/apps/:app_id/app_versions.json
   def create
     respond_to do |format|
       if @app_version.save
@@ -54,7 +54,7 @@ class Account::AppVersionsController < Account::ApplicationController
   def destroy
     @app_version.destroy
     respond_to do |format|
-      format.html { redirect_to [:account, @team, :app_versions], notice: I18n.t("app_versions.notifications.destroyed") }
+      format.html { redirect_to [:account, @app, :app_versions], notice: I18n.t("app_versions.notifications.destroyed") }
       format.json { head :no_content }
     end
   end

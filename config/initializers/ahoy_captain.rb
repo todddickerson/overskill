@@ -5,11 +5,11 @@
 # AhoyCaptain.configure do |config|
 #   # Event tracking
 #   config.event.view_name = "$view"
-#   
+#
 #   # Models
 #   config.models.event = '::Ahoy::Event'
 #   config.models.visit = '::Ahoy::Visit'
-#   
+#
 #   # Caching
 #   config.cache.enabled = true
 #   config.cache.store = Rails.cache
