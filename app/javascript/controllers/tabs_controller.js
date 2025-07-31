@@ -15,6 +15,9 @@ export default class extends Controller {
   }
 
   showPanel(panelName) {
+    console.log("Switching to panel:", panelName)
+    console.log("Panel targets found:", this.panelTargets.length)
+    
     // Update tabs
     this.tabTargets.forEach(tab => {
       if (tab.dataset.panel === panelName) {
@@ -28,6 +31,7 @@ export default class extends Controller {
 
     // Update panels
     this.panelTargets.forEach(panel => {
+      console.log("Panel:", panel.dataset.panelName, "Hidden:", panel.classList.contains("hidden"))
       if (panel.dataset.panelName === panelName) {
         panel.classList.remove("hidden")
       } else {

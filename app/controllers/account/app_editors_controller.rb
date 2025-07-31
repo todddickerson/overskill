@@ -21,8 +21,12 @@ class Account::AppEditorsController < Account::ApplicationController
 
   def update_file
     @file = @app.app_files.find(params[:file_id])
+    content = params[:app_file]&.dig(:content) || params[:content]
 
-    if @file.update(content: params[:content])
+    if @file.update(content: content)
+      # Update size based on content
+      @file.update(size_bytes: content.bytesize)
+      
       # Create a version for manual edits
       @app.app_versions.create!(
         team: @app.team,
@@ -46,7 +50,9 @@ class Account::AppEditorsController < Account::ApplicationController
         format.json { render json: {status: "saved"} }
       end
     else
-      format.json { render json: {status: "error", errors: @file.errors} }
+      respond_to do |format|
+        format.json { render json: {status: "error", errors: @file.errors} }
+      end
     end
   end
 
@@ -56,6 +62,14 @@ class Account::AppEditorsController < Account::ApplicationController
     @message.user = current_user
 
     if @message.save
+      # Create initial AI response placeholder
+      placeholder_response = @app.app_chat_messages.build(
+        role: "assistant",
+        content: "Analyzing your request and planning the changes...",
+        status: "planning"
+      )
+
+      # Start processing
       ProcessAppUpdateJob.perform_later(@message)
 
       respond_to do |format|
@@ -64,6 +78,8 @@ class Account::AppEditorsController < Account::ApplicationController
             turbo_stream.append("chat_messages",
               partial: "account/app_editors/chat_message",
               locals: {message: @message}),
+            turbo_stream.append("chat_messages", 
+              html: %Q{<div id="processing_#{@message.id}"></div>}),
             turbo_stream.replace("chat_form",
               partial: "account/app_editors/chat_form",
               locals: {app: @app})

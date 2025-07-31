@@ -15,7 +15,15 @@ class Account::AppPreviewsController < Account::ApplicationController
   end
   
   def serve_file
-    file = @app.app_files.find_by(path: params[:path])
+    path = params[:path]
+    
+    # Handle external URLs (CDN links)
+    if path.start_with?('http://') || path.start_with?('https://')
+      redirect_to path, allow_other_host: true
+      return
+    end
+    
+    file = @app.app_files.find_by(path: path)
     
     if file
       content_type = case file.file_type
@@ -28,7 +36,10 @@ class Account::AppPreviewsController < Account::ApplicationController
       
       # Set proper headers for the content type
       response.headers['Content-Type'] = content_type
-      render plain: file.content, layout: false
+      response.headers['Cache-Control'] = 'no-cache'
+      
+      # Use send_data instead of render plain to ensure proper content type handling
+      send_data file.content, type: content_type, disposition: 'inline'
     else
       render plain: "File not found", status: :not_found
     end

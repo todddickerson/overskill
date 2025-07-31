@@ -1,4 +1,10 @@
-<div class="h-full flex flex-col bg-gray-900" data-controller="code-editor" data-file-id="<%= file.id %>">
+<div class="h-full flex flex-col bg-gray-900" 
+     data-controller="codemirror" 
+     data-codemirror-content-value="<%= html_escape(file.content) %>"
+     data-codemirror-file-type-value="<%= file.file_type %>"
+     data-codemirror-file-id-value="<%= file.id %>"
+     data-codemirror-update-url-value="<%= file_account_app_editor_path(@app, file_id: file.id) %>">
+  
   <!-- Editor Header -->
   <div class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
     <div class="flex items-center space-x-3">
@@ -8,37 +14,29 @@
         <%= number_to_human_size(file.size_bytes) %>
       </span>
     </div>
-    <div id="file_<%= file.id %>_status" class="text-sm">
+    <div class="text-sm">
       <!-- Status will be updated here -->
     </div>
   </div>
   
-  <!-- Code Editor -->
-  <div class="flex-1 relative">
+  <!-- CodeMirror Editor Container -->
+  <div class="flex-1 relative" data-codemirror-target="editor">
+    <!-- CodeMirror will be mounted here -->
+    
+    <!-- Fallback textarea (hidden when CodeMirror loads) -->
     <textarea
       id="editor_<%= file.id %>"
       class="absolute inset-0 w-full h-full bg-gray-900 text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
-      data-code-editor-target="editor"
-      data-action="input->code-editor#handleChange"
       spellcheck="false"
     ><%= file.content %></textarea>
-    
-    <!-- Line numbers (optional enhancement) -->
-    <div class="absolute left-0 top-0 bottom-0 w-12 bg-gray-800 border-r border-gray-700 select-none pointer-events-none">
-      <div class="text-gray-500 text-sm font-mono p-4 leading-relaxed">
-        <% file.content.lines.count.times do |i| %>
-          <div><%= i + 1 %></div>
-        <% end %>
-      </div>
-    </div>
   </div>
   
-  <!-- Save indicator -->
+  <!-- Status Bar -->
   <div class="bg-gray-800 border-t border-gray-700 px-4 py-2 text-xs text-gray-400">
-    <span data-code-editor-target="status">Ready</span>
+    <span data-codemirror-target="status">Ready</span>
     <span class="float-right">
-      Line <span data-code-editor-target="line">1</span>, 
-      Column <span data-code-editor-target="column">1</span>
+      Line <span data-codemirror-target="line">1</span>, 
+      Column <span data-codemirror-target="column">1</span>
     </span>
   </div>
 </div>

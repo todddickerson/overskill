@@ -5,11 +5,9 @@ class ProcessAppUpdateJob < ApplicationJob
     app = chat_message.app
     @user = chat_message.user  # Store user for version creation
 
-    # Mark as processing
-    chat_message.update!(status: "processing")
-
-    # Broadcast processing state
-    broadcast_processing(chat_message)
+    # Step 1: Planning phase
+    chat_message.update!(status: "planning")
+    broadcast_status_update(chat_message)
 
     # Get current files
     current_files = app.app_files.map do |file|
@@ -26,6 +24,10 @@ class ProcessAppUpdateJob < ApplicationJob
       type: app.app_type,
       framework: app.framework
     }
+
+    # Step 2: Executing phase
+    chat_message.update!(status: "executing")
+    broadcast_status_update(chat_message)
 
     # Call AI to process the update
     client = Ai::OpenRouterClient.new
@@ -190,23 +192,45 @@ class ProcessAppUpdateJob < ApplicationJob
     broadcast_error(chat_message, error_response)
   end
 
-  def broadcast_processing(chat_message)
+  def broadcast_status_update(chat_message)
+    # Create a temporary AI message to show status
+    temp_message = chat_message.app.app_chat_messages.build(
+      role: "assistant",
+      content: get_status_message(chat_message.status),
+      status: chat_message.status
+    )
+
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{chat_message.app_id}_chat",
+      target: "processing_#{chat_message.id}",
+      partial: "account/app_editors/chat_message",
+      locals: {message: temp_message}
+    )
+  end
+
+  def get_status_message(status)
+    case status
+    when "planning"
+      "Analyzing your request and planning the changes..."
+    when "executing"
+      "Implementing the changes to your app..."
+    when "completed"
+      "Changes completed successfully!"
+    when "failed"
+      "An error occurred while processing your request."
+    else
+      "Processing your request..."
+    end
+  end
+
+  def broadcast_initial_response(chat_message)
+    # Create initial AI response placeholder
     Turbo::StreamsChannel.broadcast_append_to(
       "app_#{chat_message.app_id}_chat",
       target: "chat_messages",
       html: <<~HTML
-        <div id="processing_#{chat_message.id}" class="ml-8">
-          <div class="flex items-start space-x-2">
-            <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <i class="fas fa-robot text-white text-sm"></i>
-            </div>
-            <div class="flex-1 bg-gray-750 rounded-lg px-4 py-2">
-              <div class="flex items-center text-sm text-gray-400">
-                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-500 mr-2"></div>
-                Processing your request...
-              </div>
-            </div>
-          </div>
+        <div id="processing_#{chat_message.id}">
+          <!-- This will be replaced with status updates -->
         </div>
       HTML
     )

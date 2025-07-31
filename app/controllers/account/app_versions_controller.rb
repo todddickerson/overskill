@@ -59,6 +59,28 @@ class Account::AppVersionsController < Account::ApplicationController
     end
   end
 
+  # GET /account/app_versions/:id/preview
+  def preview
+    # For now, we'll redirect to the main app preview
+    # In the future, this could serve files from a specific version
+    redirect_to account_app_preview_path(@app_version.app)
+  end
+
+  # GET /account/app_versions/:id/compare
+  def compare
+    @current_version = @app_version.app.app_versions.order(created_at: :desc).first
+    @comparison = {
+      version: @app_version,
+      current: @current_version,
+      changes: compare_versions(@app_version, @current_version)
+    }
+
+    respond_to do |format|
+      format.html
+      format.json { render json: @comparison }
+    end
+  end
+
   private
 
   if defined?(Api::V1::ApplicationController)
@@ -68,5 +90,25 @@ class Account::AppVersionsController < Account::ApplicationController
   def process_params(strong_params)
     assign_date_and_time(strong_params, :published_at)
     # 🚅 super scaffolding will insert processing for new fields above this line.
+  end
+
+  def compare_versions(version1, version2)
+    return {} unless version1 && version2
+
+    {
+      version_numbers: {
+        from: version2.version_number,
+        to: version1.version_number
+      },
+      changelog: {
+        from: version2.changelog,
+        to: version1.changelog
+      },
+      created_at: {
+        from: version2.created_at,
+        to: version1.created_at
+      },
+      time_difference: time_ago_in_words(version2.created_at)
+    }
   end
 end
