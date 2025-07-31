@@ -27,7 +27,7 @@ class ProcessAppUpdateJob < ApplicationJob
     }
 
     # Call AI to process the update
-    client = AI::OpenRouterClient.new
+    client = Ai::OpenRouterClient.new
     response = client.update_app(chat_message.content, current_files, app_context)
 
     if response[:success]

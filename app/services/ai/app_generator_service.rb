@@ -1,4 +1,4 @@
-module AI
+module Ai
   class AppGeneratorService
     class GenerationError < StandardError; end
 
@@ -93,7 +93,7 @@ module AI
 
     def generate_with_ai(enhanced_prompt)
       # Use the OpenRouter client with prompt templates
-      client = AI::OpenRouterClient.new
+      client = Ai::OpenRouterClient.new
       client.generate_app(enhanced_prompt, framework: app.framework, app_type: app.app_type)
     end
 
@@ -127,7 +127,7 @@ module AI
 
     def security_scan_passed?(files)
       # For MVP, just check for obvious dangerous patterns
-      # Later we'll use AI::SecurityScanner service
+      # Later we'll use Ai::SecurityScanner service
 
       dangerous_patterns = [
         /eval\s*\(/,

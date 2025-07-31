@@ -16,7 +16,7 @@ class AppGenerationJob < ApplicationJob
     end
 
     # Run the generation
-    service = AI::AppGeneratorService.new(app, app_generation)
+    service = Ai::AppGeneratorService.new(app, app_generation)
     result = service.generate!
 
     if result[:success]

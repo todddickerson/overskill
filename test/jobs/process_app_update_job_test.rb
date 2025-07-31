@@ -25,7 +25,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       content: '{"changes": {"summary": "Added button"}, "files": []}'
     }, [String, Array, Hash])
 
-    AI::OpenRouterClient.stub(:new, mock_client) do
+    Ai::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
 
@@ -55,7 +55,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
     assert_difference "AppChatMessage.count", 1 do
-      AI::OpenRouterClient.stub(:new, mock_client) do
+      Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
@@ -92,7 +92,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
-    AI::OpenRouterClient.stub(:new, mock_client) do
+    Ai::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
 
@@ -121,7 +121,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
     assert_difference "AppFile.count", 1 do
-      AI::OpenRouterClient.stub(:new, mock_client) do
+      Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
@@ -156,7 +156,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
     assert_difference "AppFile.count", -1 do
-      AI::OpenRouterClient.stub(:new, mock_client) do
+      Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
@@ -180,7 +180,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
     assert_difference "AppVersion.count", 1 do
-      AI::OpenRouterClient.stub(:new, mock_client) do
+      Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
@@ -197,7 +197,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       error: "API rate limit exceeded"
     }, [String, Array, Hash])
 
-    AI::OpenRouterClient.stub(:new, mock_client) do
+    Ai::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
 
@@ -226,7 +226,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
 
     # Should broadcast processing, completion, and preview refresh
     assert_broadcasts("app_#{@app.id}_chat", 3) do
-      AI::OpenRouterClient.stub(:new, mock_client) do
+      Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
       end
     end
@@ -239,7 +239,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
       content: "Not valid JSON"
     }, [String, Array, Hash])
 
-    AI::OpenRouterClient.stub(:new, mock_client) do
+    Ai::OpenRouterClient.stub(:new, mock_client) do
       ProcessAppUpdateJob.perform_now(@chat_message)
     end
 

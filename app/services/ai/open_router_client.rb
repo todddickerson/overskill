@@ -1,4 +1,4 @@
-module AI
+module Ai
   class OpenRouterClient
     include HTTParty
     base_uri ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
@@ -72,7 +72,7 @@ module AI
 
     def generate_app(prompt, framework: "react", app_type: nil)
       # Build a detailed spec from the user's prompt
-      spec = AI::AppSpecBuilder.build_spec(prompt, framework)
+      spec = Ai::AppSpecBuilder.build_spec(prompt, framework)
 
       messages = [
         {role: "system", content: "You are an expert web developer. Follow the specifications exactly."},
@@ -84,7 +84,7 @@ module AI
 
     def update_app(user_request, current_files, app_context)
       # Build update spec
-      spec = AI::AppSpecBuilder.build_update_spec(user_request, current_files, app_context)
+      spec = Ai::AppSpecBuilder.build_update_spec(user_request, current_files, app_context)
 
       messages = [
         {role: "system", content: "You are an expert web developer. Make precise updates to the existing application."},

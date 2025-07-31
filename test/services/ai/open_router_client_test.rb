@@ -2,10 +2,10 @@ require "test_helper"
 require "minitest/mock"
 require_relative "../../../app/services/ai/open_router_client"
 
-module AI
+module Ai
   class OpenRouterClientTest < ActiveSupport::TestCase
     setup do
-      @client = AI::OpenRouterClient.new("test-api-key")
+      @client = Ai::OpenRouterClient.new("test-api-key")
     end
 
     test "should initialize with API key" do
@@ -15,7 +15,7 @@ module AI
 
     test "should use environment API key if none provided" do
       ENV["OPENROUTER_API_KEY"] = "env-api-key"
-      client = AI::OpenRouterClient.new
+      client = Ai::OpenRouterClient.new
       assert_equal "env-api-key", client.instance_variable_get(:@api_key)
     ensure
       ENV.delete("OPENROUTER_API_KEY")
@@ -54,7 +54,7 @@ module AI
         }
       })
 
-      AI::OpenRouterClient.stub(:post, mock_response) do
+      Ai::OpenRouterClient.stub(:post, mock_response) do
         result = @client.chat([{role: "user", content: "Say hello"}])
 
         assert result[:success]
@@ -70,7 +70,7 @@ module AI
       mock_response.expect(:body, '{"error": "Bad request"}')
       mock_response.expect(:parsed_response, {"error" => "Bad request"})
 
-      AI::OpenRouterClient.stub(:post, mock_response) do
+      Ai::OpenRouterClient.stub(:post, mock_response) do
         result = @client.chat([{role: "user", content: "Say hello"}])
 
         assert_not result[:success]
@@ -80,7 +80,7 @@ module AI
     end
 
     test "should handle exceptions gracefully" do
-      AI::OpenRouterClient.stub(:post, ->(*args) { raise StandardError, "Network error" }) do
+      Ai::OpenRouterClient.stub(:post, ->(*args) { raise StandardError, "Network error" }) do
         result = @client.chat([{role: "user", content: "Say hello"}])
 
         assert_not result[:success]
@@ -96,7 +96,7 @@ module AI
         "usage" => {}
       })
 
-      AI::OpenRouterClient.stub(:post, mock_response) do
+      Ai::OpenRouterClient.stub(:post, mock_response) do
         @client.generate_app("Create an app", framework: "react")
 
         # Verify the correct model was used

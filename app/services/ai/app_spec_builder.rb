@@ -1,4 +1,4 @@
-module AI
+module Ai
   class AppSpecBuilder
     def self.build_spec(user_prompt, framework = "react")
       <<~SPEC

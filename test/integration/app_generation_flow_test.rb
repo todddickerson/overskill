@@ -68,7 +68,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
     }
 
     # Mock the service
-    service = AI::AppGeneratorService.new(app, generation)
+    service = Ai::AppGeneratorService.new(app, generation)
     
     # Mock the generate_with_ai method
     def service.generate_with_ai(prompt)
@@ -143,7 +143,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
     app = create(:app, team: @team, creator: @membership)
     generation = create(:app_generation, app: app, team: @team)
 
-    service = AI::AppGeneratorService.new(app, generation)
+    service = Ai::AppGeneratorService.new(app, generation)
     
     # Mock the generate_with_ai method to return failure
     def service.generate_with_ai(prompt)
@@ -218,7 +218,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
 
     # Process all generations
     generations.each_with_index do |generation, i|
-      service = AI::AppGeneratorService.new(apps[i], generation)
+      service = Ai::AppGeneratorService.new(apps[i], generation)
       
       # Mock the generate_with_ai method
       def service.generate_with_ai(prompt)
