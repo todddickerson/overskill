@@ -6,6 +6,7 @@ app = app_generation.app
 app_generator_service = Ai::AppGeneratorService.new(app, app_generation)
 
 @generation = app_generation
+@app = app
 
 # generate! method 
 @generation.update!(status: "generating")
@@ -47,6 +48,13 @@ puts "update_app_metadata: #{update_app_metadata}"
     output_tokens: ai_response[:usage]&.dig("completion_tokens")
   )
 
+  @app.update!(
+    status: "generated",
+    ai_model: ai_response[:model],
+    ai_cost: app_generator_service.calculate_cost(ai_response[:usage])
+  )
 
+  puts "app_generation: #{@generation}"
+  puts "app: #{@app}"
 
 

@@ -1,0 +1,13 @@
+<%= link_to account_app_editor_path(file.app, file_id: file.id), 
+    class: "group flex items-center px-2 py-1 text-sm rounded hover:bg-gray-700 transition-colors #{'bg-gray-700 border-l-2 border-primary-500' if selected}",
+    data: { 
+      turbo_frame: "_top",
+      file_tree_target: "file",
+      action: "click->file-tree#selectFile"
+    } do %>
+  <i class="<%= file_extension_icon(file.path) %> mr-2 text-sm"></i>
+  <span class="text-gray-300 truncate flex-1"><%= File.basename(file.path) %></span>
+  <span class="text-xs text-gray-500 opacity-0 group-hover:opacity-100">
+    <%= number_to_human_size(file.size_bytes) %>
+  </span>
+<% end %>

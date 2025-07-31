@@ -1,9 +1,9 @@
 <div id="preview_frame" class="h-full bg-white">
   <% if app.app_files.any? %>
     <iframe 
-      srcdoc="<%= html_for_preview(app) %>"
+      src="<%= account_app_preview_path(app) %>"
       class="w-full h-full border-0"
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
       title="App Preview">
     </iframe>
   <% else %>

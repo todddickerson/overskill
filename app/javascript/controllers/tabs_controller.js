@@ -5,16 +5,16 @@ export default class extends Controller {
 
   connect() {
     // Show the first tab by default
-    this.showTab("preview")
+    this.showPanel("preview")
   }
 
   switchTab(event) {
     event.preventDefault()
     const panel = event.currentTarget.dataset.panel
-    this.showTab(panel)
+    this.showPanel(panel)
   }
 
-  showTab(panelName) {
+  showPanel(panelName) {
     // Update tabs
     this.tabTargets.forEach(tab => {
       if (tab.dataset.panel === panelName) {

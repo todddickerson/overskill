@@ -19,6 +19,53 @@ module ApplicationHelper
       "fas fa-file text-gray-400"
     end
   end
+  
+  def organize_files_into_tree(files)
+    tree = {}
+    
+    files.each do |file|
+      parts = file.path.split('/')
+      current = tree
+      
+      # Build nested structure
+      parts[0...-1].each do |part|
+        current[part] ||= { _type: 'folder', _children: {} }
+        current = current[part][:_children]
+      end
+      
+      # Add file
+      filename = parts.last
+      current[filename] = { _type: 'file', _file: file }
+    end
+    
+    tree
+  end
+  
+  def file_extension_icon(path)
+    ext = File.extname(path).downcase
+    case ext
+    when '.html', '.htm'
+      'fab fa-html5 text-orange-500'
+    when '.js', '.jsx', '.mjs'
+      'fab fa-js-square text-yellow-500'
+    when '.ts', '.tsx'
+      'fab fa-js-square text-blue-600'
+    when '.css', '.scss', '.sass'
+      'fab fa-css3-alt text-blue-500'
+    when '.json'
+      'fas fa-code text-yellow-600'
+    when '.md'
+      'fab fa-markdown text-gray-400'
+    when '.xml'
+      'fas fa-code text-orange-600'
+    when '.svg'
+      'fas fa-image text-purple-500'
+    when '.png', '.jpg', '.jpeg', '.gif', '.webp'
+      'fas fa-image text-green-500'
+    else
+      'fas fa-file-code text-gray-400'
+    end
+  end
 
   def html_for_preview(app)
     # Find the main HTML file

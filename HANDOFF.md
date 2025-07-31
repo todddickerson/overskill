@@ -34,12 +34,12 @@ The current app editor (http://localhost:3000/account/apps/{id}/editor) is missi
 
 ## TODO List (Priority Order)
 
-### 1. Fix Preview Panel (HIGH PRIORITY)
-- [ ] Create preview route that serves app files (like `/preview/apps/:id/*path`)
-- [ ] Implement iframe sandbox for security
-- [ ] Handle index.html as default file
-- [ ] Support CSS/JS file loading within preview
-- [ ] Use Cloudflare R2 for production preview hosting
+### 1. Fix Preview Panel (HIGH PRIORITY) ✅ COMPLETED
+- [x] Create preview route that serves app files (like `/preview/apps/:id/*path`)
+- [x] Implement iframe sandbox for security
+- [x] Handle index.html as default file
+- [x] Support CSS/JS file loading within preview
+- [ ] Use Cloudflare Workers for production preview hosting (TODO added)
 
 ### 2. Implement Code Editor (HIGH PRIORITY)
 - [ ] Add file tree sidebar showing all app_files

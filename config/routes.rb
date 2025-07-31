@@ -86,6 +86,11 @@ Rails.application.routes.draw do
             post :create_message
             patch "files/:file_id", action: :update_file, as: :file
           end
+          
+          # App preview routes
+          resource :preview, controller: "app_previews", only: [:show] do
+            get "files/*path", action: :serve_file, as: :file
+          end
 
           resources :app_versions
           resources :app_files
