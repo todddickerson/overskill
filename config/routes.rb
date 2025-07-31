@@ -89,7 +89,7 @@ Rails.application.routes.draw do
           
           # App preview routes
           resource :preview, controller: "app_previews", only: [:show] do
-            get "files/*path", action: :serve_file, as: :file
+            get "files/*path", action: :serve_file, as: :file, format: false
           end
 
           resources :app_versions

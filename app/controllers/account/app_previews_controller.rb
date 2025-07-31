@@ -26,7 +26,9 @@ class Account::AppPreviewsController < Account::ApplicationController
       else "text/plain"
       end
       
-      render plain: file.content, content_type: content_type
+      # Set proper headers for the content type
+      response.headers['Content-Type'] = content_type
+      render plain: file.content, layout: false
     else
       render plain: "File not found", status: :not_found
     end
