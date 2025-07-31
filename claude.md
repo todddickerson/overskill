@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT: Check HANDOFF.md First!
+**If a HANDOFF.md file exists in the root directory, read it FIRST for:**
+- Current development context and state
+- Active TODO items and priorities
+- Recent changes and issues
+- Next steps
+
+**Update HANDOFF.md as you complete tasks by:**
+1. Checking off completed items with [x]
+2. Adding notes about implementation decisions
+3. Updating the "Current State" section
+4. Removing completed items when no longer relevant
+
 ## Project Overview
 
 OverSkill is an AI-powered app marketplace platform built with Ruby on Rails (BulletTrain framework). It enables non-technical users to create, deploy, and monetize applications using natural language.
