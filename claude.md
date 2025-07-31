@@ -109,6 +109,10 @@ rails generate super_scaffold Comment Post,App,Team \
 app/
 ├── controllers/
 │   ├── account/         # Team-scoped controllers (BulletTrain pattern)
+│   │   ├── apps_controller.rb         # CRUD operations for apps
+│   │   ├── app_editors_controller.rb  # Code editor interface (/apps/:id/editor)
+│   │   ├── app_previews_controller.rb # Preview iframe & file serving (/apps/:id/preview)
+│   │   └── app_chats_controller.rb    # Chat interface for AI assistance
 │   ├── api/v1/         # API endpoints with JWT auth
 │   └── public/         # Public-facing pages
 ├── models/             # All models belong to teams for multi-tenancy
@@ -119,6 +123,17 @@ app/
 ├── jobs/              # Background jobs (Sidekiq)
 └── views/             # ERB templates with Hotwire
 ```
+
+### Key Controllers
+
+- **Account::AppsController** - Standard CRUD for apps (index, show, new, create, edit, update, destroy)
+- **Account::AppEditorsController** - Main editor interface at `/account/apps/:id/editor`
+  - Shows chat panel, file tree, code editor, and preview
+  - Handles file updates and chat messages
+- **Account::AppPreviewsController** - Serves app preview at `/account/apps/:id/preview`
+  - `show` action serves the main HTML with asset path rewriting
+  - `serve_file` action serves individual JS/CSS files with proper MIME types
+- **Account::AppChatsController** - Chat-specific actions (may be merged into editors)
 
 ### UI/UX Architecture
 

@@ -81,13 +81,16 @@ Rails.application.routes.draw do
         resources :creator_profiles
         resources :follows
         resources :apps do
+          # Chat interface (may be deprecated in favor of editor)
           resource :chat, controller: "app_chats", only: [:show, :create]
+          
+          # Main editor interface at /account/apps/:id/editor
           resource :editor, controller: "app_editors", only: [:show] do
             post :create_message
             patch "files/:file_id", action: :update_file, as: :file
           end
           
-          # App preview routes
+          # Preview iframe and file serving at /account/apps/:id/preview
           resource :preview, controller: "app_previews", only: [:show] do
             get "files/*path", action: :serve_file, as: :file, format: false
           end
