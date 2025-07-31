@@ -67,7 +67,7 @@
         <% box.title "Generated Files" %>
         <% box.description do %>
           <%= pluralize(@app.app_files.count, 'file') %> generated • 
-          Total size: <%= number_to_human_size(@app.app_files.sum(:size)) %>
+          Total size: <%= number_to_human_size(@app.app_files.sum(:size_bytes)) %>
         <% end %>
         
         <% box.body do %>
@@ -77,7 +77,7 @@
                 <div class="flex items-center justify-between mb-2">
                   <h4 class="font-mono text-sm font-medium"><%= file.path %></h4>
                   <span class="text-xs text-gray-500">
-                    <%= file.file_type %> • <%= number_to_human_size(file.size) %>
+                    <%= file.file_type %> • <%= number_to_human_size(file.size_bytes) %>
                   </span>
                 </div>
                 <details class="group">

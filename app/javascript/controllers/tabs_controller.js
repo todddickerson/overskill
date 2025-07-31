@@ -4,24 +4,25 @@ export default class extends Controller {
   static targets = ["tab", "panel"]
 
   connect() {
-    // Show the first panel by default
-    this.showPanel("preview")
+    // Show the first tab by default
+    this.showTab("preview")
   }
 
   switchTab(event) {
-    const panelName = event.currentTarget.dataset.panel
-    this.showPanel(panelName)
+    event.preventDefault()
+    const panel = event.currentTarget.dataset.panel
+    this.showTab(panel)
   }
 
-  showPanel(panelName) {
+  showTab(panelName) {
     // Update tabs
     this.tabTargets.forEach(tab => {
       if (tab.dataset.panel === panelName) {
         tab.classList.remove("text-gray-400", "border-transparent")
         tab.classList.add("text-white", "border-primary-500")
       } else {
-        tab.classList.add("text-gray-400", "border-transparent")
         tab.classList.remove("text-white", "border-primary-500")
+        tab.classList.add("text-gray-400", "border-transparent")
       }
     })
 

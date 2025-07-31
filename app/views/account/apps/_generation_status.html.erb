@@ -39,7 +39,7 @@
           <% app.app_files.limit(5).each do |file| %>
             <li class="text-sm text-gray-700">
               <span class="font-mono bg-gray-100 px-1 rounded"><%= file.path %></span>
-              <span class="text-gray-500">(<%= number_to_human_size(file.size) %>)</span>
+              <span class="text-gray-500">(<%= number_to_human_size(file.size_bytes) %>)</span>
             </li>
           <% end %>
           <% if app.app_files.count > 5 %>

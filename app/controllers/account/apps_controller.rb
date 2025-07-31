@@ -29,6 +29,7 @@ class Account::AppsController < Account::ApplicationController
         # Trigger AI generation if this is a new app
         if @app.prompt.present?
           generation = @app.app_generations.create!(
+            team: @app.team,
             prompt: @app.prompt,
             status: "pending",
             started_at: Time.current

@@ -17,8 +17,9 @@ class AppGenerationJob < ApplicationJob
 
     # Run the generation
     service = AI::AppGeneratorService.new(app, app_generation)
+    result = service.generate!
 
-    if service.generate!
+    if result[:success]
       Rails.logger.info "[AppGenerationJob] Successfully generated app ##{app.id}"
 
       # Broadcast success via Turbo
@@ -29,7 +30,7 @@ class AppGenerationJob < ApplicationJob
         AppDeploymentJob.perform_later(app)
       end
     else
-      Rails.logger.error "[AppGenerationJob] Failed to generate app ##{app.id}: #{service.errors.join(", ")}"
+      Rails.logger.error "[AppGenerationJob] Failed to generate app ##{app.id}: #{result[:error]}"
 
       # Broadcast failure
       broadcast_status(app, "failed", "Generation failed. Please try again.")

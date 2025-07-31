@@ -9,7 +9,6 @@ class AppGeneration < ApplicationRecord
 
   # 🚅 add has_many associations above.
 
-  has_one :team, through: :app
   # 🚅 add has_one associations above.
 
   # 🚅 add scopes above.

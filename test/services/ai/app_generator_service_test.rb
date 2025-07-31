@@ -3,9 +3,9 @@ require "test_helper"
 module AI
   class AppGeneratorServiceTest < ActiveSupport::TestCase
     setup do
-      @team = teams(:one)
-      @app = apps(:one)
-      @generation = app_generations(:one)
+      @team = create(:team)
+      @app = create(:app, team: @team)
+      @generation = create(:app_generation, app: @app, team: @team)
       @service = AI::AppGeneratorService.new(@app, @generation)
     end
 

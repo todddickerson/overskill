@@ -1,4 +1,5 @@
 class Account::AppEditorsController < Account::ApplicationController
+  layout "editor"
   before_action :set_app
 
   def show

@@ -14,16 +14,16 @@ module AI
       Rails.logger.info "[AppGenerator] Starting generation for App ##{app.id}"
 
       # Update generation status
-      generation.update!(
+      @generation.update!(
         started_at: Time.current,
         status: "generating"
       )
 
       # Update app status
-      app.update!(status: "generating")
+      @app.update!(status: "generating")
 
       # Step 1: Enhance the prompt
-      enhanced_prompt = enhance_prompt(generation.prompt)
+      enhanced_prompt = enhance_prompt(@generation.prompt)
 
       # Step 2: Call AI to generate the app
       ai_response = generate_with_ai(enhanced_prompt)
@@ -42,22 +42,24 @@ module AI
             update_app_metadata(parsed_data[:app])
 
             # Step 7: Mark generation as complete
-            generation.update!(
+            @generation.update!(
               completed_at: Time.current,
               status: "completed",
               ai_model: ai_response[:model],
-              ai_response: ai_response[:content],
-              ai_cost: calculate_cost(ai_response[:usage])
+              total_cost: (calculate_cost(ai_response[:usage]) * 100).to_i, # Store as cents
+              duration_seconds: (Time.current - @generation.started_at).to_i,
+              input_tokens: ai_response[:usage]&.dig("prompt_tokens"),
+              output_tokens: ai_response[:usage]&.dig("completion_tokens")
             )
 
-            app.update!(
+            @app.update!(
               status: "generated",
               ai_model: ai_response[:model],
               ai_cost: calculate_cost(ai_response[:usage])
             )
 
             Rails.logger.info "[AppGenerator] Successfully generated App ##{app.id}"
-            true
+            {success: true}
           else
             handle_error("Security scan failed - potentially unsafe code detected")
           end
@@ -69,7 +71,7 @@ module AI
       end
     rescue => e
       handle_error("Generation error: #{e.message}")
-      raise GenerationError, e.message
+      {success: false, error: e.message}
     end
 
     private
@@ -96,29 +98,31 @@ module AI
     end
 
     def parse_ai_response(content)
-      # Try to parse as JSON
-      data = JSON.parse(content)
+      begin
+        # Try to parse as JSON
+        data = JSON.parse(content)
 
-      # Validate required fields
-      return nil unless data["app"] && data["files"]
+        # Validate required fields
+        return nil unless data["app"] && data["files"]
 
-      {
-        app: data["app"],
-        files: data["files"],
-        instructions: data["instructions"],
-        deployment_notes: data["deployment_notes"]
-      }
-    rescue JSON::ParserError => e
-      Rails.logger.error "[AppGenerator] Failed to parse AI response as JSON: #{e.message}"
+        {
+          app: data["app"],
+          files: data["files"],
+          instructions: data["instructions"],
+          deployment_notes: data["deployment_notes"]
+        }
+      rescue JSON::ParserError => e
+        Rails.logger.error "[AppGenerator] Failed to parse AI response as JSON: #{e.message}"
 
-      # Try to extract JSON from markdown code blocks
-      json_match = content.match(/```json\n(.*?)\n```/m)
-      if json_match
-        json_match[1]
-        retry
+        # Try to extract JSON from markdown code blocks
+        json_match = content.match(/```json\n(.*?)\n```/m)
+        if json_match
+          content = json_match[1]
+          retry
+        end
+
+        nil
       end
-
-      nil
     end
 
     def security_scan_passed?(files)
@@ -148,13 +152,16 @@ module AI
 
     def create_app_files(files)
       files.each do |file_data|
-        app.app_files.create!(
+        @app.app_files.create!(
+          team: @app.team,
           path: file_data["path"] || file_data[:path],
           content: file_data["content"] || file_data[:content],
           file_type: determine_file_type(file_data["path"] || file_data[:path]),
-          size: (file_data["content"] || file_data[:content]).bytesize
+          size_bytes: (file_data["content"] || file_data[:content]).bytesize
         )
       end
+      
+      # Don't create version here - it's created by ProcessAppUpdateJob when there are actual changes
     end
 
     def determine_file_type(path)
@@ -183,7 +190,7 @@ module AI
         updates[:slug] = updates[:name].parameterize
       end
 
-      app.update!(updates) if updates.any?
+      @app.update!(updates) if updates.any?
     end
 
     def calculate_cost(usage)
@@ -204,15 +211,15 @@ module AI
       Rails.logger.error "[AppGenerator] #{message}"
       @errors << message
 
-      generation.update!(
+      @generation.update!(
         completed_at: Time.current,
         status: "failed",
         error_message: message
       )
 
-      app.update!(status: "failed")
+      @app.update!(status: "failed")
 
-      false
+      {success: false, error: message}
     end
   end
 end

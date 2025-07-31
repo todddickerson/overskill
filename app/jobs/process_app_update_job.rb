@@ -15,7 +15,7 @@ class ProcessAppUpdateJob < ApplicationJob
       {
         path: file.path,
         type: file.file_type,
-        size: file.size
+        size_bytes: file.size_bytes
       }
     end
 
@@ -85,14 +85,14 @@ class ProcessAppUpdateJob < ApplicationJob
           path: file_data[:path],
           content: file_data[:content],
           file_type: file_data[:type] || determine_file_type(file_data[:path]),
-          size: file_data[:content].bytesize
+          size_bytes: file_data[:content].bytesize
         )
       when "update"
         file = app.app_files.find_by(path: file_data[:path])
         if file
           file.update!(
             content: file_data[:content],
-            size: file_data[:content].bytesize
+            size_bytes: file_data[:content].bytesize
           )
         else
           # Create if doesn't exist
@@ -100,7 +100,7 @@ class ProcessAppUpdateJob < ApplicationJob
             path: file_data[:path],
             content: file_data[:content],
             file_type: file_data[:type] || determine_file_type(file_data[:path]),
-            size: file_data[:content].bytesize
+            size_bytes: file_data[:content].bytesize
           )
         end
       when "delete"
@@ -227,7 +227,7 @@ class ProcessAppUpdateJob < ApplicationJob
     Turbo::StreamsChannel.broadcast_replace_to(
       "app_#{user_message.app_id}_chat",
       target: "processing_#{user_message.id}",
-      partial: "account/app_chats/message",
+      partial: "account/app_editors/chat_message",
       locals: {message: error_message}
     )
   end

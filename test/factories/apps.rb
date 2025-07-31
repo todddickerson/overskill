@@ -11,7 +11,11 @@ FactoryBot.define do
     visibility { "private" }
     
     after(:build) do |app|
-      app.creator ||= create(:membership, team: app.team)
+      if app.creator.nil?
+        # Find existing membership or create a new one
+        existing_membership = app.team.memberships.first
+        app.creator = existing_membership || create(:membership, team: app.team)
+      end
     end
     base_price { 0.0 }
     stripe_product_id { nil }
@@ -52,9 +56,9 @@ FactoryBot.define do
 
     trait :with_files do
       after(:create) do |app|
-        create(:app_file, app: app, path: "index.html")
-        create(:app_file, app: app, path: "app.js")
-        create(:app_file, app: app, path: "styles.css")
+        create(:app_file, app: app, team: app.team, path: "index.html")
+        create(:app_file, app: app, team: app.team, path: "app.js", file_type: "javascript", content: "console.log('app');")
+        create(:app_file, app: app, team: app.team, path: "styles.css", file_type: "css", content: "body { margin: 0; }")
       end
     end
 

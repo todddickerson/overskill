@@ -17,10 +17,10 @@ class AppTest < ActiveSupport::TestCase
     assert_includes app.errors[:name], "can't be blank"
   end
 
-  test "requires slug" do
-    app = build(:app, slug: nil)
-    assert_not app.valid?
-    assert_includes app.errors[:slug], "can't be blank"
+  test "generates slug if blank" do
+    app = build(:app, name: "My Cool App", slug: nil)
+    assert app.valid?
+    assert_equal "my-cool-app", app.slug
   end
 
   test "slug must be unique" do
