@@ -74,7 +74,8 @@ module Ai
       {success: false, error: e.message}
     end
 
-    private
+    # Methods below are public for console debugging
+    # private # Uncomment to make methods private in production
 
     def enhance_prompt(original_prompt)
       # For MVP, just add some context. Later we can make this smarter.

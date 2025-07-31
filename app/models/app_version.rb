@@ -15,9 +15,8 @@ class AppVersion < ApplicationRecord
   # 🚅 add scopes above.
 
   validates :app, scope: true
-  validates :user, scope: true
+  validates :user, scope: true, allow_blank: true
   validates :version_number, presence: true
-  validates :user, presence: true
   # 🚅 add validations above.
 
   # 🚅 add callbacks above.

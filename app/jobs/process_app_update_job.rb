@@ -3,6 +3,7 @@ class ProcessAppUpdateJob < ApplicationJob
 
   def perform(chat_message)
     app = chat_message.app
+    @user = chat_message.user  # Store user for version creation
 
     # Mark as processing
     chat_message.update!(status: "processing")
@@ -70,7 +71,7 @@ class ProcessAppUpdateJob < ApplicationJob
     # Try to extract JSON from markdown
     json_match = content.match(/```json\n(.*?)\n```/m)
     if json_match
-      json_match[1]
+      content = json_match[1]
       retry
     end
 
@@ -82,6 +83,7 @@ class ProcessAppUpdateJob < ApplicationJob
       case file_data[:action]
       when "create"
         app.app_files.create!(
+          team: app.team,
           path: file_data[:path],
           content: file_data[:content],
           file_type: file_data[:type] || determine_file_type(file_data[:path]),
@@ -97,6 +99,7 @@ class ProcessAppUpdateJob < ApplicationJob
         else
           # Create if doesn't exist
           app.app_files.create!(
+            team: app.team,
             path: file_data[:path],
             content: file_data[:content],
             file_type: file_data[:type] || determine_file_type(file_data[:path]),
@@ -108,12 +111,16 @@ class ProcessAppUpdateJob < ApplicationJob
       end
     end
 
-    # Create a new version
-    app.app_versions.create!(
-      version_number: next_version_number(app),
-      changes_summary: result[:changes][:summary],
-      files_changed: result[:changes][:files_modified]&.join(", ")
-    )
+    # Create a new version if files were modified
+    if result[:files].any?
+      app.app_versions.create!(
+        team: app.team,
+        user: @user,
+        version_number: next_version_number(app),
+        changelog: result[:changes][:summary],
+        changed_files: result[:changes][:files_modified]&.join(", ")
+      )
+    end
   end
 
   def determine_file_type(path)

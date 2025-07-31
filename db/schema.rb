@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_29_190942) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_31_152149) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -139,7 +139,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_29_190942) do
     t.string "status"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id"
     t.index ["app_id"], name: "index_app_chat_messages_on_app_id"
+    t.index ["user_id"], name: "index_app_chat_messages_on_user_id"
   end
 
   create_table "app_collaborators", force: :cascade do |t|
@@ -179,7 +181,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_29_190942) do
     t.text "enhanced_prompt"
     t.string "status", default: "processing"
     t.string "ai_model", default: "kimi-k2"
-    t.datetime "started_at", null: false
+    t.datetime "started_at"
     t.datetime "completed_at"
     t.integer "duration_seconds"
     t.integer "input_tokens"
@@ -552,6 +554,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_29_190942) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "app_chat_messages", "apps"
+  add_foreign_key "app_chat_messages", "users"
   add_foreign_key "app_collaborators", "apps"
   add_foreign_key "app_collaborators", "memberships"
   add_foreign_key "app_collaborators", "teams"

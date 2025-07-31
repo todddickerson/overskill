@@ -5,6 +5,7 @@ class AppGenerationJob < ApplicationJob
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
   def perform(app_generation)
+    app_generation = AppGeneration.find(app_generation) if app_generation.is_a?(Integer)
     Rails.logger.info "[AppGenerationJob] Processing generation ##{app_generation.id}"
 
     app = app_generation.app

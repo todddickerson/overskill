@@ -3,8 +3,12 @@ require "minitest/mock"
 
 class ProcessAppUpdateJobTest < ActiveJob::TestCase
   setup do
-    @app = create(:app, :generated)
-    @chat_message = create(:app_chat_message, app: @app, role: "user", content: "Add a button", status: "pending")
+    @user = create(:user)
+    @team = create(:team)
+    @team.users << @user
+    @membership = @team.memberships.first
+    @app = create(:app, :generated, team: @team, creator: @membership)
+    @chat_message = create(:app_chat_message, app: @app, user: @user, role: "user", content: "Add a button", status: "pending")
   end
 
   test "should enqueue job" do
@@ -62,6 +66,14 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
 
     assistant_message = AppChatMessage.last
     assert_equal "assistant", assistant_message.role
+    
+    # Debug output if test fails
+    if assistant_message.status != "completed"
+      puts "Assistant message status: #{assistant_message.status}"
+      puts "Assistant message content: #{assistant_message.content}"
+      puts "Chat message response: #{@chat_message.reload.response}"
+    end
+    
     assert_equal "completed", assistant_message.status
     assert_match "Added a button", assistant_message.content
   end
@@ -69,6 +81,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
   test "should update existing files" do
     # Create existing file
     @app.app_files.create!(
+      team: @app.team,
       path: "index.html",
       content: "<h1>Original</h1>",
       file_type: "html",
@@ -133,6 +146,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
 
   test "should delete files" do
     file = @app.app_files.create!(
+      team: @app.team,
       path: "to_delete.html",
       content: "Delete me",
       file_type: "html",
@@ -164,7 +178,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     assert_nil AppFile.find_by(id: file.id)
   end
 
-  test "should create app version" do
+  test "should create app version when files are modified" do
     mock_response = {
       success: true,
       content: JSON.generate({
@@ -172,13 +186,20 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
           summary: "Updated app",
           files_modified: ["index.html"]
         },
-        files: []
+        files: [
+          {
+            action: "update",
+            path: "index.html",
+            content: "<h1>Updated</h1>"
+          }
+        ]
       })
     }
 
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
+    # Should create AppVersion when files are modified
     assert_difference "AppVersion.count", 1 do
       Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)
@@ -187,7 +208,30 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
 
     version = AppVersion.last
     assert_equal "1.0.0", version.version_number
-    assert_equal "Updated app", version.changes_summary
+    assert_equal "Updated app", version.changelog
+  end
+
+  test "should not create app version when only conversation happens" do
+    mock_response = {
+      success: true,
+      content: JSON.generate({
+        changes: {
+          summary: "No changes made, just discussed the app",
+          files_modified: []
+        },
+        files: []  # No files modified
+      })
+    }
+
+    mock_client = Minitest::Mock.new
+    mock_client.expect(:update_app, mock_response, [String, Array, Hash])
+
+    # Should NOT create AppVersion when no files are modified
+    assert_no_difference "AppVersion.count" do
+      Ai::OpenRouterClient.stub(:new, mock_client) do
+        ProcessAppUpdateJob.perform_now(@chat_message)
+      end
+    end
   end
 
   test "should handle AI error response" do
@@ -224,7 +268,7 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
     mock_client = Minitest::Mock.new
     mock_client.expect(:update_app, mock_response, [String, Array, Hash])
 
-    # Should broadcast processing, completion, and preview refresh
+    # Should broadcast processing (append), completion (replace), and preview refresh (replace)
     assert_broadcasts("app_#{@app.id}_chat", 3) do
       Ai::OpenRouterClient.stub(:new, mock_client) do
         ProcessAppUpdateJob.perform_now(@chat_message)

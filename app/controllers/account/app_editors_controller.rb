@@ -25,9 +25,11 @@ class Account::AppEditorsController < Account::ApplicationController
     if @file.update(content: params[:content])
       # Create a version for manual edits
       @app.app_versions.create!(
+        team: @app.team,
+        user: current_user,
         version_number: next_version_number(@app),
-        changes_summary: "Manual edit: #{@file.path}",
-        files_changed: @file.path
+        changelog: "Manual edit: #{@file.path}",
+        changed_files: @file.path
       )
 
       respond_to do |format|
@@ -51,6 +53,7 @@ class Account::AppEditorsController < Account::ApplicationController
   def create_message
     @message = @app.app_chat_messages.build(message_params)
     @message.role = "user"
+    @message.user = current_user
 
     if @message.save
       ProcessAppUpdateJob.perform_later(@message)

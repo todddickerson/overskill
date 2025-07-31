@@ -1,5 +1,6 @@
 class AppChatMessage < ApplicationRecord
   belongs_to :app
+  belongs_to :user, optional: true
 
   validates :content, presence: true
   validates :role, inclusion: {in: %w[user assistant system]}

@@ -15,7 +15,6 @@ class AppGeneration < ApplicationRecord
 
   validates :app, scope: true
   validates :prompt, presence: true
-  validates :started_at, presence: true
   validates :status, presence: true
   # 🚅 add validations above.
 

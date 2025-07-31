@@ -5,7 +5,7 @@
       <i class="<%= file_icon(file.file_type) %> text-gray-400"></i>
       <span class="text-white font-medium"><%= file.path %></span>
       <span class="text-xs text-gray-500">
-        <%= number_to_human_size(file.size) %>
+        <%= number_to_human_size(file.size_bytes) %>
       </span>
     </div>
     <div id="file_<%= file.id %>_status" class="text-sm">

@@ -1,6 +1,7 @@
 FactoryBot.define do
   factory :app_chat_message do
     association :app
+    association :user
     content { "Please add a button to the page" }
     role { "user" }
     response { nil }

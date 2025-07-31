@@ -5,6 +5,7 @@ production:
   :concurrency: 5
 :queues:
   - critical
+  - ai_generation
   - default
   - mailers
   - low
