@@ -1,0 +1,125 @@
+<div class="max-w-4xl mx-auto p-6">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-100 mb-2">Version Comparison</h1>
+    <div class="flex items-center space-x-4 text-sm text-gray-400">
+      <span>
+        <i class="fas fa-code-branch mr-1"></i>
+        <%= @app_version.version_number %>
+      </span>
+      <span>→</span>
+      <span>
+        <i class="fas fa-code-branch mr-1"></i>
+        <%= @current_version.version_number %> (current)
+      </span>
+    </div>
+  </div>
+
+  <div class="bg-gray-800 rounded-lg p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-200 mb-4">Version Details</h2>
+    
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <h3 class="text-sm font-medium text-gray-400 mb-2">Version <%= @app_version.version_number %></h3>
+        <div class="space-y-2">
+          <div class="text-sm">
+            <span class="text-gray-500">Created:</span>
+            <span class="text-gray-300"><%= @app_version.created_at.strftime("%B %d, %Y at %I:%M %p") %></span>
+          </div>
+          <div class="text-sm">
+            <span class="text-gray-500">By:</span>
+            <span class="text-gray-300"><%= @app_version.user&.name || "System" %></span>
+          </div>
+          <% if @app_version.changelog.present? %>
+            <div class="text-sm">
+              <span class="text-gray-500">Changes:</span>
+              <div class="text-gray-300 mt-1"><%= @app_version.changelog %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      
+      <div>
+        <h3 class="text-sm font-medium text-gray-400 mb-2">Current Version <%= @current_version.version_number %></h3>
+        <div class="space-y-2">
+          <div class="text-sm">
+            <span class="text-gray-500">Created:</span>
+            <span class="text-gray-300"><%= @current_version.created_at.strftime("%B %d, %Y at %I:%M %p") %></span>
+          </div>
+          <div class="text-sm">
+            <span class="text-gray-500">By:</span>
+            <span class="text-gray-300"><%= @current_version.user&.name || "System" %></span>
+          </div>
+          <% if @current_version.changelog.present? %>
+            <div class="text-sm">
+              <span class="text-gray-500">Changes:</span>
+              <div class="text-gray-300 mt-1"><%= @current_version.changelog %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-gray-800 rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-200 mb-4">File Changes</h2>
+    
+    <div id="diff-viewer" data-controller="diff-viewer">
+      <div class="space-y-4">
+        <% @app_version.app.app_files.each do |file| %>
+          <div class="border border-gray-700 rounded">
+            <div class="bg-gray-750 px-4 py-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-300">
+                <i class="<%= file_icon(file.path) %> mr-2"></i>
+                <%= file.path %>
+              </span>
+              <button class="text-xs text-primary-400 hover:text-primary-300"
+                      data-action="click->diff-viewer#toggleDiff"
+                      data-diff-viewer-file-param="<%= file.id %>">
+                <i class="fas fa-chevron-down"></i>
+                View Diff
+              </button>
+            </div>
+            
+            <div class="hidden" data-diff-viewer-target="diff" data-file-id="<%= file.id %>">
+              <div class="p-4">
+                <div class="bg-gray-900 rounded p-4">
+                  <pre class="text-sm text-gray-300 overflow-x-auto"><code><%= file.content %></code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 flex justify-between">
+    <%= link_to [:account, @app_version.app, :editor], class: "btn btn-secondary" do %>
+      <i class="fas fa-arrow-left mr-2"></i>
+      Back to Editor
+    <% end %>
+    
+    <%= link_to preview_account_app_version_path(@app_version), 
+                class: "btn btn-primary",
+                data: { turbo: false } do %>
+      <i class="fas fa-eye mr-2"></i>
+      Preview Version
+    <% end %>
+  </div>
+</div>
+
+<% content_for :javascript do %>
+  <script>
+    // Helper function for file icons
+    function file_icon(path) {
+      const ext = path.split('.').pop().toLowerCase();
+      const icons = {
+        'html': 'fab fa-html5 text-orange-500',
+        'js': 'fab fa-js-square text-yellow-500',
+        'css': 'fab fa-css3-alt text-blue-500',
+        'json': 'fas fa-file-code text-green-500'
+      };
+      return icons[ext] || 'fas fa-file text-gray-500';
+    }
+  </script>
+<% end %>

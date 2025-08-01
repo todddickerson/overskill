@@ -61,9 +61,16 @@ class Account::AppVersionsController < Account::ApplicationController
 
   # GET /account/app_versions/:id/preview
   def preview
-    # For now, we'll redirect to the main app preview
-    # In the future, this could serve files from a specific version
-    redirect_to account_app_preview_path(@app_version.app)
+    # Deploy this specific version to a preview Worker
+    service = Deployment::AppVersionPreviewService.new(@app_version)
+    result = service.deploy_version_preview!
+    
+    if result[:success]
+      redirect_to result[:preview_url], allow_other_host: true
+    else
+      redirect_to [:account, @app_version.app, :editor], 
+                  alert: "Failed to preview version: #{result[:error]}"
+    end
   end
 
   # GET /account/app_versions/:id/compare

@@ -115,8 +115,9 @@ class ProcessAppUpdateJob < ApplicationJob
     end
 
     # Create a new version if files were modified
+    app_version = nil
     if result[:files].any?
-      app.app_versions.create!(
+      app_version = app.app_versions.create!(
         team: app.team,
         user: @user,
         version_number: next_version_number(app),
@@ -126,6 +127,11 @@ class ProcessAppUpdateJob < ApplicationJob
       
       # Update preview worker with latest changes
       UpdatePreviewJob.perform_later(app.id)
+    end
+    
+    # Link the AI response to this version
+    if app_version && @ai_response
+      @ai_response.update!(app_version: app_version)
     end
   end
 

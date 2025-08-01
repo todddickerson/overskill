@@ -8,6 +8,7 @@ class AppVersion < ApplicationRecord
   belongs_to :user, optional: true
   # 🚅 add belongs_to associations above.
 
+  has_many :app_chat_messages, dependent: :nullify
   # 🚅 add has_many associations above.
 
   # 🚅 add has_one associations above.
