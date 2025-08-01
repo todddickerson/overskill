@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["content", "previewUrl", "productionUrl", "visitorCount", "updateButton", "todayVisitors", "visitorChart", "totalVersions", "lastUpdated"]
+  static targets = ["modal", "content", "previewUrl", "productionUrl", "visitorCount", "updateButton", "todayVisitors", "visitorChart", "totalVersions", "lastUpdated"]
   static values = { appId: String }
   
   connect() {
@@ -10,19 +10,23 @@ export default class extends Controller {
   }
   
   open() {
-    this.element.classList.remove("hidden")
-    document.body.style.overflow = "hidden"
+    if (this.hasModalTarget) {
+      this.modalTarget.classList.remove("hidden")
+      document.body.style.overflow = "hidden"
+    }
   }
   
   close(event) {
     if (event) event.preventDefault()
-    this.element.classList.add("hidden")
-    document.body.style.overflow = ""
+    if (this.hasModalTarget) {
+      this.modalTarget.classList.add("hidden")
+      document.body.style.overflow = ""
+    }
   }
   
   // Close modal when clicking outside
   closeOnBackdrop(event) {
-    if (event.target === this.element) {
+    if (event.target === this.modalTarget) {
       this.close()
     }
   }

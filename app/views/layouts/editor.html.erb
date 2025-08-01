@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html class="theme-<%= BulletTrain::Themes::Light.color %> <%= "theme-secondary-#{BulletTrain::Themes::Light.secondary_color}" if BulletTrain::Themes::Light.secondary_color %>" lang="<%= I18n.locale %>">
   <head>
-    <%= render 'shared/layouts/head' %>
+    <%= render 'layouts/head' %>
+    
+    <!-- Essential Rails JavaScript and CSS includes -->
+    <%= stylesheet_link_tag "application.light", "data-turbo-track": "reload" %>
+    <%= javascript_include_tag "application", "data-turbo-track": "reload", defer: true %>
     <style>
       /* Editor-specific styles */
       .monaco-editor { font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; }

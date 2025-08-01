@@ -117,11 +117,21 @@ class Account::AppVersionsController < Account::ApplicationController
 
   # GET /account/app_versions/:id/compare
   def compare
-    @current_version = @app_version.app.app_versions.order(created_at: :desc).first
+    # Find the previous version to compare against
+    @previous_version = @app_version.app.app_versions
+                                     .where("created_at < ?", @app_version.created_at)
+                                     .order(created_at: :desc)
+                                     .first
+    
+    file_changes = generate_file_diff(@previous_version, @app_version)
+    
     @comparison = {
-      version: @app_version,
-      current: @current_version,
-      changes: compare_versions(@app_version, @current_version)
+      current_version: @app_version.version_number,
+      previous_version: @previous_version&.version_number || "Initial",
+      file_changes: file_changes,
+      total_additions: file_changes.sum { |fc| fc[:additions] || 0 },
+      total_deletions: file_changes.sum { |fc| fc[:deletions] || 0 },
+      files_changed: file_changes.count
     }
 
     respond_to do |format|
@@ -183,6 +193,118 @@ class Account::AppVersionsController < Account::ApplicationController
   def process_params(strong_params)
     assign_date_and_time(strong_params, :published_at)
     # 🚅 super scaffolding will insert processing for new fields above this line.
+  end
+
+  def generate_file_diff(previous_version, current_version)
+    file_changes = []
+    
+    # Get all files from both versions
+    current_files = current_version.app_version_files.includes(:app_file).index_by { |vf| vf.app_file.path }
+    previous_files = previous_version&.app_version_files&.includes(:app_file)&.index_by { |vf| vf.app_file.path } || {}
+    
+    # Check files in current version
+    current_files.each do |path, current_file|
+      previous_file = previous_files[path]
+      
+      if previous_file.nil?
+        # New file
+        file_changes << {
+          path: path,
+          status: 'created',
+          additions: count_lines(current_file.content),
+          deletions: 0,
+          diff: generate_creation_diff(current_file.content)
+        }
+      elsif previous_file.content != current_file.content
+        # Modified file
+        diff_result = generate_unified_diff(previous_file.content, current_file.content, path)
+        file_changes << {
+          path: path,
+          status: 'updated',
+          additions: diff_result[:additions],
+          deletions: diff_result[:deletions],
+          diff: diff_result[:diff]
+        }
+      end
+    end
+    
+    # Check for deleted files
+    previous_files.each do |path, previous_file|
+      unless current_files.key?(path)
+        file_changes << {
+          path: path,
+          status: 'deleted',
+          additions: 0,
+          deletions: count_lines(previous_file.content),
+          diff: generate_deletion_diff(previous_file.content)
+        }
+      end
+    end
+    
+    file_changes
+  end
+
+  def generate_unified_diff(old_content, new_content, filename)
+    old_lines = old_content.split("\n")
+    new_lines = new_content.split("\n")
+    
+    # Simple line-by-line diff
+    diff_lines = []
+    additions = 0
+    deletions = 0
+    
+    # Add file header
+    diff_lines << "@@ -1,#{old_lines.length} +1,#{new_lines.length} @@"
+    
+    # Very basic diff - show all lines for now
+    # In a real implementation, you'd use a proper diff algorithm like Myers
+    max_lines = [old_lines.length, new_lines.length].max
+    
+    (0...max_lines).each do |i|
+      old_line = old_lines[i]
+      new_line = new_lines[i]
+      
+      if old_line && new_line
+        if old_line != new_line
+          diff_lines << "-#{old_line}"
+          diff_lines << "+#{new_line}"
+          deletions += 1
+          additions += 1
+        else
+          diff_lines << " #{old_line}"
+        end
+      elsif old_line
+        diff_lines << "-#{old_line}"
+        deletions += 1
+      elsif new_line
+        diff_lines << "+#{new_line}"
+        additions += 1
+      end
+    end
+    
+    {
+      diff: diff_lines.join("\n"),
+      additions: additions,
+      deletions: deletions
+    }
+  end
+
+  def generate_creation_diff(content)
+    lines = content.split("\n")
+    diff_lines = ["@@ -0,0 +1,#{lines.length} @@"]
+    lines.each { |line| diff_lines << "+#{line}" }
+    diff_lines.join("\n")
+  end
+
+  def generate_deletion_diff(content)
+    lines = content.split("\n")
+    diff_lines = ["@@ -1,#{lines.length} +0,0 @@"]
+    lines.each { |line| diff_lines << "-#{line}" }
+    diff_lines.join("\n")
+  end
+
+  def count_lines(content)
+    content.split("\n").length
   end
 
   def compare_versions(version1, version2)
