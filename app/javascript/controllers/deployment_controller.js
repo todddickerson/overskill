@@ -54,6 +54,9 @@ export default class extends Controller {
           // Update any preview URLs if needed
           if (deployment_url) {
             this.updatePreviewUrls(deployment_url)
+            
+            // Refresh the preview iframe to show the deployed app
+            this.refreshPreviewIframe(deployment_url)
           }
           break
         case 'failed':
@@ -78,6 +81,24 @@ export default class extends Controller {
       link.classList.remove('text-gray-400')
       link.classList.add('text-blue-400')
     })
+  }
+
+  refreshPreviewIframe(deploymentUrl) {
+    // Find the preview iframe
+    const previewIframe = document.querySelector('[data-version-preview-target="iframe"]')
+    if (previewIframe) {
+      // Update the src to the deployed URL
+      previewIframe.src = deploymentUrl
+    }
+    
+    // Also update the preview frame if we're on the preview tab
+    const previewFrame = document.getElementById('preview_frame')
+    if (previewFrame) {
+      const iframe = previewFrame.querySelector('iframe')
+      if (iframe) {
+        iframe.src = deploymentUrl
+      }
+    }
   }
 
   showNotification(message, type = 'info') {

@@ -17,7 +17,9 @@
     
     <div class="flex items-center space-x-4">
       <% if @app.preview_url.present? %>
-        <%= link_to @app.preview_url, target: "_blank", class: "text-sm text-gray-400 hover:text-white" do %>
+        <%= link_to @app.preview_url, target: "_blank", 
+            class: "text-sm text-gray-400 hover:text-white",
+            data: { deployment_preview: true } do %>
           <i class="fas fa-external-link-alt mr-1"></i> Open Preview
         <% end %>
       <% end %>
