@@ -59,6 +59,24 @@ class App < ApplicationRecord
     custom_domain || "https://#{slug}.overskill.app"
   end
 
+  def visitor_count
+    # For now, return a simulated count based on app activity
+    # This will be replaced with real analytics when Ahoy integration is complete
+    base_count = (created_at.to_i / 1000) % 1000
+    activity_multiplier = [app_versions.count * 5, app_chat_messages.count * 2].sum
+    [base_count + activity_multiplier, 0].max
+  end
+
+  def daily_visitors
+    # Simulate daily visitor data for the past 7 days
+    (0..6).map do |days_ago|
+      date = days_ago.days.ago.to_date
+      base = visitor_count / 30 # Average daily visitors
+      variation = (date.to_time.to_i % 10) - 5 # Add some realistic variation
+      [base + variation, 0].max
+    end.reverse
+  end
+
   private
 
   def generate_slug

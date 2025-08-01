@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["content", "previewUrl", "productionUrl", "visitorCount", "updateButton"]
+  static targets = ["content", "previewUrl", "productionUrl", "visitorCount", "updateButton", "todayVisitors", "visitorChart", "totalVersions", "lastUpdated"]
   static values = { appId: String }
   
   connect() {
@@ -33,7 +33,7 @@ export default class extends Controller {
       if (response.ok) {
         const data = await response.json()
         this.updateUrls(data)
-        this.updateVisitorCount(data.visitor_count || 0)
+        this.updateVisitorAnalytics(data)
       }
     } catch (error) {
       console.error("Failed to load app data:", error)
@@ -52,10 +52,62 @@ export default class extends Controller {
     }
   }
   
-  updateVisitorCount(count) {
+  updateVisitorAnalytics(data) {
+    // Update visitor count
     if (this.hasVisitorCountTarget) {
-      this.visitorCountTarget.textContent = count
+      this.visitorCountTarget.textContent = data.visitor_count || 0
     }
+    
+    // Update today's visitors (last item in daily_visitors array)
+    if (this.hasTodayVisitorsTarget && data.daily_visitors) {
+      const todayCount = data.daily_visitors[data.daily_visitors.length - 1] || 0
+      this.todayVisitorsTarget.textContent = `${todayCount} today`
+    }
+    
+    // Update visitor chart
+    if (this.hasVisitorChartTarget && data.daily_visitors) {
+      this.updateVisitorChart(data.daily_visitors)
+    }
+    
+    // Update additional metrics
+    if (this.hasTotalVersionsTarget) {
+      this.totalVersionsTarget.textContent = data.total_versions || 0
+    }
+    
+    if (this.hasLastUpdatedTarget && data.last_updated) {
+      const lastUpdated = new Date(data.last_updated)
+      const now = new Date()
+      const diffInHours = Math.floor((now - lastUpdated) / (1000 * 60 * 60))
+      
+      let timeText
+      if (diffInHours < 1) {
+        timeText = "Just now"
+      } else if (diffInHours < 24) {
+        timeText = `${diffInHours}h ago`
+      } else {
+        const diffInDays = Math.floor(diffInHours / 24)
+        timeText = `${diffInDays}d ago`
+      }
+      
+      this.lastUpdatedTarget.textContent = timeText
+    }
+  }
+  
+  updateVisitorChart(dailyVisitors) {
+    if (!dailyVisitors || dailyVisitors.length === 0) return
+    
+    const maxVisitors = Math.max(...dailyVisitors, 1)
+    const bars = this.visitorChartTarget.children
+    
+    dailyVisitors.forEach((count, index) => {
+      if (bars[index]) {
+        const height = Math.max((count / maxVisitors) * 100, 8) // Minimum 8% height
+        const isToday = index === dailyVisitors.length - 1
+        
+        bars[index].style.height = `${height}%`
+        bars[index].className = `flex-1 rounded-t min-h-[8px] ${isToday ? 'bg-blue-500' : 'bg-gray-300'}`
+      }
+    })
   }
   
   async update(event) {

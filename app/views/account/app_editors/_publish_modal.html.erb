@@ -51,13 +51,54 @@
       <div class="bg-gray-50 rounded-lg p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-medium text-gray-700">Published site</h3>
-          <div class="flex items-center space-x-2 text-sm text-gray-600">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-            </svg>
-            <span data-publish-modal-target="visitorCount">0</span>
-            <span>Visitors</span>
+        </div>
+        
+        <!-- Visitor Analytics -->
+        <div class="bg-white rounded-lg p-4 border border-gray-200 mb-3">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+              <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              <span class="text-sm font-medium text-gray-900">Visitor Analytics</span>
+            </div>
+            <div class="text-right">
+              <div class="text-2xl font-bold text-blue-600" data-publish-modal-target="visitorCount">0</div>
+              <div class="text-xs text-gray-500">Total visitors</div>
+            </div>
+          </div>
+          
+          <!-- Daily Chart -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs text-gray-500">
+              <span>Last 7 days</span>
+              <span data-publish-modal-target="todayVisitors">0 today</span>
+            </div>
+            <div class="flex items-end justify-between h-12 space-x-1" data-publish-modal-target="visitorChart">
+              <!-- Chart bars will be populated by JavaScript -->
+              <div class="flex-1 bg-gray-200 rounded-t min-h-[8px]" style="height: 20%"></div>
+              <div class="flex-1 bg-gray-200 rounded-t min-h-[8px]" style="height: 40%"></div>
+              <div class="flex-1 bg-gray-200 rounded-t min-h-[8px]" style="height: 30%"></div>
+              <div class="flex-1 bg-gray-200 rounded-t min-h-[8px]" style="height: 60%"></div>
+              <div class="flex-1 bg-gray-200 rounded-t min-h-[8px]" style="height: 80%"></div>
+              <div class="flex-1 bg-gray-200 rounded-t min-h-[8px]" style="height: 45%"></div>
+              <div class="flex-1 bg-blue-500 rounded-t min-h-[8px]" style="height: 70%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-gray-400">
+              <span>7d</span><span>6d</span><span>5d</span><span>4d</span><span>3d</span><span>2d</span><span>1d</span>
+            </div>
+          </div>
+          
+          <!-- Additional Metrics -->
+          <div class="grid grid-cols-2 gap-4 pt-3 mt-3 border-t border-gray-100">
+            <div class="text-center">
+              <div class="text-lg font-semibold text-gray-900" data-publish-modal-target="totalVersions">0</div>
+              <div class="text-xs text-gray-500">Updates published</div>
+            </div>
+            <div class="text-center">
+              <div class="text-sm font-medium text-gray-900" data-publish-modal-target="lastUpdated">—</div>
+              <div class="text-xs text-gray-500">Last updated</div>
+            </div>
           </div>
         </div>
         

@@ -131,15 +131,15 @@ class Account::AppEditorsController < Account::ApplicationController
     preview_url = @app.preview_url
     production_url = @app.published_url || @app.deployment_url
     
-    # For now, return mock visitor count (will integrate analytics later)
-    visitor_count = 0
-    
     render json: {
       preview_url: preview_url,
       production_url: production_url,
-      visitor_count: visitor_count,
+      visitor_count: @app.visitor_count,
+      daily_visitors: @app.daily_visitors,
       deployment_status: @app.deployment_status,
-      last_deployed_at: @app.last_deployed_at
+      last_deployed_at: @app.last_deployed_at,
+      total_versions: @app.app_versions.count,
+      last_updated: @app.updated_at
     }
   end
 
