@@ -35,11 +35,11 @@
   <!-- Main Content -->
   <div class="flex-1 flex overflow-hidden">
     <!-- Left Panel - Chat -->
-    <div class="w-96 bg-gray-50 border-r border-gray-200 flex flex-col">
+    <div class="w-96 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors duration-200">
       <!-- Chat Header -->
-      <div class="px-6 py-4 border-b border-gray-200 bg-white">
-        <h2 class="text-gray-900 font-semibold text-lg">AI Assistant</h2>
-        <p class="text-sm text-gray-600 mt-1">Describe changes to make to your app</p>
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
+        <h2 class="text-gray-900 dark:text-gray-100 font-semibold text-lg">AI Assistant</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Describe changes to make to your app</p>
       </div>
       
       <!-- Chat Messages -->
@@ -51,23 +51,23 @@
               <%= render "chat_message", message: message %>
             <% end %>
           <% else %>
-            <div class="text-center py-12">
-              <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div class="text-center py-12 animate-fadeIn">
+              <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <i class="fas fa-sparkles text-white"></i>
               </div>
-              <h3 class="text-gray-900 font-medium mb-2">Ready to help!</h3>
-              <p class="text-gray-600 text-sm mb-6">I can help you modify, improve, or debug your app.</p>
+              <h3 class="text-gray-900 dark:text-gray-100 font-medium mb-2 transition-colors duration-200">Ready to help!</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm mb-6 transition-colors duration-200">I can help you modify, improve, or debug your app.</p>
               
               <div class="space-y-3 text-left max-w-sm mx-auto">
-                <div class="flex items-center text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-200">
+                <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
                   <i class="fas fa-palette text-blue-500 mr-3"></i>
                   "Change the color scheme to dark mode"
                 </div>
-                <div class="flex items-center text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-200">
+                <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
                   <i class="fas fa-mobile-alt text-green-500 mr-3"></i>
                   "Make it mobile responsive"
                 </div>
-                <div class="flex items-center text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-200">
+                <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
                   <i class="fas fa-plus text-purple-500 mr-3"></i>
                   "Add a navigation menu"
                 </div>
@@ -78,7 +78,7 @@
       </div>
       
       <!-- Chat Input -->
-      <div class="p-6 border-t border-gray-200 bg-white" id="chat_form">
+      <div class="p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200" id="chat_form">
         <%= render "chat_form", app: @app %>
       </div>
     </div>
