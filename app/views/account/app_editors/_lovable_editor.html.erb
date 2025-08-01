@@ -76,7 +76,7 @@
           <div class="space-y-0.5">
             <% @files.each do |file| %>
               <%= link_to account_app_editor_path(@app, file_id: file.id), 
-                  class: "group flex items-center px-2 py-1 text-sm rounded hover:bg-gray-700 transition-colors #{'bg-gray-700 border-l-2 border-primary-500' if file == @selected_file}",
+                  class: "group flex items-center px-2 py-1 text-sm rounded hover:bg-gray-700 transition-colors #{'bg-gray-200 border-l-2 border-primary-500' if file == @selected_file}",
                   data: { turbo_frame: "_top" } do %>
                 <i class="<%= file_extension_icon(file.path) %> mr-2 text-sm"></i>
                 <span class="text-gray-300 truncate flex-1"><%= File.basename(file.path) %></span>

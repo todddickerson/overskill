@@ -1,4 +1,4 @@
-<div class="mb-6">
+<div id="app_chat_message_<%= message.id %>" class="mb-6 message-content" data-message-status="<%= message.status if message.role == 'assistant' %>">
   <% if message.role == 'user' %>
     <!-- User message - simple gray bubble, no icon -->
     <div class="flex justify-end">

@@ -20,6 +20,7 @@ class App < ApplicationRecord
   # has_many :posts # TODO: uncomment when Post model exists
   # 🚅 add has_many associations above.
 
+  has_one_attached :logo
   # 🚅 add has_one associations above.
 
   scope :published, -> { where(status: "published", visibility: "public") }

@@ -25,12 +25,12 @@ export default class extends Controller {
   
   open() {
     this.dropdownTarget.classList.remove("hidden")
-    this.triggerTarget.classList.add("bg-gray-700")
+    this.triggerTarget.classList.add("bg-gray-200", "dark:bg-gray-700")
   }
   
   close() {
     this.dropdownTarget.classList.add("hidden")
-    this.triggerTarget.classList.remove("bg-gray-700")
+    this.triggerTarget.classList.remove("bg-gray-200", "dark:bg-gray-700")
   }
   
   closeOnClickOutside(event) {

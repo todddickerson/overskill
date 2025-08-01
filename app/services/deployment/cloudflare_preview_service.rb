@@ -36,7 +36,7 @@ class Deployment::CloudflarePreviewService
     
     return { success: false, error: "Failed to upload preview worker" } unless upload_response['success']
     
-    # Enable workers.dev subdomain
+    # Try to enable workers.dev subdomain (non-critical if it fails)
     enable_workers_dev_subdomain(worker_name)
     
     # Ensure route exists for auto-preview domain (using overskill.app for now)
@@ -156,7 +156,18 @@ class Deployment::CloudflarePreviewService
         
         // Handle root path
         if (pathname === '/') {
-          return serveFile('index.html', 'text/html')
+          const htmlContent = await getFile('index.html')
+          if (htmlContent) {
+            // Add CSP header to allow CDN resources
+            return new Response(htmlContent, {
+              headers: {
+                'Content-Type': 'text/html',
+                'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https:;",
+                'X-Frame-Options': 'ALLOWALL'
+              }
+            })
+          }
+          return new Response('File not found', { status: 404 })
         }
         
         // Serve static files
@@ -164,6 +175,11 @@ class Deployment::CloudflarePreviewService
         const contentType = getContentType(cleanPath)
         
         return serveFile(cleanPath, contentType)
+      }
+      
+      function getFile(path) {
+        const files = #{app_files_as_json}
+        return files[path]
       }
 
       async function serveFile(path, contentType) {
@@ -227,16 +243,25 @@ class Deployment::CloudflarePreviewService
   
   def enable_workers_dev_subdomain(worker_name)
     # Enable the workers.dev subdomain for the worker
-    response = self.class.patch(
-      "/accounts/#{@account_id}/workers/scripts/#{worker_name}/subdomain",
-      headers: { 'Content-Type' => 'application/json' },
-      body: JSON.generate({ enabled: true })
-    )
-    
-    if response.code == 200
-      Rails.logger.info "Enabled workers.dev subdomain for #{worker_name}"
-    else
-      Rails.logger.warn "Failed to enable workers.dev subdomain: #{response.body}"
+    # Note: This endpoint requires account-level permissions and may not work with API tokens
+    begin
+      response = self.class.patch(
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}/subdomain",
+        headers: { 'Content-Type' => 'application/json' },
+        body: JSON.generate({ enabled: true })
+      )
+      
+      if response.code == 200
+        Rails.logger.info "Enabled workers.dev subdomain for #{worker_name}"
+      else
+        # Log the error but don't fail the deployment
+        # The worker is still accessible via custom domain
+        Rails.logger.warn "Failed to enable workers.dev subdomain: #{response.body}"
+        Rails.logger.info "Worker is still accessible via custom domain"
+      end
+    rescue => e
+      # Don't fail if subdomain enabling fails - worker still works via custom domain
+      Rails.logger.warn "Could not enable workers.dev subdomain (non-critical): #{e.message}"
     end
   end
   

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_01_172918) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -141,9 +141,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_172918) do
     t.datetime "updated_at", null: false
     t.bigint "user_id"
     t.bigint "app_version_id"
+    t.index ["app_id", "created_at"], name: "index_app_chat_messages_on_app_id_and_created_at"
     t.index ["app_id"], name: "index_app_chat_messages_on_app_id"
     t.index ["app_version_id"], name: "index_app_chat_messages_on_app_version_id"
+    t.index ["created_at"], name: "index_app_chat_messages_on_created_at"
+    t.index ["status"], name: "index_app_chat_messages_on_status"
     t.index ["user_id"], name: "index_app_chat_messages_on_user_id"
+    t.check_constraint "role::text = 'assistant'::text AND (status::text = ANY (ARRAY['planning'::character varying, 'executing'::character varying, 'generating'::character varying, 'completed'::character varying, 'failed'::character varying, 'validation_error'::character varying]::text[])) OR role::text <> 'assistant'::text AND status IS NULL", name: "check_status_only_for_assistant"
   end
 
   create_table "app_collaborators", force: :cascade do |t|
@@ -264,6 +268,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_172918) do
     t.string "staging_url"
     t.datetime "staging_deployed_at"
     t.datetime "preview_updated_at"
+    t.text "logo_prompt"
+    t.datetime "logo_generated_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["featured"], name: "index_apps_on_featured"
     t.index ["slug"], name: "index_apps_on_slug", unique: true

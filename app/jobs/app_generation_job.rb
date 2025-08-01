@@ -26,6 +26,9 @@ class AppGenerationJob < ApplicationJob
       # Broadcast success via Turbo
       broadcast_status(app, "generated", "Your app has been generated successfully!")
 
+      # Queue logo generation job
+      GenerateAppLogoJob.perform_later(app.id)
+      
       # Queue deployment job if enabled
       if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
         AppDeploymentJob.perform_later(app)

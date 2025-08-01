@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["tab", "panel"]
+  static targets = ["tab", "panel", "refreshButton"]
 
   connect() {
     console.log("🎯 Tabs controller connected!")
@@ -42,11 +42,11 @@ export default class extends Controller {
       const tabPanel = tab.dataset.panel
       
       if (tabPanel === panelName) {
-        tab.classList.remove("text-gray-400", "border-transparent")
-        tab.classList.add("text-white", "border-primary-500")
+        tab.classList.remove("text-gray-600", "dark:text-gray-400", "border-transparent")
+        tab.classList.add("text-gray-900", "dark:text-white", "border-primary-500")
       } else {
-        tab.classList.remove("text-white", "border-primary-500")
-        tab.classList.add("text-gray-400", "border-transparent")
+        tab.classList.remove("text-gray-900", "dark:text-white", "border-primary-500")
+        tab.classList.add("text-gray-600", "dark:text-gray-400", "border-transparent")
       }
     })
 
@@ -66,5 +66,38 @@ export default class extends Controller {
     const url = new URL(window.location)
     url.searchParams.set('tab', panelName)
     window.history.replaceState({}, '', url)
+    
+    // Show/hide refresh button based on active tab
+    if (this.hasRefreshButtonTarget) {
+      if (panelName === 'preview') {
+        this.refreshButtonTarget.classList.remove('invisible')
+      } else {
+        this.refreshButtonTarget.classList.add('invisible')
+      }
+    }
+  }
+  
+  refreshPreview(event) {
+    console.log("🔄 Refreshing preview...")
+    
+    // Find the preview iframe
+    const iframe = this.element.querySelector('iframe')
+    if (iframe) {
+      // Add spinning animation to button
+      const icon = this.refreshButtonTarget.querySelector('i')
+      if (icon) {
+        icon.classList.add('fa-spin')
+      }
+      
+      // Reload the iframe
+      iframe.src = iframe.src
+      
+      // Remove spinning animation after a delay
+      setTimeout(() => {
+        if (icon) {
+          icon.classList.remove('fa-spin')
+        }
+      }, 1000)
+    }
   }
 }

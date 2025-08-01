@@ -255,8 +255,8 @@ module Ai
           content = file["content"] || file[:content]
           file_type = determine_file_type(path)
           
-          # Apply fixes for JavaScript files
-          if file_type == "javascript"
+          # Apply fixes for JavaScript and HTML files
+          if file_type == "javascript" || file_type == "html"
             content = Ai::CodeValidatorService.fix_common_issues(content, file_type)
           end
           

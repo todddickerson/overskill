@@ -7,6 +7,9 @@ module Ai
       { pattern: /\brequire\s*\(/, message: "CommonJS require() is not allowed. Use script tags in HTML." },
       { pattern: /\bmodule\.exports/, message: "CommonJS exports are not allowed. Use global functions." },
       
+      # localStorage without try/catch
+      { pattern: /(?<!try\s*\{[^}]*)\blocalStorage\.(getItem|setItem|removeItem|clear)/, message: "localStorage access must be wrapped in try/catch for sandboxed environments." },
+      
       # JSX (when not using Babel)
       { pattern: /<[A-Z]\w*[^>]*\/?>/, message: "JSX syntax detected. Use React.createElement() instead." },
       { pattern: /<\/[A-Z]\w*>/, message: "JSX closing tags detected. Use React.createElement() instead." },
@@ -94,6 +97,30 @@ module Ai
             }
           end
           
+          # CRITICAL: Ensure Tailwind CSS is loaded
+          unless content.match?(/cdn\.tailwindcss\.com/)
+            errors << {
+              file: file[:path],
+              message: "HTML MUST include Tailwind CSS CDN: <script src=\"https://cdn.tailwindcss.com\"></script>"
+            }
+          end
+          
+          # Ensure OverSkill attribution
+          unless content.match?(/OverSkill/i)
+            warnings << {
+              file: file[:path],
+              message: "HTML should include OverSkill attribution in meta tags"
+            }
+          end
+          
+          # Check for proper meta tags
+          unless content.match?(/<meta\s+name=["']generator["']\s+content=["']OverSkill/i)
+            warnings << {
+              file: file[:path],
+              message: "HTML should include generator meta tag with 'OverSkill AI'"
+            }
+          end
+          
           # Check script order
           if content.include?("app.js") && content.include?("components.js")
             app_index = content.index("app.js")
@@ -116,21 +143,87 @@ module Ai
     end
     
     def self.fix_common_issues(content, file_type)
-      return content unless file_type == "javascript"
-      
-      # Fix imports to use global React
-      fixed = content.gsub(/import\s+React.*from\s+['"]react['"].*\n/, "const { useState, useEffect, useRef } = React;\n")
-      fixed = fixed.gsub(/import\s+ReactDOM.*from\s+['"]react-dom['"].*\n/, "")
-      
-      # Fix exports to global functions
-      fixed = fixed.gsub(/export\s+default\s+function\s+(\w+)/, 'window.\1 = function')
-      fixed = fixed.gsub(/export\s+function\s+(\w+)/, 'window.\1 = function')
-      fixed = fixed.gsub(/export\s+const\s+(\w+)/, 'window.\1')
-      
-      # Remove export statements at end
-      fixed = fixed.gsub(/export\s*{\s*[^}]+\s*}.*\n?/, '')
-      
-      fixed
+      case file_type
+      when "javascript"
+        # Fix imports to use global React
+        fixed = content.gsub(/import\s+React.*from\s+['"]react['"].*\n/, "const { useState, useEffect, useRef } = React;\n")
+        fixed = fixed.gsub(/import\s+ReactDOM.*from\s+['"]react-dom['"].*\n/, "")
+        
+        # Fix exports to global functions
+        fixed = fixed.gsub(/export\s+default\s+function\s+(\w+)/, 'window.\1 = function')
+        fixed = fixed.gsub(/export\s+function\s+(\w+)/, 'window.\1 = function')
+        fixed = fixed.gsub(/export\s+const\s+(\w+)/, 'window.\1')
+        
+        # Remove export statements at end
+        fixed = fixed.gsub(/export\s*{\s*[^}]+\s*}.*\n?/, '')
+        
+        fixed
+      when "html"
+        fixed = content.dup
+        
+        # Add Tailwind CSS if missing
+        unless fixed.match?(/cdn\.tailwindcss\.com/)
+          tailwind_script = '  <script src="https://cdn.tailwindcss.com"></script>'
+          
+          if fixed.match?(/<\/head>/)
+            fixed = fixed.sub(/<\/head>/, "#{tailwind_script}\n</head>")
+          elsif fixed.match?(/<head>/)
+            fixed = fixed.sub(/<head>/, "<head>\n#{tailwind_script}")
+          end
+        end
+        
+        # Add OverSkill meta tags if missing
+        unless fixed.match?(/<meta\s+name=["']generator["']/i)
+          overskill_meta = <<~META.strip
+              <meta name="description" content="Created with OverSkill - Build apps without code">
+              <meta name="author" content="OverSkill">
+              <meta name="generator" content="OverSkill AI">
+              
+              <!-- Open Graph -->
+              <meta property="og:description" content="Created with OverSkill - Build apps without code">
+              <meta property="og:type" content="website">
+              
+              <!-- Twitter Card -->
+              <meta name="twitter:card" content="summary">
+              <meta name="twitter:site" content="@overskill_app">
+          META
+          
+          if fixed.match?(/<title>(.*?)<\/title>/i)
+            fixed = fixed.sub(/<\/title>/, "</title>\n  #{overskill_meta}")
+          elsif fixed.match?(/<\/head>/)
+            fixed = fixed.sub(/<\/head>/, "  #{overskill_meta}\n</head>")
+          end
+        end
+        
+        # Add Remix CTA badge if missing
+        unless fixed.match?(/Remix with OverSkill/i)
+          remix_badge = <<~BADGE.strip
+            
+            <!-- Remix with OverSkill CTA badge -->
+            <a href="https://overskill.app/remix?template=this-app" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               style="position: fixed; bottom: 20px; right: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 16px; border-radius: 24px; text-decoration: none; font-size: 14px; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; gap: 8px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s, box-shadow 0.2s;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.2)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white"/>
+                <path d="M2 17L12 22L22 17" stroke="white"/>
+                <path d="M2 12L12 17L22 12" stroke="white"/>
+              </svg>
+              <span style="font-weight: 600;">Remix with OverSkill</span>
+            </a>
+          BADGE
+          
+          if fixed.match?(/<\/body>/i)
+            fixed = fixed.sub(/<\/body>/i, "#{remix_badge}\n</body>")
+          end
+        end
+        
+        fixed
+      else
+        content
+      end
     end
   end
 end

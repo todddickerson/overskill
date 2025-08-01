@@ -1,38 +1,58 @@
 class ProcessAppUpdateJob < ApplicationJob
   include ActionView::RecordIdentifier
   queue_as :ai_generation
+  
+  # Set a 10-minute timeout for the entire job
+  around_perform do |job, block|
+    Timeout.timeout(600) do  # 10 minutes
+      block.call
+    end
+  rescue Timeout::Error
+    chat_message = job.arguments.first
+    handle_timeout_error(chat_message)
+  end
 
   def perform(chat_message)
     app = chat_message.app
     @user = chat_message.user  # Store user for version creation
 
-    # Step 1: Planning phase
-    chat_message.update!(status: "planning")
-    broadcast_status_update(chat_message)
+    begin
+      # Step 1: Planning phase
+      chat_message.update!(status: "planning")
+      broadcast_status_update(chat_message)
 
-    # Get current files
-    current_files = app.app_files.map do |file|
-      {
-        path: file.path,
-        type: file.file_type,
-        size_bytes: file.size_bytes
+      # Get current files
+      current_files = app.app_files.map do |file|
+        {
+          path: file.path,
+          type: file.file_type,
+          size_bytes: file.size_bytes
+        }
+      end
+
+      # Build app context
+      app_context = {
+        name: app.name,
+        type: app.app_type,
+        framework: app.framework
       }
+
+      # Step 2: Executing phase
+      chat_message.update!(status: "executing")
+      broadcast_status_update(chat_message)
+
+      # Call AI to process the update
+      client = Ai::OpenRouterClient.new
+      response = client.update_app(chat_message.content, current_files, app_context)
+    rescue Net::ReadTimeout => e
+      handle_error(chat_message, "The request timed out. This usually happens with complex requests. Please try breaking your request into smaller, more specific changes.")
+      return
+    rescue StandardError => e
+      Rails.logger.error "[ProcessAppUpdate] Unexpected error: #{e.class} - #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      handle_error(chat_message, "An unexpected error occurred: #{e.message}")
+      return
     end
-
-    # Build app context
-    app_context = {
-      name: app.name,
-      type: app.app_type,
-      framework: app.framework
-    }
-
-    # Step 2: Executing phase
-    chat_message.update!(status: "executing")
-    broadcast_status_update(chat_message)
-
-    # Call AI to process the update
-    client = Ai::OpenRouterClient.new
-    response = client.update_app(chat_message.content, current_files, app_context)
 
     if response[:success]
       # Parse the response
@@ -243,6 +263,24 @@ class ProcessAppUpdateJob < ApplicationJob
   end
 
 
+  def handle_timeout_error(chat_message)
+    Rails.logger.error "[ProcessAppUpdate] Job timed out after 10 minutes for chat_message #{chat_message.id}"
+    
+    chat_message.update!(
+      status: "failed",
+      response: "Request timed out after 10 minutes"
+    )
+
+    # Create timeout error message
+    error_response = chat_message.app.app_chat_messages.create!(
+      role: "assistant",
+      content: "This request took too long to process (over 10 minutes) and was automatically cancelled. Please try breaking your request into smaller, more specific changes.",
+      status: "failed"
+    )
+
+    broadcast_error(chat_message, error_response)
+  end
+
   def handle_error(chat_message, error_message)
     Rails.logger.error "[ProcessAppUpdate] Error: #{error_message}"
 
@@ -311,7 +349,13 @@ class ProcessAppUpdateJob < ApplicationJob
       .first
     
     if ai_message && ai_message.id != assistant_message.id
-      # Delete the placeholder AI message
+      # First, broadcast removal of the placeholder
+      Turbo::StreamsChannel.broadcast_remove_to(
+        "app_#{user_message.app_id}_chat",
+        target: "app_chat_message_#{ai_message.id}"
+      )
+      
+      # Then delete the placeholder AI message
       ai_message.destroy
     end
     
@@ -330,14 +374,50 @@ class ProcessAppUpdateJob < ApplicationJob
       partial: "account/app_editors/preview_frame",
       locals: {app: user_message.app}
     )
+    
+    # Refresh the chat form to re-enable it
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{user_message.app_id}_chat",
+      target: "chat_form",
+      partial: "account/app_editors/chat_input_wrapper",
+      locals: {app: user_message.app}
+    )
   end
 
   def broadcast_error(user_message, error_message)
-    Turbo::StreamsChannel.broadcast_replace_to(
+    # Find and remove any placeholder messages first
+    ai_message = user_message.app.app_chat_messages
+      .where(role: "assistant")
+      .where("created_at > ?", user_message.created_at)
+      .where.not(id: error_message.id)
+      .order(created_at: :asc)
+      .first
+    
+    if ai_message
+      # Broadcast removal of the placeholder
+      Turbo::StreamsChannel.broadcast_remove_to(
+        "app_#{user_message.app_id}_chat",
+        target: "app_chat_message_#{ai_message.id}"
+      )
+      
+      # Delete the placeholder
+      ai_message.destroy
+    end
+    
+    # Broadcast the error message
+    Turbo::StreamsChannel.broadcast_append_to(
       "app_#{user_message.app_id}_chat",
-      target: "processing_#{user_message.id}",
+      target: "chat_messages",
       partial: "account/app_editors/chat_message",
       locals: {message: error_message}
+    )
+    
+    # Re-enable the chat form
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{user_message.app_id}_chat",
+      target: "chat_form",
+      partial: "account/app_editors/chat_input_wrapper",
+      locals: {app: user_message.app}
     )
   end
   

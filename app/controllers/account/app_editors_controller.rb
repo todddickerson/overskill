@@ -85,7 +85,7 @@ class Account::AppEditorsController < Account::ApplicationController
               partial: "account/app_editors/chat_message",
               locals: {message: ai_response}),
             turbo_stream.replace("chat_form",
-              partial: "account/app_editors/chat_form",
+              partial: "account/app_editors/chat_input_wrapper",
               locals: {app: @app}),
             # Append a temporary element that will scroll the container on connection
             turbo_stream.append("chat_messages", 
@@ -97,7 +97,7 @@ class Account::AppEditorsController < Account::ApplicationController
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: turbo_stream.replace("chat_form",
-            partial: "account/app_editors/chat_form",
+            partial: "account/app_editors/chat_input_wrapper",
             locals: {app: @app, message: @message})
         end
       end

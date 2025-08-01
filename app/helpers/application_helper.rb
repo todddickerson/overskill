@@ -45,25 +45,51 @@ module ApplicationHelper
     ext = File.extname(path).downcase
     case ext
     when '.html', '.htm'
-      'fab fa-html5 text-orange-500'
+      'fab fa-html5'
     when '.js', '.jsx', '.mjs'
-      'fab fa-js-square text-yellow-500'
+      'fab fa-js-square'
     when '.ts', '.tsx'
-      'fab fa-js-square text-blue-600'
+      'fab fa-js-square'
     when '.css', '.scss', '.sass'
-      'fab fa-css3-alt text-blue-500'
+      'fab fa-css3-alt'
     when '.json'
-      'fas fa-code text-yellow-600'
+      'fas fa-code'
     when '.md'
-      'fab fa-markdown text-gray-400'
+      'fab fa-markdown'
     when '.xml'
-      'fas fa-code text-orange-600'
+      'fas fa-code'
     when '.svg'
-      'fas fa-image text-purple-500'
+      'fas fa-image'
     when '.png', '.jpg', '.jpeg', '.gif', '.webp'
-      'fas fa-image text-green-500'
+      'fas fa-image'
     else
-      'fas fa-file-code text-gray-400'
+      'fas fa-file-code'
+    end
+  end
+  
+  def file_extension_color(path)
+    ext = File.extname(path).downcase
+    case ext
+    when '.html', '.htm'
+      'text-orange-500 dark:text-orange-400'
+    when '.js', '.jsx', '.mjs'
+      'text-yellow-500 dark:text-yellow-400'
+    when '.ts', '.tsx'
+      'text-blue-600 dark:text-blue-400'
+    when '.css', '.scss', '.sass'
+      'text-blue-500 dark:text-blue-400'
+    when '.json'
+      'text-yellow-600 dark:text-yellow-400'
+    when '.md'
+      'text-gray-600 dark:text-gray-400'
+    when '.xml'
+      'text-orange-600 dark:text-orange-400'
+    when '.svg'
+      'text-purple-500 dark:text-purple-400'
+    when '.png', '.jpg', '.jpeg', '.gif', '.webp'
+      'text-green-500 dark:text-green-400'
+    else
+      'text-gray-600 dark:text-gray-400'
     end
   end
 

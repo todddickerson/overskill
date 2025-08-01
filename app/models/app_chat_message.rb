@@ -7,8 +7,11 @@ class AppChatMessage < ApplicationRecord
   validates :role, inclusion: {in: %w[user assistant system]}
 
   # AI response statuses for better user feedback
-  STATUSES = %w[planning executing completed failed].freeze
+  STATUSES = %w[planning executing generating completed failed validation_error].freeze
   validates :status, inclusion: {in: STATUSES}, allow_nil: true
+  
+  # Ensure only assistant messages can have status
+  validate :status_only_for_assistant
 
   scope :conversation, -> { where(role: %w[user assistant]) }
 
@@ -59,6 +62,14 @@ class AppChatMessage < ApplicationRecord
       "Failed"
     else
       ""
+    end
+  end
+  
+  private
+  
+  def status_only_for_assistant
+    if status.present? && role != 'assistant'
+      errors.add(:status, 'can only be set for assistant messages')
     end
   end
 end

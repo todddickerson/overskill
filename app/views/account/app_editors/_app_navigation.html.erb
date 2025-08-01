@@ -3,44 +3,53 @@
   <!-- Trigger Button -->
   <button data-app-navigation-target="trigger"
           data-action="click->app-navigation#toggle"
-          class="flex items-center space-x-2 px-2 py-1 rounded-lg hover:bg-gray-700 transition-colors duration-150">
+          class="flex items-center space-x-2 px-2 py-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-150">
+    <!-- App Icon -->
+    <% if @app.logo.attached? %>
+      <%= image_tag @app.logo, class: "w-6 h-6 rounded", alt: @app.name %>
+    <% else %>
+      <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center">
+        <span class="text-white text-xs font-bold"><%= @app.name.first.upcase %></span>
+      </div>
+    <% end %>
     <!-- App Name -->
-    <span class="text-white font-semibold text-sm"><%= @app.name %></span>
-    <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+    <span class="text-gray-900 dark:text-white font-semibold text-sm"><%= @app.name %></span>
+    <!-- Dropdown Icon -->
+    <i class="fas fa-chevron-down text-gray-600 dark:text-gray-400 text-xs"></i>
   </button>
 
   <!-- App Dropdown Panel (Simple) -->
   <div data-app-navigation-target="dropdown"
-       class="hidden absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+       class="hidden absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50">
     
     <!-- App Management Items -->
     <div class="py-2">
       <!-- App Overview -->
       <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors">
-        <i class="fas fa-th-large text-gray-500 w-4"></i>
-        <span class="text-sm text-gray-900">App Overview</span>
+              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <i class="fas fa-th-large text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">App Overview</span>
       </button>
 
       <!-- Users -->
       <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors">
-        <i class="fas fa-users text-gray-500 w-4"></i>
-        <span class="text-sm text-gray-900">Users</span>
+              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <i class="fas fa-users text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Users</span>
       </button>
 
       <!-- Security -->
       <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors">
-        <i class="fas fa-shield-alt text-gray-500 w-4"></i>
-        <span class="text-sm text-gray-900">Security</span>
+              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <i class="fas fa-shield-alt text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Security</span>
       </button>
 
       <!-- App Settings -->
       <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors">
-        <i class="fas fa-cog text-gray-500 w-4"></i>
-        <span class="text-sm text-gray-900">App Settings</span>
+              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <i class="fas fa-cog text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">App Settings</span>
       </button>
     </div>
   </div>

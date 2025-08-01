@@ -1,4 +1,4 @@
-<div class="h-full flex flex-col bg-gray-900" 
+<div class="h-full w-full flex flex-col bg-white dark:bg-gray-900" 
      data-controller="codemirror" 
      data-codemirror-content-value="<%= html_escape(file.content) %>"
      data-codemirror-file-type-value="<%= file.file_type %>"
@@ -6,11 +6,11 @@
      data-codemirror-update-url-value="<%= file_account_app_editor_path(app, file_id: file.id) %>">
   
   <!-- Editor Header -->
-  <div class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+  <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
     <div class="flex items-center space-x-3">
-      <i class="<%= file_icon(file.file_type) %> text-gray-400"></i>
-      <span class="text-white font-medium"><%= file.path %></span>
-      <span class="text-xs text-gray-500">
+      <i class="<%= file_icon(file.file_type) %> text-gray-600 dark:text-gray-400"></i>
+      <span class="text-gray-900 dark:text-white font-medium"><%= file.path %></span>
+      <span class="text-xs text-gray-600 dark:text-gray-500">
         <%= number_to_human_size(file.size_bytes) %>
       </span>
     </div>
@@ -26,13 +26,13 @@
     <!-- Fallback textarea (hidden when CodeMirror loads) -->
     <textarea
       id="editor_<%= file.id %>"
-      class="absolute inset-0 w-full h-full bg-gray-900 text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
+      class="absolute inset-0 w-full h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
       spellcheck="false"
     ><%= file.content %></textarea>
   </div>
   
   <!-- Status Bar -->
-  <div class="bg-gray-800 border-t border-gray-700 px-4 py-2 text-xs text-gray-400">
+  <div class="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
     <span data-codemirror-target="status">Ready</span>
     <span class="float-right">
       Line <span data-codemirror-target="line">1</span>, 

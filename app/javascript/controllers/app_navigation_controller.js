@@ -25,7 +25,7 @@ export default class extends Controller {
   
   open() {
     this.dropdownTarget.classList.remove("hidden")
-    this.triggerTarget.classList.add("bg-gray-700")
+    this.triggerTarget.classList.add("bg-gray-200", "dark:bg-gray-700")
     
     // Add backdrop blur effect
     document.body.style.backdropFilter = "blur(2px)"
@@ -33,7 +33,7 @@ export default class extends Controller {
   
   close() {
     this.dropdownTarget.classList.add("hidden")
-    this.triggerTarget.classList.remove("bg-gray-700")
+    this.triggerTarget.classList.remove("bg-gray-200", "dark:bg-gray-700")
     
     // Remove backdrop blur effect
     document.body.style.backdropFilter = ""

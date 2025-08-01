@@ -45,10 +45,17 @@ export default class extends Controller {
     // Add ESC key listener
     this.escapeHandler = this.keydown.bind(this)
     document.addEventListener('keydown', this.escapeHandler)
+    
+    // Listen for custom open event
+    this.openHandler = this.open.bind(this)
+    this.element.addEventListener('open-version-history', this.openHandler)
   }
 
   disconnect() {
     // Remove ESC key listener
     document.removeEventListener('keydown', this.escapeHandler)
+    
+    // Remove custom event listener
+    this.element.removeEventListener('open-version-history', this.openHandler)
   }
 }

@@ -37,12 +37,12 @@ export default class extends Controller {
     // Remove previous selection from all file links
     const allFileLinks = this.element.querySelectorAll('[data-file-tree-target="file"]')
     allFileLinks.forEach(file => {
-      file.classList.remove('bg-gray-700', 'border-l-2', 'border-primary-500')
+      file.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'border-l-2', 'border-primary-500')
     })
     
     // Add selection to clicked file
     const fileElement = event.currentTarget
-    fileElement.classList.add('bg-gray-700', 'border-l-2', 'border-primary-500')
+    fileElement.classList.add('bg-gray-100', 'dark:bg-gray-800', 'border-l-2', 'border-primary-500')
   }
   
   organizeFiles() {

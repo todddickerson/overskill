@@ -1,27 +1,25 @@
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-200" 
-     data-controller="version-preview deployment publish-modal version-comparison version-actions version-history" 
+     data-controller="version-preview deployment publish-modal version-comparison version-actions" 
      data-version-preview-app-id-value="<%= @app.id %>"
      data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
      data-deployment-app-id-value="<%= @app.id %>"
      data-publish-modal-app-id-value="<%= @app.id %>"
-     data-version-comparison-app-id-value="<%= @app.id %>"
-     data-version-history-app-id-value="<%= @app.id %>">
+     data-version-comparison-app-id-value="<%= @app.id %>">
   <!-- Header -->
   <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between transition-colors duration-200">
-    <div class="flex items-center space-x-4">
-      <!-- Team Navigation Dropdown -->
+    <div class="flex items-center">
+      <!-- Overskill Logo with Dropdown -->
       <%= render "team_navigation" %>
       
-      <%= link_to account_team_apps_path(@app.team), class: "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" do %>
-        <i class="fas fa-arrow-left"></i>
-      <% end %>
+      <!-- Separator -->
+      <div class="h-5 w-[1px] bg-slate-300 rotate-[25deg] mx-2"></div>
       
-      <!-- App Navigation Dropdown -->
+      <!-- App Logo and Name with Dropdown -->
       <%= render "app_navigation", app: @app %>
     </div>
     
     <div class="flex items-center space-x-4">
-      <button data-action="click->version-history#open"
+      <button onclick="document.querySelector('[data-controller*=version-history]').dispatchEvent(new CustomEvent('open-version-history'))"
               class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
         <i class="fas fa-history mr-1"></i> Version History
       </button>
@@ -43,11 +41,6 @@
   <div class="flex-1 flex overflow-hidden">
     <!-- Left Panel - Chat -->
     <div class="w-96 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors duration-200">
-      <!-- Chat Header -->
-      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
-        <h2 class="text-gray-900 dark:text-gray-100 font-semibold text-lg">AI Assistant</h2>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Describe changes to make to your app</p>
-      </div>
       
       <!-- Chat Messages -->
       <div class="flex-1 overflow-y-auto px-6 py-4" id="chat_container" data-controller="chat-scroller">
@@ -85,30 +78,39 @@
       </div>
       
       <!-- Chat Input -->
-      <div class="p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200" id="chat_form">
-        <%= render "chat_form", app: @app %>
-      </div>
+      <%= render "chat_input_wrapper", app: @app %>
     </div>
     
     <!-- Right Panel - Preview/Code -->
-    <div class="flex-1 bg-gray-900 flex flex-col"
+    <div class="flex-1 bg-white dark:bg-gray-900 flex flex-col"
          data-controller="tabs"
          data-tabs-debug="true">
       <!-- Tabs -->
-      <div class="bg-gray-800 border-b border-gray-700 px-4 flex items-center space-x-1"
+      <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between"
            id="tabs-container">
-        <button class="px-4 py-2 text-sm font-medium text-white border-b-2 border-primary-500"
-                data-tabs-target="tab"
-                data-panel="preview"
-                data-action="click->tabs#switchTab">
-          <i class="fas fa-eye mr-2"></i>Preview
-        </button>
-        <button class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent"
-                data-tabs-target="tab"
-                data-panel="files"
-                data-action="click->tabs#switchTab">
-          <i class="fas fa-folder mr-2"></i>Files (<%= @files.count %>)
-        </button>
+        <div class="flex items-center space-x-1">
+          <button class="px-4 py-2 text-sm font-medium text-gray-900 dark:text-white border-b-2 border-primary-500"
+                  data-tabs-target="tab"
+                  data-panel="preview"
+                  data-action="click->tabs#switchTab">
+            <i class="fas fa-eye mr-2"></i>Preview
+          </button>
+          <button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent"
+                  data-tabs-target="tab"
+                  data-panel="files"
+                  data-action="click->tabs#switchTab">
+            <i class="fas fa-folder mr-2"></i>Files (<%= @files.count %>)
+          </button>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+          <button class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  data-tabs-target="refreshButton"
+                  data-action="click->tabs#refreshPreview"
+                  title="Refresh preview">
+            <i class="fas fa-sync-alt text-sm"></i>
+          </button>
+        </div>
       </div>
       
       <!-- Tab Panels -->
@@ -124,14 +126,16 @@
           <% if @files.any? %>
             <div class="h-full flex">
               <!-- File Tree -->
-              <%= render "file_tree", files: @files, selected_file: @selected_file, app: @app %>
+              <div class="flex-shrink-0 flex-grow-0">
+                <%= render "file_tree", files: @files, selected_file: @selected_file, app: @app %>
+              </div>
               
               <!-- Code Display -->
-              <div class="flex-1 bg-gray-900" id="code_editor">
+              <div class="w-full flex-1 min-w-0 bg-white dark:bg-gray-900 overflow-hidden" id="code_editor">
                 <% if @selected_file %>
                   <%= render "code_editor", file: @selected_file, app: @app %>
                 <% else %>
-                  <div class="h-full flex items-center justify-center text-gray-500">
+                  <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
                     <div class="text-center">
                       <i class="fas fa-code text-4xl mb-4"></i>
                       <p>Select a file to view its contents</p>
@@ -141,7 +145,7 @@
               </div>
             </div>
           <% else %>
-            <div class="h-full flex items-center justify-center text-gray-500">
+            <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
               <div class="text-center">
                 <i class="fas fa-folder-open text-6xl mb-4"></i>
                 <p class="text-xl">No files found for this app</p>

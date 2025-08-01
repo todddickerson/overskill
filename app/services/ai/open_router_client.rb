@@ -21,7 +21,7 @@ module Ai
           "X-Title" => "OverSkill Platform",
           "Content-Type" => "application/json"
         },
-        timeout: 120  # 2 minute timeout for long generation requests
+        timeout: 600  # 10 minute timeout for long generation requests
       }
     end
 
@@ -38,7 +38,22 @@ module Ai
 
       Rails.logger.info "[AI] Calling OpenRouter with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
-      response = self.class.post("/chat/completions", @options.merge(body: body.to_json))
+      retries = 0
+      max_retries = 2
+      
+      begin
+        response = self.class.post("/chat/completions", @options.merge(body: body.to_json))
+      rescue Net::ReadTimeout => e
+        retries += 1
+        if retries <= max_retries
+          Rails.logger.warn "[AI] Timeout occurred, retrying (#{retries}/#{max_retries})..."
+          sleep(retries * 2) # Exponential backoff
+          retry
+        else
+          Rails.logger.error "[AI] Timeout after #{max_retries} retries"
+          raise e
+        end
+      end
 
       if response.success?
         result = response.parsed_response
