@@ -99,7 +99,9 @@ Rails.application.routes.draw do
           resources :app_versions do
             member do
               get :preview
+              get "files/*path", action: :serve_file, as: :file, format: false
               get :compare
+              post :restore
             end
           end
           resources :app_files

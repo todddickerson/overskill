@@ -1,24 +1,58 @@
-<div id="preview_frame" class="h-full bg-white">
-  <% if app.app_files.any? %>
-    <% # Use Cloudflare preview URL if available, otherwise fallback to Rails preview %>
-    <% preview_src = app.preview_url || account_app_preview_path(app) %>
-    <iframe 
-      src="<%= preview_src %>"
-      class="w-full h-full border-0"
-      <% if app.preview_url %>
-        sandbox="allow-scripts allow-forms allow-modals"
-      <% else %>
-        sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
-      <% end %>
-      title="App Preview">
-    </iframe>
-  <% else %>
-    <div class="h-full flex items-center justify-center text-gray-500">
-      <div class="text-center">
-        <i class="fas fa-code text-4xl mb-4"></i>
-        <p>No preview available yet</p>
-        <p class="text-sm">Generate your app to see it here</p>
-      </div>
+<div id="preview_frame" class="h-full bg-white flex flex-col" 
+     data-controller="version-preview"
+     data-version-preview-app-id-value="<%= app.id %>">
+  
+  <!-- Version header (hidden by default) -->
+  <div data-version-preview-target="versionHeader" 
+       class="hidden bg-gray-100 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <span class="text-sm text-gray-600">Previewing version</span>
+      <span data-version-preview-target="currentVersionBadge" 
+            class="px-2 py-1 bg-gray-700 text-white text-xs rounded font-medium">
+        v1.0.0
+      </span>
     </div>
-  <% end %>
+    
+    <div class="flex items-center space-x-2">
+      <button data-version-preview-target="restoreButton"
+              data-action="click->version-preview#restoreVersion"
+              class="hidden px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded flex items-center">
+        <i class="fas fa-history mr-2"></i>
+        Restore This Version
+      </button>
+      
+      <button data-action="click->version-preview#showLatest"
+              class="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded">
+        <i class="fas fa-times mr-1"></i>
+        Back to Latest
+      </button>
+    </div>
+  </div>
+  
+  <!-- Preview iframe -->
+  <div class="flex-1 relative">
+    <% if app.app_files.any? %>
+      <% # Use Cloudflare preview URL if available, otherwise fallback to Rails preview %>
+      <% preview_src = app.preview_url || account_app_preview_path(app) %>
+      <iframe 
+        data-version-preview-target="iframe"
+        src="<%= preview_src %>"
+        class="w-full h-full border-0"
+        <% if app.preview_url %>
+          sandbox="allow-scripts allow-forms allow-modals"
+        <% else %>
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+        <% end %>
+        title="App Preview">
+      </iframe>
+    <% else %>
+      <div class="h-full flex items-center justify-center text-gray-500">
+        <div class="text-center">
+          <i class="fas fa-code text-4xl mb-4"></i>
+          <p>No preview available yet</p>
+          <p class="text-sm">Generate your app to see it here</p>
+        </div>
+      </div>
+    <% end %>
+  </div>
 </div>
