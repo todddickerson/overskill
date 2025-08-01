@@ -54,7 +54,7 @@
       </div>
       
       <!-- Chat Messages -->
-      <div class="flex-1 overflow-y-auto p-4" id="chat_container">
+      <div class="flex-1 overflow-y-auto p-4" id="chat_container" data-controller="chat-scroller">
         <%= turbo_stream_from "app_#{@app.id}_chat" %>
         <div id="chat_messages" class="space-y-4">
           <% if @messages.any? %>

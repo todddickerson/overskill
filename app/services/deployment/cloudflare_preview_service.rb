@@ -36,17 +36,31 @@ class Deployment::CloudflarePreviewService
     
     return { success: false, error: "Failed to upload preview worker" } unless upload_response['success']
     
+    # Enable workers.dev subdomain
+    enable_workers_dev_subdomain(worker_name)
+    
     # Ensure route exists for auto-preview domain (using overskill.app for now)
     ensure_preview_route(preview_subdomain, worker_name)
     
+    # Get the workers.dev URL (which is automatically enabled now)
+    workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+    
     # Update app with preview URLs
-    preview_url = "https://#{preview_subdomain}.overskill.app"
+    # For now, use workers.dev URL until custom domain DNS is configured
+    preview_url = workers_dev_url
+    custom_domain_url = "https://#{preview_subdomain}.overskill.app"
+    
     @app.update!(
       preview_url: preview_url,
       preview_updated_at: Time.current
     )
     
-    { success: true, preview_url: preview_url }
+    { 
+      success: true, 
+      preview_url: preview_url,
+      custom_domain_url: custom_domain_url,
+      note: "Using workers.dev URL. To use custom domain, add DNS CNAME: #{preview_subdomain} -> #{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+    }
   rescue => e
     Rails.logger.error "Preview update failed: #{e.message}"
     { success: false, error: e.message }
@@ -161,6 +175,21 @@ class Deployment::CloudflarePreviewService
     )
     
     JSON.parse(response.body)
+  end
+  
+  def enable_workers_dev_subdomain(worker_name)
+    # Enable the workers.dev subdomain for the worker
+    response = self.class.patch(
+      "/accounts/#{@account_id}/workers/scripts/#{worker_name}/subdomain",
+      headers: { 'Content-Type' => 'application/json' },
+      body: JSON.generate({ enabled: true })
+    )
+    
+    if response.code == 200
+      Rails.logger.info "Enabled workers.dev subdomain for #{worker_name}"
+    else
+      Rails.logger.warn "Failed to enable workers.dev subdomain: #{response.body}"
+    end
   end
   
   def ensure_preview_route(subdomain, worker_name)

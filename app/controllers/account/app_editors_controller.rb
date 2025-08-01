@@ -87,7 +87,9 @@ class Account::AppEditorsController < Account::ApplicationController
             turbo_stream.replace("chat_form",
               partial: "account/app_editors/chat_form",
               locals: {app: @app}),
-            turbo_stream.execute("document.getElementById('chat_container').scrollTop = document.getElementById('chat_container').scrollHeight")
+            # Append a temporary element that will scroll the container on connection
+            turbo_stream.append("chat_messages", 
+              "<div data-controller='chat-scroller' data-chat-scroller-target='trigger'></div>")
           ]
         end
       end
