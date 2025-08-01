@@ -1,4 +1,5 @@
 class App < ApplicationRecord
+  include AutoPreview
   # 🚅 add concerns above.
 
   # 🚅 add attribute accessors above.

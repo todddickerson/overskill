@@ -87,6 +87,7 @@ Rails.application.routes.draw do
           # Main editor interface at /account/apps/:id/editor
           resource :editor, controller: "app_editors", only: [:show] do
             post :create_message
+            post :deploy
             patch "files/:file_id", action: :update_file, as: :file
           end
           

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_31_152149) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_01_123500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -210,6 +210,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_31_152149) do
     t.datetime "published_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "environment"
     t.index ["app_id"], name: "index_app_versions_on_app_id"
     t.index ["team_id"], name: "index_app_versions_on_team_id"
     t.index ["user_id"], name: "index_app_versions_on_user_id"
@@ -241,6 +242,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_31_152149) do
     t.integer "ai_cost", default: 0
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "deployment_url"
+    t.string "deployment_status"
+    t.datetime "deployed_at"
+    t.string "staging_url"
+    t.datetime "staging_deployed_at"
+    t.datetime "preview_updated_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["featured"], name: "index_apps_on_featured"
     t.index ["slug"], name: "index_apps_on_slug", unique: true

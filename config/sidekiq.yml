@@ -6,6 +6,8 @@ production:
 :queues:
   - critical
   - ai_generation
+  - deployment
+  - preview_updates
   - default
   - mailers
   - low
