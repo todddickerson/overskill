@@ -110,7 +110,8 @@ module Ai
           app: data["app"],
           files: data["files"],
           instructions: data["instructions"],
-          deployment_notes: data["deployment_notes"]
+          deployment_notes: data["deployment_notes"],
+          whats_next: data["whats_next"]
         }
       rescue JSON::ParserError => e
         Rails.logger.error "[AppGenerator] Failed to parse AI response as JSON: #{e.message}"

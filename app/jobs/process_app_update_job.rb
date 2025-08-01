@@ -212,25 +212,29 @@ class ProcessAppUpdateJob < ApplicationJob
       response += "**Testing notes:** #{result[:testing_notes]}\n\n"
     end
 
-    # Add bug detection and suggestions
-    bugs_detected = detect_potential_bugs(result)
-    suggestions = generate_suggestions(result, bugs_detected)
-    
-    if bugs_detected.any? || suggestions.any?
-      response += "## What's next?\n\n"
+    # Add What's next section from AI response
+    if result[:whats_next]
+      bugs = result[:whats_next][:bugs] || []
+      suggestions = result[:whats_next][:suggestions] || []
       
-      if bugs_detected.any?
-        response += "⚠️ **Potential issues detected:**\n"
-        bugs_detected.each do |bug|
-          response += "- #{bug[:message]}\n"
+      if bugs.any? || suggestions.any?
+        response += "## What's next?\n\n"
+        
+        if bugs.any?
+          response += "⚠️ **Potential issues detected:**\n"
+          bugs.each do |bug|
+            response += "- #{bug[:message]}"
+            response += " (#{bug[:file]})" if bug[:file]
+            response += "\n"
+          end
+          response += "\n"
         end
-        response += "\n"
-      end
-      
-      if suggestions.any?
-        response += "**Quick actions:**\n"
-        suggestions.each do |suggestion|
-          response += "[#{suggestion[:label]}]: #{suggestion[:prompt]}\n"
+        
+        if suggestions.any?
+          response += "**Quick actions:**\n"
+          suggestions.each do |suggestion|
+            response += "[#{suggestion[:label]}]: #{suggestion[:prompt]}\n"
+          end
         end
       end
     end
@@ -238,105 +242,6 @@ class ProcessAppUpdateJob < ApplicationJob
     response
   end
 
-  def detect_potential_bugs(result)
-    bugs = []
-    
-    # Check for common React issues
-    result[:files].each do |file|
-      if file[:type] == "javascript" && file[:content]
-        content = file[:content]
-        
-        # Check for undefined state/props access
-        if content.match(/props\.\w+\.length/) && !content.match(/props\.\w+\s*&&\s*props\.\w+\.length/)
-          bugs << { 
-            message: "Potential undefined error: Accessing .length without checking if prop exists",
-            file: file[:path]
-          }
-        end
-        
-        # Check for missing key props in map
-        if content.match(/\.map\s*\([^)]+\)\s*=>\s*React\.createElement/) && !content.match(/key\s*:/)
-          bugs << {
-            message: "Missing 'key' prop in list rendering",
-            file: file[:path]
-          }
-        end
-        
-        # Check for useState without proper initialization
-        if content.match(/useState\(\)/) 
-          bugs << {
-            message: "useState called without initial value",
-            file: file[:path]
-          }
-        end
-      end
-      
-      # Check for missing error handling
-      if file[:content]&.match(/fetch\(|axios\.|\.then\(/) && !file[:content].match(/\.catch\(|try\s*{/)
-        bugs << {
-          message: "API calls without error handling",
-          file: file[:path]
-        }
-      end
-    end
-    
-    bugs
-  end
-  
-  def generate_suggestions(result, bugs_detected)
-    suggestions = []
-    
-    # Auto-fix suggestions for detected bugs
-    if bugs_detected.any? { |bug| bug[:message].include?("undefined error") }
-      suggestions << {
-        label: "🔧 Fix undefined errors",
-        prompt: "Add proper null checks and default values to prevent undefined errors"
-      }
-    end
-    
-    # General improvement suggestions based on files
-    has_styles = result[:files].any? { |f| f[:type] == "css" }
-    has_js = result[:files].any? { |f| f[:type] == "javascript" }
-    
-    if has_js && !has_styles
-      suggestions << {
-        label: "🎨 Add styling",
-        prompt: "Create a beautiful UI with modern CSS styling and animations"
-      }
-    end
-    
-    if has_js
-      suggestions << {
-        label: "♻️ Refactor code",
-        prompt: "Refactor the code to be more maintainable and follow best practices"
-      }
-      
-      suggestions << {
-        label: "🧪 Add error handling",
-        prompt: "Add comprehensive error handling and user-friendly error messages"
-      }
-      
-      suggestions << {
-        label: "📱 Make responsive",
-        prompt: "Make the app fully responsive for mobile and tablet devices"
-      }
-    end
-    
-    # Framework-specific suggestions
-    if result[:files].any? { |f| f[:content]&.include?("React.createElement") }
-      suggestions << {
-        label: "🔄 Add loading states",
-        prompt: "Add loading states and skeleton screens for better UX"
-      }
-      
-      suggestions << {
-        label: "⚡ Optimize performance",
-        prompt: "Optimize React performance with memo, useCallback, and lazy loading"
-      }
-    end
-    
-    suggestions
-  end
 
   def handle_error(chat_message, error_message)
     Rails.logger.error "[ProcessAppUpdate] Error: #{error_message}"

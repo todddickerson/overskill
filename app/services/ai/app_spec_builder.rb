@@ -53,6 +53,12 @@ module Ai
         - Security best practices (sanitize inputs)
         - Local storage for data persistence
         
+        ## What's Next Analysis
+        After generating the app, analyze the code and provide:
+        1. Bug detection for common issues
+        2. Smart suggestions for improvements
+        3. Each suggestion should have a label and full prompt text
+        
         ## File Output Format
         Return ONLY valid JSON with this structure:
         {
@@ -71,7 +77,26 @@ module Ai
             }
           ],
           "instructions": "How to use the app",
-          "deployment_notes": "Any special notes"
+          "deployment_notes": "Any special notes",
+          "whats_next": {
+            "bugs": [
+              {
+                "message": "Description of potential issue",
+                "file": "filename.js",
+                "severity": "warning|error"
+              }
+            ],
+            "suggestions": [
+              {
+                "label": "🔧 Fix something",
+                "prompt": "Full prompt text to pre-fill when clicked"
+              },
+              {
+                "label": "✨ Add feature",
+                "prompt": "Add this specific feature..."
+              }
+            ]
+          }
         }
 
         ## Example Structure (FOLLOW THIS PATTERN):
@@ -156,6 +181,26 @@ module Ai
         8. ALWAYS use production CDN builds (production.min.js NOT development.js)
         9. React apps must initialize with "something on initial load always"
 
+        WHAT'S NEXT SUGGESTIONS:
+        After completing the changes, analyze the code and provide smart suggestions for next steps.
+        Include:
+        - Bug Detection: Check for common issues like:
+          * Undefined property access (e.g., props.items.length without null check)
+          * Missing React key props in list rendering
+          * useState without initial values
+          * API calls without error handling
+          * Long functions that should be refactored (>100 lines)
+          * Missing accessibility attributes
+          * Performance issues (no memoization, excessive re-renders)
+        
+        - Smart Suggestions based on the code:
+          * If React components are long (>200 lines), suggest: "Refactor [ComponentName] into smaller components"
+          * If no error boundaries, suggest: "Add error boundaries for better error handling"
+          * If no loading states, suggest: "Add loading states and skeleton screens"
+          * If no responsive design, suggest: "Make the app fully responsive"
+          * If basic styling, suggest: "Enhance UI with animations and modern design"
+          * Context-specific suggestions based on app type
+
         Return ONLY valid JSON with this structure:
         {
           "changes": {
@@ -178,7 +223,26 @@ module Ai
               "action": "create"
             }
           ],
-          "testing_notes": "What to test after these changes"
+          "testing_notes": "What to test after these changes",
+          "whats_next": {
+            "bugs": [
+              {
+                "message": "Description of potential issue",
+                "file": "filename.js",
+                "severity": "warning|error"
+              }
+            ],
+            "suggestions": [
+              {
+                "label": "🔧 Fix something",
+                "prompt": "Full prompt text to pre-fill when clicked"
+              },
+              {
+                "label": "✨ Add feature",
+                "prompt": "Add this specific feature..."
+              }
+            ]
+          }
         }
       SPEC
     end
