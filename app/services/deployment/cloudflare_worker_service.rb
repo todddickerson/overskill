@@ -7,10 +7,20 @@ class Deployment::CloudflareWorkerService
   def initialize(app)
     @app = app
     @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
-    @api_token = ENV['CLOUDFLARE_API_TOKEN'] || ENV['CLOUDFLARE_API_KEY']
+    @api_key = ENV['CLOUDFLARE_API_KEY']
+    @api_token = ENV['CLOUDFLARE_API_TOKEN']
+    @email = ENV['CLOUDFLARE_EMAIL']
     @zone_id = ENV['CLOUDFLARE_ZONE_ID'] || ENV['CLOUDFLARE_ZONE'] # For overskill.app domain
     
-    self.class.headers 'Authorization' => "Bearer #{@api_token}"
+    # Use API Token if available, otherwise use Global API Key
+    if @api_token.present?
+      self.class.headers 'Authorization' => "Bearer #{@api_token}"
+    elsif @api_key.present? && @email.present?
+      self.class.headers({
+        'X-Auth-Email' => @email,
+        'X-Auth-Key' => @api_key
+      })
+    end
   end
   
   # Deploy app to Cloudflare Workers with unique subdomain
@@ -75,7 +85,8 @@ class Deployment::CloudflareWorkerService
   private
   
   def credentials_present?
-    [@account_id, @api_token, @zone_id].all?(&:present?)
+    @account_id.present? && @zone_id.present? && 
+      (@api_token.present? || (@api_key.present? && @email.present?))
   end
   
   def generate_subdomain
