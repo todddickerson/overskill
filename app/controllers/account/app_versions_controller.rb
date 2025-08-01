@@ -73,14 +73,15 @@ class Account::AppVersionsController < Account::ApplicationController
 
   # GET /account/app_versions/:id/preview
   def preview
-    # For now, serve the version files directly from Rails
-    # Later this can deploy to a versioned Worker
-    @html_file = find_version_file(@app_version, "html")
+    # Deploy this specific version to a preview Worker
+    service = Deployment::AppVersionPreviewService.new(@app_version)
+    result = service.deploy_version_preview!
     
-    if @html_file
-      render html: process_html_for_version_preview(@html_file.content).html_safe, layout: false
+    if result[:success]
+      redirect_to result[:preview_url], allow_other_host: true
     else
-      render plain: "No HTML file found for this version", status: :not_found
+      redirect_to [:account, @app_version.app, :editor], 
+                  alert: "Failed to preview version: #{result[:error]}"
     end
   end
   

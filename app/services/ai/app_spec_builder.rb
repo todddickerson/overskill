@@ -14,6 +14,7 @@ module Ai
         - Access React via global objects: const { useState, useEffect } = React;
         - Functional components with hooks only
         - Use Tailwind CSS via CDN for styling
+        - ALWAYS use production CDN builds (production.min.js NOT development.js)
         - Structure:
           - index.html (loads React from CDN, then components.js, then app.js)
           - app.js (main React app using React.createElement)
@@ -25,6 +26,7 @@ module Ai
         - require() calls
         - JSX syntax (use React.createElement instead)
         - Any module bundler syntax
+        - Development CDN builds (always use production.min.js)
         
         ### For Vanilla JS Apps:
         - Modern ES6+ JavaScript
@@ -151,6 +153,8 @@ module Ai
         5. For React apps: NO IMPORTS/EXPORTS - use global React and React.createElement()
         6. Ensure all code is browser-compatible (no require, no ES6 modules)
         7. Components should be global functions, not exported/imported
+        8. ALWAYS use production CDN builds (production.min.js NOT development.js)
+        9. React apps must initialize with "something on initial load always"
 
         Return ONLY valid JSON with this structure:
         {

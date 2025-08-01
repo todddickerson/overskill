@@ -27,7 +27,34 @@ module Ai
         
         content = file[:content]
         
-        # Check for forbidden patterns
+        # For HTML files, check specific patterns
+        if file[:path].match?(/\.html$/)
+          # Extract non-script content for validation
+          non_script_content = content.gsub(/<script[^>]*>.*?<\/script>/m, '')
+          
+          # Only check for JSX in non-script parts of HTML
+          if non_script_content.match?(/<[A-Z]\w*[^>]*\/?>/) || non_script_content.match?(/<\/[A-Z]\w*>/)
+            errors << {
+              file: file[:path],
+              message: "JSX syntax detected outside script tags. Use React.createElement() instead.",
+              pattern: "JSX in HTML"
+            }
+          end
+          
+          # Check for development CDN builds in HTML
+          if content.match?(/unpkg\.com.*development\.js/)
+            errors << {
+              file: file[:path],
+              message: "Use production builds from CDN, not development builds.",
+              pattern: "development.js"
+            }
+          end
+          
+          # Skip other pattern checks for HTML files
+          next
+        end
+        
+        # Check for forbidden patterns in JS/JSX files
         FORBIDDEN_PATTERNS.each do |rule|
           if content.match?(rule[:pattern])
             errors << {

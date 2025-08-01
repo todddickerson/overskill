@@ -64,7 +64,8 @@ class ProcessAppUpdateJob < ApplicationJob
             result[:files] = fixed_files
             apply_changes(app, result)
           else
-            handle_error(chat_message, "Generated code has errors: #{retry_validation[:errors].first[:message]}")
+            # Create error response with fix option
+            handle_validation_error(chat_message, validation[:errors], result)
             return
           end
         end
@@ -307,5 +308,40 @@ class ProcessAppUpdateJob < ApplicationJob
       partial: "account/app_editors/chat_message",
       locals: {message: error_message}
     )
+  end
+  
+  def handle_validation_error(chat_message, errors, result)
+    # Create a detailed error message
+    error_details = errors.map { |e| "• #{e[:file]}: #{e[:message]}" }.join("\n")
+    
+    error_message = <<~MESSAGE
+      I encountered some issues with the generated code:
+      
+      #{error_details}
+      
+      These issues prevent the code from running properly in the browser. Would you like me to:
+      
+      1. **Fix automatically** - I'll update the code to be browser-compatible
+      2. **Show the code anyway** - You can review and fix it manually
+      
+      What would you prefer?
+    MESSAGE
+    
+    # Create assistant response with error details
+    assistant_message = chat_message.app.app_chat_messages.create!(
+      role: "assistant",
+      content: error_message,
+      status: "validation_error",
+      metadata: {
+        validation_errors: errors,
+        original_result: result
+      }
+    )
+    
+    # Update original message status
+    chat_message.update!(status: "validation_error", response: "Code validation failed")
+    
+    # Broadcast error response
+    broadcast_error(chat_message, assistant_message)
   end
 end

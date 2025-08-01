@@ -134,12 +134,15 @@ class Deployment::AppVersionPreviewService
   end
   
   def reconstruct_files_at_version
-    # For now, we'll use the current files
-    # In a full implementation, you'd track file changes per version
+    # Get the files as they were at this version
     files_hash = {}
-    @app.app_files.each do |file|
-      files_hash[file.path] = file.content
+    
+    # Use the content stored in app_version_files
+    @app_version.app_version_files.each do |version_file|
+      app_file = version_file.app_file
+      files_hash[app_file.path] = version_file.content
     end
+    
     files_hash
   end
   

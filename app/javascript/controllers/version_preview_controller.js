@@ -32,7 +32,7 @@ export default class extends Controller {
   
   async previewVersion(versionId) {
     // Update the iframe to show the specific version
-    const versionPreviewUrl = `/account/apps/${this.appId}/versions/${versionId}/preview`
+    const versionPreviewUrl = `/account/app_versions/${versionId}/preview`
     this.iframeTarget.src = versionPreviewUrl
     
     // Store the current version ID
@@ -43,7 +43,7 @@ export default class extends Controller {
     
     // Fetch version details to update the header
     try {
-      const response = await fetch(`/account/apps/${this.appId}/versions/${versionId}.json`)
+      const response = await fetch(`/account/app_versions/${versionId}.json`)
       const version = await response.json()
       
       // Update version badge
@@ -69,7 +69,7 @@ export default class extends Controller {
     }
     
     try {
-      const response = await fetch(`/account/apps/${this.appId}/versions/${this.currentVersionId}/restore`, {
+      const response = await fetch(`/account/app_versions/${this.currentVersionId}/restore`, {
         method: 'POST',
         headers: {
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
