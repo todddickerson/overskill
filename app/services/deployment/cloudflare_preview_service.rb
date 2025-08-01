@@ -95,6 +95,54 @@ class Deployment::CloudflarePreviewService
     base_name.presence || "app-#{@app.id}"
   end
   
+  def deploy_to_environment(environment, subdomain)
+    return { success: false, error: "Missing Cloudflare credentials" } unless credentials_present?
+    
+    worker_name = "#{environment}-#{@app.id}"
+    
+    # Upload worker script with latest files
+    worker_script = generate_worker_script
+    upload_response = upload_worker(worker_name, worker_script)
+    
+    return { success: false, error: "Failed to upload #{environment} worker" } unless upload_response['success']
+    
+    # Enable workers.dev subdomain
+    enable_workers_dev_subdomain(worker_name)
+    
+    # Ensure route exists for the environment
+    ensure_preview_route(subdomain, worker_name)
+    
+    # Get both URLs
+    workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+    custom_domain_url = "https://#{subdomain}.overskill.app"
+    
+    # Update app with deployment info based on environment
+    case environment
+    when :staging
+      @app.update!(
+        staging_url: custom_domain_url,
+        staging_deployed_at: Time.current
+      )
+    when :production
+      @app.update!(
+        deployment_url: custom_domain_url,
+        deployed_at: Time.current,
+        deployment_status: 'deployed'
+      )
+    end
+    
+    { 
+      success: true, 
+      message: custom_domain_url,
+      deployment_url: custom_domain_url,
+      workers_dev_url: workers_dev_url,
+      environment: environment
+    }
+  rescue => e
+    Rails.logger.error "#{environment.to_s.capitalize} deployment failed: #{e.message}"
+    { success: false, error: e.message }
+  end
+
   def generate_worker_script
     # Same worker script but with CORS headers for preview
     <<~JAVASCRIPT
