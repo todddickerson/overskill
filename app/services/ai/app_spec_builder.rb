@@ -9,15 +9,22 @@ module Ai
         ## Tech Stack & Structure
         
         ### For React Apps:
-        - Use React 18+ via CDN (unpkg)
+        - Use React 18+ via CDN (unpkg) - NO ES6 MODULES OR IMPORTS
+        - Use React.createElement() instead of JSX (NO BABEL NEEDED)
+        - Access React via global objects: const { useState, useEffect } = React;
         - Functional components with hooks only
         - Use Tailwind CSS via CDN for styling
-        - Include Babel standalone for JSX
         - Structure:
-          - index.html (main entry)
-          - app.js (main React app)
-          - components.js (reusable components)
+          - index.html (loads React from CDN, then components.js, then app.js)
+          - app.js (main React app using React.createElement)
+          - components.js (reusable components as global functions)
           - styles.css (custom styles if needed)
+        
+        CRITICAL: DO NOT USE:
+        - import/export statements
+        - require() calls
+        - JSX syntax (use React.createElement instead)
+        - Any module bundler syntax
         
         ### For Vanilla JS Apps:
         - Modern ES6+ JavaScript
@@ -65,7 +72,62 @@ module Ai
           "deployment_notes": "Any special notes"
         }
 
-        Remember: Create a COMPLETE, working application that runs immediately when served. Include all necessary code in the files.
+        ## Example Structure (FOLLOW THIS PATTERN):
+        
+        ### index.html:
+        ```html
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>App Title</title>
+          <!-- React from CDN -->
+          <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+          <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+          <!-- Tailwind CSS -->
+          <script src="https://cdn.tailwindcss.com"></script>
+          <!-- Custom styles if needed -->
+          <link rel="stylesheet" href="styles.css">
+        </head>
+        <body>
+          <div id="root"></div>
+          <!-- Load scripts in correct order -->
+          <script src="components.js"></script>
+          <script src="app.js"></script>
+        </body>
+        </html>
+        ```
+        
+        ### app.js (NO IMPORTS, use React.createElement):
+        ```javascript
+        const { useState, useEffect } = React;
+        
+        function App() {
+          const [state, setState] = useState(initialValue);
+          
+          return React.createElement('div', { className: 'container' },
+            React.createElement('h1', null, 'Title'),
+            React.createElement(ComponentName, { prop: value })
+          );
+        }
+        
+        // Mount the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+        ```
+        
+        ### components.js (Global functions, NO EXPORTS):
+        ```javascript
+        // Define components as global functions
+        function ComponentName({ prop }) {
+          return React.createElement('div', null, 'content');
+        }
+        
+        // NO export statements - components are global
+        ```
+
+        Remember: Create a COMPLETE, working application that runs immediately when served. Test that all files work together without any bundler.
       SPEC
     end
 
@@ -86,6 +148,9 @@ module Ai
         2. Maintain the existing code style and patterns
         3. Don't break existing functionality
         4. Keep the same tech stack unless explicitly asked to change
+        5. For React apps: NO IMPORTS/EXPORTS - use global React and React.createElement()
+        6. Ensure all code is browser-compatible (no require, no ES6 modules)
+        7. Components should be global functions, not exported/imported
 
         Return ONLY valid JSON with this structure:
         {

@@ -152,7 +152,10 @@ module Ai
     end
 
     def create_app_files(files)
-      files.each do |file_data|
+      # Validate and fix files before creating
+      validated_files = validate_and_fix_files(files)
+      
+      validated_files.each do |file_data|
         @app.app_files.create!(
           team: @app.team,
           path: file_data["path"] || file_data[:path],
@@ -221,6 +224,68 @@ module Ai
       @app.update!(status: "failed")
 
       {success: false, error: message}
+    end
+    
+    def validate_and_fix_files(files)
+      # Convert to consistent format for validation
+      normalized_files = files.map do |file|
+        {
+          path: file["path"] || file[:path],
+          content: file["content"] || file[:content],
+          type: determine_file_type(file["path"] || file[:path])
+        }
+      end
+      
+      # Validate the files
+      validation = Ai::CodeValidatorService.validate_files(normalized_files)
+      
+      if validation[:valid]
+        return files
+      else
+        # Log validation errors
+        Rails.logger.warn "[AppGenerator] Code validation warnings:"
+        validation[:errors].each do |error|
+          Rails.logger.warn "  #{error[:file]}: #{error[:message]}"
+        end
+        
+        # Try to fix common issues
+        fixed_files = files.map do |file|
+          path = file["path"] || file[:path]
+          content = file["content"] || file[:content]
+          file_type = determine_file_type(path)
+          
+          # Apply fixes for JavaScript files
+          if file_type == "javascript"
+            content = Ai::CodeValidatorService.fix_common_issues(content, file_type)
+          end
+          
+          # Return in original format
+          if file.is_a?(Hash) && file.key?("path")
+            file.merge("content" => content)
+          else
+            file.merge(content: content)
+          end
+        end
+        
+        # Validate again after fixes
+        normalized_fixed = fixed_files.map do |file|
+          {
+            path: file["path"] || file[:path],
+            content: file["content"] || file[:content],
+            type: determine_file_type(file["path"] || file[:path])
+          }
+        end
+        
+        retry_validation = Ai::CodeValidatorService.validate_files(normalized_fixed)
+        if !retry_validation[:valid]
+          Rails.logger.error "[AppGenerator] Code still has errors after fixes:"
+          retry_validation[:errors].each do |error|
+            Rails.logger.error "  #{error[:file]}: #{error[:message]}"
+          end
+        end
+        
+        fixed_files
+      end
     end
   end
 end

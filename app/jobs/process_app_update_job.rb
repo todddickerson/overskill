@@ -39,8 +39,35 @@ class ProcessAppUpdateJob < ApplicationJob
       result = parse_update_response(response[:content])
 
       if result
-        # Apply the changes
-        apply_changes(app, result)
+        # Validate the generated code before applying
+        validation = Ai::CodeValidatorService.validate_files(result[:files])
+        
+        if validation[:valid]
+          # Apply the changes
+          apply_changes(app, result)
+        else
+          # Log validation errors
+          Rails.logger.error "[ProcessAppUpdate] Code validation failed:"
+          validation[:errors].each do |error|
+            Rails.logger.error "  #{error[:file]}: #{error[:message]}"
+          end
+          
+          # Try to fix common issues and retry
+          fixed_files = result[:files].map do |file|
+            file[:content] = Ai::CodeValidatorService.fix_common_issues(file[:content], file[:type])
+            file
+          end
+          
+          # Validate again
+          retry_validation = Ai::CodeValidatorService.validate_files(fixed_files)
+          if retry_validation[:valid]
+            result[:files] = fixed_files
+            apply_changes(app, result)
+          else
+            handle_error(chat_message, "Generated code has errors: #{retry_validation[:errors].first[:message]}")
+            return
+          end
+        end
 
         # Create assistant response
         assistant_message = app.app_chat_messages.create!(
