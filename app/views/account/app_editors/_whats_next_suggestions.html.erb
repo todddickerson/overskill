@@ -1,0 +1,27 @@
+<% if suggestions.any? %>
+  <div class="ml-10 mt-4">
+    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">What's next?</h4>
+      
+      <% if bugs.any? %>
+        <div class="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
+          <p class="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2">⚠️ Potential issues detected:</p>
+          <ul class="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
+            <% bugs.each do |bug| %>
+              <li>• <%= bug[:message] %> <span class="text-yellow-600 dark:text-yellow-400">(<%= bug[:file] %>)</span></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+      
+      <div class="flex flex-wrap gap-2">
+        <% suggestions.each do |suggestion| %>
+          <button onclick="document.querySelector('#chat_input').value = '<%= suggestion[:prompt] %>'; document.querySelector('#chat_input').focus();"
+                  class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+            <%= suggestion[:label] %>
+          </button>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -48,6 +48,63 @@
         <% end %>
       </div>
     </div>
+    
+    <!-- Check for What's next section and quick actions -->
+    <% if message.role == 'assistant' && message.content.include?("What's next?") %>
+      <% 
+        # Parse quick actions from the message
+        suggestions = []
+        bugs = []
+        
+        # Extract bugs
+        if message.content.match(/⚠️ \*\*Potential issues detected:\*\*\n(.*?)\n\n/m)
+          bugs_text = $1
+          bugs_text.split("\n").each do |line|
+            if line.start_with?("- ")
+              bugs << { message: line.sub("- ", "") }
+            end
+          end
+        end
+        
+        # Extract quick actions
+        if message.content.match(/\*\*Quick actions:\*\*\n(.*?)$/m)
+          actions_text = $1
+          actions_text.split("\n").each do |line|
+            if match = line.match(/\[(.*?)\]:\s*(.*)/)
+              suggestions << { label: match[1], prompt: match[2] }
+            end
+          end
+        end
+      %>
+      
+      <% if suggestions.any? || bugs.any? %>
+        <div class="ml-10 mt-4">
+          <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Quick actions</h4>
+            
+            <% if bugs.any? %>
+              <div class="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
+                <p class="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2">⚠️ Potential issues:</p>
+                <ul class="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
+                  <% bugs.each do |bug| %>
+                    <li>• <%= bug[:message] %></li>
+                  <% end %>
+                </ul>
+              </div>
+            <% end %>
+            
+            <div class="flex flex-wrap gap-2">
+              <% suggestions.each do |suggestion| %>
+                <button onclick="document.querySelector('[name=&quot;app_chat_message[content]&quot;]').value = '<%= suggestion[:prompt].gsub("'", "\\'") %>'; document.querySelector('[name=&quot;app_chat_message[content]&quot;]').focus();"
+                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <%= suggestion[:label] %>
+                </button>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
   <% end %>
   </div>
   
