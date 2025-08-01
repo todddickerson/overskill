@@ -5,28 +5,21 @@ export default class extends Controller {
 
   connect() {
     console.log("🎯 Tabs controller connected!")
-    console.log("Controller element:", this.element)
     console.log("Found tabs:", this.tabTargets.length)
     console.log("Found panels:", this.panelTargets.length)
-    
-    // Add visible indication that controller is connected
-    this.element.style.border = "2px solid red"
-    setTimeout(() => {
-      this.element.style.border = ""
-    }, 1000)
     
     // Log details about each panel
     this.panelTargets.forEach((panel, index) => {
       console.log(`Panel ${index}:`, {
         panelName: panel.dataset.panelName,
-        classes: panel.className,
-        hidden: panel.classList.contains("hidden"),
-        element: panel
+        hidden: panel.classList.contains("hidden")
       })
     })
     
-    // Show the first tab by default
-    this.showPanel("preview")
+    // Show the first tab by default (or restore from URL param)
+    const urlParams = new URLSearchParams(window.location.search)
+    const activeTab = urlParams.get('tab') || 'preview'
+    this.showPanel(activeTab)
   }
 
   disconnect() {
@@ -42,17 +35,11 @@ export default class extends Controller {
   }
 
   showPanel(panelName) {
-    console.log("📋 showPanel called with:", panelName)
-    console.log("Panel targets count:", this.panelTargets.length)
-    console.log("Tab targets count:", this.tabTargets.length)
+    console.log(`Switching to ${panelName} tab`)
     
     // Update tabs
-    this.tabTargets.forEach((tab, index) => {
+    this.tabTargets.forEach((tab) => {
       const tabPanel = tab.dataset.panel
-      console.log(`Tab ${index} (${tabPanel}):`, {
-        isActive: tabPanel === panelName,
-        element: tab
-      })
       
       if (tabPanel === panelName) {
         tab.classList.remove("text-gray-400", "border-transparent")
@@ -64,31 +51,20 @@ export default class extends Controller {
     })
 
     // Update panels
-    this.panelTargets.forEach((panel, index) => {
+    this.panelTargets.forEach((panel) => {
       const panelDataName = panel.dataset.panelName
       const shouldShow = panelDataName === panelName
       
-      console.log(`Panel ${index} (${panelDataName}):`, {
-        shouldShow,
-        currentlyHidden: panel.classList.contains("hidden"),
-        willBeHidden: !shouldShow,
-        classList: Array.from(panel.classList),
-        element: panel
-      })
-      
       if (shouldShow) {
-        console.log(`✅ Showing panel: ${panelDataName}`)
         panel.classList.remove("hidden")
       } else {
-        console.log(`❌ Hiding panel: ${panelDataName}`)
         panel.classList.add("hidden")
       }
     })
     
-    // Verify final state
-    console.log("🔍 Final panel states:")
-    this.panelTargets.forEach(panel => {
-      console.log(`- ${panel.dataset.panelName}: ${panel.classList.contains("hidden") ? "HIDDEN" : "VISIBLE"}`)
-    })
+    // Update URL without page reload
+    const url = new URL(window.location)
+    url.searchParams.set('tab', panelName)
+    window.history.replaceState({}, '', url)
   }
 }

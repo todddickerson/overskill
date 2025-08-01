@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Tab Switching</title>
+  <script>
+    // Simulate the tab switching logic
+    function testTabSwitch() {
+      console.log("Testing tab switch...");
+      
+      // Find all panels
+      const panels = document.querySelectorAll('[data-panel-name]');
+      console.log("Found panels:", panels.length);
+      
+      panels.forEach(panel => {
+        console.log(`Panel: ${panel.dataset.panelName}, Hidden: ${panel.classList.contains('hidden')}`);
+      });
+      
+      // Simulate clicking Code tab
+      console.log("\nSimulating Code tab click...");
+      panels.forEach(panel => {
+        if (panel.dataset.panelName === 'code') {
+          panel.classList.remove('hidden');
+          console.log("✅ Showing code panel");
+        } else {
+          panel.classList.add('hidden');
+          console.log(`❌ Hiding ${panel.dataset.panelName} panel`);
+        }
+      });
+      
+      // Check final state
+      console.log("\nFinal state:");
+      panels.forEach(panel => {
+        console.log(`Panel: ${panel.dataset.panelName}, Hidden: ${panel.classList.contains('hidden')}`);
+      });
+    }
+  </script>
+</head>
+<body>
+  <h1>Tab Switching Test</h1>
+  
+  <div>
+    <div data-panel-name="preview" class="">Preview Panel</div>
+    <div data-panel-name="code" class="hidden">Code Panel</div>
+    <div data-panel-name="files" class="hidden">Files Panel</div>
+  </div>
+  
+  <button onclick="testTabSwitch()">Test Tab Switch</button>
+  
+  <p>Open browser console to see the results.</p>
+</body>
+</html>
