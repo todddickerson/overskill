@@ -142,6 +142,11 @@ class Account::AppEditorsController < Account::ApplicationController
       last_updated: @app.updated_at
     }
   end
+  
+  def versions
+    @versions = @app.app_versions.order(created_at: :desc)
+    render partial: "version_history_list", locals: { app: @app, versions: @versions }
+  end
 
   private
 

@@ -30,6 +30,8 @@ export default class extends Controller {
     } else if (action === 'compare' && version) {
       // This could open the compare modal or switch to compare view
       this.compareVersion(version)
+    } else if (action === 'restore' && version) {
+      this.restoreSpecificVersion(version)
     }
   }
   
@@ -73,6 +75,30 @@ export default class extends Controller {
     
     try {
       const response = await fetch(`/account/app_versions/${this.currentVersionId}/restore`, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        // Refresh the page to show the new version
+        window.location.reload()
+      } else {
+        alert("Failed to restore version. Please try again.")
+      }
+    } catch (error) {
+      console.error("Failed to restore version:", error)
+      alert("An error occurred while restoring the version.")
+    }
+  }
+  
+  async restoreSpecificVersion(versionId) {
+    try {
+      const response = await fetch(`/account/app_versions/${versionId}/restore`, {
         method: 'POST',
         headers: {
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,

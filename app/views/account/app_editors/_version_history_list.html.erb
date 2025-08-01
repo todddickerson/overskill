@@ -1,0 +1,51 @@
+<div class="p-6">
+  <div class="space-y-2">
+    <% versions.each do |version| %>
+      <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group cursor-pointer"
+           data-version-id="<%= version.id %>">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <div class="flex items-center space-x-3">
+              <h4 class="font-medium text-gray-900 dark:text-gray-100">
+                Version <%= version.version_number %>
+              </h4>
+              <% if version.bookmarked? %>
+                <i class="fas fa-bookmark text-yellow-500 text-sm" title="Bookmarked"></i>
+              <% end %>
+              <span class="text-sm text-gray-500 dark:text-gray-400">
+                <%= time_ago_in_words(version.created_at) %> ago
+              </span>
+            </div>
+            
+            <% if version.changelog.present? %>
+              <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                <%= version.changelog %>
+              </p>
+            <% end %>
+            
+            <% if version.changed_files.present? %>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <i class="fas fa-file-code mr-1"></i>
+                <%= version.changed_files %>
+              </p>
+            <% end %>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="window.postMessage({action: 'preview', version: '<%= version.id %>'}, '*'); document.querySelector('[data-version-history-target=modal]').classList.add('hidden'); document.body.classList.remove('overflow-hidden');"
+                    class="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 transition-colors"
+                    title="Preview this version">
+              <i class="fas fa-eye mr-1"></i>Preview
+            </button>
+            <button onclick="if(confirm('Restore this version? This will create a new version with the content from Version <%= version.version_number %>.')) { window.postMessage({action: 'restore', version: '<%= version.id %>'}, '*'); document.querySelector('[data-version-history-target=modal]').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }"
+                    class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded px-3 py-1 transition-colors"
+                    title="Restore this version">
+              <i class="fas fa-undo mr-1"></i>Restore
+            </button>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

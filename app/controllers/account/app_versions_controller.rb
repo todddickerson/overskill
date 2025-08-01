@@ -140,6 +140,15 @@ class Account::AppVersionsController < Account::ApplicationController
     end
   end
   
+  # POST /account/app_versions/:id/bookmark
+  def bookmark
+    @app_version.toggle!(:bookmarked)
+    
+    respond_to do |format|
+      format.json { render json: { bookmarked: @app_version.bookmarked? } }
+    end
+  end
+  
   # POST /account/app_versions/:id/restore
   def restore
     app = @app_version.app

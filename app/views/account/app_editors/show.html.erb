@@ -1,10 +1,11 @@
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-200" 
-     data-controller="version-preview deployment publish-modal version-comparison" 
+     data-controller="version-preview deployment publish-modal version-comparison version-actions version-history" 
      data-version-preview-app-id-value="<%= @app.id %>"
      data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
      data-deployment-app-id-value="<%= @app.id %>"
      data-publish-modal-app-id-value="<%= @app.id %>"
-     data-version-comparison-app-id-value="<%= @app.id %>">
+     data-version-comparison-app-id-value="<%= @app.id %>"
+     data-version-history-app-id-value="<%= @app.id %>">
   <!-- Header -->
   <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between transition-colors duration-200">
     <div class="flex items-center space-x-4">
@@ -20,6 +21,10 @@
     </div>
     
     <div class="flex items-center space-x-4">
+      <button data-action="click->version-history#open"
+              class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+        <i class="fas fa-history mr-1"></i> Version History
+      </button>
       <% if @app.preview_url.present? %>
         <%= link_to @app.preview_url, target: "_blank", 
             class: "text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors",
@@ -155,3 +160,6 @@
 
 <!-- Version Comparison Modal -->
 <%= render "version_comparison_modal", app: @app %>
+
+<!-- Version History Modal -->
+<%= render "version_history_modal", app: @app %>

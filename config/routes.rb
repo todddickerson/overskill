@@ -92,6 +92,9 @@ Rails.application.routes.draw do
             patch "files/:file_id", action: :update_file, as: :file
           end
           
+          # Version list for history modal
+          get :versions, controller: "app_editors"
+          
           # Preview iframe and file serving at /account/apps/:id/preview
           resource :preview, controller: "app_previews", only: [:show] do
             get "files/*path", action: :serve_file, as: :file, format: false
@@ -103,6 +106,7 @@ Rails.application.routes.draw do
               get "files/*path", action: :serve_file, as: :file, format: false
               get :compare
               post :restore
+              post :bookmark
             end
           end
           resources :app_files
