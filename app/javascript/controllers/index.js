@@ -1,5 +1,4 @@
 import { Application } from "@hotwired/stimulus"
-import { identifierForContextKey } from "stimulus/webpack-helpers"
 import { controllerDefinitions as bulletTrainControllers } from "@bullet-train/bullet-train"
 import { controllerDefinitions as bulletTrainFieldControllers } from "@bullet-train/fields"
 import { controllerDefinitions as bulletTrainSortableControllers } from "@bullet-train/bullet-train-sortable"
@@ -24,9 +23,22 @@ import { context as controllersContext } from './**/*_controller.js';
 application.register('reveal', RevealController)
 application.register('scroll-reveal', ScrollReveal)
 
+// Helper function to convert filename to identifier (esbuild compatible)
+function identifierForContextKey(key) {
+  const logicalName = key
+    .replace(/^\.\//, '')
+    .replace(/_controller\.(js|ts)$/, '')
+    .replace(/\//g, '--')
+    .replace(/_/g, '-')
+  return logicalName
+}
+
 let controllers = Object.keys(controllersContext).map((filename) => ({
   identifier: identifierForContextKey(filename),
   controllerConstructor: controllersContext[filename] }))
+
+// Debug logging
+console.log('Loading controllers:', controllers.map(c => c.identifier))
 
 controllers = overrideByIdentifier([
   ...bulletTrainControllers,
@@ -36,6 +48,9 @@ controllers = overrideByIdentifier([
 ])
 
 application.load(controllers)
+
+// Log all registered controllers
+console.log('Registered Stimulus controllers:', Object.keys(application.router.modulesByIdentifier))
 
 CableReady.initialize({ consumer })
 
