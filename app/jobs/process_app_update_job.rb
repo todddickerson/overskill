@@ -153,6 +153,9 @@ class ProcessAppUpdateJob < ApplicationJob
         changed_files: result[:changes][:files_modified]&.join(", ")
       )
       
+      # Create version file snapshots for all current files
+      create_version_file_snapshots(app_version, result[:files])
+      
       # Update preview worker with latest changes
       UpdatePreviewJob.perform_later(app.id)
     end
@@ -310,6 +313,24 @@ class ProcessAppUpdateJob < ApplicationJob
     )
   end
   
+  def create_version_file_snapshots(app_version, changed_files)
+    app = app_version.app
+    
+    # Create snapshots for all current files in the app
+    app.app_files.each do |app_file|
+      # Determine the action based on whether this file was changed
+      file_change = changed_files.find { |f| f[:path] == app_file.path }
+      action = file_change ? file_change[:action] : 'unchanged'
+      
+      # Create version file snapshot
+      app_version.app_version_files.create!(
+        app_file: app_file,
+        content: app_file.content,
+        action: action == 'unchanged' ? 'update' : action
+      )
+    end
+  end
+
   def handle_validation_error(chat_message, errors, result)
     # Create a detailed error message
     error_details = errors.map { |e| "• #{e[:file]}: #{e[:message]}" }.join("\n")

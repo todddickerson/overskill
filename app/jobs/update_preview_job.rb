@@ -13,6 +13,9 @@ class UpdatePreviewJob < ApplicationJob
       
       # Broadcast update to connected clients
       broadcast_preview_update(app, 'updated', result[:preview_url])
+      
+      # Also broadcast via Turbo Stream to refresh the preview iframe
+      broadcast_preview_refresh(app, result[:preview_url])
     else
       Rails.logger.error "Failed to update preview for app #{app.id}: #{result[:error]}"
       broadcast_preview_update(app, 'failed', result[:error])
@@ -32,6 +35,25 @@ class UpdatePreviewJob < ApplicationJob
         preview_url: app.preview_url,
         updated_at: app.preview_updated_at&.iso8601
       }
+    )
+  end
+  
+  def broadcast_preview_refresh(app, preview_url)
+    # Broadcast a Turbo Stream with JavaScript to dispatch a custom event
+    javascript_code = <<~JS
+      window.dispatchEvent(new CustomEvent('preview-updated', {
+        detail: {
+          appId: '#{app.id}',
+          previewUrl: '#{preview_url}'
+        }
+      }));
+    JS
+    
+    Turbo::StreamsChannel.broadcast_action_to(
+      "app_#{app.id}_chat",
+      action: "append",
+      target: "body",
+      html: "<script>#{javascript_code}</script>"
     )
   end
 end

@@ -9,6 +9,7 @@ class AppVersion < ApplicationRecord
   # 🚅 add belongs_to associations above.
 
   has_many :app_chat_messages, dependent: :nullify
+  has_many :app_version_files, dependent: :destroy
   # 🚅 add has_many associations above.
 
   # 🚅 add has_one associations above.

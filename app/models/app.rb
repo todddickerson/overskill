@@ -54,6 +54,11 @@ class App < ApplicationRecord
     status == "failed"
   end
 
+  def published_url
+    # Return the custom domain if set, otherwise use the default overskill.app subdomain
+    custom_domain || "https://#{slug}.overskill.app"
+  end
+
   private
 
   def generate_slug

@@ -7,6 +7,7 @@ class AppFile < ApplicationRecord
   belongs_to :app
   # 🚅 add belongs_to associations above.
 
+  has_many :app_version_files, dependent: :destroy
   # 🚅 add has_many associations above.
 
   # 🚅 add has_one associations above.

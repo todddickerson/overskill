@@ -10,6 +10,9 @@ export default class extends Controller {
     // Store the current app ID for version restoration
     this.appId = this.data.get("appId")
     this.currentVersionId = null
+    
+    // Listen for preview updates via ActionCable
+    this.setupPreviewUpdateListener()
   }
   
   disconnect() {
@@ -112,6 +115,40 @@ export default class extends Controller {
       window.dispatchEvent(new CustomEvent('show-version-diff', { 
         detail: { versionId } 
       }))
+    }
+  }
+  
+  setupPreviewUpdateListener() {
+    // Listen for preview updates via custom events
+    window.addEventListener('preview-updated', this.handlePreviewUpdate.bind(this))
+    
+    // Also listen for the Turbo stream replacement to detect when preview frame updates
+    document.addEventListener('turbo:before-stream-render', (event) => {
+      if (event.target && event.target.id === 'preview_frame') {
+        // Preview frame is being replaced, refresh the iframe after a short delay
+        setTimeout(() => this.refreshPreview(), 100)
+      }
+    })
+  }
+  
+  handlePreviewUpdate(event) {
+    if (event.detail && event.detail.appId === this.appId) {
+      this.refreshPreview(event.detail.previewUrl)
+    }
+  }
+  
+  refreshPreview(newUrl = null) {
+    // Only refresh if we're showing the latest version (not a historical one)
+    if (this.currentVersionId) return
+    
+    if (newUrl) {
+      // Use the provided URL
+      this.iframeTarget.src = newUrl + '?t=' + Date.now()
+    } else {
+      // Force reload the current iframe by adding a timestamp
+      const currentSrc = this.iframeTarget.src
+      const separator = currentSrc.includes('?') ? '&' : '?'
+      this.iframeTarget.src = currentSrc.split('?')[0] + separator + 't=' + Date.now()
     }
   }
 }

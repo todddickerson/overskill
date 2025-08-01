@@ -88,6 +88,7 @@ Rails.application.routes.draw do
           resource :editor, controller: "app_editors", only: [:show] do
             post :create_message
             post :deploy
+            get :deployment_info
             patch "files/:file_id", action: :update_file, as: :file
           end
           

@@ -1,0 +1,96 @@
+<!-- Team Navigation Dropdown -->
+<div class="relative" data-controller="team-navigation">
+  <!-- Team Logo/Trigger -->
+  <button data-team-navigation-target="trigger"
+          data-action="click->team-navigation#toggle"
+          class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center hover:bg-orange-600 transition-colors duration-150">
+    <div class="w-6 h-6 bg-white rounded-sm flex items-center justify-center">
+      <div class="w-4 h-0.5 bg-orange-500"></div>
+      <div class="absolute w-4 h-0.5 bg-orange-500 rotate-90"></div>
+    </div>
+    <i class="fas fa-chevron-down text-white text-xs absolute -bottom-1 -right-1"></i>
+  </button>
+
+  <!-- Team Dropdown Panel -->
+  <div data-team-navigation-target="dropdown"
+       class="hidden absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+    
+    <!-- Back to Workspace -->
+    <div class="px-4 py-3 border-b border-gray-100">
+      <button data-action="click->team-navigation#backToWorkspace"
+              class="flex items-center space-x-2 text-gray-700 hover:text-gray-900 transition-colors">
+        <i class="fas fa-arrow-left text-sm"></i>
+        <span class="font-medium">Back to Workspace</span>
+      </button>
+    </div>
+
+    <!-- User Info -->
+    <div class="px-4 py-3 border-b border-gray-100">
+      <div class="text-sm text-gray-600"><%= current_user.email %></div>
+    </div>
+
+    <!-- Credits Section -->
+    <div class="px-4 py-3 border-b border-gray-100">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium text-gray-900">Credits</span>
+        <span class="text-sm font-medium text-gray-900">Monthly Credits</span>
+      </div>
+      
+      <!-- Progress Bar -->
+      <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+        <div class="bg-blue-600 h-2 rounded-full" style="width: 12%"></div>
+      </div>
+      
+      <div class="flex items-center justify-between text-sm text-gray-600">
+        <span>3/250</span>
+        <span>Credits renew on: 2025-08-28</span>
+      </div>
+      
+      <!-- Win Free Credits Button -->
+      <button data-action="click->team-navigation#winFreeCredits"
+              class="w-full mt-3 flex items-center justify-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+        <i class="fas fa-gift text-blue-600"></i>
+        <span class="text-sm font-medium text-blue-700">Win Free Credits</span>
+        <i class="fas fa-chevron-right text-blue-600 text-xs"></i>
+      </button>
+    </div>
+
+    <!-- Navigation Items -->
+    <div class="py-2">
+      <!-- Documentation -->
+      <button data-action="click->team-navigation#viewDocumentation"
+              class="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+        <i class="fas fa-book text-gray-500 w-5"></i>
+        <span class="text-sm text-gray-900">Documentation</span>
+      </button>
+
+      <!-- Billing -->
+      <button data-action="click->team-navigation#manageBilling"
+              class="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+        <i class="fas fa-credit-card text-gray-500 w-5"></i>
+        <span class="text-sm text-gray-900">Billing</span>
+      </button>
+
+      <!-- Help Center -->
+      <button data-action="click->team-navigation#getHelp"
+              class="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+        <i class="fas fa-question-circle text-gray-500 w-5"></i>
+        <span class="text-sm text-gray-900">Help Center</span>
+      </button>
+
+      <!-- Upgrade Plan -->
+      <button data-action="click->team-navigation#upgradePlan"
+              class="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+        <i class="fas fa-rocket text-orange-500 w-5"></i>
+        <span class="text-sm text-orange-600 font-medium">Upgrade Plan</span>
+      </button>
+
+      <!-- Sign Out -->
+      <button data-action="click->team-navigation#signOut"
+              class="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+        <i class="fas fa-sign-out-alt text-gray-500 w-5"></i>
+        <span class="text-sm text-gray-900">Sign Out</span>
+      </button>
+    </div>
+  </div>
+</div>

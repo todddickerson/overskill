@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_01_133117) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_01_162127) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -195,6 +195,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_133117) do
     t.datetime "updated_at", null: false
     t.index ["app_id"], name: "index_app_generations_on_app_id"
     t.index ["team_id"], name: "index_app_generations_on_team_id"
+  end
+
+  create_table "app_version_files", force: :cascade do |t|
+    t.bigint "app_version_id", null: false
+    t.bigint "app_file_id", null: false
+    t.text "content"
+    t.string "action"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_file_id"], name: "index_app_version_files_on_app_file_id"
+    t.index ["app_version_id", "app_file_id"], name: "index_app_version_files_on_app_version_id_and_app_file_id", unique: true
+    t.index ["app_version_id"], name: "index_app_version_files_on_app_version_id"
   end
 
   create_table "app_versions", force: :cascade do |t|
@@ -572,6 +584,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_133117) do
   add_foreign_key "app_files", "teams"
   add_foreign_key "app_generations", "apps"
   add_foreign_key "app_generations", "teams"
+  add_foreign_key "app_version_files", "app_files"
+  add_foreign_key "app_version_files", "app_versions"
   add_foreign_key "app_versions", "apps"
   add_foreign_key "app_versions", "teams"
   add_foreign_key "app_versions", "users"
