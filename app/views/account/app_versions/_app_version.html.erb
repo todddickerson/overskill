@@ -7,7 +7,7 @@
 <% with_attribute_settings object: app_version do %>
   <tr data-id="<%= app_version.id %>">
     <%= render "shared/tables/checkbox", object: app_version %>
-    <td><%= render 'shared/attributes/option', attribute: :user, url: [:account, app_version] %></td>
+    <td><%= render 'shared/attributes/belongs_to', attribute: :user, url: [:account, app_version] %></td>
     <td><%= render 'shared/attributes/text', attribute: :commit_sha %></td>
     <td><%= render 'shared/attributes/text', attribute: :commit_message %></td>
     <td><%= render 'shared/attributes/text', attribute: :version_number %></td>

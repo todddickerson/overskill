@@ -42,13 +42,13 @@ class Deployment::CloudflarePreviewService
     # Ensure route exists for auto-preview domain (using overskill.app for now)
     ensure_preview_route(preview_subdomain, worker_name)
     
-    # Get the workers.dev URL (which is automatically enabled now)
+    # Get both URLs
     workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+    custom_domain_url = "https://#{preview_subdomain}.overskill.app"
     
     # Update app with preview URLs
-    # For now, use workers.dev URL until custom domain DNS is configured
-    preview_url = workers_dev_url
-    custom_domain_url = "https://#{preview_subdomain}.overskill.app"
+    # Use custom domain now that wildcard DNS is configured
+    preview_url = custom_domain_url
     
     @app.update!(
       preview_url: preview_url,

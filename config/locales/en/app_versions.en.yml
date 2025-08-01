@@ -32,10 +32,6 @@ en:
         api_title: *user
         api_description: *user
         placeholder: Select
-        options:
-          one: One
-          two: Two
-          three: Three
       commit_sha:
         _: &commit_sha Commit Sha
         label: *commit_sha

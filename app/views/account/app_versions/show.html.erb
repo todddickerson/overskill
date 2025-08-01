@@ -11,7 +11,7 @@
 
         <% box.body do %>
           <% with_attribute_settings object: @app_version, strategy: :label do %>
-            <%= render 'shared/attributes/option', attribute: :user %>
+            <%= render 'shared/attributes/belongs_to', attribute: :user %>
             <%= render 'shared/attributes/text', attribute: :commit_sha %>
             <%= render 'shared/attributes/text', attribute: :commit_message %>
             <%= render 'shared/attributes/text', attribute: :version_number %>
