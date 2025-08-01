@@ -71,7 +71,7 @@ class ProcessAppUpdateJob < ApplicationJob
         end
 
         # Create assistant response
-        assistant_message = app.app_chat_messages.create!(
+        @assistant_message = app.app_chat_messages.create!(
           role: "assistant",
           content: format_assistant_response(result),
           status: "completed"
@@ -81,7 +81,7 @@ class ProcessAppUpdateJob < ApplicationJob
         chat_message.update!(status: "completed", response: result[:changes][:summary])
 
         # Broadcast completion
-        broadcast_completion(chat_message, assistant_message)
+        broadcast_completion(chat_message, @assistant_message)
       else
         handle_error(chat_message, "Failed to parse AI response")
       end
@@ -161,8 +161,8 @@ class ProcessAppUpdateJob < ApplicationJob
     end
     
     # Link the AI response to this version
-    if app_version && @ai_response
-      @ai_response.update!(app_version: app_version)
+    if app_version && @assistant_message
+      @assistant_message.update!(app_version: app_version)
     end
   end
 
