@@ -35,6 +35,9 @@ class Account::AppEditorsController < Account::ApplicationController
         changelog: "Manual edit: #{@file.path}",
         changed_files: @file.path
       )
+      
+      # Update preview worker with latest changes
+      UpdatePreviewJob.perform_later(@app.id)
 
       respond_to do |format|
         format.turbo_stream do
@@ -63,7 +66,7 @@ class Account::AppEditorsController < Account::ApplicationController
 
     if @message.save
       # Create initial AI response placeholder
-      placeholder_response = @app.app_chat_messages.build(
+      ai_response = @app.app_chat_messages.create!(
         role: "assistant",
         content: "Analyzing your request and planning the changes...",
         status: "planning"
@@ -78,13 +81,45 @@ class Account::AppEditorsController < Account::ApplicationController
             turbo_stream.append("chat_messages",
               partial: "account/app_editors/chat_message",
               locals: {message: @message}),
-            turbo_stream.append("chat_messages", 
-              html: %Q{<div id="processing_#{@message.id}"></div>}),
+            turbo_stream.append("chat_messages",
+              partial: "account/app_editors/chat_message",
+              locals: {message: ai_response}),
             turbo_stream.replace("chat_form",
               partial: "account/app_editors/chat_form",
-              locals: {app: @app})
+              locals: {app: @app}),
+            turbo_stream.execute("document.getElementById('chat_container').scrollTop = document.getElementById('chat_container').scrollHeight")
           ]
         end
+      end
+    else
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.replace("chat_form",
+            partial: "account/app_editors/chat_form",
+            locals: {app: @app, message: @message})
+        end
+      end
+    end
+  end
+
+  def deploy
+    # Check if app has files to deploy
+    unless @app.app_files.any?
+      render json: { error: "No files to deploy" }, status: :unprocessable_entity
+      return
+    end
+
+    # Determine deployment target
+    environment = params[:environment] || "production"
+    
+    # Queue deployment job with environment
+    DeployAppJob.perform_later(@app.id, environment)
+
+    respond_to do |format|
+      format.json { render json: { message: "Deployment started", status: "deploying", environment: environment } }
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace("deploy_status",
+          html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>})
       end
     end
   end

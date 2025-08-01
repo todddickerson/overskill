@@ -1,7 +1,8 @@
 <div class="h-screen flex flex-col bg-gray-900" 
-     data-controller="version-preview" 
+     data-controller="version-preview deployment" 
      data-version-preview-app-id-value="<%= @app.id %>"
-     data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>">
+     data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
+     data-deployment-app-id-value="<%= @app.id %>">
   <!-- Header -->
   <div class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
     <div class="flex items-center space-x-4">
@@ -20,9 +21,25 @@
           <i class="fas fa-external-link-alt mr-1"></i> Open Preview
         <% end %>
       <% end %>
-      <button class="text-sm bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700">
-        <i class="fas fa-cloud-upload-alt mr-1"></i> Deploy
-      </button>
+      <%= button_to deploy_account_app_editor_path(@app), 
+            method: :post,
+            remote: true,
+            class: "text-sm bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700",
+            data: { 
+              turbo: true, 
+              action: "click->deployment#deploy",
+              deployment_target: "button"
+            } do %>
+        <span data-deployment-target="status">
+          <% if @app.deployment_status == 'deploying' %>
+            <i class="fas fa-spinner fa-spin mr-1"></i> Deploying...
+          <% elsif @app.deployment_status == 'deployed' %>
+            <i class="fas fa-check mr-1"></i> Deployed
+          <% else %>
+            <i class="fas fa-cloud-upload-alt mr-1"></i> Deploy
+          <% end %>
+        </span>
+      <% end %>
     </div>
   </div>
   
@@ -68,7 +85,9 @@
     <div class="flex-1 bg-gray-900 flex flex-col">
       <!-- Tabs -->
       <div class="bg-gray-800 border-b border-gray-700 px-4 flex items-center space-x-1"
-           data-controller="tabs">
+           data-controller="tabs"
+           data-tabs-debug="true"
+           id="tabs-container">
         <button class="px-4 py-2 text-sm font-medium text-white border-b-2 border-primary-500"
                 data-tabs-target="tab"
                 data-panel="preview"

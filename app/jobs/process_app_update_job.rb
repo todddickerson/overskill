@@ -1,4 +1,5 @@
 class ProcessAppUpdateJob < ApplicationJob
+  include ActionView::RecordIdentifier
   queue_as :ai_generation
 
   def perform(chat_message)
@@ -122,6 +123,9 @@ class ProcessAppUpdateJob < ApplicationJob
         changelog: result[:changes][:summary],
         changed_files: result[:changes][:files_modified]&.join(", ")
       )
+      
+      # Update preview worker with latest changes
+      UpdatePreviewJob.perform_later(app.id)
     end
   end
 
@@ -193,19 +197,27 @@ class ProcessAppUpdateJob < ApplicationJob
   end
 
   def broadcast_status_update(chat_message)
-    # Create a temporary AI message to show status
-    temp_message = chat_message.app.app_chat_messages.build(
-      role: "assistant",
-      content: get_status_message(chat_message.status),
-      status: chat_message.status
-    )
-
-    Turbo::StreamsChannel.broadcast_replace_to(
-      "app_#{chat_message.app_id}_chat",
-      target: "processing_#{chat_message.id}",
-      partial: "account/app_editors/chat_message",
-      locals: {message: temp_message}
-    )
+    # Find the AI response message that was created
+    ai_message = chat_message.app.app_chat_messages
+      .where(role: "assistant")
+      .where("created_at > ?", chat_message.created_at)
+      .order(created_at: :asc)
+      .first
+    
+    if ai_message
+      # Update the existing AI message
+      ai_message.update!(
+        content: get_status_message(chat_message.status),
+        status: chat_message.status
+      )
+      
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{chat_message.app_id}_chat",
+        target: dom_id(ai_message),
+        partial: "account/app_editors/chat_message",
+        locals: {message: ai_message}
+      )
+    end
   end
 
   def get_status_message(status)
@@ -223,24 +235,25 @@ class ProcessAppUpdateJob < ApplicationJob
     end
   end
 
-  def broadcast_initial_response(chat_message)
-    # Create initial AI response placeholder
-    Turbo::StreamsChannel.broadcast_append_to(
-      "app_#{chat_message.app_id}_chat",
-      target: "chat_messages",
-      html: <<~HTML
-        <div id="processing_#{chat_message.id}">
-          <!-- This will be replaced with status updates -->
-        </div>
-      HTML
-    )
-  end
+
 
   def broadcast_completion(user_message, assistant_message)
-    # Broadcast to chat
-    Turbo::StreamsChannel.broadcast_replace_to(
+    # Find and update the AI message that was created initially
+    ai_message = user_message.app.app_chat_messages
+      .where(role: "assistant")
+      .where("created_at > ?", user_message.created_at)
+      .order(created_at: :asc)
+      .first
+    
+    if ai_message && ai_message.id != assistant_message.id
+      # Delete the placeholder AI message
+      ai_message.destroy
+    end
+    
+    # Broadcast the final assistant message
+    Turbo::StreamsChannel.broadcast_append_to(
       "app_#{user_message.app_id}_chat",
-      target: "processing_#{user_message.id}",
+      target: "chat_messages",
       partial: "account/app_editors/chat_message",
       locals: {message: assistant_message}
     )
