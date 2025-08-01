@@ -1,8 +1,8 @@
-<%= link_to account_app_editor_path(file.app, file_id: file.id), 
+<%= link_to account_app_editor_path(file.app, file_id: file.id, format: :turbo_stream), 
     class: "group flex items-center px-2 py-1 text-sm rounded hover:bg-gray-700 transition-colors #{'bg-gray-700 border-l-2 border-primary-500' if selected}",
     data: { 
-      turbo_frame: "_top",
       file_tree_target: "file",
+      file_id: file.id,
       action: "click->file-tree#selectFile"
     } do %>
   <i class="<%= file_extension_icon(file.path) %> mr-2 text-sm"></i>

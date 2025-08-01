@@ -32,8 +32,11 @@ export default class extends Controller {
   }
   
   selectFile(event) {
-    // Remove previous selection
-    this.fileTargets.forEach(file => {
+    // Don't prevent default - let the link work
+    
+    // Remove previous selection from all file links
+    const allFileLinks = this.element.querySelectorAll('[data-file-tree-target="file"]')
+    allFileLinks.forEach(file => {
       file.classList.remove('bg-gray-700', 'border-l-2', 'border-primary-500')
     })
     

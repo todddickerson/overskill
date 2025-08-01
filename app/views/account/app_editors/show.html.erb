@@ -9,10 +9,9 @@
       <%= link_to account_team_apps_path(@app.team), class: "text-gray-400 hover:text-white" do %>
         <i class="fas fa-arrow-left"></i>
       <% end %>
-      <h1 class="text-white font-semibold"><%= @app.name %></h1>
-      <span class="text-xs text-gray-500">
-        <%= @app.framework.upcase %> • <%= @app.app_type&.humanize %>
-      </span>
+      
+      <!-- App Navigation Dropdown -->
+      <%= render "app_navigation", app: @app %>
     </div>
     
     <div class="flex items-center space-x-4">
@@ -23,25 +22,10 @@
           <i class="fas fa-external-link-alt mr-1"></i> Open Preview
         <% end %>
       <% end %>
-      <%= button_to deploy_account_app_editor_path(@app), 
-            method: :post,
-            remote: true,
-            class: "text-sm bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700",
-            data: { 
-              turbo: true, 
-              action: "click->deployment#deploy",
-              deployment_target: "button"
-            } do %>
-        <span data-deployment-target="status">
-          <% if @app.deployment_status == 'deploying' %>
-            <i class="fas fa-spinner fa-spin mr-1"></i> Deploying...
-          <% elsif @app.deployment_status == 'deployed' %>
-            <i class="fas fa-check mr-1"></i> Deployed
-          <% else %>
-            <i class="fas fa-cloud-upload-alt mr-1"></i> Deploy
-          <% end %>
-        </span>
-      <% end %>
+      <button data-action="click->publish-modal#open"
+              class="text-sm bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700">
+        <i class="fas fa-globe mr-1"></i> Publish
+      </button>
     </div>
   </div>
   
@@ -84,23 +68,17 @@
     </div>
     
     <!-- Right Panel - Preview/Code -->
-    <div class="flex-1 bg-gray-900 flex flex-col">
+    <div class="flex-1 bg-gray-900 flex flex-col"
+         data-controller="tabs"
+         data-tabs-debug="true">
       <!-- Tabs -->
       <div class="bg-gray-800 border-b border-gray-700 px-4 flex items-center space-x-1"
-           data-controller="tabs"
-           data-tabs-debug="true"
            id="tabs-container">
         <button class="px-4 py-2 text-sm font-medium text-white border-b-2 border-primary-500"
                 data-tabs-target="tab"
                 data-panel="preview"
                 data-action="click->tabs#switchTab">
           <i class="fas fa-eye mr-2"></i>Preview
-        </button>
-        <button class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent"
-                data-tabs-target="tab"
-                data-panel="code"
-                data-action="click->tabs#switchTab">
-          <i class="fas fa-code mr-2"></i>Code
         </button>
         <button class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent"
                 data-tabs-target="tab"
@@ -117,31 +95,18 @@
           <%= render "preview_frame", app: @app %>
         </div>
         
-        <!-- Code Panel -->
-        <div class="h-full hidden absolute inset-0" data-tabs-target="panel" data-panel-name="code">
-          <div class="h-full flex">
-            <!-- File Tree -->
-            <%= render "file_tree", files: @files, selected_file: @selected_file %>
-            
-            <!-- Code Editor -->
-            <div class="flex-1" id="code_editor">
-              <%= render "code_editor", file: @selected_file if @selected_file %>
-            </div>
-          </div>
-        </div>
-        
         <!-- Files Panel -->
         <div class="h-full hidden absolute inset-0" data-tabs-target="panel" data-panel-name="files">
           <!-- Debug: Files count = <%= @files.count %> -->
           <% if @files.any? %>
             <div class="h-full flex">
               <!-- File Tree -->
-              <%= render "file_tree", files: @files, selected_file: @selected_file %>
+              <%= render "file_tree", files: @files, selected_file: @selected_file, app: @app %>
               
               <!-- Code Display -->
-              <div class="flex-1 bg-gray-900">
+              <div class="flex-1 bg-gray-900" id="code_editor">
                 <% if @selected_file %>
-                  <%= render "code_editor", file: @selected_file %>
+                  <%= render "code_editor", file: @selected_file, app: @app %>
                 <% else %>
                   <div class="h-full flex items-center justify-center text-gray-500">
                     <div class="text-center">
@@ -166,3 +131,6 @@
     </div>
   </div>
 </div>
+
+<!-- Publish Modal -->
+<%= render "publish_modal", app: @app %>

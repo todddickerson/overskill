@@ -1,4 +1,4 @@
-<div class="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto" data-controller="file-tree">
+<div id="file_tree" class="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto" data-controller="file-tree">
   <div class="p-3">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Files</h3>
@@ -8,9 +8,9 @@
     </div>
     
     <div class="space-y-0.5">
-      <% if @files.any? %>
+      <% if files.any? %>
         <% # For now, show flat file list - can enhance to tree structure later %>
-        <% @files.group_by { |f| File.dirname(f.path) }.each do |dir, dir_files| %>
+        <% files.group_by { |f| File.dirname(f.path) }.each do |dir, dir_files| %>
           <% if dir != "." %>
             <div class="group" data-file-tree-target="folder">
               <div class="flex items-center px-2 py-1 text-sm text-gray-400 hover:bg-gray-700 rounded cursor-pointer"
@@ -20,13 +20,13 @@
               </div>
               <div class="ml-4 hidden" data-file-tree-target="children">
                 <% dir_files.each do |file| %>
-                  <%= render "file_tree_item", file: file, selected: file == @selected_file %>
+                  <%= render "file_tree_item", file: file, selected: file == selected_file %>
                 <% end %>
               </div>
             </div>
           <% else %>
             <% dir_files.each do |file| %>
-              <%= render "file_tree_item", file: file, selected: file == @selected_file %>
+              <%= render "file_tree_item", file: file, selected: file == selected_file %>
             <% end %>
           <% end %>
         <% end %>

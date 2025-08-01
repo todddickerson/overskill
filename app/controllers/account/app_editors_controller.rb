@@ -13,7 +13,7 @@ class Account::AppEditorsController < Account::ApplicationController
         if params[:file_id]
           render turbo_stream: turbo_stream.replace("code_editor",
             partial: "account/app_editors/code_editor",
-            locals: {file: @selected_file})
+            locals: {file: @selected_file, app: @app})
         end
       end
     end
@@ -124,6 +124,23 @@ class Account::AppEditorsController < Account::ApplicationController
           html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>})
       end
     end
+  end
+
+  def deployment_info
+    # Get deployment URLs and visitor info
+    preview_url = @app.preview_url
+    production_url = @app.published_url || @app.deployment_url
+    
+    # For now, return mock visitor count (will integrate analytics later)
+    visitor_count = 0
+    
+    render json: {
+      preview_url: preview_url,
+      production_url: production_url,
+      visitor_count: visitor_count,
+      deployment_status: @app.deployment_status,
+      last_deployed_at: @app.last_deployed_at
+    }
   end
 
   private
