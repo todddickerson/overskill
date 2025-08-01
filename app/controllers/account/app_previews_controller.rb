@@ -17,6 +17,9 @@ class Account::AppPreviewsController < Account::ApplicationController
   def serve_file
     path = params[:path]
     
+    # Strip query parameters from the path
+    path = path.split('?').first if path.include?('?')
+    
     # Handle external URLs (CDN links)
     if path.start_with?('http://') || path.start_with?('https://')
       redirect_to path, allow_other_host: true
@@ -55,14 +58,14 @@ class Account::AppPreviewsController < Account::ApplicationController
     # Replace relative asset paths with our preview routes
     html = html.dup
     
-    # Replace script src references
-    html.gsub!(/src=["']([^"']+\.js)["']/) do |match|
+    # Replace script src references (including those with query params)
+    html.gsub!(/src=["']([^"']+\.js(?:\?[^"']*)?)["']/) do |match|
       src = $1
       %Q{src="#{file_account_app_preview_path(@app, path: src)}"}
     end
     
-    # Replace link href references for CSS
-    html.gsub!(/href=["']([^"']+\.css)["']/) do |match|
+    # Replace link href references for CSS (including those with query params)
+    html.gsub!(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/) do |match|
       href = $1
       %Q{href="#{file_account_app_preview_path(@app, path: href)}"}
     end
