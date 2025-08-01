@@ -106,7 +106,6 @@
       <% end %>
     <% end %>
   <% end %>
-  </div>
   
   <% if message.role == 'assistant' && message.status == 'completed' %>
     <% version = message.app_version || message.app.app_versions.order(created_at: :desc).first %>
