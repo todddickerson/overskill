@@ -137,7 +137,7 @@ class Ai::SmartRequestHandler
     json_patterns = [
       /```json\s*(\{.*?\})\s*```/m,
       /```\s*(\{.*?\})\s*```/m,
-      /(\{(?:[^{}]|(?1))*\})/m
+      /(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})/m
     ]
     
     json_patterns.each do |pattern|

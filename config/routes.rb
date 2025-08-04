@@ -164,6 +164,9 @@ Rails.application.routes.draw do
               get :logs
             end
           end
+          
+          # App settings (simplified for non-technical users)
+          resources :app_settings
         end
       end
     end

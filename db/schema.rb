@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_04_164338) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_04_165115) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -180,6 +180,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_164338) do
     t.index ["team_id"], name: "index_app_collaborators_on_team_id"
   end
 
+  create_table "app_domains", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "domain"
+    t.string "status"
+    t.datetime "verified_at"
+    t.string "ssl_status"
+    t.string "cloudflare_zone_id"
+    t.string "cloudflare_record_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_domains_on_app_id"
+  end
+
   create_table "app_files", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "app_id", null: false
@@ -229,6 +242,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_164338) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["app_id"], name: "index_app_o_auth_providers_on_app_id"
+  end
+
+  create_table "app_settings", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "key"
+    t.text "value"
+    t.boolean "encrypted"
+    t.text "description"
+    t.string "setting_type"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_settings_on_app_id"
   end
 
   create_table "app_table_columns", force: :cascade do |t|
@@ -699,11 +724,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_164338) do
   add_foreign_key "app_collaborators", "apps"
   add_foreign_key "app_collaborators", "memberships"
   add_foreign_key "app_collaborators", "teams"
+  add_foreign_key "app_domains", "apps"
   add_foreign_key "app_files", "apps"
   add_foreign_key "app_files", "teams"
   add_foreign_key "app_generations", "apps"
   add_foreign_key "app_generations", "teams"
   add_foreign_key "app_o_auth_providers", "apps"
+  add_foreign_key "app_settings", "apps"
   add_foreign_key "app_table_columns", "app_tables"
   add_foreign_key "app_tables", "apps"
   add_foreign_key "app_version_files", "app_files"

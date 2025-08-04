@@ -2,8 +2,10 @@ class Account::AppDashboardsController < Account::ApplicationController
   account_load_and_authorize_resource :app, through: :team, through_association: :apps
   
   def show
-    # Main dashboard view - handled by app_editors#show with dashboard tab
-    redirect_to account_app_editor_path(@app, tab: 'dashboard')
+    # Main dashboard view - redirect to editor with dashboard tab
+    # Handle deep links through tab parameter
+    tab = params[:tab] || 'tables'
+    redirect_to account_app_editor_path(@app, anchor: "dashboard-#{tab}")
   end
   
   def data

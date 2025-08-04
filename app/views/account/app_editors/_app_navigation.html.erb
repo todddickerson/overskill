@@ -18,12 +18,47 @@
     <i class="fas fa-chevron-down text-gray-600 dark:text-gray-400 text-xs"></i>
   </button>
 
-  <!-- App Dropdown Panel (Simple) -->
+  <!-- App Dropdown Panel (Enhanced with Deep Links) -->
   <div data-app-navigation-target="dropdown"
-       class="hidden absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50">
+       class="hidden absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50">
     
     <!-- App Management Items -->
     <div class="py-2">
+      <!-- Dashboard Section with Deep Links -->
+      <div class="px-4 py-2">
+        <%= link_to account_app_dashboard_path(@app),
+            class: "flex items-center space-x-3 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400" do %>
+          <i class="fas fa-tachometer-alt text-gray-500 dark:text-gray-400 w-4"></i>
+          <span class="text-sm font-medium">Dashboard</span>
+        <% end %>
+        
+        <!-- Dashboard Sub-items (Deep Links) -->
+        <div class="ml-7 mt-2 space-y-1">
+          <%= link_to "#{account_app_dashboard_path(@app)}?tab=tables",
+              class: "block text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 py-1",
+              data: { turbo_frame: "_top" } do %>
+            Tables
+          <% end %>
+          <%= link_to "#{account_app_dashboard_path(@app)}?tab=queries",
+              class: "block text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 py-1",
+              data: { turbo_frame: "_top" } do %>
+            Queries
+          <% end %>
+          <%= link_to "#{account_app_dashboard_path(@app)}?tab=api",
+              class: "block text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 py-1",
+              data: { turbo_frame: "_top" } do %>
+            API Explorer
+          <% end %>
+          <%= link_to "#{account_app_dashboard_path(@app)}?tab=realtime",
+              class: "block text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 py-1",
+              data: { turbo_frame: "_top" } do %>
+            Realtime
+          <% end %>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+      
       <!-- Deployment Center -->
       <%= link_to account_app_deployment_path(@app),
           class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
@@ -31,18 +66,18 @@
         <span class="text-sm text-gray-900 dark:text-gray-100">Deployment</span>
       <% end %>
       
-      <!-- Database Dashboard -->
-      <%= link_to account_app_dashboard_path(@app),
+      <!-- Settings -->
+      <%= link_to account_app_app_settings_path(@app),
           class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
-        <i class="fas fa-database text-gray-500 dark:text-gray-400 w-4"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">Database</span>
+        <i class="fas fa-sliders-h text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Settings</span>
       <% end %>
 
       <!-- Security Policies -->
       <%= link_to account_app_security_policies_path(@app),
           class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
         <i class="fas fa-shield-alt text-gray-500 dark:text-gray-400 w-4"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">Security Policies</span>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Security</span>
       <% end %>
 
       <!-- Audit Logs -->
@@ -52,13 +87,13 @@
         <span class="text-sm text-gray-900 dark:text-gray-100">Audit Logs</span>
       <% end %>
 
-      <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+      <div class="border-t border-gray-200 dark:border-gray-700 my-2"></div>
 
-      <!-- App Settings -->
+      <!-- App Info/Edit -->
       <%= link_to edit_account_app_path(@app),
           class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
-        <i class="fas fa-cog text-gray-500 dark:text-gray-400 w-4"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">App Settings</span>
+        <i class="fas fa-info-circle text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">App Info</span>
       <% end %>
     </div>
   </div>

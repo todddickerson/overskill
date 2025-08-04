@@ -1,70 +1,85 @@
-<div class="h-full flex bg-gray-50 dark:bg-gray-900" data-controller="dashboard-tabs">
+<div class="h-full flex bg-gray-50 dark:bg-gray-900" data-controller="dashboard-tabs dashboard-deep-link" data-dashboard-deep-link-default-tab-value="overview">
   <!-- Left Navigation -->
   <div class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
     <div class="p-4">
       <h2 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Dashboard</h2>
       <nav class="space-y-1">
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 border-r-2 border-primary-500 rounded-md"
-                data-dashboard-tabs-target="tab"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
                 data-panel="overview"
-                data-action="click->dashboard-tabs#switchTab">
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
           <i class="fas fa-th-large mr-2"></i>
           Overview
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
-                data-panel="data"
-                data-action="click->dashboard-tabs#switchTab">
-          <i class="fas fa-database mr-2"></i>
-          Data
-          <i class="fas fa-chevron-down ml-auto text-xs"></i>
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
+                data-panel="tables"
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
+          <i class="fas fa-table mr-2"></i>
+          Tables
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
                 data-panel="users"
-                data-action="click->dashboard-tabs#switchTab">
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
           <i class="fas fa-users mr-2"></i>
           Users
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
                 data-panel="analytics"
-                data-action="click->dashboard-tabs#switchTab">
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
           <i class="fas fa-chart-line mr-2"></i>
           Analytics
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
                 data-panel="domains"
-                data-action="click->dashboard-tabs#switchTab">
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
           <i class="fas fa-globe mr-2"></i>
           Domains
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
                 data-panel="security"
-                data-action="click->dashboard-tabs#switchTab">
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
           <i class="fas fa-shield-alt mr-2"></i>
           Security
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
-                data-panel="api"
-                data-action="click->dashboard-tabs#switchTab">
-          <i class="fas fa-code mr-2"></i>
-          API
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
+                data-panel="queries"
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
+          <i class="fas fa-terminal mr-2"></i>
+          Queries
         </button>
         
         <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
-                data-dashboard-tabs-target="tab"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
+                data-panel="api"
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
+          <i class="fas fa-code mr-2"></i>
+          API Explorer
+        </button>
+        
+        <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
+                data-panel="realtime"
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
+          <i class="fas fa-broadcast-tower mr-2"></i>
+          Realtime
+        </button>
+        
+        <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+                data-dashboard-tabs-target="tab" data-dashboard-deep-link-target="tab"
                 data-panel="settings"
-                data-action="click->dashboard-tabs#switchTab">
+                data-action="click->dashboard-tabs#switchTab click->dashboard-deep-link#switchTab">
           <i class="fas fa-cog mr-2"></i>
           Settings
         </button>
@@ -75,7 +90,7 @@
   <!-- Main Content Area -->
   <div class="flex-1 overflow-hidden">
     <!-- Overview Panel -->
-    <div class="h-full overflow-y-auto p-6" data-dashboard-tabs-target="panel" data-panel-name="overview">
+    <div class="h-full overflow-y-auto p-6" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="overview">
       <div class="max-w-6xl mx-auto">
         <!-- App Header -->
         <div class="mb-8">
@@ -190,8 +205,8 @@
       </div>
     </div>
     
-    <!-- Data Panel -->
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="data"
+    <!-- Tables Panel -->
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="tables"
          data-controller="database-manager"
          data-database-manager-app-id-value="<%= app.id %>">
       <div class="max-w-6xl mx-auto">
@@ -276,42 +291,59 @@
     </div>
     
     <!-- Other panels (placeholder for now) -->
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="users">
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="users">
       <div class="max-w-6xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Users</h1>
         <p class="text-gray-600 dark:text-gray-400">User management coming soon...</p>
       </div>
     </div>
     
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="analytics">
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="analytics">
       <div class="max-w-6xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Analytics</h1>
         <p class="text-gray-600 dark:text-gray-400">Analytics dashboard coming soon...</p>
       </div>
     </div>
     
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="domains">
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="domains">
       <div class="max-w-6xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Domains</h1>
         <p class="text-gray-600 dark:text-gray-400">Custom domain management coming soon...</p>
       </div>
     </div>
     
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="security">
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="security">
       <div class="max-w-6xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Security</h1>
         <p class="text-gray-600 dark:text-gray-400">Security settings coming soon...</p>
       </div>
     </div>
     
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="api">
+    <!-- Queries Panel -->
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="queries">
       <div class="max-w-6xl mx-auto">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">API</h1>
-        <p class="text-gray-600 dark:text-gray-400">API management coming soon...</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">SQL Queries</h1>
+        <p class="text-gray-600 dark:text-gray-400">Run SQL queries against your database...</p>
       </div>
     </div>
     
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-panel-name="settings">
+    <!-- API Explorer Panel -->
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="api">
+      <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">API Explorer</h1>
+        <p class="text-gray-600 dark:text-gray-400">Test your app's API endpoints...</p>
+      </div>
+    </div>
+    
+    <!-- Realtime Panel -->
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="realtime">
+      <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Realtime</h1>
+        <p class="text-gray-600 dark:text-gray-400">Configure realtime subscriptions...</p>
+      </div>
+    </div>
+    
+    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="settings">
       <div class="max-w-6xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Settings</h1>
         <p class="text-gray-600 dark:text-gray-400">App settings coming soon...</p>

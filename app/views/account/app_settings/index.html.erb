@@ -1,0 +1,115 @@
+<% content_for :title, "Settings - #{@app.name}" %>
+
+<div class="max-w-4xl mx-auto">
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">App Settings</h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-1">Configure <%= @app.name %> with environment variables and integrations</p>
+      </div>
+      
+      <%= link_to account_app_path(@app), class: "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white" do %>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      <% end %>
+    </div>
+  </div>
+  
+  <!-- Common Settings Section -->
+  <div class="bg-white dark:bg-gray-900 shadow rounded-lg mb-8">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white">Common Settings</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">These are the most frequently used settings for your app</p>
+    </div>
+    
+    <div class="p-6 space-y-6">
+      <% AppSetting::SETTING_TYPES.each do |type_key, type_label| %>
+        <% common_settings = AppSetting::COMMON_SETTINGS.select { |k, v| v[:type] == type_key } %>
+        <% if common_settings.any? %>
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3"><%= type_label %></h4>
+            <div class="space-y-3">
+              <% common_settings.each do |key, config| %>
+                <% setting = @app_settings.find { |s| s.key == key } %>
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div class="flex-1">
+                    <div class="font-medium text-sm text-gray-900 dark:text-white"><%= config[:label] %></div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                      <%= setting&.value || content_tag(:span, "Not set", class: "italic") %>
+                    </div>
+                  </div>
+                  <% if setting %>
+                    <%= link_to "Edit", edit_account_app_app_setting_path(@app, setting), 
+                        class: "text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400" %>
+                  <% else %>
+                    <%= link_to "Set", new_account_app_app_setting_path(@app, key: key, type: type_key), 
+                        class: "text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400" %>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+  
+  <!-- Custom Environment Variables -->
+  <div class="bg-white dark:bg-gray-900 shadow rounded-lg">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <div>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Custom Environment Variables</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Advanced settings for technical users</p>
+      </div>
+      
+      <%= link_to new_account_app_app_setting_path(@app), 
+                  class: "inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700" do %>
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Variable
+      <% end %>
+    </div>
+    
+    <div class="p-6">
+      <% custom_settings = @app_settings.reject(&:common_setting?) %>
+      <% if custom_settings.any? %>
+        <div class="space-y-2">
+          <% custom_settings.each do |setting| %>
+            <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div class="flex-1">
+                <div class="font-mono text-sm text-gray-900 dark:text-white"><%= setting.key %></div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  <% if setting.encrypted? %>
+                    <span class="inline-flex items-center">
+                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                      </svg>
+                      Encrypted
+                    </span>
+                  <% else %>
+                    <%= truncate(setting.value, length: 50) %>
+                  <% end %>
+                </div>
+              </div>
+              
+              <div class="flex items-center space-x-2">
+                <%= link_to "Edit", edit_account_app_app_setting_path(@app, setting), 
+                    class: "text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400" %>
+                <%= link_to "Remove", account_app_app_setting_path(@app, setting), 
+                    method: :delete,
+                    data: { confirm: "Are you sure?" },
+                    class: "text-sm text-red-600 hover:text-red-700 dark:text-red-400" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-8">
+          No custom environment variables configured yet.
+        </p>
+      <% end %>
+    </div>
+  </div>
+</div>
