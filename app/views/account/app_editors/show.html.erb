@@ -10,42 +10,46 @@
 
   <!-- Mobile Header (visible only on mobile) -->
   <div class="lg:hidden h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
-    <div class="flex items-center space-x-3 flex-1 min-w-0">
-      <!-- Team Navigation (overskill Logo + Dropdown) -->
+    <!-- Left: Logo only -->
+    <div class="flex items-center">
       <%= render "team_navigation" %>
-      
-      <!-- Divider -->
-      <div class="h-5 w-[2px] bg-slate-200 rotate-[25deg] dark:bg-slate-700 ml-2 mr-2"></div>
-      
-      <!-- App Navigation (App Logo + Name + Dropdown) -->
-      <%= render "app_navigation" %>
     </div>
     
-    <!-- Mobile Actions -->
-    <div class="flex items-center space-x-2">
-      <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              data-action="click->editor-layout#toggleChat">
-        <i class="fas fa-comments text-sm"></i>
+    <!-- Center: Dashboard/Preview Toggle -->
+    <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+      <button class="px-3 py-1 text-xs font-medium rounded-full transition-all"
+              data-main-tabs-target="tab"
+              data-panel="dashboard"
+              data-action="click->main-tabs#switchTab">
+        Dashboard
       </button>
-      <button data-action="click->publish-modal#open"
-              class="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
-        Publish
+      <button class="px-3 py-1 text-xs font-medium rounded-full transition-all"
+              data-main-tabs-target="tab"
+              data-panel="preview"
+              data-action="click->main-tabs#switchTab">
+        Preview
       </button>
     </div>
+    
+    <!-- Right: Publish Icon -->
+    <button data-action="click->publish-modal#open"
+            class="p-2 text-primary-600 hover:text-primary-700">
+      <i class="fas fa-rocket text-sm"></i>
+    </button>
   </div>
 
   <!-- Main Layout Container -->
   <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
   
-  <!-- Chat Panel - Left Column on Desktop, Bottom Sheet on Mobile -->
-  <div class="flex flex-col bg-white dark:bg-gray-900 border-r lg:border-r border-t lg:border-t-0 border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden relative 
-              lg:h-screen h-1/2 lg:w-96 w-full order-2 lg:order-1"
+  <!-- Chat Panel - Left Column on Desktop, Hidden on Mobile until triggered -->
+  <div class="hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r lg:border-r border-t lg:border-t-0 border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden relative 
+              lg:h-auto h-1/2 lg:w-96 w-full order-2 lg:order-1"
        data-editor-layout-target="chatPanel"
        data-controller="resizable-panel"
        data-resizable-panel-min-width-value="320"
        data-resizable-panel-max-width-value="600"
        data-resizable-panel-default-width-value="384"
-       style="lg:width: 384px;">
+       style="width: 384px;">
     
     <!-- Chat Header -->
     <div class="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
@@ -127,10 +131,10 @@
          data-resizable-panel-target="handle"></div>
   </div>
   
-  <!-- Right Column - Main Content -->
-  <div class="flex-1 flex flex-col min-w-0 h-screen">
-    <!-- Right Header -->
-    <div class="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
+  <!-- Main Content Area - Right Column on Desktop, Top on Mobile -->
+  <div class="flex-1 flex flex-col min-w-0 order-1 lg:order-2">
+    <!-- Desktop Header (hidden on mobile) -->
+    <div class="hidden lg:flex h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 items-center justify-between">
       <!-- Left side - Navigation -->
       <div class="flex items-center">
         <!-- Chat Toggle (when collapsed) -->
@@ -268,8 +272,8 @@
       </div>
     </div>
     
-    <!-- Main Content Area - Full Screen on Mobile, Right Column on Desktop -->
-    <div class="flex-1 lg:flex-1 bg-white dark:bg-gray-900 overflow-hidden order-1 lg:order-2 h-1/2 lg:h-screen">
+    <!-- Main Content Area -->
+    <div class="flex-1 bg-white dark:bg-gray-900 overflow-hidden">
       <!-- Dashboard View -->
       <div class="h-full hidden" data-main-tabs-target="panel" data-panel-name="dashboard">
         <%= render "dashboard_with_subnav", app: @app, files: @files, selected_file: @selected_file %>
@@ -299,6 +303,13 @@
       </div>
     </div>
   </div>
+  
+  <!-- Mobile Floating Edit Button -->
+  <button class="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center z-40"
+          data-action="click->editor-layout#openMobileChat"
+          data-editor-layout-target="floatingEditButton">
+    <i class="fas fa-magic text-lg"></i>
+  </button>
 </div>
 
 <!-- Publish Modal -->

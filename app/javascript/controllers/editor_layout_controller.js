@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 // Controller to manage the editor layout including chat panel and activity monitor
 export default class extends Controller {
-  static targets = ["chatPanel", "collapseIcon", "activityModal", "expandButton"]
+  static targets = ["chatPanel", "collapseIcon", "activityModal", "expandButton", "floatingEditButton"]
   static values = { chatVisible: Boolean }
   
   connect() {
@@ -91,5 +91,41 @@ export default class extends Controller {
         document.body.removeChild(notification)
       }, 2000)
     })
+  }
+  
+  // Open mobile chat as full screen overlay
+  openMobileChat() {
+    // Show chat panel and make it full screen on mobile
+    this.chatPanelTarget.classList.remove('hidden', 'h-1/2', 'order-2', 'lg:flex')
+    this.chatPanelTarget.classList.add('flex', 'fixed', 'inset-0', 'z-50', 'h-full')
+    
+    // Hide floating button while chat is open
+    if (this.hasFloatingEditButtonTarget) {
+      this.floatingEditButtonTarget.classList.add('hidden')
+    }
+    
+    // Update close button action for mobile
+    const closeButton = this.chatPanelTarget.querySelector('[data-action*="editor-layout#toggleChat"]')
+    if (closeButton) {
+      closeButton.dataset.action = 'click->editor-layout#closeMobileChat'
+    }
+  }
+  
+  // Close mobile chat
+  closeMobileChat() {
+    // Hide chat panel on mobile
+    this.chatPanelTarget.classList.remove('flex', 'fixed', 'inset-0', 'z-50', 'h-full')
+    this.chatPanelTarget.classList.add('hidden', 'lg:flex', 'h-1/2', 'order-2')
+    
+    // Show floating button again
+    if (this.hasFloatingEditButtonTarget) {
+      this.floatingEditButtonTarget.classList.remove('hidden')
+    }
+    
+    // Restore toggle action
+    const closeButton = this.chatPanelTarget.querySelector('[data-action*="editor-layout#closeMobileChat"]')
+    if (closeButton) {
+      closeButton.dataset.action = 'click->editor-layout#toggleChat'
+    }
   }
 }
