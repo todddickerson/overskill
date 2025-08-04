@@ -39,6 +39,11 @@
               data: { turbo_frame: "_top" } do %>
             Tables
           <% end %>
+          <%= link_to "#{account_app_dashboard_path(@app)}?tab=schema",
+              class: "block text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 py-1",
+              data: { turbo_frame: "_top" } do %>
+            Schema Designer
+          <% end %>
           <%= link_to "#{account_app_dashboard_path(@app)}?tab=queries",
               class: "block text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 py-1",
               data: { turbo_frame: "_top" } do %>

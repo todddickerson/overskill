@@ -1,0 +1,179 @@
+<div class="max-w-6xl mx-auto">
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Analytics</h1>
+    <p class="text-gray-600 dark:text-gray-400">Track your app's performance and user engagement</p>
+  </div>
+  
+  <!-- Date Range Selector -->
+  <div class="mb-6 flex items-center justify-between">
+    <div class="flex items-center space-x-4">
+      <button class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">
+        Last 7 days
+      </button>
+      <button class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md">
+        Last 30 days
+      </button>
+      <button class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md">
+        Last 90 days
+      </button>
+    </div>
+    
+    <button class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">
+      <i class="fas fa-download mr-1"></i> Export Data
+    </button>
+  </div>
+  
+  <!-- Key Metrics -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</h3>
+        <span class="text-xs text-green-600 dark:text-green-400">
+          <i class="fas fa-arrow-up"></i> 12%
+        </span>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= number_with_delimiter(app.visitor_count) %></p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">vs. previous period</p>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</h3>
+        <span class="text-xs text-green-600 dark:text-green-400">
+          <i class="fas fa-arrow-up"></i> 8%
+        </span>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= number_with_delimiter((app.visitor_count * 0.3).to_i) %></p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Daily active users</p>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Session</h3>
+        <span class="text-xs text-red-600 dark:text-red-400">
+          <i class="fas fa-arrow-down"></i> 3%
+        </span>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white">4m 32s</p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Average duration</p>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Bounce Rate</h3>
+        <span class="text-xs text-green-600 dark:text-green-400">
+          <i class="fas fa-arrow-down"></i> 5%
+        </span>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white">42%</p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Single page visits</p>
+    </div>
+  </div>
+  
+  <!-- Charts Section -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- User Growth Chart -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">User Growth</h3>
+      <div class="h-64 flex items-center justify-center text-gray-400">
+        <div class="text-center">
+          <i class="fas fa-chart-line text-4xl mb-2"></i>
+          <p class="text-sm">Chart visualization would go here</p>
+          <p class="text-xs mt-2">Showing trend for last 7 days</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Traffic Sources -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Traffic Sources</h3>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+            <span class="text-sm text-gray-700 dark:text-gray-300">Direct</span>
+          </div>
+          <span class="text-sm font-medium text-gray-900 dark:text-white">45%</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+            <span class="text-sm text-gray-700 dark:text-gray-300">Search</span>
+          </div>
+          <span class="text-sm font-medium text-gray-900 dark:text-white">30%</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+            <span class="text-sm text-gray-700 dark:text-gray-300">Social</span>
+          </div>
+          <span class="text-sm font-medium text-gray-900 dark:text-white">15%</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <div class="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
+            <span class="text-sm text-gray-700 dark:text-gray-300">Referral</span>
+          </div>
+          <span class="text-sm font-medium text-gray-900 dark:text-white">10%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Popular Pages -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Popular Pages</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-left border-b border-gray-200 dark:border-gray-700">
+            <th class="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Page</th>
+            <th class="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Views</th>
+            <th class="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unique</th>
+            <th class="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg. Time</th>
+            <th class="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bounce</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          <tr class="hover:bg-gray-50 dark:hover:bg-gray-900">
+            <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">/</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">2,345</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">1,890</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">3:45</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">35%</td>
+          </tr>
+          <tr class="hover:bg-gray-50 dark:hover:bg-gray-900">
+            <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">/dashboard</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">1,234</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">987</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">5:12</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">22%</td>
+          </tr>
+          <tr class="hover:bg-gray-50 dark:hover:bg-gray-900">
+            <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">/profile</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">876</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">654</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">2:30</td>
+            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">45%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Notice about real analytics -->
+  <div class="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+    <div class="flex">
+      <div class="flex-shrink-0">
+        <i class="fas fa-info-circle text-blue-400"></i>
+      </div>
+      <div class="ml-3">
+        <p class="text-sm text-blue-700 dark:text-blue-300">
+          This is sample analytics data. Once your app is deployed and receiving traffic, real analytics will appear here.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
