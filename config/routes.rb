@@ -62,6 +62,18 @@ Rails.application.routes.draw do
 
         # routes for standard user actions and resources are configured in the `bullet_train` gem, but you can add more here.
       end
+      
+      # Supabase sync management (admin only)
+      resources :supabase_sync, only: [:index] do
+        collection do
+          post :sync_all
+          get :webhook_logs
+        end
+        member do
+          post :sync_user
+          get :check_status
+        end
+      end
 
       # team-level resources.
       resources :teams, extending do

@@ -1,19 +1,19 @@
 # Overskill Development Handoff
 
-## Current State Summary ✅ CHAT SYSTEM FULLY OPERATIONAL
+## Current State Summary ✅ MOBILE UI & AI GENERATION COMPLETE
 
-**MAJOR MILESTONE: Chat Form & UI Issues Resolved**
+**MAJOR MILESTONE: Professional Mobile-First Editor with AI Function Calling**
 
-The OverSkill app editor chat system is now fully operational with comprehensive fixes for form submission, UI responsiveness, error handling, and system reliability.
+The OverSkill app editor now features a fully responsive mobile UI, improved AI generation with function calling, and real-time progress tracking.
 
-### ✅ **Latest Completed: Chat System & UI Polish (2025-08-01)**
-- **Fixed Chat Form Submission**: Enhanced form handling with multiple fallback methods
-- **Enhanced Error Handling**: Comprehensive timeout handling and automatic recovery
-- **Stuck Message Prevention**: Database constraints + periodic cleanup jobs
-- **Auto Logo Generation**: DALL-E integration for automatic app logo creation
-- **Dark/Light Mode Polish**: Consistent theming across all UI components
-- **Version History Modal**: Fixed controller scoping and modal functionality
-- **OverSkill Branding**: Enhanced branding integration in all generated apps
+### ✅ **Latest Completed: Mobile UI & AI Improvements (2025-08-04)**
+- **Mobile-First Editor**: Simplified mobile UI with dashboard/preview toggle
+- **Floating Edit Button**: Bottom-right FAB opens AI chat as full-screen overlay
+- **Function Calling**: OpenAI-compatible function calling eliminates JSON parsing errors
+- **Real-time Progress**: Text-based progress bars with detailed status messages
+- **Activity Monitor**: Complete API call tracking with filtering and statistics
+- **Fixed Chat Position**: Chat panel properly positioned on left for desktop
+- **Kimi K2 Integration**: Primary AI model with Claude Sonnet fallback
 
 ### ✅ **Completed: Professional App Editor**
 - **Lovable.dev-style UI**: Split-screen layout with chat, preview, and code panels
@@ -73,12 +73,18 @@ The OverSkill app editor chat system is now fully operational with comprehensive
 
 ## Current Issues & Next Priorities
 
-### **IMMEDIATE - Chat Form Still Not Submitting**
-- [ ] **DEBUG: Chat form submission** - Form reaches "Submitting form..." but doesn't hit server
-  - Enhanced form submission logic is in place but not working
-  - Need to debug why requestSubmit()/submit() isn't reaching Rails controller
-  - May need to investigate Turbo form handling or CSRF issues
-  - Console shows: "Submit called, processing: false" → "Submitting form..." but no server logs
+### **COMPLETED - Supabase Dual Auth Phase 2**
+- [x] **User Sync Background Job**: Created SyncUsersToSupabaseJob for batch processing
+- [x] **Real-time User Sync**: SupabaseAuthSyncJob handles create/update/delete events
+- [x] **OAuth Provider Sync**: SupabaseOauthSyncService manages social login integration
+- [x] **Admin Dashboard**: Full sync monitoring UI at /account/supabase_sync
+- [x] **Sync Verification**: Rake tasks for status checking and management
+
+### **NEXT - Supabase Phase 3 (App Integration)**
+- [ ] **App Auth Configuration**: Store Supabase credentials per app
+- [ ] **JWT Token Exchange**: Bridge Rails and Supabase sessions
+- [ ] **App User Management**: Sync app-specific users to Supabase
+- [ ] **Real-time Database**: Enable Supabase real-time features
 
 ### **High Priority - Production Scale**
 - [ ] **Cloudflare Workers Migration**: Real Node.js runtime for previews
@@ -151,7 +157,9 @@ app/javascript/controllers/
 ├── codemirror_controller.js         # Professional code editor
 ├── version_preview_controller.js    # Version management
 ├── version_history_controller.js    # FIXED: Modal controller scoping
-└── tabs_controller.js               # Tab navigation with dark mode fixes
+├── tabs_controller.js               # Tab navigation with dark mode fixes
+├── main_tabs_controller.js          # NEW: Mobile-aware tab switching
+└── editor_layout_controller.js      # ENHANCED: Mobile chat overlay support
 
 app/controllers/account/
 ├── app_editors_controller.rb        # Enhanced with chat form fixes
@@ -165,12 +173,28 @@ app/models/
 app/jobs/
 ├── cleanup_stuck_messages_job.rb   # NEW: Periodic message cleanup
 ├── generate_app_logo_job.rb        # NEW: Automatic logo generation
-└── process_app_update_job.rb       # ENHANCED: Timeout & error handling
+├── process_app_update_job.rb       # ENHANCED: Timeout & error handling
+├── sync_users_to_supabase_job.rb   # NEW: Batch user sync to Supabase
+└── supabase_auth_sync_job.rb       # ENHANCED: Real-time user sync
 
 app/services/ai/
 ├── logo_generator_service.rb       # NEW: DALL-E logo generation
 ├── openai_client.rb               # NEW: OpenAI API integration
-└── app_spec_builder.rb            # ENHANCED: OverSkill branding
+├── app_spec_builder.rb            # ENHANCED: OverSkill branding
+└── open_router_client.rb          # ENHANCED: Function calling support
+
+app/services/
+├── supabase_service.rb            # Core Supabase API integration
+└── supabase_oauth_sync_service.rb # NEW: OAuth provider sync
+
+app/controllers/account/
+├── supabase_sync_controller.rb    # NEW: Admin sync dashboard
+
+app/views/account/supabase_sync/
+└── index.html.erb                 # NEW: Sync monitoring UI
+
+lib/tasks/
+└── supabase_sync.rake             # NEW: Sync management tasks
 
 app/views/account/app_editors/
 ├── show.html.erb                   # Updated controller scoping
@@ -229,27 +253,29 @@ App.first.app_files.pluck(:path, :file_type, :size_bytes)
 
 ## Next Session Focus 🚀
 
-**URGENT: Chat form submission debugging needed!** Current priorities:
+**Current Priority: Complete Supabase Integration** Next steps:
 
-1. **DEBUG Chat Form**: Investigate why form reaches "Submitting form..." but doesn't hit Rails server
-2. **Investigate**: Turbo form handling, CSRF tokens, form element references
-3. **Once fixed**: Resume Cloudflare Workers migration and Deploy Button features
+1. **Supabase Phase 2**: Implement user sync between Rails and Supabase
+2. **Supabase Phase 3**: App-level integration for generated apps
+3. **Deploy Button**: Cloudflare Workers deployment pipeline
+4. **Custom Domains**: User domain management system
 
-## Recent Session Summary (2025-08-01)
+## Recent Session Summary (2025-08-04)
 
 ### ✅ **Completed**
-- Fixed status_text method visibility in AppChatMessage model
-- Enhanced chat form controller with comprehensive submission logic
-- Added database constraints and periodic cleanup for stuck messages
-- Implemented automatic app logo generation with DALL-E
-- Fixed dark/light mode styling issues across all components
-- Enhanced version history modal with proper controller scoping
-- Added comprehensive error handling and timeout mechanisms
-- Updated OverSkill branding integration in generated apps
-
-### ❌ **Still Broken**
-- **Chat form submission**: Form JavaScript executes but doesn't reach Rails controller
-- Need debugging of form element, Turbo streams, or CSRF handling
+- Fixed dashboard navigation and deep links
+- Installed OverSkill logo and Neue Regrade font
+- Removed unnecessary preview controls
+- Fixed all header button functionality
+- Implemented automatic error detection for previews
+- Regenerated App 18 with improved AI orchestration
+- Added real-time progress messaging during generation
+- Implemented OpenAI function calling to avoid JSON errors
+- Fixed chat submit button functionality
+- Created comprehensive activity monitor
+- Made editor fully mobile responsive
+- Fixed chat panel positioning on desktop
+- Created simple mobile UI with floating edit button
 
 ## Quick Start for New Developer
 

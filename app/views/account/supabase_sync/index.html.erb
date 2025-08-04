@@ -1,0 +1,156 @@
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Supabase User Sync</h1>
+    <p class="text-gray-600 dark:text-gray-400">Monitor and manage user synchronization between Rails and Supabase</p>
+  </div>
+
+  <!-- Sync Statistics -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</h3>
+        <i class="fas fa-users text-gray-400"></i>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= @sync_stats[:total_users] %></p>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Synced</h3>
+        <i class="fas fa-check-circle text-green-500"></i>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= @sync_stats[:synced_users] %></p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        <%= number_to_percentage((@sync_stats[:synced_users].to_f / @sync_stats[:total_users] * 100), precision: 1) %>
+      </p>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Pending</h3>
+        <i class="fas fa-clock text-yellow-500"></i>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= @sync_stats[:pending_users] %></p>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Failed</h3>
+        <i class="fas fa-exclamation-circle text-red-500"></i>
+      </div>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= @sync_stats[:failed_users] %></p>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex flex-wrap gap-4 mb-8">
+    <%= button_to "Sync All Pending Users", 
+                  sync_all_account_supabase_sync_index_path,
+                  method: :post,
+                  class: "px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium",
+                  data: { turbo_confirm: "This will queue a background job to sync all pending users. Continue?" } %>
+    
+    <%= link_to "View Webhook Logs", 
+                webhook_logs_account_supabase_sync_index_path,
+                class: "px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium" %>
+    
+    <% if @sync_stats[:last_sync] %>
+      <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+        <i class="fas fa-sync-alt mr-2"></i>
+        Last sync: <%= time_ago_in_words(@sync_stats[:last_sync]) %> ago
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Failed Syncs -->
+  <% if @failed_syncs.any? %>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Failed Syncs</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead class="bg-gray-50 dark:bg-gray-900">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Attempt</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <% @failed_syncs.each do |user| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-medium text-gray-900 dark:text-white"><%= user.name %></div>
+                  <div class="text-sm text-gray-500 dark:text-gray-400"><%= user.email %></div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                    <%= user.supabase_sync_status %>
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <%= user.supabase_last_synced_at ? time_ago_in_words(user.supabase_last_synced_at) + " ago" : "Never" %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= button_to "Retry", 
+                                sync_user_account_supabase_sync_path(user),
+                                method: :post,
+                                class: "text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Recent Syncs -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Recent Syncs</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-900">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Supabase ID</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Synced</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <% @recent_syncs.each do |user| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900 dark:text-white"><%= user.name %></div>
+                <div class="text-sm text-gray-500 dark:text-gray-400"><%= user.email %></div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <code class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                  <%= user.supabase_user_id || "—" %>
+                </code>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <% status_color = case user.supabase_sync_status
+                                  when 'synced' then 'green'
+                                  when 'pending' then 'yellow'
+                                  else 'red'
+                                  end %>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<%= status_color %>-100 text-<%= status_color %>-800 dark:bg-<%= status_color %>-900 dark:text-<%= status_color %>-200">
+                  <%= user.supabase_sync_status || 'pending' %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                <%= user.supabase_last_synced_at ? time_ago_in_words(user.supabase_last_synced_at) + " ago" : "Never" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
