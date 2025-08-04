@@ -1,0 +1,256 @@
+<%# Superior database management UI - more transparent than Base44's locked-in approach %>
+<div class="container mx-auto max-w-6xl px-4 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Database Configuration
+    </h1>
+    <p class="text-gray-600 dark:text-gray-300">
+      Manage your team's database settings. Unlike competitors, OverSkill gives you complete control over your data.
+    </p>
+  </div>
+
+  <div class="grid gap-6">
+    <%# Current Configuration Card %>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+          Current Configuration
+        </h2>
+        <%= link_to "Edit Settings", edit_account_team_database_config_path(@team), 
+            class: "btn btn-primary" %>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-center">
+          <span class="text-gray-600 dark:text-gray-400 w-32">Mode:</span>
+          <span class="font-medium text-gray-900 dark:text-white">
+            <%= @config.database_mode.humanize %>
+            <% if @config.uses_custom_supabase? %>
+              <span class="ml-2 text-sm text-green-600 dark:text-green-400">
+                (Your Own Supabase)
+              </span>
+            <% else %>
+              <span class="ml-2 text-sm text-blue-600 dark:text-blue-400">
+                (OverSkill Managed)
+              </span>
+            <% end %>
+          </span>
+        </div>
+
+        <% if @config.uses_custom_supabase? %>
+          <div class="flex items-center">
+            <span class="text-gray-600 dark:text-gray-400 w-32">Supabase URL:</span>
+            <span class="font-mono text-sm text-gray-900 dark:text-white">
+              <%= @config.supabase_url %>
+            </span>
+          </div>
+
+          <div class="flex items-center">
+            <span class="text-gray-600 dark:text-gray-400 w-32">Connection:</span>
+            <% if @config.validated? %>
+              <span class="flex items-center text-green-600 dark:text-green-400">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                Validated <%= time_ago_in_words(@config.last_validated_at) %> ago
+              </span>
+            <% else %>
+              <span class="text-yellow-600 dark:text-yellow-400">Not validated</span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Data Sovereignty Benefits %>
+    <div class="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-6">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+        🔐 Your Data, Your Control
+      </h3>
+      <div class="grid md:grid-cols-2 gap-4 text-sm">
+        <div class="space-y-2">
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-700 dark:text-gray-300">
+              <strong>Complete Data Ownership:</strong> Use your own Supabase instance
+            </span>
+          </div>
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-700 dark:text-gray-300">
+              <strong>No Vendor Lock-in:</strong> Export and migrate anytime
+            </span>
+          </div>
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-700 dark:text-gray-300">
+              <strong>Compliance Ready:</strong> Keep data in your preferred region
+            </span>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-700 dark:text-gray-300">
+              <strong>Transparent Security:</strong> View all RLS policies
+            </span>
+          </div>
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-700 dark:text-gray-300">
+              <strong>Full Audit Trail:</strong> Complete visibility into data access
+            </span>
+          </div>
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-700 dark:text-gray-300">
+              <strong>Cost Control:</strong> Use your existing Supabase plan
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%# Quick Actions %>
+    <div class="grid md:grid-cols-3 gap-4">
+      <%= link_to test_connection_account_team_database_config_path(@team),
+          data: { turbo_method: :post },
+          class: "bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition-shadow" do %>
+        <div class="flex items-center">
+          <svg class="w-8 h-8 text-blue-600 dark:text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <div>
+            <h4 class="font-semibold text-gray-900 dark:text-white">Test Connection</h4>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Verify database access</p>
+          </div>
+        </div>
+      <% end %>
+
+      <%= link_to export_instructions_account_team_database_config_path(@team),
+          class: "bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition-shadow" do %>
+        <div class="flex items-center">
+          <svg class="w-8 h-8 text-green-600 dark:text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+          </svg>
+          <div>
+            <h4 class="font-semibold text-gray-900 dark:text-white">Export Data</h4>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Download your data</p>
+          </div>
+        </div>
+      <% end %>
+
+      <%= link_to migration_status_account_team_database_config_path(@team),
+          class: "bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition-shadow" do %>
+        <div class="flex items-center">
+          <svg class="w-8 h-8 text-purple-600 dark:text-purple-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <div>
+            <h4 class="font-semibold text-gray-900 dark:text-white">Migration Status</h4>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Move apps to custom DB</p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Import Data Section %>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        Import Data
+      </h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Import apps and data from previous exports or other platforms.
+      </p>
+      <button onclick="document.getElementById('import-modal').classList.remove('hidden')" 
+              class="btn btn-secondary">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        Import Data
+      </button>
+    </div>
+  </div>
+  
+  <%# Import Modal %>
+  <div id="import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full">
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+          Import Data
+        </h3>
+      </div>
+      
+      <%= form_with url: import_data_account_team_database_config_path(@team), 
+                    method: :post,
+                    multipart: true,
+                    data: { turbo: false },
+                    class: "p-6" do |f| %>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Select Import File
+            </label>
+            <%= f.file_field :import_file, 
+                accept: ".json,.zip",
+                required: true,
+                class: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white" %>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Supported formats: JSON (.json) or ZIP archive (.zip)
+            </p>
+          </div>
+          
+          <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-4">
+            <h4 class="font-medium text-blue-900 dark:text-blue-100 mb-2">Import Notes:</h4>
+            <ul class="list-disc list-inside text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <li>JSON imports are fastest and most reliable</li>
+              <li>ZIP imports can include multiple apps and files</li>
+              <li>Existing apps will be updated, not duplicated</li>
+              <li>Data ownership and security settings are preserved</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end space-x-3">
+          <button type="button" 
+                  onclick="document.getElementById('import-modal').classList.add('hidden')"
+                  class="btn btn-secondary">
+            Cancel
+          </button>
+          <%= f.submit "Import", 
+              class: "btn btn-primary",
+              data: { disable_with: "Importing..." } %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<script>
+// Close modal on escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('import-modal').classList.add('hidden');
+  }
+});
+
+// Close modal on background click
+document.getElementById('import-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) {
+    e.currentTarget.classList.add('hidden');
+  }
+});
+</script>

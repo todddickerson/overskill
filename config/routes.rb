@@ -78,6 +78,18 @@ Rails.application.routes.draw do
           # 🚅 super scaffolding will insert new integration installations above this line.
         end
 
+        # Database configuration for hybrid architecture
+        resource :database_config, controller: "team_database_configs", only: [:show, :edit, :update] do
+          member do
+            post :test_connection
+            get :export_instructions
+            get :migration_status
+            get "export_app/:app_id", action: :export_app, as: :export_app
+            post :export_all_apps
+            post :import_data
+          end
+        end
+
         resources :creator_profiles
         resources :follows
         resources :apps do

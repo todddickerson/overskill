@@ -1,0 +1,157 @@
+<%# Database configuration edit form %>
+<div class="container mx-auto max-w-4xl px-4 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Edit Database Configuration
+    </h1>
+    <p class="text-gray-600 dark:text-gray-300">
+      Configure how your team's app data is stored. You can use OverSkill's managed database or bring your own Supabase instance.
+    </p>
+  </div>
+
+  <%= form_with model: @config, url: account_team_database_config_path(@team), method: :patch do |f| %>
+    <% if @config.errors.any? %>
+      <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+        <h3 class="text-red-800 dark:text-red-200 font-semibold mb-2">Please fix the following errors:</h3>
+        <ul class="list-disc list-inside text-red-700 dark:text-red-300">
+          <% @config.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+      <div class="p-6 space-y-6">
+        <%# Database Mode Selection %>
+        <div>
+          <%= f.label :database_mode, class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" %>
+          <div class="space-y-3">
+            <label class="flex items-start cursor-pointer p-4 border-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors database-mode-option" data-mode="managed">
+              <%= f.radio_button :database_mode, "managed", class: "mt-1 mr-3" %>
+              <div>
+                <div class="font-medium text-gray-900 dark:text-white">OverSkill Managed</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Let us handle the database infrastructure. Zero configuration required.
+                </div>
+              </div>
+            </label>
+
+            <label class="flex items-start cursor-pointer p-4 border-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors database-mode-option" data-mode="custom">
+              <%= f.radio_button :database_mode, "custom", class: "mt-1 mr-3" %>
+              <div>
+                <div class="font-medium text-gray-900 dark:text-white">Custom Supabase</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Use your own Supabase instance for complete data control and compliance.
+                </div>
+              </div>
+            </label>
+
+            <label class="flex items-start cursor-pointer p-4 border-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors database-mode-option" data-mode="hybrid">
+              <%= f.radio_button :database_mode, "hybrid", class: "mt-1 mr-3" %>
+              <div>
+                <div class="font-medium text-gray-900 dark:text-white">
+                  Hybrid
+                  <span class="ml-2 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-1 rounded">BETA</span>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Start with managed, migrate specific apps to your own database as needed.
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <%# Custom Supabase Configuration %>
+        <div id="custom-config" class="space-y-4" style="<%= 'display: none' unless @config.uses_custom_supabase? %>">
+          <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 class="text-blue-900 dark:text-blue-100 font-medium mb-2">Setting up your Supabase instance:</h4>
+            <ol class="list-decimal list-inside text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <li>Create a new project at <a href="https://supabase.com" target="_blank" class="underline">supabase.com</a></li>
+              <li>Go to Settings → API to find your credentials</li>
+              <li>Copy the Project URL, Service Role Key, and Anon Key</li>
+              <li>Ensure your project allows connections from OverSkill's servers</li>
+            </ol>
+          </div>
+
+          <div>
+            <%= f.label :supabase_url, "Supabase Project URL", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" %>
+            <%= f.text_field :supabase_url, 
+                placeholder: "https://your-project.supabase.co",
+                class: "form-input w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700" %>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Found in Supabase Dashboard → Settings → API</p>
+          </div>
+
+          <div>
+            <%= f.label :supabase_service_key, "Service Role Key (secret)", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" %>
+            <%= f.password_field :supabase_service_key, 
+                placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                class: "form-input w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 font-mono text-sm",
+                autocomplete: "off" %>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Keep this secret! Has full database access.</p>
+          </div>
+
+          <div>
+            <%= f.label :supabase_anon_key, "Anon Key (public)", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" %>
+            <%= f.password_field :supabase_anon_key, 
+                placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                class: "form-input w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 font-mono text-sm",
+                autocomplete: "off" %>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Safe to expose in client-side code.</p>
+          </div>
+
+          <div>
+            <%= f.label :notes, "Notes (optional)", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" %>
+            <%= f.text_area :notes, 
+                rows: 3,
+                placeholder: "Any special configuration or notes about this database...",
+                class: "form-input w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700" %>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 rounded-b-lg flex justify-between">
+        <%= link_to "Cancel", account_team_database_config_path(@team), 
+            class: "btn btn-secondary" %>
+        <%= f.submit "Save Configuration", 
+            class: "btn btn-primary",
+            data: { disable_with: "Saving..." } %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modeRadios = document.querySelectorAll('input[name="team_database_config[database_mode]"]');
+  const customConfig = document.getElementById('custom-config');
+  const modeOptions = document.querySelectorAll('.database-mode-option');
+
+  function updateUI() {
+    const selectedMode = document.querySelector('input[name="team_database_config[database_mode]"]:checked')?.value;
+    
+    // Show/hide custom config
+    if (selectedMode === 'custom' || selectedMode === 'hybrid') {
+      customConfig.style.display = 'block';
+    } else {
+      customConfig.style.display = 'none';
+    }
+
+    // Update visual selection
+    modeOptions.forEach(option => {
+      const radio = option.querySelector('input[type="radio"]');
+      if (radio.checked) {
+        option.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+      } else {
+        option.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+      }
+    });
+  }
+
+  modeRadios.forEach(radio => {
+    radio.addEventListener('change', updateUI);
+  });
+
+  // Initial UI update
+  updateUI();
+});</script>

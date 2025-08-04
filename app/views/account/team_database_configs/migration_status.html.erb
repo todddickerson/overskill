@@ -1,0 +1,267 @@
+<%# Migration status page %>
+<div class="container mx-auto max-w-6xl px-4 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Database Migration Status
+    </h1>
+    <p class="text-gray-600 dark:text-gray-300">
+      Manage the migration of your apps from OverSkill's managed database to your custom Supabase instance.
+    </p>
+  </div>
+
+  <% if @config.uses_custom_supabase? %>
+    <% if @apps_migration_status.any? %>
+      <div class="grid gap-6">
+        <%# Migration Overview %>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Migration Overview
+          </h2>
+          
+          <div class="grid md:grid-cols-3 gap-4">
+            <div class="text-center">
+              <div class="text-3xl font-bold text-gray-900 dark:text-white">
+                <%= @apps_migration_status.count %>
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">Total Apps</div>
+            </div>
+            <div class="text-center">
+              <div class="text-3xl font-bold text-green-600 dark:text-green-400">
+                <%= @apps_migration_status.count { |status| status[:uses_custom] } %>
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">Using Custom DB</div>
+            </div>
+            <div class="text-center">
+              <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                <%= @apps_migration_status.count { |status| status[:can_migrate] } %>
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">Ready to Migrate</div>
+            </div>
+          </div>
+        </div>
+
+        <%# Apps List %>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div class="p-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              App Migration Details
+            </h2>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="border-t border-gray-200 dark:border-gray-700">
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    App Name
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Tables
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Database
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                <% @apps_migration_status.each do |status| %>
+                  <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <td class="px-6 py-4">
+                      <div class="text-sm font-medium text-gray-900 dark:text-white">
+                        <%= status[:app].name %>
+                      </div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Created <%= time_ago_in_words(status[:app].created_at) %> ago
+                      </div>
+                    </td>
+                    <td class="px-6 py-4">
+                      <div class="text-sm text-gray-900 dark:text-white">
+                        <%= status[:tables_count] %> tables
+                      </div>
+                    </td>
+                    <td class="px-6 py-4">
+                      <% if status[:uses_custom] %>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200">
+                          Custom
+                        </span>
+                      <% else %>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
+                          Managed
+                        </span>
+                      <% end %>
+                    </td>
+                    <td class="px-6 py-4">
+                      <% if status[:uses_custom] %>
+                        <span class="text-sm text-green-600 dark:text-green-400">
+                          ✓ Migrated
+                        </span>
+                      <% elsif status[:can_migrate] %>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                          Ready to migrate
+                        </span>
+                      <% else %>
+                        <span class="text-sm text-gray-500 dark:text-gray-500">
+                          Not available
+                        </span>
+                      <% end %>
+                    </td>
+                    <td class="px-6 py-4">
+                      <% if status[:can_migrate] %>
+                        <button type="button" 
+                                class="btn btn-sm btn-primary"
+                                onclick="migrateApp('<%= status[:app].id %>', '<%= status[:app].name %>')">
+                          Migrate
+                        </button>
+                      <% elsif status[:uses_custom] %>
+                        <button type="button" 
+                                class="btn btn-sm btn-secondary"
+                                onclick="viewMigrationDetails('<%= status[:app].id %>')">
+                          View Details
+                        </button>
+                      <% else %>
+                        <span class="text-xs text-gray-500">—</span>
+                      <% end %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <%# Migration Instructions %>
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+          <h3 class="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-3">
+            ⚠️ Important Migration Notes
+          </h3>
+          <ul class="list-disc list-inside text-sm text-yellow-800 dark:text-yellow-200 space-y-2">
+            <li>Migration is a one-time process. Once migrated, apps cannot be moved back to managed database.</li>
+            <li>During migration, your app may be briefly unavailable (typically less than 1 minute).</li>
+            <li>All data, including user authentication and file storage references, will be preserved.</li>
+            <li>Ensure your custom Supabase instance has sufficient resources for your app's data.</li>
+            <li>We recommend testing with a non-production app first.</li>
+          </ul>
+        </div>
+      </div>
+
+      <%# Migration Modal %>
+      <div id="migration-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full">
+          <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+              Confirm Migration
+            </h3>
+          </div>
+          <div class="p-6">
+            <p class="text-gray-600 dark:text-gray-300 mb-4">
+              Are you sure you want to migrate <strong id="migrate-app-name"></strong> to your custom Supabase instance?
+            </p>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded p-4 mb-4">
+              <h4 class="font-medium text-gray-900 dark:text-white mb-2">This will:</h4>
+              <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <li>Export all app data from managed database</li>
+                <li>Create schema and tables in your Supabase</li>
+                <li>Import all data with preserved relationships</li>
+                <li>Update app configuration to use custom database</li>
+              </ul>
+            </div>
+            <div class="flex items-start">
+              <input type="checkbox" id="confirm-understand" class="mt-1 mr-2">
+              <label for="confirm-understand" class="text-sm text-gray-600 dark:text-gray-400">
+                I understand this action cannot be undone and my app may be briefly unavailable.
+              </label>
+            </div>
+          </div>
+          <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+            <button type="button" class="btn btn-secondary" onclick="closeMigrationModal()">
+              Cancel
+            </button>
+            <button type="button" 
+                    id="confirm-migrate-btn"
+                    class="btn btn-primary" 
+                    onclick="confirmMigration()"
+                    disabled>
+              Start Migration
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <script>
+      let currentAppId = null;
+
+      function migrateApp(appId, appName) {
+        currentAppId = appId;
+        document.getElementById('migrate-app-name').textContent = appName;
+        document.getElementById('migration-modal').classList.remove('hidden');
+        document.getElementById('confirm-understand').checked = false;
+        document.getElementById('confirm-migrate-btn').disabled = true;
+      }
+
+      function closeMigrationModal() {
+        document.getElementById('migration-modal').classList.add('hidden');
+        currentAppId = null;
+      }
+
+      function confirmMigration() {
+        if (!currentAppId) return;
+        
+        // TODO: Implement actual migration via AJAX
+        alert(`Starting migration for app ${currentAppId}. You will receive an email when complete.`);
+        closeMigrationModal();
+      }
+
+      function viewMigrationDetails(appId) {
+        // TODO: Show migration details
+        alert(`Migration details for app ${appId}`);
+      }
+
+      // Enable confirm button only when checkbox is checked
+      document.getElementById('confirm-understand').addEventListener('change', function() {
+        document.getElementById('confirm-migrate-btn').disabled = !this.checked;
+      });
+
+      // Close modal on escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeMigrationModal();
+        }
+      });
+      </script>
+    <% else %>
+      <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
+        <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          No Apps to Migrate
+        </h3>
+        <p class="text-gray-600 dark:text-gray-400 mb-4">
+          Create apps first before you can migrate them to your custom database.
+        </p>
+        <%= link_to "Create App", new_account_app_path, class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  <% else %>
+    <%# Not using custom database %>
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-8 text-center">
+      <svg class="w-16 h-16 text-blue-600 dark:text-blue-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <h3 class="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+        Custom Database Not Configured
+      </h3>
+      <p class="text-blue-800 dark:text-blue-200 mb-4">
+        To migrate apps to your own database, you need to configure a custom Supabase instance first.
+      </p>
+      <%= link_to "Configure Custom Database", edit_account_team_database_config_path(@team), 
+          class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

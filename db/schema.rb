@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_04_152805) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_04_161724) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -322,11 +322,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_152805) do
     t.datetime "preview_updated_at"
     t.text "logo_prompt"
     t.datetime "logo_generated_at"
+    t.boolean "use_custom_database", default: false, null: false
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["featured"], name: "index_apps_on_featured"
     t.index ["slug"], name: "index_apps_on_slug", unique: true
     t.index ["status"], name: "index_apps_on_status"
     t.index ["team_id"], name: "index_apps_on_team_id"
+    t.index ["use_custom_database"], name: "index_apps_on_use_custom_database"
     t.index ["visibility"], name: "index_apps_on_visibility"
   end
 
@@ -518,6 +520,25 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_152805) do
     t.index ["tangible_thing_id"], name: "index_tangible_things_assignments_on_tangible_thing_id"
   end
 
+  create_table "team_database_configs", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.string "database_mode", default: "managed", null: false
+    t.string "supabase_url"
+    t.text "supabase_service_key"
+    t.text "supabase_anon_key"
+    t.string "migration_status"
+    t.datetime "last_migration_at"
+    t.json "export_format_preferences", default: {}
+    t.text "custom_rls_policies"
+    t.text "notes"
+    t.boolean "validated", default: false
+    t.datetime "last_validated_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["database_mode"], name: "index_team_database_configs_on_database_mode"
+    t.index ["team_id"], name: "index_team_database_configs_on_team_id"
+  end
+
   create_table "teams", id: :serial, force: :cascade do |t|
     t.string "name"
     t.string "slug"
@@ -686,6 +707,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_152805) do
   add_foreign_key "scaffolding_completely_concrete_tangible_things", "scaffolding_absolutely_abstract_creative_concepts", column: "absolutely_abstract_creative_concept_id"
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "memberships"
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "scaffolding_completely_concrete_tangible_things", column: "tangible_thing_id"
+  add_foreign_key "team_database_configs", "teams"
   add_foreign_key "users", "oauth_applications", column: "platform_agent_of_id"
   add_foreign_key "webhooks_outgoing_endpoints", "scaffolding_absolutely_abstract_creative_concepts"
   add_foreign_key "webhooks_outgoing_endpoints", "teams"

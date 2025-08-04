@@ -35,6 +35,11 @@
         <i class="fal fa-cog ti ti-settings"></i>
       <% end %>
     <% end if can? :edit, current_team %>
+    <%= render 'account/shared/menu/item', url: main_app.account_team_database_config_path(current_team), label: 'Database Settings' do |p| %>
+      <% p.content_for :icon do %>
+        <i class="fal fa-database ti ti-database"></i>
+      <% end %>
+    <% end if can? :manage, current_team %>
     <%= render 'account/memberships/menu_item' %>
     <%= render 'account/billing/subscriptions/menu_item' if billing_enabled? %>
   <% end %>

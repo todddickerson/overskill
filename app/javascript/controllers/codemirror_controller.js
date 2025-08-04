@@ -30,6 +30,14 @@ export default class extends Controller {
     }
   }
 
+  contentValueChanged() {
+    // Re-initialize editor when content changes (switching files)
+    if (this.editor) {
+      this.editor.destroy()
+    }
+    this.setupEditor()
+  }
+
   setupEditor() {
     const extensions = [
       basicSetup,

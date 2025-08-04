@@ -40,6 +40,8 @@ class App < ApplicationRecord
   before_validation :generate_slug
   # 🚅 add callbacks above.
 
+  # Delegate to team's database config for hybrid architecture
+  delegate :database_config, to: :team, prefix: true, allow_nil: true
   # 🚅 add delegations above.
 
   def valid_creators

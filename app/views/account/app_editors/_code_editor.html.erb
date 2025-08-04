@@ -1,3 +1,4 @@
+<%= turbo_frame_tag "code_editor" do %>
 <div class="h-full w-full flex flex-col bg-white dark:bg-gray-900" 
      data-controller="codemirror" 
      data-codemirror-content-value="<%= html_escape(file.content || '') %>"
@@ -40,3 +41,4 @@
     </span>
   </div>
 </div>
+<% end %>

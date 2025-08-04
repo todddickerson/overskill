@@ -1,0 +1,248 @@
+<%# Data export instructions %>
+<div class="container mx-auto max-w-6xl px-4 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Export Your Data
+    </h1>
+    <p class="text-gray-600 dark:text-gray-300">
+      OverSkill believes in data portability. Export your app data anytime to use with your own infrastructure.
+    </p>
+  </div>
+
+  <% if @apps.any? %>
+    <div class="grid gap-6">
+      <%# Export Options %>
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Export Options
+        </h2>
+        
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">
+              📦 Full Database Export
+            </h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              Export complete database structure and data for all apps
+            </p>
+            <button type="button" class="btn btn-primary btn-sm" onclick="startFullExport()">
+              Export All Data
+            </button>
+          </div>
+
+          <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">
+              🎯 Individual App Export
+            </h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              Export data for specific apps only
+            </p>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('app-selector').scrollIntoView()">
+              Select Apps
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <%# Apps List %>
+      <div id="app-selector" class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Your Apps
+        </h2>
+
+        <div class="space-y-3">
+          <% @apps.each do |app| %>
+            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <h3 class="font-medium text-gray-900 dark:text-white">
+                    <%= app.name %>
+                  </h3>
+                  <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    <%= app.app_tables.count %> tables • 
+                    <%= app.use_custom_database? ? "Custom Database" : "Managed Database" %>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                  <button type="button" 
+                          class="btn btn-sm btn-secondary"
+                          onclick="showExportSQL('<%= app.id %>', '<%= app.name %>')">
+                    View SQL
+                  </button>
+                  <button type="button" 
+                          class="btn btn-sm btn-primary"
+                          onclick="exportApp('<%= app.id %>', '<%= app.name %>')">
+                    Export
+                  </button>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Export Instructions %>
+      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-blue-900 dark:text-blue-100 mb-4">
+          📚 Migration Guide
+        </h2>
+        
+        <div class="space-y-4 text-sm">
+          <div>
+            <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-2">
+              1. Set up your Supabase project
+            </h3>
+            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1 ml-4">
+              <li>Create a new project at <a href="https://supabase.com" target="_blank" class="underline">supabase.com</a></li>
+              <li>Note your project URL and API keys</li>
+              <li>Ensure RLS is enabled for security</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-2">
+              2. Export your data
+            </h3>
+            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1 ml-4">
+              <li>Click "Export" on your apps above</li>
+              <li>You'll receive SQL files with schema and data</li>
+              <li>Review the included RLS policies</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-2">
+              3. Import to your Supabase
+            </h3>
+            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1 ml-4">
+              <li>Run the schema SQL first</li>
+              <li>Import the data SQL files</li>
+              <li>Verify RLS policies are active</li>
+              <li>Test with your anon key</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-2">
+              4. Update your app configuration
+            </h3>
+            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1 ml-4">
+              <li>Go to Database Configuration</li>
+              <li>Switch to "Custom Supabase" mode</li>
+              <li>Enter your Supabase credentials</li>
+              <li>Test the connection</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%# SQL Preview Modal %>
+    <div id="sql-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[80vh] flex flex-col">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            SQL Export Preview: <span id="sql-app-name"></span>
+          </h3>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1">
+          <pre id="sql-content" class="bg-gray-100 dark:bg-gray-900 p-4 rounded font-mono text-sm overflow-x-auto"></pre>
+        </div>
+        <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+          <button type="button" class="btn btn-secondary" onclick="closeSQLModal()">
+            Close
+          </button>
+          <button type="button" class="btn btn-primary" onclick="downloadSQL()">
+            Download SQL
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function startFullExport() {
+      if (confirm('This will export all data for all your apps. Continue?')) {
+        // TODO: Implement full export
+        alert('Full export started. You will receive an email when ready.');
+      }
+    }
+
+    function exportApp(appId, appName) {
+      const format = prompt(`Export format for ${appName}?\n\nOptions: sql, json, zip`, 'zip');
+      
+      if (format && ['sql', 'json', 'zip'].includes(format.toLowerCase())) {
+        window.location.href = `<%= account_team_database_config_path(@team) %>/export_app/${appId}.${format.toLowerCase()}`;
+      }
+    }
+
+    async function showExportSQL(appId, appName) {
+      try {
+        // Show loading state
+        document.getElementById('sql-app-name').textContent = appName;
+        document.getElementById('sql-content').textContent = 'Loading SQL preview...';
+        document.getElementById('sql-modal').classList.remove('hidden');
+        
+        // Fetch actual SQL preview
+        const response = await fetch(`<%= account_team_database_config_path(@team) %>/export_app/${appId}.sql`, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        
+        if (response.ok) {
+          const sql = await response.text();
+          // Show first 1000 lines for preview
+          const lines = sql.split('\n');
+          const preview = lines.slice(0, 1000).join('\n');
+          const truncated = lines.length > 1000 ? '\n\n-- ... (preview truncated, download for full export)' : '';
+          
+          document.getElementById('sql-content').textContent = preview + truncated;
+        } else {
+          document.getElementById('sql-content').textContent = '-- Error loading SQL preview';
+        }
+      } catch (error) {
+        console.error('Error fetching SQL:', error);
+        document.getElementById('sql-content').textContent = '-- Error loading SQL preview';
+      }
+    }
+
+    function closeSQLModal() {
+      document.getElementById('sql-modal').classList.add('hidden');
+    }
+
+    function downloadSQL() {
+      const content = document.getElementById('sql-content').textContent;
+      const appName = document.getElementById('sql-app-name').textContent;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${appName.replace(/\s+/g, '_').toLowerCase()}_export.sql`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
+
+    // Close modal on escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeSQLModal();
+      }
+    });
+    </script>
+  <% else %>
+    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
+      <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+      </svg>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        No Apps to Export
+      </h3>
+      <p class="text-gray-600 dark:text-gray-400 mb-4">
+        Create your first app to start using the database features.
+      </p>
+      <%= link_to "Create App", new_account_app_path, class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

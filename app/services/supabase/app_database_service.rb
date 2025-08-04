@@ -3,13 +3,19 @@ class Supabase::AppDatabaseService
   
   base_uri ENV.fetch('SUPABASE_URL', 'https://overskill.supabase.co')
   
+  # Custom config support for hybrid architecture
+  attr_accessor :custom_config
+  
   def initialize(app)
     @app = app
+    # Default to managed Supabase credentials
     @headers = {
       'Authorization' => "Bearer #{ENV.fetch('SUPABASE_SERVICE_KEY')}",
       'Content-Type' => 'application/json',
       'apikey' => ENV.fetch('SUPABASE_ANON_KEY')
     }
+    # Custom config can be set by HybridConnectionManager
+    @custom_config = nil
   end
   
   def create_app_database
