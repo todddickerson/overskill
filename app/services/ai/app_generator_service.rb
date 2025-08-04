@@ -36,9 +36,9 @@ module Ai
       if ai_response[:success]
         update_progress_message(progress_message, "AI generation complete! Processing response...", 50)
         
-        # Step 3: Parse the AI response
-        update_progress_message(progress_message, "Parsing AI response...", 60)
-        parsed_data = parse_ai_response(ai_response[:content])
+        # Step 3: Parse the AI response (now using function calling)
+        update_progress_message(progress_message, "Processing function call response...", 60)
+        parsed_data = parse_function_call_response(ai_response)
 
         if parsed_data
           # Step 4: Security scan
@@ -121,8 +121,54 @@ module Ai
       client.generate_app(enhanced_prompt, framework: app.framework, app_type: app.app_type)
     end
 
+    def parse_function_call_response(ai_response)
+      Rails.logger.info "[AppGenerator] Parsing function call response"
+      
+      # Extract function call results
+      tool_calls = ai_response[:tool_calls]
+      
+      unless tool_calls&.any?
+        Rails.logger.error "[AppGenerator] No function calls found in AI response"
+        return nil
+      end
+      
+      # Find the generate_app function call
+      generate_call = tool_calls.find { |call| call.dig("function", "name") == "generate_app" }
+      
+      unless generate_call
+        Rails.logger.error "[AppGenerator] No generate_app function call found"
+        return nil
+      end
+      
+      begin
+        # Parse the function arguments - this is already structured JSON
+        arguments = generate_call.dig("function", "arguments")
+        data = arguments.is_a?(String) ? JSON.parse(arguments) : arguments
+        
+        Rails.logger.info "[AppGenerator] Successfully parsed function call arguments"
+        
+        # Validate the structured data
+        unless validate_function_call_data(data)
+          Rails.logger.error "[AppGenerator] Function call data validation failed"
+          return nil
+        end
+
+        {
+          app: data["app"],
+          files: data["files"],
+          instructions: data["instructions"],
+          deployment_notes: data["deployment_notes"],
+          whats_next: data["whats_next"]
+        }
+      rescue JSON::ParserError => e
+        Rails.logger.error "[AppGenerator] Failed to parse function arguments: #{e.message}"
+        Rails.logger.error "[AppGenerator] Arguments: #{arguments.inspect}"
+        nil
+      end
+    end
+
     def parse_ai_response(content)
-      Rails.logger.info "[AppGenerator] Parsing AI response (#{content.length} chars)"
+      Rails.logger.info "[AppGenerator] Parsing AI response (#{content.length} chars) - FALLBACK MODE"
       
       # Log response preview for debugging
       if ENV["VERBOSE_AI_LOGGING"] == "true"
@@ -228,6 +274,42 @@ module Ai
       end
       
       nil
+    end
+
+    def validate_function_call_data(data)
+      required_fields = %w[app files]
+      missing_fields = required_fields.select { |field| data[field].nil? || data[field].empty? }
+      
+      if missing_fields.any?
+        Rails.logger.error "[AppGenerator] Missing required fields in function call: #{missing_fields.join(', ')}"
+        return false
+      end
+      
+      # Validate app structure
+      app_data = data["app"]
+      required_app_fields = %w[name description type features tech_stack]
+      missing_app_fields = required_app_fields.select { |field| app_data[field].nil? || app_data[field].empty? }
+      
+      if missing_app_fields.any?
+        Rails.logger.error "[AppGenerator] Missing app fields: #{missing_app_fields.join(', ')}"
+        return false
+      end
+      
+      # Validate files structure
+      if !data["files"].is_a?(Array) || data["files"].empty?
+        Rails.logger.error "[AppGenerator] Files must be a non-empty array"
+        return false
+      end
+      
+      data["files"].each_with_index do |file, index|
+        unless file.is_a?(Hash) && file["path"] && file["content"]
+          Rails.logger.error "[AppGenerator] File #{index} missing path or content"
+          return false
+        end
+      end
+      
+      Rails.logger.info "[AppGenerator] Function call data validation passed"
+      true
     end
 
     def validate_ai_response(data)

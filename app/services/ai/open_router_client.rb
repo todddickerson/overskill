@@ -85,36 +85,243 @@ module Ai
       }
     end
 
-    def generate_app(prompt, framework: "react", app_type: nil)
-      # Build a detailed spec from the user's prompt
-      spec = Ai::AppSpecBuilder.build_spec(prompt, framework)
+    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: 8000)
+      model_id = MODELS[model] || model
 
+      body = {
+        model: model_id,
+        messages: messages,
+        tools: tools,
+        tool_choice: "auto", # Let the model decide when to use tools
+        temperature: temperature,
+        max_tokens: max_tokens,
+        stream: false
+      }
+
+      Rails.logger.info "[AI] Calling OpenRouter with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+
+      retries = 0
+      max_retries = 2
+      
+      begin
+        response = self.class.post("/chat/completions", @options.merge(body: body.to_json))
+      rescue Net::ReadTimeout => e
+        retries += 1
+        if retries <= max_retries
+          Rails.logger.warn "[AI] Timeout occurred, retrying (#{retries}/#{max_retries})..."
+          sleep(retries * 2) # Exponential backoff
+          retry
+        else
+          Rails.logger.error "[AI] Timeout after #{max_retries} retries"
+          raise e
+        end
+      end
+
+      if response.success?
+        result = response.parsed_response
+        usage = result.dig("usage")
+        choice = result.dig("choices", 0)
+        message = choice&.dig("message")
+
+        if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
+          Rails.logger.info "[AI] Token usage - Prompt: #{usage["prompt_tokens"]}, Completion: #{usage["completion_tokens"]}, Cost: $#{calculate_cost(usage, model_id)}"
+        end
+
+        # Check if the model used function calling
+        tool_calls = message&.dig("tool_calls")
+        
+        if tool_calls&.any?
+          Rails.logger.info "[AI] Function calls detected: #{tool_calls.length}"
+          
+          {
+            success: true,
+            content: message["content"],
+            tool_calls: tool_calls,
+            usage: usage,
+            model: model_id
+          }
+        else
+          # No function calls - this might be an issue with the model
+          Rails.logger.warn "[AI] No function calls in response for model #{model_id}"
+          
+          {
+            success: false,
+            error: "Model did not use function calling",
+            content: message&.dig("content"),
+            usage: usage,
+            model: model_id
+          }
+        end
+      else
+        Rails.logger.error "[AI] OpenRouter error: #{response.code} - #{response.body}"
+        {
+          success: false,
+          error: response.parsed_response["error"] || "Unknown error",
+          code: response.code
+        }
+      end
+    rescue => e
+      Rails.logger.error "[AI] OpenRouter tools exception: #{e.message}"
+      {
+        success: false,
+        error: e.message
+      }
+    end
+
+    def generate_app(prompt, framework: "react", app_type: nil)
+      # Use function calling for structured output - no more JSON parsing errors!
       messages = [
-        {role: "system", content: "You are an expert web developer. Follow the specifications exactly."},
-        {role: "user", content: spec}
+        {
+          role: "system", 
+          content: "You are an expert web developer. Use the generate_app function to create a complete web application based on the user's requirements."
+        },
+        {
+          role: "user", 
+          content: "Create a #{framework} application: #{prompt}"
+        }
       ]
 
-      # Try Kimi K2 first, fallback to Claude Sonnet if it fails/times out
-      result = chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
+      tools = [
+        {
+          type: "function",
+          function: {
+            name: "generate_app",
+            description: "Generate a complete web application with all necessary files",
+            parameters: {
+              type: "object",
+              properties: {
+                app: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Application name" },
+                    description: { type: "string", description: "What the app does" },
+                    type: { type: "string", description: "App category" },
+                    features: { 
+                      type: "array", 
+                      items: { type: "string" },
+                      description: "List of key features"
+                    },
+                    tech_stack: { 
+                      type: "array", 
+                      items: { type: "string" },
+                      description: "Technologies used"
+                    }
+                  },
+                  required: ["name", "description", "type", "features", "tech_stack"]
+                },
+                files: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      path: { type: "string", description: "File path (e.g., index.html)" },
+                      content: { type: "string", description: "Complete file content" }
+                    },
+                    required: ["path", "content"]
+                  },
+                  description: "All application files"
+                },
+                instructions: { 
+                  type: "string", 
+                  description: "Setup and deployment instructions" 
+                },
+                deployment_notes: { 
+                  type: "string", 
+                  description: "Important deployment considerations" 
+                }
+              },
+              required: ["app", "files"]
+            }
+          }
+        }
+      ]
+
+      # Try Kimi K2 first for cost savings, fallback to Claude Sonnet if function calling fails
+      Rails.logger.info "[AI] Attempting Kimi K2 function calling for cost efficiency"
+      result = chat_with_tools(messages, tools, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
       
-      if !result[:success] && result[:error]&.include?("timeout")
-        Rails.logger.warn "[AI] Kimi K2 timed out, falling back to Claude Sonnet"
-        result = chat(messages, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
+      # Enhanced error detection for OpenRouter Kimi K2 issues
+      kimi_failed = false
+      if !result[:success]
+        Rails.logger.error "[AI] Kimi K2 API call failed: #{result[:error]}"
+        kimi_failed = true
+      elsif !result[:tool_calls]&.any?
+        Rails.logger.error "[AI] Kimi K2 did not return function calls - OpenRouter issue detected"
+        kimi_failed = true
+      elsif result[:content]&.include?("```json")
+        Rails.logger.error "[AI] Kimi K2 returned JSON in content instead of function call - OpenRouter function calling broken"
+        kimi_failed = true
+      end
+      
+      # Fallback to Claude Sonnet if Kimi K2 has issues
+      if kimi_failed
+        Rails.logger.warn "[AI] Kimi K2 OpenRouter function calling unreliable, falling back to Claude Sonnet"
+        result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
+        
+        # Track the fallback for monitoring
+        Rails.logger.info "[AI] Claude Sonnet fallback result: success=#{result[:success]}, tool_calls=#{result[:tool_calls]&.any?}"
+      else
+        Rails.logger.info "[AI] Kimi K2 function calling successful!"
       end
       
       result
     end
 
     def update_app(user_request, current_files, app_context)
-      # Build update spec
-      spec = Ai::AppSpecBuilder.build_update_spec(user_request, current_files, app_context)
-
+      # Use function calling for app updates too
       messages = [
-        {role: "system", content: "You are an expert web developer. Make precise updates to the existing application."},
-        {role: "user", content: spec}
+        {
+          role: "system", 
+          content: "You are an expert web developer. Use the update_app function to make precise changes to the existing application based on the user's request."
+        },
+        {
+          role: "user", 
+          content: "Update the application: #{user_request}\n\nCurrent files:\n#{current_files.map { |f| "#{f[:path]}: #{f[:content][0..200]}..." }.join("\n\n")}"
+        }
       ]
 
-      chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 8000)
+      tools = [
+        {
+          type: "function",
+          function: {
+            name: "update_app",
+            description: "Update specific files in the web application",
+            parameters: {
+              type: "object",
+              properties: {
+                changes: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      file_path: { type: "string", description: "Path of file to update" },
+                      new_content: { type: "string", description: "Complete new file content" },
+                      change_description: { type: "string", description: "What was changed" }
+                    },
+                    required: ["file_path", "new_content", "change_description"]
+                  },
+                  description: "List of file changes to make"
+                },
+                summary: { 
+                  type: "string", 
+                  description: "Summary of all changes made" 
+                }
+              },
+              required: ["changes", "summary"]
+            }
+          }
+        }
+      ]
+
+      # Try Kimi K2 first, fallback to Claude Sonnet if needed
+      result = chat_with_tools(messages, tools, model: :kimi_k2, temperature: 0.7, max_tokens: 8000)
+      
+      if !result[:success] || !result[:tool_calls]&.any?
+        Rails.logger.warn "[AI] Kimi K2 app update function calling failed, falling back to Claude Sonnet"
+        result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 8000)
+      end
+      
+      result
     end
     
     def analyze_app_update_request(request:, current_files:, app_context:)
