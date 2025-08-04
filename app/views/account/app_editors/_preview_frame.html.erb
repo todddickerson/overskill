@@ -1,85 +1,125 @@
-<div id="preview_frame" class="h-full bg-white flex flex-col" 
-     data-controller="version-preview preview-mode"
+<div id="preview_frame" class="h-full flex flex-col" 
+     data-controller="version-preview preview-mode preview-device"
      data-version-preview-app-id-value="<%= app.id %>"
      data-preview-mode-app-id-value="<%= app.id %>"
-     data-preview-mode-mode-value="auto">
+     data-preview-mode-mode-value="auto"
+     data-preview-device-current-device-value="desktop">
   
-  <!-- Preview controls header -->
-  <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
-    <div class="flex items-center space-x-3">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Preview</h3>
-      <span class="text-xs text-gray-500 dark:text-gray-500" data-preview-mode-target="statusText">
-        Auto-refresh ON
-      </span>
-    </div>
-    <div class="flex items-center space-x-2">
-      <button data-action="click->preview-mode#toggleMode"
-              data-preview-mode-target="modeButton"
-              class="px-3 py-1 text-xs font-medium rounded-full text-green-600 bg-green-100 dark:bg-green-900/50 hover:opacity-80 transition-opacity">
-        <i class="fas fa-sync mr-2"></i>Auto
-      </button>
-      <button data-action="click->preview-mode#refreshPreview"
-              class="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-        <i class="fas fa-redo"></i>
-      </button>
-      <%= link_to account_app_deployment_path(app),
-          class: "px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" do %>
-        <i class="fas fa-rocket"></i>
-      <% end %>
-    </div>
-  </div>
-  
-  <!-- Version header (hidden by default) -->
-  <div data-version-preview-target="versionHeader" 
-       class="hidden bg-gray-100 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-    <div class="flex items-center space-x-3">
-      <span class="text-sm text-gray-600">Previewing version</span>
-      <span data-version-preview-target="currentVersionBadge" 
-            class="px-2 py-1 bg-gray-700 text-white text-xs rounded font-medium">
-        v1.0.0
-      </span>
-    </div>
-    
-    <div class="flex items-center space-x-2">
-      <button data-version-preview-target="restoreButton"
-              data-action="click->version-preview#restoreVersion"
-              class="hidden px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded flex items-center">
-        <i class="fas fa-history mr-2"></i>
-        Restore This Version
-      </button>
-      
-      <button data-action="click->version-preview#showLatest"
-              class="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded">
-        <i class="fas fa-times mr-1"></i>
-        Back to Latest
-      </button>
-    </div>
-  </div>
-  
-  <!-- Preview iframe -->
-  <div class="flex-1 relative" data-preview-mode-target="preview">
-    <% if app.app_files.any? %>
-      <% # Use Cloudflare preview URL if available, otherwise fallback to Rails preview %>
-      <% preview_src = app.preview_url || account_app_preview_path(app) %>
-      <iframe 
-        data-version-preview-target="iframe"
-        src="<%= preview_src %>"
-        class="w-full h-full border-0"
-        <% if app.preview_url %>
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
-        <% else %>
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
-        <% end %>
-        title="App Preview">
-      </iframe>
-    <% else %>
-      <div class="h-full flex items-center justify-center text-gray-500">
-        <div class="text-center">
-          <i class="fas fa-code text-4xl mb-4"></i>
-          <p>No preview available yet</p>
-          <p class="text-sm">Generate your app to see it here</p>
+  <div class="h-full bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <!-- Unified Preview Header -->
+    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <!-- Device Toggle -->
+        <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
+          <button class="px-2 py-1 text-sm rounded transition-colors"
+                  data-action="click->preview-device#setDesktop"
+                  data-preview-device-target="desktopButton"
+                  title="Desktop view">
+            <i class="fas fa-desktop"></i>
+          </button>
+          <button class="px-2 py-1 text-sm text-gray-500 dark:text-gray-400 rounded transition-colors"
+                  data-action="click->preview-device#setMobile"
+                  data-preview-device-target="mobileButton"
+                  title="Mobile view">
+            <i class="fas fa-mobile-alt"></i>
+          </button>
+        </div>
+        
+        <!-- Divider -->
+        <div class="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+        
+        <!-- Preview Status -->
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Preview</span>
+          <span class="text-xs text-gray-500 dark:text-gray-500" data-preview-mode-target="statusText">
+            Auto-refresh ON
+          </span>
         </div>
       </div>
-    <% end %>
+      
+      <div class="flex items-center space-x-2">
+        <!-- Auto-refresh Toggle -->
+        <button data-action="click->preview-mode#toggleMode"
+                data-preview-mode-target="modeButton"
+                class="px-3 py-1 text-xs font-medium rounded-full text-green-600 bg-green-100 dark:bg-green-900/50 hover:opacity-80 transition-opacity">
+          <i class="fas fa-sync mr-1.5"></i>Auto
+        </button>
+        
+        <!-- Manual Refresh -->
+        <button data-action="click->preview-mode#refreshPreview"
+                class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Refresh preview">
+          <i class="fas fa-redo text-sm"></i>
+        </button>
+        
+        <!-- External Link -->
+        <% if app.preview_url.present? %>
+          <%= link_to app.preview_url, target: "_blank", 
+              class: "p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors",
+              title: "Open in new tab" do %>
+            <i class="fas fa-external-link-alt text-sm"></i>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+    
+    <!-- Version header (hidden by default) -->
+    <div data-version-preview-target="versionHeader" 
+         class="hidden bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 px-6 py-2 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <i class="fas fa-code-branch text-blue-600 dark:text-blue-400"></i>
+        <span class="text-sm text-gray-700 dark:text-gray-300">Previewing version</span>
+        <span data-version-preview-target="currentVersionBadge" 
+              class="px-2 py-0.5 bg-blue-600 text-white text-xs rounded font-medium">
+          v1.0.0
+        </span>
+      </div>
+      
+      <div class="flex items-center space-x-2">
+        <button data-version-preview-target="restoreButton"
+                data-action="click->version-preview#restoreVersion"
+                class="hidden px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded flex items-center">
+          <i class="fas fa-history mr-2"></i>
+          Restore This Version
+        </button>
+        
+        <button data-action="click->version-preview#showLatest"
+                class="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+          <i class="fas fa-times mr-1"></i>
+          Back to Latest
+        </button>
+      </div>
+    </div>
+    
+    <!-- Preview Content Area -->
+    <div class="flex-1 relative p-4" data-preview-mode-target="preview">
+      <div class="h-full bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden"
+           data-preview-device-target="container">
+        <% if app.app_files.any? %>
+          <% # Use Cloudflare preview URL if available, otherwise fallback to Rails preview %>
+          <% preview_src = app.preview_url || account_app_preview_path(app) %>
+          <iframe 
+            data-version-preview-target="iframe"
+            data-preview-device-target="iframe"
+            src="<%= preview_src %>"
+            class="w-full h-full border-0"
+            <% if app.preview_url %>
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
+            <% else %>
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
+            <% end %>
+            title="App Preview">
+          </iframe>
+        <% else %>
+          <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
+            <div class="text-center">
+              <i class="fas fa-code text-5xl mb-4 text-gray-400"></i>
+              <p class="text-lg font-medium">No preview available yet</p>
+              <p class="text-sm mt-1">Generate your app to see it here</p>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
   </div>
 </div>

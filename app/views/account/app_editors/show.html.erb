@@ -136,47 +136,7 @@
       
       <!-- Preview View -->
       <div class="h-full hidden" data-main-tabs-target="panel" data-panel-name="preview">
-        <div class="h-full relative">
-          <!-- Preview Controls Bar -->
-          <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-3">
-            <!-- Device Toggle -->
-            <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
-              <button class="px-2 py-1 text-sm bg-white dark:bg-gray-600 rounded shadow-sm"
-                      data-action="click->preview#setDesktop"
-                      title="Desktop view">
-                <i class="fas fa-desktop text-gray-700 dark:text-gray-300"></i>
-              </button>
-              <button class="px-2 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                      data-action="click->preview#setMobile"
-                      title="Mobile view">
-                <i class="fas fa-mobile-alt"></i>
-              </button>
-            </div>
-            
-            <!-- Refresh -->
-            <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                    data-action="click->preview#refresh"
-                    title="Refresh preview">
-              <i class="fas fa-sync-alt text-sm"></i>
-            </button>
-            
-            <!-- External Link -->
-            <% if @app.preview_url.present? %>
-              <%= link_to @app.preview_url, target: "_blank", 
-                  class: "p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700",
-                  title: "Open in new tab" do %>
-                <i class="fas fa-external-link-alt text-sm"></i>
-              <% end %>
-            <% end %>
-          </div>
-          
-          <!-- Preview Frame with rounded corners -->
-          <div class="h-full p-4">
-            <div class="h-full bg-white rounded-xl overflow-hidden shadow-xl">
-              <%= render "preview_frame", app: @app %>
-            </div>
-          </div>
-        </div>
+        <%= render "preview_frame", app: @app %>
       </div>
     </div>
   </div>
