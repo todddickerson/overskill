@@ -33,9 +33,7 @@
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: asset-url('NeueRegrade-Bold-Font.otf') format('opentype'),
-       url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-Bold.woff2') format('woff2'),
-       url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-Bold.woff') format('woff');
+  src: asset-url('NeueRegrade-Bold-Font.otf') format('opentype');
 }
 
 /* Brand font class for overskill branding */

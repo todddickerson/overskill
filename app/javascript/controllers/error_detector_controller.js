@@ -9,6 +9,12 @@ export default class extends Controller {
   }
 
   setupErrorDetection() {
+    // Check if preview target exists before trying to use it
+    if (!this.hasPreviewTarget) {
+      console.log('Error detector: No preview target found, skipping setup')
+      return
+    }
+    
     const previewFrame = this.previewTarget
     
     if (previewFrame && previewFrame.contentWindow) {
