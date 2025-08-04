@@ -152,6 +152,55 @@ module Ai
       true
     end
 
+    def generate_auth_config(app)
+      {
+        auth_provider: 'supabase',
+        supabase_url: ENV['SUPABASE_URL'],
+        supabase_anon_key: ENV['SUPABASE_ANON_KEY'],
+        auth_options: {
+          providers: ['email', 'google', 'github'],
+          redirect_url: "#{app.published_url}/auth/callback",
+          enable_signup: !app.invite_only?,
+          require_email_verification: true
+        }
+      }
+    end
+    
+    def generate_auth_code
+      <<~JS
+        // Supabase client initialization
+        import { createClient } from '@supabase/supabase-js'
+        
+        const supabase = createClient(
+          process.env.REACT_APP_SUPABASE_URL,
+          process.env.REACT_APP_SUPABASE_ANON_KEY
+        )
+        
+        // Auth hook
+        export function useAuth() {
+          const [user, setUser] = useState(null)
+          const [loading, setLoading] = useState(true)
+          
+          useEffect(() => {
+            // Get initial session
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              setUser(session?.user ?? null)
+              setLoading(false)
+            })
+            
+            // Listen for auth changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+              setUser(session?.user ?? null)
+            })
+            
+            return () => subscription.unsubscribe()
+          }, [])
+          
+          return { user, loading, supabase }
+        }
+      JS
+    end
+
     def create_app_files(files)
       # Validate and fix files before creating
       validated_files = validate_and_fix_files(files)

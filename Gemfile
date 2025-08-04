@@ -307,3 +307,4 @@ group :production do
   # terser is used to compress assets during precompilation
   gem "terser"
 end
+gem 'supabase_api'

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_04_165115) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_04_174533) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -636,9 +636,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_165115) do
     t.integer "failed_attempts", default: 0, null: false
     t.string "unlock_token"
     t.datetime "locked_at"
+    t.string "supabase_user_id"
+    t.string "supabase_sync_status", default: "pending"
+    t.datetime "supabase_last_synced_at"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["platform_agent_of_id"], name: "index_users_on_platform_agent_of_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.index ["supabase_sync_status"], name: "index_users_on_supabase_sync_status"
+    t.index ["supabase_user_id"], name: "index_users_on_supabase_user_id", unique: true
     t.index ["unlock_token"], name: "index_users_on_unlock_token", unique: true
   end
 

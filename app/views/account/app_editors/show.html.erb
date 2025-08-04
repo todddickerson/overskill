@@ -107,12 +107,6 @@
                   data-action="click->tabs#switchTab">
             <i class="fas fa-folder mr-2"></i>Files (<%= @files.count %>)
           </button>
-          <button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent"
-                  data-tabs-target="tab"
-                  data-panel="settings"
-                  data-action="click->tabs#switchTab">
-            <i class="fas fa-cog mr-2"></i>Settings
-          </button>
         </div>
         
         <div class="flex items-center space-x-2">
@@ -171,10 +165,6 @@
           <% end %>
         </div>
         
-        <!-- Settings Panel -->
-        <div class="h-full hidden absolute inset-0 overflow-y-auto p-6" data-tabs-target="panel" data-panel-name="settings">
-          <%= render "account/apps/settings_panel", app: @app %>
-        </div>
       </div>
     </div>
   </div>

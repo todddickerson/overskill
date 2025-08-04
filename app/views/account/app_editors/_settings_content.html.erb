@@ -1,0 +1,139 @@
+<div class="max-w-6xl mx-auto">
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">App Settings</h1>
+    <p class="text-gray-600 dark:text-gray-400 mt-1">Configure your app's settings and environment variables</p>
+  </div>
+  
+  <!-- Basic Settings -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h3>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">App Name</label>
+        <input type="text" value="<%= @app.name %>" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+        <textarea rows="3" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"><%= @app.description || @app.prompt %></textarea>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">App URL</label>
+        <div class="flex">
+          <input type="text" value="<%= @app.slug %>" class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+          <span class="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md text-gray-600 dark:text-gray-300">.overskill.app</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Environment Variables -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6" data-controller="app-settings" data-app-settings-app-id-value="<%= @app.id %>">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Environment Variables</h3>
+      <button class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400" data-action="click->app-settings#addVariable">
+        <i class="fas fa-plus mr-1"></i> Add Variable
+      </button>
+    </div>
+    <div class="p-6">
+      <div class="space-y-3" data-app-settings-target="variablesList">
+        <% if @app.app_settings.any? %>
+          <% @app.app_settings.each do |setting| %>
+            <div class="flex items-center space-x-2" data-setting-id="<%= setting.id %>">
+              <input type="text" value="<%= setting.key %>" placeholder="KEY" class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm">
+              <input type="text" value="<%= setting.value %>" placeholder="Value" class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+              <button class="text-gray-400 hover:text-red-600 dark:hover:text-red-400" title="Remove variable">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          <% end %>
+        <% else %>
+          <p class="text-sm text-gray-500 dark:text-gray-400">No environment variables configured yet.</p>
+        <% end %>
+      </div>
+      
+      <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Authentication Settings -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Authentication</h3>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" checked class="rounded">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Enable user authentication</span>
+        </label>
+      </div>
+      
+      <div class="ml-6 space-y-3">
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" checked class="rounded">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Allow email/password login</span>
+        </label>
+        
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" class="rounded">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Enable Google OAuth</span>
+        </label>
+        
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" class="rounded">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Enable GitHub OAuth</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Privacy Settings -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Privacy & Access</h3>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">App Visibility</label>
+        <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+          <option>Public - Anyone can access</option>
+          <option selected>Public (Login Required) - Anyone can access but must log in</option>
+          <option>Private - Only invited users can access</option>
+        </select>
+      </div>
+      
+      <div>
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" class="rounded">
+          <span class="text-sm text-gray-700 dark:text-gray-300">Allow users to create accounts</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Danger Zone -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-red-200 dark:border-red-900">
+    <div class="px-6 py-4 border-b border-red-200 dark:border-red-900">
+      <h3 class="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
+    </div>
+    <div class="p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h4 class="font-medium text-gray-900 dark:text-white">Delete this app</h4>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Once deleted, this app and all its data will be permanently removed.</p>
+        </div>
+        <button class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">
+          Delete App
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

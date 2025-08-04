@@ -28,6 +28,9 @@ Rails.application.routes.draw do
   end
 
   namespace :webhooks do
+    # Supabase authentication webhooks
+    post "supabase/auth_event", to: "supabase#auth_event"
+    
     namespace :incoming do
       namespace :oauth do
         # 🚅 super scaffolding will insert new oauth provider webhooks above this line.

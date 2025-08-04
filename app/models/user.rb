@@ -19,9 +19,28 @@ class User < ApplicationRecord
 
   # 🚅 add validations above.
 
+  # Supabase sync callbacks
+  after_create :create_supabase_auth_user
+  after_update :sync_to_supabase_profile, if: :should_sync_to_supabase?
+  
   # 🚅 add callbacks above.
 
   # 🚅 add delegations above.
 
+  # Supabase sync methods
+  def should_sync_to_supabase?
+    saved_change_to_email? || saved_change_to_first_name? || saved_change_to_last_name?
+  end
+  
+  private
+  
+  def create_supabase_auth_user
+    SupabaseAuthSyncJob.perform_later(self, :create)
+  end
+  
+  def sync_to_supabase_profile
+    SupabaseAuthSyncJob.perform_later(self, :update)
+  end
+  
   # 🚅 add methods above.
 end
