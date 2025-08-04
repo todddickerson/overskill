@@ -14,24 +14,41 @@ export default class extends Controller {
   toggleChat() {
     this.chatVisibleValue = !this.chatVisibleValue
     
+    // Check if we're on mobile (using Tailwind's lg breakpoint)
+    const isMobile = window.innerWidth < 1024
+    
     if (this.chatVisibleValue) {
-      // Restore previous width or default
-      const savedWidth = localStorage.getItem('chatPanelWidth') || '384'
-      this.chatPanelTarget.style.width = `${savedWidth}px`
-      this.chatPanelTarget.style.minWidth = `${savedWidth}px`
+      if (isMobile) {
+        // On mobile, show chat panel (it's a bottom sheet)
+        this.chatPanelTarget.style.display = 'flex'
+        this.chatPanelTarget.classList.remove('hidden')
+      } else {
+        // Desktop behavior - restore previous width or default
+        const savedWidth = localStorage.getItem('chatPanelWidth') || '384'
+        this.chatPanelTarget.style.width = `${savedWidth}px`
+        this.chatPanelTarget.style.minWidth = `${savedWidth}px`
+        this.chatPanelTarget.style.display = 'flex'
+        this.chatPanelTarget.classList.remove('hidden')
+      }
       
       // Hide expand button when chat is visible
       if (this.hasExpandButtonTarget) {
         this.expandButtonTarget.classList.add('hidden')
       }
     } else {
-      // Save current width before hiding
-      const currentWidth = this.chatPanelTarget.offsetWidth
-      if (currentWidth > 0) {
-        localStorage.setItem('chatPanelWidth', currentWidth)
+      if (isMobile) {
+        // On mobile, hide chat panel completely
+        this.chatPanelTarget.style.display = 'none'
+        this.chatPanelTarget.classList.add('hidden')
+      } else {
+        // Desktop behavior - collapse to 0 width
+        const currentWidth = this.chatPanelTarget.offsetWidth
+        if (currentWidth > 0) {
+          localStorage.setItem('chatPanelWidth', currentWidth)
+        }
+        this.chatPanelTarget.style.width = '0px'
+        this.chatPanelTarget.style.minWidth = '0px'
       }
-      this.chatPanelTarget.style.width = '0px'
-      this.chatPanelTarget.style.minWidth = '0px'
       
       // Show expand button when chat is hidden
       if (this.hasExpandButtonTarget) {

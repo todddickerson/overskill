@@ -1,4 +1,4 @@
-<div class="h-screen flex bg-gray-50 dark:bg-gray-900 overflow-hidden" 
+<div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden" 
      data-controller="version-preview deployment publish-modal version-comparison version-actions editor-layout main-tabs preview-device" 
      data-version-preview-app-id-value="<%= @app.to_param %>"
      data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
@@ -7,33 +7,73 @@
      data-version-comparison-app-id-value="<%= @app.to_param %>"
      data-editor-layout-chat-visible-value="true"
      data-preview-device-current-device-value="desktop">
+
+  <!-- Mobile Header (visible only on mobile) -->
+  <div class="lg:hidden h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
+    <div class="flex items-center space-x-3 flex-1 min-w-0">
+      <!-- Team Navigation (overskill Logo + Dropdown) -->
+      <%= render "team_navigation" %>
+      
+      <!-- Divider -->
+      <div class="h-5 w-[2px] bg-slate-200 rotate-[25deg] dark:bg-slate-700 ml-2 mr-2"></div>
+      
+      <!-- App Navigation (App Logo + Name + Dropdown) -->
+      <%= render "app_navigation" %>
+    </div>
+    
+    <!-- Mobile Actions -->
+    <div class="flex items-center space-x-2">
+      <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              data-action="click->editor-layout#toggleChat">
+        <i class="fas fa-comments text-sm"></i>
+      </button>
+      <button data-action="click->publish-modal#open"
+              class="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
+        Publish
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Layout Container -->
+  <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
   
-  <!-- Left Column - Chat -->
-  <div class="flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden relative h-screen"
+  <!-- Chat Panel - Left Column on Desktop, Bottom Sheet on Mobile -->
+  <div class="flex flex-col bg-white dark:bg-gray-900 border-r lg:border-r border-t lg:border-t-0 border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden relative 
+              lg:h-screen h-1/2 lg:w-96 w-full order-2 lg:order-1"
        data-editor-layout-target="chatPanel"
        data-controller="resizable-panel"
        data-resizable-panel-min-width-value="320"
        data-resizable-panel-max-width-value="600"
        data-resizable-panel-default-width-value="384"
-       style="width: 384px;">
+       style="lg:width: 384px;">
     
-    <!-- Left Header -->
+    <!-- Chat Header -->
     <div class="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
+      <!-- Mobile: Show just app name, Desktop: Show full navigation -->
       <div class="flex items-center space-x-3 flex-1 min-w-0">
-        <!-- Team Navigation (overskill Logo + Dropdown) -->
-        <%= render "team_navigation" %>
+        <!-- Desktop Navigation -->
+        <div class="hidden lg:flex items-center space-x-3 flex-1 min-w-0">
+          <!-- Team Navigation (overskill Logo + Dropdown) -->
+          <%= render "team_navigation" %>
+          
+          <!-- Divider -->
+          <div class="h-5 w-[2px] bg-slate-200 rotate-[25deg] dark:bg-slate-700 ml-2 mr-2"></div>
+          
+          <!-- App Navigation (App Logo + Name + Dropdown) -->
+          <%= render "app_navigation" %>
+        </div>
         
-        <!-- Divider -->
-        <div class="h-5 w-[2px] bg-slate-200 rotate-[25deg] dark:bg-slate-700 ml-2 mr-2"></div>
-        
-        <!-- App Navigation (App Logo + Name + Dropdown) -->
-        <%= render "app_navigation" %>
+        <!-- Mobile Navigation - Just AI Assistant Title -->
+        <div class="lg:hidden flex items-center space-x-2">
+          <i class="fas fa-sparkles text-blue-500 text-sm"></i>
+          <span class="text-sm font-medium text-gray-900 dark:text-white">AI Assistant</span>
+        </div>
       </div>
       
       <div class="relative" data-controller="tooltip" data-tooltip-content-value="Hide AI Assistant" data-tooltip-position-value="bottom">
         <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700 ml-2"
                 data-action="click->editor-layout#toggleChat mouseenter->tooltip#show mouseleave->tooltip#hide">
-          <i class="fas fa-chevron-left text-sm transition-transform duration-200" data-editor-layout-target="collapseIcon"></i>
+          <i class="fas fa-chevron-left lg:fa-chevron-left fa-chevron-down text-sm transition-transform duration-200" data-editor-layout-target="collapseIcon"></i>
         </button>
       </div>
     </div>
@@ -121,75 +161,115 @@
       
       <!-- Right side - Actions -->
       <div class="flex items-center space-x-3">
-        <!-- Preview Controls (shown when preview tab is active) -->
-        <div class="flex items-center space-x-2 mr-4" data-main-tabs-target="previewControls">
-          <!-- Device Toggle -->
-          <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
-            <div class="relative" data-controller="tooltip" data-tooltip-content-value="Switch to desktop view" data-tooltip-position-value="bottom">
-              <button class="px-2 py-1 text-sm rounded transition-colors"
-                      data-action="click->preview-device#setDesktop mouseenter->tooltip#show mouseleave->tooltip#hide"
-                      data-preview-device-target="desktopButton">
-                <i class="fas fa-desktop"></i>
-              </button>
+        <!-- Desktop: Full Actions, Mobile: Essential Actions Only -->
+        <div class="hidden lg:flex items-center space-x-3">
+          <!-- Preview Controls (shown when preview tab is active) -->
+          <div class="flex items-center space-x-2 mr-4" data-main-tabs-target="previewControls">
+            <!-- Device Toggle -->
+            <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
+              <div class="relative" data-controller="tooltip" data-tooltip-content-value="Switch to desktop view" data-tooltip-position-value="bottom">
+                <button class="px-2 py-1 text-sm rounded transition-colors"
+                        data-action="click->preview-device#setDesktop mouseenter->tooltip#show mouseleave->tooltip#hide"
+                        data-preview-device-target="desktopButton">
+                  <i class="fas fa-desktop"></i>
+                </button>
+              </div>
+              <div class="relative" data-controller="tooltip" data-tooltip-content-value="Switch to mobile view" data-tooltip-position-value="bottom">
+                <button class="px-2 py-1 text-sm text-gray-500 dark:text-gray-400 rounded transition-colors"
+                        data-action="click->preview-device#setMobile mouseenter->tooltip#show mouseleave->tooltip#hide"
+                        data-preview-device-target="mobileButton">
+                  <i class="fas fa-mobile-alt"></i>
+                </button>
+              </div>
             </div>
-            <div class="relative" data-controller="tooltip" data-tooltip-content-value="Switch to mobile view" data-tooltip-position-value="bottom">
-              <button class="px-2 py-1 text-sm text-gray-500 dark:text-gray-400 rounded transition-colors"
-                      data-action="click->preview-device#setMobile mouseenter->tooltip#show mouseleave->tooltip#hide"
-                      data-preview-device-target="mobileButton">
-                <i class="fas fa-mobile-alt"></i>
-              </button>
+            
+            <!-- Divider -->
+            <div class="h-6 w-px bg-gray-300 dark:bg-gray-600 ml-2"></div>
+          </div>
+          
+          <!-- Activity Monitor -->
+          <div class="relative" data-controller="tooltip" data-tooltip-content-value="View activity logs and API usage" data-tooltip-position-value="bottom">
+            <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    data-action="click->editor-layout#toggleActivityMonitor mouseenter->tooltip#show mouseleave->tooltip#hide">
+              <i class="fas fa-chart-line text-sm"></i>
+            </button>
+          </div>
+          
+          <!-- Version History -->
+          <div class="relative" data-controller="tooltip" data-tooltip-content-value="Browse previous versions of your app" data-tooltip-position-value="bottom">
+            <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    data-action="click->editor-layout#openVersionHistory mouseenter->tooltip#show mouseleave->tooltip#hide">
+              <i class="fas fa-history text-sm"></i>
+            </button>
+          </div>
+          
+          <!-- Help -->
+          <div class="relative" data-controller="tooltip" data-tooltip-content-value="Get help and documentation" data-tooltip-position-value="bottom">
+            <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    data-action="mouseenter->tooltip#show mouseleave->tooltip#hide">
+              <i class="fas fa-question-circle text-sm"></i>
+            </button>
+          </div>
+          
+          <!-- Share -->
+          <div class="relative" data-controller="tooltip" data-tooltip-content-value="Share your app with others" data-tooltip-position-value="bottom">
+            <button class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                    data-action="click->editor-layout#openShareModal mouseenter->tooltip#show mouseleave->tooltip#hide">
+              Share
+            </button>
+          </div>
+          
+          <!-- Publish -->
+          <div class="relative" data-controller="tooltip" data-tooltip-content-value="Deploy your app to production" data-tooltip-position-value="bottom">
+            <button data-action="click->publish-modal#open mouseenter->tooltip#show mouseleave->tooltip#hide"
+                    class="px-4 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
+              Publish
+            </button>
+          </div>
+        </div>
+        
+        <!-- Mobile: Essential Actions + Overflow Menu -->
+        <div class="lg:hidden flex items-center space-x-2">
+          <!-- Overflow Menu -->
+          <div class="relative" data-controller="dropdown">
+            <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    data-action="click->dropdown#toggle">
+              <i class="fas fa-ellipsis-v text-sm"></i>
+            </button>
+            
+            <div class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 hidden"
+                 data-dropdown-target="menu">
+              <div class="py-1">
+                <button class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                        data-action="click->editor-layout#toggleActivityMonitor">
+                  <i class="fas fa-chart-line text-sm mr-2"></i>
+                  Activity Monitor
+                </button>
+                <button class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                        data-action="click->editor-layout#openVersionHistory">
+                  <i class="fas fa-history text-sm mr-2"></i>
+                  Version History
+                </button>
+                <button class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                        data-action="click->editor-layout#openShareModal">
+                  <i class="fas fa-share text-sm mr-2"></i>
+                  Share App
+                </button>
+              </div>
             </div>
           </div>
           
-          
-          <!-- Divider -->
-          <div class="h-6 w-px bg-gray-300 dark:bg-gray-600 ml-2"></div>
-        </div>
-        
-        <!-- Activity Monitor -->
-        <div class="relative" data-controller="tooltip" data-tooltip-content-value="View activity logs and API usage" data-tooltip-position-value="bottom">
-          <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                  data-action="click->editor-layout#toggleActivityMonitor mouseenter->tooltip#show mouseleave->tooltip#hide">
-            <i class="fas fa-chart-line text-sm"></i>
-          </button>
-        </div>
-        
-        <!-- Version History -->
-        <div class="relative" data-controller="tooltip" data-tooltip-content-value="Browse previous versions of your app" data-tooltip-position-value="bottom">
-          <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                  data-action="click->editor-layout#openVersionHistory mouseenter->tooltip#show mouseleave->tooltip#hide">
-            <i class="fas fa-history text-sm"></i>
-          </button>
-        </div>
-        
-        <!-- Help -->
-        <div class="relative" data-controller="tooltip" data-tooltip-content-value="Get help and documentation" data-tooltip-position-value="bottom">
-          <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                  data-action="mouseenter->tooltip#show mouseleave->tooltip#hide">
-            <i class="fas fa-question-circle text-sm"></i>
-          </button>
-        </div>
-        
-        <!-- Share -->
-        <div class="relative" data-controller="tooltip" data-tooltip-content-value="Share your app with others" data-tooltip-position-value="bottom">
-          <button class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                  data-action="click->editor-layout#openShareModal mouseenter->tooltip#show mouseleave->tooltip#hide">
-            Share
-          </button>
-        </div>
-        
-        <!-- Publish -->
-        <div class="relative" data-controller="tooltip" data-tooltip-content-value="Deploy your app to production" data-tooltip-position-value="bottom">
-          <button data-action="click->publish-modal#open mouseenter->tooltip#show mouseleave->tooltip#hide"
-                  class="px-4 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
+          <!-- Mobile Publish Button -->
+          <button data-action="click->publish-modal#open"
+                  class="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
             Publish
           </button>
         </div>
       </div>
     </div>
     
-    <!-- Main Content Area -->
-    <div class="flex-1 bg-white dark:bg-gray-900 overflow-hidden">
+    <!-- Main Content Area - Full Screen on Mobile, Right Column on Desktop -->
+    <div class="flex-1 lg:flex-1 bg-white dark:bg-gray-900 overflow-hidden order-1 lg:order-2 h-1/2 lg:h-screen">
       <!-- Dashboard View -->
       <div class="h-full hidden" data-main-tabs-target="panel" data-panel-name="dashboard">
         <%= render "dashboard_with_subnav", app: @app, files: @files, selected_file: @selected_file %>
