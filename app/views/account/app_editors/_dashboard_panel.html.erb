@@ -338,11 +338,8 @@
     </div>
     
     <!-- API Explorer Panel -->
-    <div class="h-full overflow-y-auto p-6 hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="api">
-      <div class="max-w-6xl mx-auto">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">API Explorer</h1>
-        <p class="text-gray-600 dark:text-gray-400">Test your app's API endpoints...</p>
-      </div>
+    <div class="h-full hidden" data-dashboard-tabs-target="panel" data-dashboard-deep-link-target="panel" data-panel-name="api">
+      <%= render "api_explorer", app: app %>
     </div>
     
     <!-- Realtime Panel -->

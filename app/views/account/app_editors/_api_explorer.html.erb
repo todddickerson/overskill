@@ -1,0 +1,277 @@
+<div class="h-full flex bg-gray-50 dark:bg-gray-900" data-controller="api-explorer" data-api-explorer-app-id-value="<%= app.id %>">
+  <!-- Left Sidebar - Endpoints -->
+  <div class="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">API Endpoints</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Test your app's API</p>
+    </div>
+    
+    <!-- Endpoints List -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <!-- Base URL -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Base URL</label>
+        <div class="flex items-center space-x-2">
+          <input type="text" 
+                 value="<%= app.preview_url || 'https://your-app.overskill.app' %>/api"
+                 data-api-explorer-target="baseUrl"
+                 class="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono">
+          <button class="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Table Endpoints (auto-generated) -->
+      <div class="space-y-4" data-api-explorer-target="endpointsList">
+        <div class="space-y-2">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Database Tables</h3>
+          
+          <% if app.app_tables.any? %>
+            <% app.app_tables.each do |table| %>
+              <div class="space-y-1">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mt-3"><%= table.name %></div>
+                
+                <!-- GET all -->
+                <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                        data-action="click->api-explorer#selectEndpoint"
+                        data-method="GET"
+                        data-path="/api/<%= table.name %>"
+                        data-description="Get all <%= table.name %>">
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">GET</span>
+                    <span class="text-gray-700 dark:text-gray-300">/<%= table.name %></span>
+                  </div>
+                  <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+                </button>
+                
+                <!-- GET by ID -->
+                <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                        data-action="click->api-explorer#selectEndpoint"
+                        data-method="GET"
+                        data-path="/api/<%= table.name %>/:id"
+                        data-description="Get <%= table.name.singularize %> by ID">
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">GET</span>
+                    <span class="text-gray-700 dark:text-gray-300">/<%= table.name %>/:id</span>
+                  </div>
+                  <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+                </button>
+                
+                <!-- POST -->
+                <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                        data-action="click->api-explorer#selectEndpoint"
+                        data-method="POST"
+                        data-path="/api/<%= table.name %>"
+                        data-description="Create new <%= table.name.singularize %>">
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">POST</span>
+                    <span class="text-gray-700 dark:text-gray-300">/<%= table.name %></span>
+                  </div>
+                  <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+                </button>
+                
+                <!-- PUT -->
+                <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                        data-action="click->api-explorer#selectEndpoint"
+                        data-method="PUT"
+                        data-path="/api/<%= table.name %>/:id"
+                        data-description="Update <%= table.name.singularize %>">
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 rounded">PUT</span>
+                    <span class="text-gray-700 dark:text-gray-300">/<%= table.name %>/:id</span>
+                  </div>
+                  <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+                </button>
+                
+                <!-- DELETE -->
+                <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                        data-action="click->api-explorer#selectEndpoint"
+                        data-method="DELETE"
+                        data-path="/api/<%= table.name %>/:id"
+                        data-description="Delete <%= table.name.singularize %>">
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded">DELETE</span>
+                    <span class="text-gray-700 dark:text-gray-300">/<%= table.name %>/:id</span>
+                  </div>
+                  <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+                </button>
+              </div>
+            <% end %>
+          <% else %>
+            <p class="text-sm text-gray-500 dark:text-gray-400 italic">No tables created yet</p>
+          <% end %>
+        </div>
+        
+        <!-- Authentication Endpoints -->
+        <div class="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Authentication</h3>
+          
+          <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                  data-action="click->api-explorer#selectEndpoint"
+                  data-method="POST"
+                  data-path="/api/auth/login"
+                  data-description="User login">
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">POST</span>
+              <span class="text-gray-700 dark:text-gray-300">/auth/login</span>
+            </div>
+            <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+          </button>
+          
+          <button class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                  data-action="click->api-explorer#selectEndpoint"
+                  data-method="POST"
+                  data-path="/api/auth/signup"
+                  data-description="User signup">
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">POST</span>
+              <span class="text-gray-700 dark:text-gray-300">/auth/signup</span>
+            </div>
+            <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-gray-600"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Right Panel - Request/Response -->
+  <div class="flex-1 flex flex-col">
+    <!-- Request Builder -->
+    <div class="flex-1 p-6 overflow-y-auto" data-api-explorer-target="requestPanel">
+      <div class="max-w-4xl mx-auto">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Request</h3>
+        
+        <!-- Method & URL -->
+        <div class="mb-6">
+          <div class="flex items-center space-x-3">
+            <select data-api-explorer-target="methodSelect"
+                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-medium">
+              <option value="GET" selected>GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            
+            <input type="text" 
+                   data-api-explorer-target="urlInput"
+                   placeholder="/api/endpoint"
+                   class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono">
+            
+            <button class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+                    data-action="click->api-explorer#sendRequest">
+              Send
+            </button>
+          </div>
+        </div>
+        
+        <!-- Tabs for Headers/Body/Auth -->
+        <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
+          <nav class="-mb-px flex space-x-8">
+            <button class="py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600 dark:text-blue-400"
+                    data-api-explorer-target="tab"
+                    data-tab="headers"
+                    data-action="click->api-explorer#switchTab">
+              Headers
+            </button>
+            <button class="py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    data-api-explorer-target="tab"
+                    data-tab="body"
+                    data-action="click->api-explorer#switchTab">
+              Body
+            </button>
+            <button class="py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    data-api-explorer-target="tab"
+                    data-tab="auth"
+                    data-action="click->api-explorer#switchTab">
+              Auth
+            </button>
+          </nav>
+        </div>
+        
+        <!-- Tab Content -->
+        <div data-api-explorer-target="tabContent">
+          <!-- Headers Tab -->
+          <div data-tab-panel="headers">
+            <div class="space-y-3" data-api-explorer-target="headersList">
+              <div class="flex items-center space-x-3">
+                <input type="text" placeholder="Header name" value="Content-Type"
+                       class="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <input type="text" placeholder="Header value" value="application/json"
+                       class="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            <button class="mt-3 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                    data-action="click->api-explorer#addHeader">
+              <i class="fas fa-plus mr-1"></i> Add Header
+            </button>
+          </div>
+          
+          <!-- Body Tab -->
+          <div data-tab-panel="body" class="hidden">
+            <div class="space-y-3">
+              <select class="text-sm px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <option>JSON</option>
+                <option>Text</option>
+                <option>Form Data</option>
+              </select>
+              <textarea data-api-explorer-target="bodyInput"
+                        rows="10"
+                        placeholder='{"key": "value"}'
+                        class="w-full px-4 py-3 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+            </div>
+          </div>
+          
+          <!-- Auth Tab -->
+          <div data-tab-panel="auth" class="hidden">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Authentication Type
+                </label>
+                <select class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                  <option>No Auth</option>
+                  <option>Bearer Token</option>
+                  <option>API Key</option>
+                  <option>Basic Auth</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Token
+                </label>
+                <input type="text" 
+                       placeholder="Enter your authentication token"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Response Panel -->
+    <div class="flex-1 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-6 overflow-y-auto">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Response</h3>
+          <div class="flex items-center space-x-4 text-sm" data-api-explorer-target="responseInfo">
+            <!-- Response info will be shown here -->
+          </div>
+        </div>
+        
+        <div data-api-explorer-target="responsePanel">
+          <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-8 text-center">
+            <i class="fas fa-paper-plane text-4xl text-gray-400 mb-3"></i>
+            <p class="text-gray-600 dark:text-gray-400">Send a request to see the response</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
