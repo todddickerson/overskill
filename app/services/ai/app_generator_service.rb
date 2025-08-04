@@ -207,7 +207,6 @@ module Ai
     def create_progress_message(message, progress)
       # Create a system message in the chat to show progress
       progress_msg = @app.app_chat_messages.create!(
-        team: @app.team,
         content: build_progress_content(message, progress),
         role: 'system'
       )
@@ -230,6 +229,13 @@ module Ai
     end
 
     def build_progress_content(message, progress)
+      # Use a visual progress bar with text characters instead of HTML
+      progress_bar_width = 20
+      filled_chars = (progress * progress_bar_width / 100).round
+      empty_chars = progress_bar_width - filled_chars
+      
+      progress_bar = "█" * filled_chars + "░" * empty_chars
+      
       <<~CONTENT
         **🔄 Generation Progress**
 
@@ -237,9 +243,7 @@ module Ai
 
         Progress: #{progress}%
 
-        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-          <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: #{progress}%"></div>
-        </div>
+        `#{progress_bar}` #{progress}%
       CONTENT
     end
 
