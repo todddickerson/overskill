@@ -103,6 +103,22 @@ Rails.application.routes.draw do
           resource :preview, controller: "app_previews", only: [:show] do
             get "files/*path", action: :serve_file, as: :file, format: false
           end
+          
+          # Dashboard interface for database management
+          resource :dashboard, controller: "app_dashboards", only: [:show] do
+            get :data
+            post :create_table
+            patch "tables/:table_id", action: :update_table, as: :update_table
+            delete "tables/:table_id", action: :delete_table, as: :delete_table
+            get "tables/:table_id/data", action: :table_data, as: :table_data
+            get "tables/:table_id/schema", action: :table_schema, as: :table_schema
+            post "tables/:table_id/columns", action: :create_column, as: :create_column
+            patch "tables/:table_id/columns/:column_id", action: :update_column, as: :update_column
+            delete "tables/:table_id/columns/:column_id", action: :delete_column, as: :delete_column
+            post "tables/:table_id/records", action: :create_record, as: :create_record
+            patch "tables/:table_id/records/:record_id", action: :update_record, as: :update_record
+            delete "tables/:table_id/records/:record_id", action: :delete_record, as: :delete_record
+          end
 
           resources :app_versions do
             member do

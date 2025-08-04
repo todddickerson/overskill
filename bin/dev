@@ -4,6 +4,16 @@ bin/link
 
 if [ -x "$(command -v overmind)" ]
 then
+  # Kill existing tmux session to stop old processes
+  if command -v tmux > /dev/null; then
+    tmux kill-session -t overskill 2>/dev/null || true
+  fi
+  rm -f ./.overmind.sock
+  rm -f tmp/pids/server.pid
+  # Kill any process listening on port 3000 (free up Puma port)
+  if command -v lsof > /dev/null; then
+    lsof -ti tcp:3000 | xargs -r kill -9 || true
+  fi
   bundle exec overmind start -f Procfile.dev "$@"
 else
   bundle exec foreman start -f Procfile.dev "$@"

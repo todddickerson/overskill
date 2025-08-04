@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_04_152805) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -131,6 +131,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
   end
 
+  create_table "app_api_integrations", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "name"
+    t.string "base_url"
+    t.string "auth_type"
+    t.string "api_key"
+    t.string "path_prefix"
+    t.text "additional_headers"
+    t.boolean "enabled"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_api_integrations_on_app_id"
+  end
+
   create_table "app_chat_messages", force: :cascade do |t|
     t.bigint "app_id", null: false
     t.text "content"
@@ -141,10 +155,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
     t.datetime "updated_at", null: false
     t.bigint "user_id"
     t.bigint "app_version_id"
+    t.jsonb "metadata", default: {}
     t.index ["app_id", "created_at"], name: "index_app_chat_messages_on_app_id_and_created_at"
     t.index ["app_id"], name: "index_app_chat_messages_on_app_id"
     t.index ["app_version_id"], name: "index_app_chat_messages_on_app_version_id"
     t.index ["created_at"], name: "index_app_chat_messages_on_created_at"
+    t.index ["metadata"], name: "index_app_chat_messages_on_metadata", using: :gin
     t.index ["status"], name: "index_app_chat_messages_on_status"
     t.index ["user_id"], name: "index_app_chat_messages_on_user_id"
     t.check_constraint "role::text = 'assistant'::text AND (status::text = ANY (ARRAY['planning'::character varying, 'executing'::character varying, 'generating'::character varying, 'completed'::character varying, 'failed'::character varying, 'validation_error'::character varying]::text[])) OR role::text <> 'assistant'::text AND status IS NULL", name: "check_status_only_for_assistant"
@@ -201,6 +217,41 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
     t.index ["team_id"], name: "index_app_generations_on_team_id"
   end
 
+  create_table "app_o_auth_providers", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "provider"
+    t.string "client_id"
+    t.string "client_secret"
+    t.string "domain"
+    t.string "redirect_uri"
+    t.text "scopes"
+    t.boolean "enabled"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_o_auth_providers_on_app_id"
+  end
+
+  create_table "app_table_columns", force: :cascade do |t|
+    t.bigint "app_table_id", null: false
+    t.string "name"
+    t.string "column_type"
+    t.text "options"
+    t.boolean "required"
+    t.string "default_value"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_table_id"], name: "index_app_table_columns_on_app_table_id"
+  end
+
+  create_table "app_tables", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "name"
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_tables_on_app_id"
+  end
+
   create_table "app_version_files", force: :cascade do |t|
     t.bigint "app_version_id", null: false
     t.bigint "app_file_id", null: false
@@ -230,6 +281,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
     t.datetime "updated_at", null: false
     t.string "environment"
     t.boolean "bookmarked", default: false, null: false
+    t.string "display_name"
     t.index ["app_id"], name: "index_app_versions_on_app_id"
     t.index ["bookmarked"], name: "index_app_versions_on_bookmarked"
     t.index ["team_id"], name: "index_app_versions_on_team_id"
@@ -300,6 +352,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
     t.index ["slug"], name: "index_creator_profiles_on_slug", unique: true
     t.index ["team_id"], name: "index_creator_profiles_on_team_id"
     t.index ["username"], name: "index_creator_profiles_on_username", unique: true
+  end
+
+  create_table "feature_flags", force: :cascade do |t|
+    t.string "name"
+    t.boolean "enabled"
+    t.integer "percentage"
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "follows", force: :cascade do |t|
@@ -582,6 +643,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
   add_foreign_key "account_onboarding_invitation_lists", "teams"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "app_api_integrations", "apps"
   add_foreign_key "app_chat_messages", "app_versions"
   add_foreign_key "app_chat_messages", "apps"
   add_foreign_key "app_chat_messages", "users"
@@ -592,6 +654,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_203543) do
   add_foreign_key "app_files", "teams"
   add_foreign_key "app_generations", "apps"
   add_foreign_key "app_generations", "teams"
+  add_foreign_key "app_o_auth_providers", "apps"
+  add_foreign_key "app_table_columns", "app_tables"
+  add_foreign_key "app_tables", "apps"
   add_foreign_key "app_version_files", "app_files"
   add_foreign_key "app_version_files", "app_versions"
   add_foreign_key "app_versions", "apps"

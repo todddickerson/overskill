@@ -188,53 +188,206 @@ module Ai
     
     def build_analysis_prompt(request, current_files, app_context)
       prompt = <<~PROMPT
-        Analyze this user request and create a detailed plan for updating the app.
+        CRITICAL: You are working within OverSkill, a platform that generates client-side web apps deployed to Cloudflare Workers.
+        
+        PLATFORM CONSTRAINTS:
+        - Apps are FILE-BASED ONLY (HTML, CSS, JS files served directly)
+        - NO build processes, npm, package.json, node_modules, or compilation
+        - NO server-side code, backends, or Node.js APIs
+        - NO external package installation or complex imports
+        - Apps run in sandboxed iframe environments with limited APIs
+        - Use VANILLA JavaScript, HTML5, and CSS3 (with approved exceptions)
+        
+        APPROVED TECHNOLOGIES (work within OverSkill constraints):
+        - ✅ React: Component-based architecture via CDN (react, react-dom via unpkg.com)
+        - ✅ Tailwind CSS: Use full minified build via CDN (all utility classes available)
+        - ✅ Shadcn/ui Components: Professional React components (adapt HTML/CSS to JSX)
+        - ✅ Alpine.js: Lightweight JavaScript framework for non-React apps only
+        - ✅ Chart.js: Professional data visualization (cdn.jsdelivr.net/npm/chart.js)
+        - ✅ Lucide React: React icon components (unpkg.com/lucide-react)
+        - ✅ Animate.css: Professional animations and transitions (cdnjs.cloudflare.com/ajax/libs/animate.css)
+        - ✅ Modern ES6+ JavaScript features (async/await, destructuring, arrow functions)
+        - ✅ CSS3 features (flexbox, grid, custom properties, animations)
+        - ✅ HTML5 APIs (localStorage, sessionStorage, fetch, canvas, geolocation)
+        
+        FORBIDDEN APPROACHES:
+        - Do NOT suggest npm install, build scripts, or package management
+        - Do NOT recommend development servers, git clone, or repository operations
+        - Do NOT propose service workers, external dependencies, or backend solutions
+        - Do NOT suggest system-level debugging or server management
+        
+        CORRECT DEBUGGING APPROACH:
+        - Use console.log() and browser DevTools for debugging
+        - Implement try-catch blocks and error handling in JavaScript
+        - Check DOM elements exist before manipulation
+        - Use defensive programming and validation
+        
+        DESIGN EXCELLENCE REQUIREMENTS:
+        Your goal is to create sophisticated, professional-grade applications that truly WOW users.
+        
+        VISUAL DESIGN STANDARDS:
+        - Choose sophisticated color palettes with specific hex codes (e.g., #1a1a1a, #f8f9fa, accent colors)
+        - Plan typography hierarchy for readability and elegance
+        - Use generous white space and clean layouts
+        - Leverage Shadcn/ui components for professional, accessible interfaces (buttons, cards, dialogs, forms)
+        - Copy Shadcn/ui HTML/CSS directly - no installation required, works with Tailwind CDN
+        - Consider industry-specific aesthetics (e.g., gallery-style for art apps, dashboard-style for business)
+        - Create cohesive design systems using consistent component patterns
+        
+        DATABASE & BACKEND INTEGRATION:
+        OverSkill provides secure backend database capabilities via Supabase integration:
+        - Apps can have DATABASE TABLES with custom schemas (users, posts, products, etc.)
+        - Tables support various COLUMN TYPES: text, number, boolean, date, datetime, select, multiselect
+        - AUTHENTICATION via OAuth providers (Google, GitHub, Auth0) through secure Cloudflare Workers
+        - API INTEGRATIONS (Stripe, SendGrid, OpenAI, etc.) proxied securely through Workers
+        - NO direct database connections in client code - all data access via secure endpoints
+        
+        WHEN PLANNING APPS THAT NEED DATA:
+        1. **IDENTIFY DATA REQUIREMENTS**: What entities need to be stored? (users, posts, comments, etc.)
+        2. **DESIGN SCHEMA**: What fields does each entity need? (name, email, content, timestamps)
+        3. **PLAN RELATIONSHIPS**: How do entities connect? (posts belong to users, comments belong to posts)
+        4. **SUGGEST SCHEMA**: In your response, include a "database_schema" section with table definitions
+        5. **CONSIDER AUTH**: Does the app need user authentication? Suggest appropriate OAuth providers
+        6. **API NEEDS**: Does the app need third-party services? (payments, emails, AI features)
+        
+        SCHEMA SPECIFICATION FORMAT:
+        ```json
+        "database_schema": {
+          "tables": [
+            {
+              "name": "users",
+              "description": "Application user accounts",
+              "columns": [
+                {"name": "email", "type": "text", "required": true},
+                {"name": "name", "type": "text", "required": true},
+                {"name": "avatar_url", "type": "text", "required": false}
+              ]
+            },
+            {
+              "name": "posts", 
+              "description": "Blog posts or content",
+              "columns": [
+                {"name": "title", "type": "text", "required": true},
+                {"name": "content", "type": "text", "required": true},
+                {"name": "author_email", "type": "text", "required": true},
+                {"name": "published_at", "type": "datetime", "required": false}
+              ]
+            }
+          ]
+        }
+        ```
+        
+        COMPLETE SYSTEM THINKING:
+        - Plan holistic user experiences, not just individual features
+        - Consider the complete data flow from user input to storage to display
+        - Think about user authentication and authorization needs
+        - Plan for data validation, error handling, and edge cases
+        - Consider data relationships and how different sections connect
+        - Include sample/placeholder data to make the app feel real and professional
+        - Design for the complete user journey, not just technical functionality
         
         User Request: #{request}
         
         Current App Context:
         - Name: #{app_context[:name]}
         - Type: #{app_context[:type]}
-        - Framework: #{app_context[:framework]}
+        - Framework: #{app_context[:framework]} (IMPORTANT: Generate #{app_context[:framework]} code, not vanilla JS)
         
         Current Files:
         #{current_files.map { |f| "- #{f[:path]} (#{f[:type]})" }.join("\n")}
         
         Return a JSON response with this structure:
         {
-          "analysis": "Brief analysis of what the user wants",
-          "approach": "High-level approach to implement the changes",
+          "analysis": "Deep analysis of user needs and how to create a sophisticated solution",
+          "approach": "Professional, design-first approach using vanilla web technologies",
+          "design_language": {
+            "color_palette": {"primary": "#hex", "secondary": "#hex", "accent": "#hex", "background": "#hex"},
+            "typography": "Description of font hierarchy and styling approach",
+            "aesthetic": "Overall visual theme and inspiration (e.g., 'Clean gallery aesthetic', 'Modern dashboard')"
+          },
           "steps": [
-            {"description": "Step 1 description", "files_affected": ["file1.js"]},
-            {"description": "Step 2 description", "files_affected": ["file2.css"]}
+            {"description": "Step with design and UX considerations", "files_affected": ["file1.js"], "design_notes": "Visual/UX considerations"},
+            {"description": "Step focusing on professional polish", "files_affected": ["file2.css"], "design_notes": "Aesthetic improvements"}
           ],
-          "considerations": ["Any important considerations"],
-          "trade_offs": ["Any trade-offs to consider"]
+          "system_architecture": ["How different components work together as a cohesive system"],
+          "user_experience_flow": ["Key user journeys and how they flow through the app"],
+          "professional_touches": ["Specific elements that will make this app feel polished and impressive"]
         }
       PROMPT
     end
     
     def build_execution_prompt(plan)
       prompt = <<~PROMPT
-        Execute this plan and generate the necessary code changes.
+        CRITICAL: Execute this plan within OverSkill's platform constraints.
         
-        Plan:
+        EXECUTION CONSTRAINTS:
+        - Generate ONLY vanilla HTML, CSS, and JavaScript files (with approved exceptions)
+        - NO build processes, imports, or external dependencies (except approved CDNs)
+        - Files must be self-contained and work when served directly
+        - Use modern JavaScript (ES6+) but ensure browser compatibility
+        - Include proper error handling and defensive programming
+        
+        APPROVED EXTERNAL RESOURCES:
+        - ✅ React: <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        - ✅ React DOM: <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+        - ✅ Babel Standalone: <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script> (for JSX)
+        - ✅ Tailwind CSS: Include via CDN link in HTML head section
+        - ✅ Shadcn/ui Components: Adapt HTML/CSS to React JSX components
+        - ✅ Alpine.js: <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script> (vanilla apps only)
+        - ✅ Chart.js: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        - ✅ Lucide React: Use with React apps for consistent icons
+        - ✅ Animate.css: <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+        - ✅ OverSkill.js: <script src="overskill.js"></script> (enhanced error handling and editor communication)
+        - ✅ Web fonts (Google Fonts, etc.) via CDN links
+        
+        IMPLEMENTATION REQUIREMENTS:
+        - All JavaScript must work without compilation or bundling
+        - CSS can be standard CSS3 OR Tailwind utility classes (via CDN)
+        - HTML must be valid HTML5 that works in iframe sandbox
+        - Include console.log statements for debugging
+        - Add try-catch blocks around potentially failing operations
+        
+        TAILWIND CSS USAGE:
+        - Include via: <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+        - Use utility classes freely (bg-blue-500, flex, grid, etc.)
+        - All Tailwind classes are available (no purging/optimization needed)
+        
+        REACT COMPONENT USAGE (when framework is React):
+        - Create functional React components with hooks (useState, useEffect)
+        - Use JSX syntax with type="text/babel" for browser compilation
+        - Adapt Shadcn/ui HTML to React JSX components
+        - Use className instead of class for CSS classes
+        - Implement proper React patterns (components, props, state)
+        - Include React.createElement fallbacks if needed
+        
+        VANILLA JS USAGE (when framework is vanilla):
+        - Alpine.js: Add x-data, x-show, x-on directives for interactivity
+        - Direct DOM manipulation with modern JavaScript
+        - Use standard HTML class attributes
+        
+        UNIVERSAL USAGE (all frameworks):
+        - Chart.js: Create professional charts and data visualizations
+        - Lucide Icons: Use appropriate icon system for framework
+        - Animate.css: Add smooth animations with utility classes
+        - OverSkill.js: Provides error handling, editor communication, and development tools
+        
+        Plan to Execute:
         #{plan.to_json}
         
-        Generate the complete updated code for all affected files.
+        Generate the complete updated code for all affected files following OverSkill constraints.
         
         Return a JSON response with this structure:
         {
-          "summary": "Brief summary of changes made",
+          "summary": "Brief summary of changes made (within platform constraints)",
           "files": [
             {
               "path": "filename.ext",
-              "content": "complete file content here",
+              "content": "complete vanilla file content here (no imports/build tools)",
               "summary": "What was changed in this file"
             }
           ],
           "whats_next": [
-            {"title": "Suggestion 1", "description": "Description of what could be done next"}
+            {"title": "Client-side improvement", "description": "Suggestion using vanilla technologies"}
           ],
           "validation_issues": [
             {"severity": "warning", "title": "Issue", "description": "Description", "file": "file.js"}
@@ -245,25 +398,43 @@ module Ai
     
     def build_fix_prompt(issues, current_files)
       prompt = <<~PROMPT
-        Fix these issues in the app:
+        CRITICAL: Fix these issues within OverSkill's platform constraints.
         
-        Issues:
+        PLATFORM CONSTRAINTS:
+        - Use ONLY vanilla HTML, CSS/Tailwind, and JavaScript  
+        - NO build tools, npm, external packages, or server-side solutions
+        - Implement client-side debugging with console.log and try-catch
+        - Ensure code works when files are served directly (no compilation)
+        
+        APPROVED STYLING OPTIONS:
+        - ✅ Standard CSS3 with all modern features
+        - ✅ Tailwind CSS via CDN (all utility classes available)
+        - ✅ Combination of custom CSS + Tailwind utilities
+        
+        Issues to Fix:
         #{issues.map { |i| "- #{i[:severity]}: #{i[:title]} in #{i[:file]}" }.join("\n")}
         
         Current Files:
         #{current_files.map { |f| "File: #{f[:path]}\n```\n#{f[:content]}\n```" }.join("\n\n")}
         
+        DEBUGGING APPROACH:
+        - Add console.log statements to trace execution
+        - Use try-catch blocks around potentially failing code
+        - Check if DOM elements exist before manipulating them
+        - Validate data types and values before operations
+        - Include fallback UI for error states
+        
         Return a JSON response with this structure:
         {
-          "summary": "Summary of fixes applied",
+          "summary": "Summary of fixes applied (using vanilla technologies)",
           "files": [
             {
               "path": "filename.ext",
-              "content": "complete fixed file content"
+              "content": "complete fixed file content with error handling"
             }
           ],
           "fixes": [
-            {"issue": "Issue description", "solution": "How it was fixed"}
+            {"issue": "Issue description", "solution": "How it was fixed using client-side approach"}
           ]
         }
       PROMPT

@@ -430,30 +430,35 @@ module Ai
     
     def validate_app_state(result)
       # Run validation on current app state
-      validator = CodeValidatorService.new
       issues = []
       
-      app.app_files.each do |file|
-        validation_result = validator.validate(file.content, file.file_type)
-        
-        validation_result[:errors].each do |error|
-          issues << {
-            severity: :error,
-            title: error[:message],
-            description: "Pattern '#{error[:pattern]}' found",
-            file: file.path,
-            line: error[:line]
-          }
-        end
-        
-        validation_result[:warnings].each do |warning|
-          issues << {
-            severity: :warning,
-            title: warning[:message],
-            description: "Potential issue detected",
-            file: file.path
-          }
-        end
+      # Prepare files array for validation
+      files_to_validate = app.app_files.map do |file|
+        {
+          path: file.path,
+          content: file.content
+        }
+      end
+      
+      validation_result = Ai::CodeValidatorService.validate_files(files_to_validate)
+      
+      validation_result[:errors].each do |error|
+        issues << {
+          severity: :error,
+          title: error[:message],
+          description: "Pattern '#{error[:pattern]}' found",
+          file: error[:file],
+          line: nil
+        }
+      end
+      
+      validation_result[:warnings].each do |warning|
+        issues << {
+          severity: :warning,
+          title: warning[:message],
+          description: "Potential issue detected",
+          file: warning[:file] || "unknown"
+        }
       end
       
       # Add AI-detected issues if any

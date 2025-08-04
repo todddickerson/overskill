@@ -53,6 +53,10 @@ gem "bootsnap", require: false
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # gem "image_processing", "~> 1.2"
 
+# Markdown rendering
+gem "redcarpet", "~> 3.6"
+gem "rouge", "~> 4.1" # For syntax highlighting
+
 # A natural language date/time parser.
 gem "chronic"
 

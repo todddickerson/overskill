@@ -273,6 +273,43 @@ Required environment variables (copy `.env.example` to `.env`):
 6. **Super-scaffolding strategy**: Use for any model needing CRUD/API endpoints
 7. **Dual UI approach**: Admin features in `/account/`, public UX in `/public/`
 
+## BulletTrain Role System (CRITICAL)
+
+**Understanding BulletTrain Roles - MEMORIZE THIS:**
+
+1. **Role Storage**: 
+   - Roles are stored in `membership.role_ids` as a JSONB array (NOT a single role field)
+   - Example: `["admin"]` or `["editor", "viewer"]` or `["default"]`
+
+2. **Role Definitions** (in `config/models/roles.yml`):
+   - **admin**: Full management permissions, includes editor role
+   - **editor**: Can manage specific models (e.g., TangibleThings)
+   - **default**: Basic permissions (read, create some models)
+
+3. **Key Concepts**:
+   - **team_id = organization_id** in our architecture
+   - Teams represent organizations/companies
+   - Each membership connects a user to a team with specific roles
+
+4. **Accessing Roles in Code**:
+   ```ruby
+   # Get primary role (highest permission)
+   primary_role = membership.role_ids.include?('admin') ? 'admin' : 
+                  membership.role_ids.include?('editor') ? 'editor' : 
+                  membership.role_ids.first || 'default'
+   
+   # Check if user has admin role
+   is_admin = membership.role_ids.include?('admin')
+   
+   # Get all roles
+   all_roles = membership.role_ids || ['default']
+   ```
+
+5. **Permission Hierarchy**:
+   - admin > editor > default
+   - Admins automatically get all editor permissions
+   - Use CanCan's `permit` method for role-based authorization
+
 ## Debugging Tips
 
 ```ruby
@@ -312,20 +349,90 @@ To test the app generation flow:
    - `test_openrouter_api.rb` - API connectivity test
    - `test_simple_api.rb` - Direct HTTP test
 
-### Current Status (Phase 2B Complete)
-- ✅ Lovable.dev-style UI implemented (split screen, chat, preview, code editor)
-- ✅ App generation models and services created
-- ✅ Chat-based iterative improvement system
-- ✅ Live preview with iframe rendering
-- ✅ File browser with syntax highlighting
-- ✅ Dark theme professional editor experience
-- ⚠️ API connectivity needs testing with proper credentials
-- ⚠️ Module loading may require explicit requires in some contexts
+### Testing Database Management System
+To test the complete database dashboard system:
+1. Ensure Supabase credentials are configured in `.env.development.local`
+2. Use the database test scripts in project root:
+   - `test_database_dashboard_flow.rb` - Complete database dashboard test
+   - `test_ai_chat_integration.rb` - AI database planning integration test
+   - `test_live_ai_message.rb` - End-to-end AI message system test
+
+**Required Environment Variables:**
+```bash
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key  # ⚠️ Must restart Rails after adding
+```
+
+### Current Status (Phase 3A Complete - Database Management System)
+- ✅ **Lovable.dev-style UI** implemented (split screen, chat, preview, code editor)
+- ✅ **App generation models and services** created
+- ✅ **Chat-based iterative improvement system**
+- ✅ **Live preview with iframe rendering**
+- ✅ **File browser with syntax highlighting**
+- ✅ **Dark theme professional editor experience**
+- ✅ **Base44-style Database Dashboard** with full CRUD interface
+- ✅ **Supabase integration** with multi-tenant row-level security
+- ✅ **Dynamic schema management UI** (create/edit tables and columns)
+- ✅ **Real-time table data viewer** with add/edit/delete records
+- ✅ **AI orchestration database awareness** (schema planning integrated)
+- ✅ **OAuth and API integration system** via Cloudflare Workers
+- ✅ **Multi-step AI orchestration** with validation and improvement cycles
+- ⚠️ **Environment**: Restart Rails server after adding `SUPABASE_ANON_KEY` to `.env.development.local`
+
+### Database Management System (NEW)
+**Complete Base44-style database management now available:**
+
+#### Dashboard Interface
+- **Dashboard Tab**: Added beside Preview/Files in app editor
+- **Professional UI**: Base44-inspired design with dark theme support
+- **Real-time Updates**: Live table/record management with notifications
+
+#### Schema Management
+- **Dynamic Table Creation**: Name, description, validation
+- **Advanced Column Types**: text, number, boolean, date, datetime, select, multiselect
+- **Schema Editor**: Visual column management with type-specific options
+- **Validation**: Column name patterns, required fields, type checking
+
+#### Data Management  
+- **Table Data Viewer**: Full CRUD interface for records
+- **Dynamic Forms**: Auto-generated forms based on column schema
+- **Type-specific Inputs**: Proper input types for each column type
+- **Batch Operations**: Select, multiselect with option parsing
+
+#### Supabase Integration
+- **Multi-tenant Architecture**: App-specific schemas (`app_{id}_tablename`)
+- **Row Level Security**: Automatic RLS policies for data isolation
+- **Service Layer**: Complete `Supabase::AppDatabaseService` for operations
+- **SQL Generation**: Type mapping and DDL generation
+
+#### AI Integration
+- **Schema Planning**: AI analysis prompts include database capabilities
+- **Context Awareness**: AI knows about existing tables and columns
+- **Database Keywords**: Strong integration (DATABASE, SCHEMA, TABLE, SUPABASE found)
+- **Multi-step Orchestration**: Database changes included in AI workflow
+
+#### Testing & Validation
+✅ **Database Dashboard Test**: All components tested and functional
+✅ **AI Chat Integration Test**: Schema planning verified in AI prompts  
+✅ **Live Message Test**: End-to-end system integration confirmed
+✅ **CRUD Interface Test**: Full create/read/update/delete operations
 
 ## Additional Documentation
 
 - Main docs: `/docs/` directory
 - AI context: `/docs/ai-context.md` (comprehensive guide)
+- **AI Orchestration Standards**: `/docs/ai-orchestration-design-standards.md` ⭐ **CRITICAL**
+- AI platform constraints: `/docs/ai-app-development-constraints.md`
+- OpenRouter monitoring: `/docs/openrouter-kimi-monitoring.md`
 - Business plan: `/docs/business-plan.md`
 - Architecture: `/docs/architecture.md`
 - BulletTrain docs: https://bullettrain.co/docs
+
+## CRITICAL: AI Orchestration Quality Standards
+
+**📍 Location**: `/docs/ai-orchestration-design-standards.md`  
+**📅 Last Updated**: August 4, 2025  
+**🎯 Purpose**: Maintains Base44-level sophisticated app generation quality
+
+This document defines our enhanced AI orchestration approach that enables professional-grade app generation. **Any changes to AI prompts in `app/services/ai/open_router_client.rb` MUST be reflected in this document immediately** to prevent quality regression.

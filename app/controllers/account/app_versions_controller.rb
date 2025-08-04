@@ -1,5 +1,8 @@
 class Account::AppVersionsController < Account::ApplicationController
   account_load_and_authorize_resource :app_version, through: :app, through_association: :app_versions
+  
+  # For member actions, load the app_version directly
+  before_action :load_app_version, only: [:preview, :serve_file, :compare, :bookmark, :restore]
 
   # GET /account/apps/:app_id/app_versions
   # GET /account/apps/:app_id/app_versions.json
@@ -194,6 +197,11 @@ class Account::AppVersionsController < Account::ApplicationController
   end
 
   private
+  
+  def load_app_version
+    @app_version ||= AppVersion.joins(app: :team).where(apps: { team_id: current_team.id }).find(params[:id])
+    @app ||= @app_version.app
+  end
 
   if defined?(Api::V1::ApplicationController)
     include strong_parameters_from_api

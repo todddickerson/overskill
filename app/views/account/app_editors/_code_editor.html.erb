@@ -1,6 +1,6 @@
 <div class="h-full w-full flex flex-col bg-white dark:bg-gray-900" 
      data-controller="codemirror" 
-     data-codemirror-content-value="<%= html_escape(file.content) %>"
+     data-codemirror-content-value="<%= html_escape(file.content || '') %>"
      data-codemirror-file-type-value="<%= file.file_type %>"
      data-codemirror-file-id-value="<%= file.id %>"
      data-codemirror-update-url-value="<%= file_account_app_editor_path(app, file_id: file.id) %>">
@@ -28,7 +28,7 @@
       id="editor_<%= file.id %>"
       class="absolute inset-0 w-full h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
       spellcheck="false"
-    ><%= file.content %></textarea>
+    ><%= file.content || '' %></textarea>
   </div>
   
   <!-- Status Bar -->

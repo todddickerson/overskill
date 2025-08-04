@@ -1,6 +1,8 @@
 class Account::AppEditorsController < Account::ApplicationController
   layout "editor"
   before_action :set_app
+  skip_before_action :set_app, only: [:deployment_info]
+  before_action :set_app_by_id, only: [:deployment_info]
 
   def show
     @messages = @app.app_chat_messages.order(created_at: :asc)
@@ -8,7 +10,14 @@ class Account::AppEditorsController < Account::ApplicationController
     @selected_file = @files.find_by(id: params[:file_id]) || @files.first
 
     respond_to do |format|
-      format.html
+      format.html do
+        # For Turbo Frame requests, render just the code editor partial
+        if turbo_frame_request? && turbo_frame_request_id == "code_editor"
+          render partial: "account/app_editors/code_editor", locals: { file: @selected_file, app: @app }
+        else
+          render :show
+        end
+      end
       format.turbo_stream do
         if params[:file_id]
           render turbo_stream: turbo_stream.replace("code_editor",
@@ -170,6 +179,10 @@ class Account::AppEditorsController < Account::ApplicationController
 
   def set_app
     @app = current_team.apps.find(params[:app_id])
+  end
+  
+  def set_app_by_id
+    @app = current_team.apps.find(params[:id])
   end
 
   def message_params

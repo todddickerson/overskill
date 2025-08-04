@@ -1,10 +1,10 @@
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-200" 
      data-controller="version-preview deployment publish-modal version-comparison version-actions" 
-     data-version-preview-app-id-value="<%= @app.id %>"
+     data-version-preview-app-id-value="<%= @app.to_param %>"
      data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
-     data-deployment-app-id-value="<%= @app.id %>"
-     data-publish-modal-app-id-value="<%= @app.id %>"
-     data-version-comparison-app-id-value="<%= @app.id %>">
+     data-deployment-app-id-value="<%= @app.to_param %>"
+     data-publish-modal-app-id-value="<%= @app.to_param %>"
+     data-version-comparison-app-id-value="<%= @app.to_param %>">
   <!-- Header -->
   <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between transition-colors duration-200">
     <div class="flex items-center">
@@ -97,6 +97,12 @@
           </button>
           <button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent"
                   data-tabs-target="tab"
+                  data-panel="dashboard"
+                  data-action="click->tabs#switchTab">
+            <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+          </button>
+          <button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent"
+                  data-tabs-target="tab"
                   data-panel="files"
                   data-action="click->tabs#switchTab">
             <i class="fas fa-folder mr-2"></i>Files (<%= @files.count %>)
@@ -120,6 +126,11 @@
           <%= render "preview_frame", app: @app %>
         </div>
         
+        <!-- Dashboard Panel -->
+        <div class="h-full hidden absolute inset-0" data-tabs-target="panel" data-panel-name="dashboard">
+          <%= render "dashboard_panel", app: @app %>
+        </div>
+        
         <!-- Files Panel -->
         <div class="h-full hidden absolute inset-0" data-tabs-target="panel" data-panel-name="files">
           <!-- Debug: Files count = <%= @files.count %> -->
@@ -131,7 +142,7 @@
               </div>
               
               <!-- Code Display -->
-              <div class="w-full flex-1 min-w-0 bg-white dark:bg-gray-900 overflow-hidden" id="code_editor">
+              <%= turbo_frame_tag "code_editor", class: "w-full flex-1 min-w-0 bg-white dark:bg-gray-900 overflow-hidden" do %>
                 <% if @selected_file %>
                   <%= render "code_editor", file: @selected_file, app: @app %>
                 <% else %>
@@ -142,8 +153,7 @@
                     </div>
                   </div>
                 <% end %>
-              </div>
-            </div>
+              <% end %>
           <% else %>
             <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
               <div class="text-center">

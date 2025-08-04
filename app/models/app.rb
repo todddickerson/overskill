@@ -13,6 +13,9 @@ class App < ApplicationRecord
   has_many :app_generations, dependent: :destroy
   has_many :app_collaborators, dependent: :destroy
   has_many :app_chat_messages, dependent: :destroy
+  has_many :app_tables, dependent: :destroy
+  has_many :app_oauth_providers, dependent: :destroy
+  has_many :app_api_integrations, dependent: :destroy
   # has_many :purchases # TODO: uncomment when Purchase model exists
   # has_many :app_reviews # TODO: uncomment when AppReview model exists
   # has_many :flash_sales # TODO: uncomment when FlashSale model exists
@@ -56,8 +59,9 @@ class App < ApplicationRecord
   end
 
   def published_url
-    # Return the custom domain if set, otherwise use the default overskill.app subdomain
-    custom_domain || "https://#{slug}.overskill.app"
+    # Return the custom domain if set (future feature), otherwise use the default overskill.app subdomain
+    # TODO: Add custom_domain column when implementing entri.com integration
+    "https://#{slug}.overskill.app"
   end
 
   def visitor_count
@@ -76,6 +80,11 @@ class App < ApplicationRecord
       variation = (date.to_time.to_i % 10) - 5 # Add some realistic variation
       [base + variation, 0].max
     end.reverse
+  end
+
+  def last_deployed_at
+    # Return the most recent deployment timestamp
+    [deployed_at, staging_deployed_at].compact.max
   end
 
   private
