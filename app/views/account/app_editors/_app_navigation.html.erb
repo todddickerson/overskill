@@ -24,6 +24,13 @@
     
     <!-- App Management Items -->
     <div class="py-2">
+      <!-- Deployment Center -->
+      <%= link_to account_app_deployment_path(@app),
+          class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
+        <i class="fas fa-rocket text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Deployment</span>
+      <% end %>
+      
       <!-- Database Dashboard -->
       <%= link_to account_app_dashboard_path(@app),
           class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>

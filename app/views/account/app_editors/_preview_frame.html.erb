@@ -1,6 +1,33 @@
 <div id="preview_frame" class="h-full bg-white flex flex-col" 
-     data-controller="version-preview"
-     data-version-preview-app-id-value="<%= app.id %>">
+     data-controller="version-preview preview-mode"
+     data-version-preview-app-id-value="<%= app.id %>"
+     data-preview-mode-app-id-value="<%= app.id %>"
+     data-preview-mode-mode-value="auto">
+  
+  <!-- Preview controls header -->
+  <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Preview</h3>
+      <span class="text-xs text-gray-500 dark:text-gray-500" data-preview-mode-target="statusText">
+        Auto-refresh ON
+      </span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button data-action="click->preview-mode#toggleMode"
+              data-preview-mode-target="modeButton"
+              class="px-3 py-1 text-xs font-medium rounded-full text-green-600 bg-green-100 dark:bg-green-900/50 hover:opacity-80 transition-opacity">
+        <i class="fas fa-sync mr-2"></i>Auto
+      </button>
+      <button data-action="click->preview-mode#refreshPreview"
+              class="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+        <i class="fas fa-redo"></i>
+      </button>
+      <%= link_to account_app_deployment_path(app),
+          class: "px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" do %>
+        <i class="fas fa-rocket"></i>
+      <% end %>
+    </div>
+  </div>
   
   <!-- Version header (hidden by default) -->
   <div data-version-preview-target="versionHeader" 
@@ -30,7 +57,7 @@
   </div>
   
   <!-- Preview iframe -->
-  <div class="flex-1 relative">
+  <div class="flex-1 relative" data-preview-mode-target="preview">
     <% if app.app_files.any? %>
       <% # Use Cloudflare preview URL if available, otherwise fallback to Rails preview %>
       <% preview_src = app.preview_url || account_app_preview_path(app) %>

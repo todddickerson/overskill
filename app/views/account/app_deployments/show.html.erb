@@ -1,0 +1,408 @@
+<%# Professional Deployment Dashboard - Better than Base44's basic status %>
+<div class="container mx-auto max-w-7xl px-4 py-8">
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Deployment Center
+        </h1>
+        <p class="text-gray-600 dark:text-gray-400">
+          Deploy your app to multiple environments with confidence.
+        </p>
+      </div>
+      <div class="flex space-x-3">
+        <%= link_to account_app_editor_path(@app), 
+            class: "btn btn-secondary" do %>
+          <i class="fas fa-code mr-2"></i>
+          Back to Editor
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Environment Status Cards %>
+  <div class="grid md:grid-cols-3 gap-6 mb-8">
+    <%# Production %>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 <%= @deployment_status[:production][:status] == 'success' ? 'border-green-500' : 'border-gray-200 dark:border-gray-700' %>">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            Production
+          </h3>
+          <%= deployment_status_badge(@deployment_status[:production][:status]) %>
+        </div>
+        
+        <% if @deployment_status[:production][:url] %>
+          <div class="mb-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Live at:</p>
+            <%= link_to @deployment_status[:production][:url], 
+                @deployment_status[:production][:url],
+                target: "_blank",
+                class: "text-primary-600 hover:text-primary-700 text-sm break-all" %>
+          </div>
+        <% end %>
+        
+        <% if @deployment_status[:production][:deployed_at] %>
+          <p class="text-xs text-gray-500 dark:text-gray-500 mb-4">
+            Last deployed <%= time_ago_in_words(@deployment_status[:production][:deployed_at]) %> ago
+          </p>
+        <% end %>
+        
+        <div class="flex space-x-2">
+          <button onclick="deployToEnvironment('production')" 
+                  class="btn btn-primary btn-sm flex-1"
+                  data-deployment-target="deployButton">
+            <i class="fas fa-rocket mr-1"></i>
+            Deploy
+          </button>
+          <% if @deployment_status[:production][:status] == 'success' %>
+            <button onclick="showRollbackModal('production')" 
+                    class="btn btn-secondary btn-sm">
+              <i class="fas fa-undo"></i>
+            </button>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Staging %>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 <%= @deployment_status[:staging][:status] == 'success' ? 'border-yellow-500' : 'border-gray-200 dark:border-gray-700' %>">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            Staging
+          </h3>
+          <%= deployment_status_badge(@deployment_status[:staging][:status]) %>
+        </div>
+        
+        <% if @deployment_status[:staging][:url] %>
+          <div class="mb-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Available at:</p>
+            <%= link_to @deployment_status[:staging][:url], 
+                @deployment_status[:staging][:url],
+                target: "_blank",
+                class: "text-primary-600 hover:text-primary-700 text-sm break-all" %>
+          </div>
+        <% end %>
+        
+        <% if @deployment_status[:staging][:deployed_at] %>
+          <p class="text-xs text-gray-500 dark:text-gray-500 mb-4">
+            Last deployed <%= time_ago_in_words(@deployment_status[:staging][:deployed_at]) %> ago
+          </p>
+        <% end %>
+        
+        <button onclick="deployToEnvironment('staging')" 
+                class="btn btn-secondary btn-sm w-full">
+          <i class="fas fa-upload mr-1"></i>
+          Deploy to Staging
+        </button>
+      </div>
+    </div>
+
+    <%# Preview %>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 border-blue-500">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            Live Preview
+          </h3>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+            <span class="w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse"></span>
+            Always Live
+          </span>
+        </div>
+        
+        <div class="mb-4">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Preview URL:</p>
+          <%= link_to @deployment_status[:preview][:url], 
+              @deployment_status[:preview][:url],
+              target: "_blank",
+              class: "text-primary-600 hover:text-primary-700 text-sm break-all" %>
+        </div>
+        
+        <p class="text-xs text-gray-500 dark:text-gray-500 mb-4">
+          Auto-updates with every save
+        </p>
+        
+        <%= link_to @deployment_status[:preview][:url], 
+            target: "_blank",
+            class: "btn btn-secondary btn-sm w-full" do %>
+          <i class="fas fa-external-link-alt mr-1"></i>
+          Open Preview
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Visitor Analytics %>
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-8">
+    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+          Visitor Analytics
+        </h2>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center">
+            <span class="text-2xl font-bold text-gray-900 dark:text-white mr-2">
+              <%= number_with_delimiter(@deployment_status[:visitor_stats][:total]) %>
+            </span>
+            <span class="text-sm text-gray-600 dark:text-gray-400">
+              Total Visitors
+            </span>
+          </div>
+          <%= visitor_trend_indicator(@deployment_status[:visitor_stats][:trend]) %>
+        </div>
+      </div>
+    </div>
+    <div class="p-6">
+      <div class="h-64" data-controller="visitor-chart" 
+           data-visitor-chart-data-value="<%= @deployment_status[:visitor_stats][:daily].to_json %>">
+        <!-- Chart will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <%# Deployment History %>
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+        Deployment History
+      </h2>
+    </div>
+    
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-200 dark:border-gray-700">
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Environment
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Status
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Initiated By
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Started
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Duration
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          <% @deployment_history.each do |deployment| %>
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                  <%= deployment.environment %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= deployment_status_badge(deployment.status) %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                <%= deployment.initiated_by.name %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                <%= deployment.started_at.strftime('%b %d, %I:%M %p') %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                <%= deployment.duration_in_words || '—' %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <button onclick="viewDeploymentLogs('<%= deployment.id %>')" 
+                        class="text-primary-600 hover:text-primary-700 text-sm">
+                  <i class="fas fa-file-alt"></i>
+                  Logs
+                </button>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    
+    <% if @deployment_history.empty? %>
+      <div class="p-8 text-center text-gray-500 dark:text-gray-400">
+        <i class="fas fa-rocket text-4xl mb-4"></i>
+        <p>No deployments yet</p>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Deployment Progress Modal %>
+<div id="deployment-progress-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full">
+    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        Deployment Progress
+      </h3>
+    </div>
+    
+    <div class="p-6">
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
+          <span id="deployment-status" class="text-sm text-gray-600 dark:text-gray-400">Initializing...</span>
+        </div>
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div id="deployment-progress-bar" 
+               class="bg-primary-600 h-2 rounded-full transition-all duration-500"
+               style="width: 0%"></div>
+        </div>
+      </div>
+      
+      <div id="deployment-logs" 
+           class="bg-gray-100 dark:bg-gray-900 rounded p-4 h-64 overflow-y-auto font-mono text-xs">
+        <!-- Logs will appear here -->
+      </div>
+    </div>
+    
+    <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+      <button onclick="closeDeploymentModal()" 
+              class="btn btn-secondary"
+              id="deployment-close-btn"
+              disabled>
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let deploymentInterval;
+let currentDeploymentId;
+
+async function deployToEnvironment(environment) {
+  const response = await fetch('<%= deploy_account_app_deployment_path(@app) %>', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: JSON.stringify({ environment })
+  });
+  
+  const data = await response.json();
+  
+  if (response.ok) {
+    currentDeploymentId = data.deployment_id;
+    showDeploymentProgress();
+    startDeploymentPolling();
+  } else {
+    alert(data.error || 'Deployment failed');
+  }
+}
+
+function showDeploymentProgress() {
+  document.getElementById('deployment-progress-modal').classList.remove('hidden');
+  document.getElementById('deployment-progress-bar').style.width = '0%';
+  document.getElementById('deployment-logs').innerHTML = '';
+  document.getElementById('deployment-status').textContent = 'Initializing...';
+  document.getElementById('deployment-close-btn').disabled = true;
+}
+
+function closeDeploymentModal() {
+  document.getElementById('deployment-progress-modal').classList.add('hidden');
+  if (deploymentInterval) {
+    clearInterval(deploymentInterval);
+  }
+  location.reload(); // Refresh to show updated status
+}
+
+async function startDeploymentPolling() {
+  deploymentInterval = setInterval(async () => {
+    const response = await fetch(`<%= status_account_app_deployment_path(@app) %>?deployment_id=${currentDeploymentId}`);
+    const data = await response.json();
+    
+    updateDeploymentProgress(data);
+    
+    if (['success', 'failed', 'cancelled'].includes(data.status)) {
+      clearInterval(deploymentInterval);
+      document.getElementById('deployment-close-btn').disabled = false;
+    }
+  }, 2000);
+}
+
+function updateDeploymentProgress(data) {
+  const statusEl = document.getElementById('deployment-status');
+  const progressBar = document.getElementById('deployment-progress-bar');
+  
+  switch (data.status) {
+    case 'pending':
+      statusEl.textContent = 'Waiting to start...';
+      progressBar.style.width = '10%';
+      break;
+    case 'building':
+      statusEl.textContent = 'Building application...';
+      progressBar.style.width = '40%';
+      break;
+    case 'deploying':
+      statusEl.textContent = 'Deploying to servers...';
+      progressBar.style.width = '70%';
+      break;
+    case 'success':
+      statusEl.textContent = 'Deployment successful!';
+      progressBar.style.width = '100%';
+      progressBar.classList.add('bg-green-600');
+      break;
+    case 'failed':
+      statusEl.textContent = 'Deployment failed';
+      progressBar.classList.add('bg-red-600');
+      break;
+  }
+}
+
+async function viewDeploymentLogs(deploymentId) {
+  window.open(`<%= logs_account_app_deployment_path(@app) %>?deployment_id=${deploymentId}`, '_blank');
+}
+
+function showRollbackModal(environment) {
+  if (confirm(`Are you sure you want to rollback the ${environment} deployment?`)) {
+    // Implement rollback
+  }
+}
+
+<%# Helper methods %>
+<% def deployment_status_badge(status)
+  classes = case status
+  when 'success'
+    'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+  when 'failed'
+    'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+  when 'pending', 'building', 'deploying'
+    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300'
+  else
+    'bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300'
+  end
+  
+  content_tag :span, status.humanize, 
+    class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{classes}"
+end
+
+def visitor_trend_indicator(trend)
+  case trend
+  when 'up'
+    content_tag :div, class: "flex items-center text-green-600 dark:text-green-400" do
+      concat content_tag(:i, "", class: "fas fa-arrow-up mr-1")
+      concat content_tag(:span, "Trending up", class: "text-sm")
+    end
+  when 'down'
+    content_tag :div, class: "flex items-center text-red-600 dark:text-red-400" do
+      concat content_tag(:i, "", class: "fas fa-arrow-down mr-1")
+      concat content_tag(:span, "Trending down", class: "text-sm")
+    end
+  else
+    content_tag :div, class: "flex items-center text-gray-600 dark:text-gray-400" do
+      concat content_tag(:i, "", class: "fas fa-minus mr-1")
+      concat content_tag(:span, "Stable", class: "text-sm")
+    end
+  end
+end %>
+</script>

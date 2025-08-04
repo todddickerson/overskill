@@ -154,6 +154,16 @@ Rails.application.routes.draw do
               get :export
             end
           end
+          
+          # Deployment management
+          resource :deployment, controller: "app_deployments", only: [:show] do
+            member do
+              post :deploy
+              get :status
+              post :rollback
+              get :logs
+            end
+          end
         end
       end
     end

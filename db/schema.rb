@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_04_161724) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_04_164338) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -332,6 +332,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_161724) do
     t.index ["visibility"], name: "index_apps_on_visibility"
   end
 
+  create_table "build_logs", force: :cascade do |t|
+    t.bigint "deployment_log_id", null: false
+    t.string "level"
+    t.text "message"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["deployment_log_id"], name: "index_build_logs_on_deployment_log_id"
+  end
+
   create_table "creator_profiles", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "membership_id", null: false
@@ -354,6 +363,25 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_161724) do
     t.index ["slug"], name: "index_creator_profiles_on_slug", unique: true
     t.index ["team_id"], name: "index_creator_profiles_on_team_id"
     t.index ["username"], name: "index_creator_profiles_on_username", unique: true
+  end
+
+  create_table "deployment_logs", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "environment"
+    t.string "status"
+    t.bigint "initiated_by_id", null: false
+    t.string "deployment_url"
+    t.text "error_message"
+    t.datetime "started_at"
+    t.datetime "completed_at"
+    t.bigint "rollback_from_id"
+    t.string "deployed_version"
+    t.text "build_output"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_deployment_logs_on_app_id"
+    t.index ["initiated_by_id"], name: "index_deployment_logs_on_initiated_by_id"
+    t.index ["rollback_from_id"], name: "index_deployment_logs_on_rollback_from_id"
   end
 
   create_table "feature_flags", force: :cascade do |t|
@@ -685,8 +713,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_161724) do
   add_foreign_key "app_versions", "users"
   add_foreign_key "apps", "memberships", column: "creator_id"
   add_foreign_key "apps", "teams"
+  add_foreign_key "build_logs", "deployment_logs"
   add_foreign_key "creator_profiles", "memberships"
   add_foreign_key "creator_profiles", "teams"
+  add_foreign_key "deployment_logs", "apps"
+  add_foreign_key "deployment_logs", "deployment_logs", column: "rollback_from_id"
+  add_foreign_key "deployment_logs", "users", column: "initiated_by_id"
   add_foreign_key "follows", "creator_profiles", column: "followed_id"
   add_foreign_key "follows", "teams"
   add_foreign_key "follows", "users", column: "follower_id"
