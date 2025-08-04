@@ -7,8 +7,9 @@ module Ai
       { pattern: /\brequire\s*\(/, message: "CommonJS require() is not allowed. Use script tags in HTML." },
       { pattern: /\bmodule\.exports/, message: "CommonJS exports are not allowed. Use global functions." },
       
-      # localStorage without try/catch
-      { pattern: /(?<!try\s*\{[^}]*)\blocalStorage\.(getItem|setItem|removeItem|clear)/, message: "localStorage access must be wrapped in try/catch for sandboxed environments." },
+      # localStorage without try/catch - simplified pattern
+      # Note: This is a simplified check - it won't catch all cases but avoids Ruby regex limitations
+      { pattern: /\blocalStorage\.(getItem|setItem|removeItem|clear)/, message: "localStorage access should be wrapped in try/catch for sandboxed environments." },
       
       # JSX (when not using Babel)
       { pattern: /<[A-Z]\w*[^>]*\/?>/, message: "JSX syntax detected. Use React.createElement() instead." },

@@ -81,6 +81,10 @@ Rails.application.routes.draw do
         resources :creator_profiles
         resources :follows
         resources :apps do
+          member do
+            get :deployment_info, to: "app_editors#deployment_info"
+          end
+          
           # Chat interface (may be deprecated in favor of editor)
           resource :chat, controller: "app_chats", only: [:show, :create]
           

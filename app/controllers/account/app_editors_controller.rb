@@ -60,20 +60,29 @@ class Account::AppEditorsController < Account::ApplicationController
   end
 
   def create_message
+    Rails.logger.info "[AppEditors#create_message] Starting message creation for app #{@app.id}"
+    Rails.logger.info "[AppEditors#create_message] Message params: #{message_params.inspect}"
+    
     @message = @app.app_chat_messages.build(message_params)
     @message.role = "user"
     @message.user = current_user
+    
+    Rails.logger.info "[AppEditors#create_message] Built message: #{@message.inspect}"
 
     if @message.save
+      Rails.logger.info "[AppEditors#create_message] User message saved with ID: #{@message.id}"
+      
       # Create initial AI response placeholder
       ai_response = @app.app_chat_messages.create!(
         role: "assistant",
         content: "Analyzing your request and planning the changes...",
         status: "planning"
       )
+      Rails.logger.info "[AppEditors#create_message] AI placeholder created with ID: #{ai_response.id}"
 
       # Start processing
-      ProcessAppUpdateJob.perform_later(@message)
+      job = ProcessAppUpdateJob.perform_later(@message)
+      Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJob enqueued with job ID: #{job.job_id}"
 
       respond_to do |format|
         format.turbo_stream do

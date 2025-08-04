@@ -5,7 +5,19 @@ class AppGenerationJob < ApplicationJob
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
   def perform(app_generation)
-    app_generation = AppGeneration.find(app_generation) if app_generation.is_a?(Integer)
+    # Handle different input types
+    if app_generation.is_a?(Integer)
+      app_generation = AppGeneration.find(app_generation)
+    elsif app_generation.is_a?(App)
+      # If an App was passed by mistake, find its latest generation
+      Rails.logger.warn "[AppGenerationJob] Received App instead of AppGeneration, finding latest generation"
+      app_generation = app_generation.app_generations.order(created_at: :desc).first
+      unless app_generation
+        Rails.logger.error "[AppGenerationJob] No AppGeneration found for App ##{app_generation.id}"
+        return
+      end
+    end
+    
     Rails.logger.info "[AppGenerationJob] Processing generation ##{app_generation.id}"
 
     app = app_generation.app

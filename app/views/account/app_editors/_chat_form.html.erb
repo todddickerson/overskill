@@ -1,9 +1,11 @@
 <%= form_with model: app.app_chat_messages.build, 
               url: create_message_account_app_editor_path(app),
               class: "relative",
+              local: false,
               data: { 
                 controller: "chat-form",
-                action: "submit->chat-form#submit"
+                action: "submit->chat-form#submit",
+                turbo_stream: true
               } do |form| %>
   <div class="relative bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-md transition-shadow focus-within:shadow-md focus-within:border-blue-300 dark:focus-within:border-blue-400">
     <%= form.text_area :content,

@@ -13,13 +13,21 @@ class ProcessAppUpdateJob < ApplicationJob
   end
 
   def perform(chat_message)
+    Rails.logger.info "[ProcessAppUpdate] Job started for message ##{chat_message.id}"
+    Rails.logger.info "[ProcessAppUpdate] Message details: role=#{chat_message.role}, content=#{chat_message.content[0..100]}..."
+    
     app = chat_message.app
+    Rails.logger.info "[ProcessAppUpdate] App details: id=#{app.id}, name=#{app.name}"
+    
     @user = chat_message.user  # Store user for version creation
+    Rails.logger.info "[ProcessAppUpdate] User: #{@user&.email || 'nil'}"
 
     begin
       # Step 1: Planning phase
-      chat_message.update!(status: "planning")
-      broadcast_status_update(chat_message)
+      Rails.logger.info "[ProcessAppUpdate] Step 1: Planning phase"
+      # Note: Don't update user message status - only assistant messages can have status
+      broadcast_status_update(chat_message, "planning")
+      Rails.logger.info "[ProcessAppUpdate] Broadcasted planning status"
 
       # Get current files
       current_files = app.app_files.map do |file|
@@ -37,13 +45,17 @@ class ProcessAppUpdateJob < ApplicationJob
         framework: app.framework
       }
 
-      # Step 2: Executing phase
-      chat_message.update!(status: "executing")
-      broadcast_status_update(chat_message)
+      # Step 2: Executing phase  
+      Rails.logger.info "[ProcessAppUpdate] Step 2: Executing phase"
+      # Note: Don't update user message status - only assistant messages can have status
+      broadcast_status_update(chat_message, "executing")
+      Rails.logger.info "[ProcessAppUpdate] Broadcasted executing status"
 
       # Call AI to process the update
+      Rails.logger.info "[ProcessAppUpdate] Calling AI API..."
       client = Ai::OpenRouterClient.new
       response = client.update_app(chat_message.content, current_files, app_context)
+      Rails.logger.info "[ProcessAppUpdate] AI response received: success=#{response[:success]}"
     rescue Net::ReadTimeout => e
       handle_error(chat_message, "The request timed out. This usually happens with complex requests. Please try breaking your request into smaller, more specific changes.")
       return
@@ -97,8 +109,7 @@ class ProcessAppUpdateJob < ApplicationJob
           status: "completed"
         )
 
-        # Update original message status
-        chat_message.update!(status: "completed", response: result[:changes][:summary])
+        # Note: Don't update user message status - only assistant messages can have status
 
         # Broadcast completion
         broadcast_completion(chat_message, @assistant_message)
@@ -115,17 +126,40 @@ class ProcessAppUpdateJob < ApplicationJob
   private
 
   def parse_update_response(content)
-    JSON.parse(content, symbolize_names: true)
-  rescue JSON::ParserError => e
-    Rails.logger.error "[ProcessAppUpdate] Failed to parse response: #{e.message}"
-
-    # Try to extract JSON from markdown
-    json_match = content.match(/```json\n(.*?)\n```/m)
-    if json_match
-      content = json_match[1]
-      retry
+    # Clean up the content first
+    cleaned_content = content.strip
+    
+    # Try to parse as-is first
+    begin
+      return JSON.parse(cleaned_content, symbolize_names: true)
+    rescue JSON::ParserError => e
+      Rails.logger.info "[ProcessAppUpdate] Direct parse failed, trying to extract from markdown"
     end
-
+    
+    # Try to extract JSON from markdown code blocks
+    # Handle various formats: ```json, ```JSON, ```, etc.
+    json_patterns = [
+      /```json\s*\n?(.+?)\n?```/mi,
+      /```JSON\s*\n?(.+?)\n?```/mi,
+      /```\s*\n?(.+?)\n?```/mi
+    ]
+    
+    json_patterns.each do |pattern|
+      match = cleaned_content.match(pattern)
+      if match
+        begin
+          extracted = match[1].strip
+          Rails.logger.info "[ProcessAppUpdate] Extracted JSON from markdown, trying to parse"
+          return JSON.parse(extracted, symbolize_names: true)
+        rescue JSON::ParserError => e
+          Rails.logger.warn "[ProcessAppUpdate] Failed to parse extracted content: #{e.message}"
+          next
+        end
+      end
+    end
+    
+    Rails.logger.error "[ProcessAppUpdate] Failed to parse response after all attempts"
+    Rails.logger.error "[ProcessAppUpdate] Raw content: #{cleaned_content[0..500]}..."
     nil
   end
 
@@ -266,10 +300,7 @@ class ProcessAppUpdateJob < ApplicationJob
   def handle_timeout_error(chat_message)
     Rails.logger.error "[ProcessAppUpdate] Job timed out after 10 minutes for chat_message #{chat_message.id}"
     
-    chat_message.update!(
-      status: "failed",
-      response: "Request timed out after 10 minutes"
-    )
+    # Note: Don't update user message status - only assistant messages can have status
 
     # Create timeout error message
     error_response = chat_message.app.app_chat_messages.create!(
@@ -284,10 +315,7 @@ class ProcessAppUpdateJob < ApplicationJob
   def handle_error(chat_message, error_message)
     Rails.logger.error "[ProcessAppUpdate] Error: #{error_message}"
 
-    chat_message.update!(
-      status: "failed",
-      response: error_message
-    )
+    # Note: Don't update user message status - only assistant messages can have status
 
     # Create error message
     error_response = chat_message.app.app_chat_messages.create!(
@@ -299,7 +327,9 @@ class ProcessAppUpdateJob < ApplicationJob
     broadcast_error(chat_message, error_response)
   end
 
-  def broadcast_status_update(chat_message)
+  def broadcast_status_update(chat_message, status)
+    Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Finding AI message for status: #{status}"
+    
     # Find the AI response message that was created
     ai_message = chat_message.app.app_chat_messages
       .where(role: "assistant")
@@ -307,12 +337,16 @@ class ProcessAppUpdateJob < ApplicationJob
       .order(created_at: :asc)
       .first
     
+    Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Found AI message: #{ai_message&.id || 'nil'}"
+    
     if ai_message
       # Update the existing AI message
+      Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Updating AI message #{ai_message.id} with status: #{status}"
       ai_message.update!(
-        content: get_status_message(chat_message.status),
-        status: chat_message.status
+        content: get_status_message(status),
+        status: status
       )
+      Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] AI message updated successfully"
       
       Turbo::StreamsChannel.broadcast_replace_to(
         "app_#{chat_message.app_id}_chat",
@@ -467,8 +501,7 @@ class ProcessAppUpdateJob < ApplicationJob
       }
     )
     
-    # Update original message status
-    chat_message.update!(status: "validation_error", response: "Code validation failed")
+    # Note: Don't update user message status - only assistant messages can have status
     
     # Broadcast error response
     broadcast_error(chat_message, assistant_message)

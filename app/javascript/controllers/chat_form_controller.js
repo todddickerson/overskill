@@ -161,76 +161,64 @@ export default class extends Controller {
     
     // Check for cmd+enter or ctrl+enter
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      console.log('Cmd+Enter detected, submitting...')
-      event.preventDefault()
-      this.submit(event)
+      console.log('Cmd+Enter detected, triggering form submission...')
+      event.preventDefault() // Prevent default textarea behavior
+      
+      // Find the form element and submit it
+      const form = this.element
+      if (form && form.tagName === 'FORM') {
+        console.log('Submitting form via requestSubmit...')
+        if (form.requestSubmit) {
+          form.requestSubmit()
+        } else {
+          // Fallback for older browsers
+          const submitButton = this.hasSubmitTarget ? this.submitTarget : form.querySelector('[type="submit"]')
+          if (submitButton) {
+            submitButton.click()
+          } else {
+            form.submit()
+          }
+        }
+      }
     }
   }
   
   // Handle form submission
   submit(event) {
     console.log('Submit called, processing:', this.processingValue)
+    console.log('Event type:', event ? event.type : 'no event')
+    console.log('Form element:', this.element)
     console.log('Has textarea target:', this.hasTextareaTarget)
     console.log('Textarea value:', this.hasTextareaTarget ? this.textareaTarget.value : 'N/A')
-    console.log('Textarea element:', this.hasTextareaTarget ? this.textareaTarget : 'N/A')
     
-    // Only prevent default if it's a form submission event
-    if (event && event.type === 'submit') {
-      event.preventDefault()
+    // Log form data
+    if (this.element && this.element.tagName === 'FORM') {
+      const formData = new FormData(this.element)
+      console.log('Form data entries:')
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}: ${value}`)
+      }
     }
     
     // Don't submit if already processing
     if (this.processingValue) {
-      console.log('Already processing, skipping submit')
+      console.log('Already processing, preventing submission')
+      if (event) event.preventDefault()
       return
     }
     
     // Don't submit if textarea is empty or doesn't exist
     if (!this.hasTextareaTarget || !this.textareaTarget.value.trim()) {
-      console.log('No textarea or empty value')
-      console.log('Textarea targets found:', this.element.querySelectorAll('[data-chat-form-target="textarea"]').length)
+      console.log('No textarea or empty value, preventing submission')
+      if (event) event.preventDefault()
       return
     }
     
-    console.log('Submitting form...')
-    console.log('Form element:', this.element)
-    console.log('Submit target:', this.hasSubmitTarget ? this.submitTarget : 'N/A')
+    console.log('Form validation passed, allowing submission to proceed to Rails...')
+    // Set processing state to prevent duplicate submissions
+    this.processingValue = true
     
-    // Try multiple submission methods
-    try {
-      // Method 1: Use requestSubmit if available (modern browsers)
-      if (this.element.tagName === 'FORM') {
-        console.log('Using direct form submission')
-        if (this.element.requestSubmit) {
-          console.log('Using requestSubmit')
-          this.element.requestSubmit()
-        } else {
-          console.log('Fallback to submit()')
-          this.element.submit()
-        }
-      } else {
-        // Method 2: Find the form and submit it
-        const form = this.element.closest('form') || this.element.querySelector('form')
-        if (form) {
-          console.log('Found form via search:', form)
-          if (form.requestSubmit) {
-            console.log('Using requestSubmit on found form')
-            form.requestSubmit()
-          } else {
-            console.log('Using submit() on found form')
-            form.submit()
-          }
-        } else {
-          console.error('Could not find form element')
-        }
-      }
-    } catch (error) {
-      console.error('Form submission error:', error)
-      // Last resort: try clicking the submit button
-      if (this.hasSubmitTarget) {
-        console.log('Trying submit button click as fallback')
-        this.submitTarget.click()
-      }
-    }
+    // Allow the form to submit naturally - don't preventDefault()
+    // The form will be submitted by Rails/Turbo automatically
   }
 }

@@ -4,5 +4,6 @@ require 'sidekiq-cron'
 Sidekiq::Cron::Job.create(
   name: 'Cleanup Stuck Messages',
   cron: '*/5 * * * *', # Every 5 minutes
-  class: 'CleanupStuckMessagesJob'
+  class: 'CleanupStuckMessagesJob',
+  active_job: true  # This tells sidekiq-cron to use ActiveJob
 )
