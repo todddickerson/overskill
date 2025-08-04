@@ -1,0 +1,109 @@
+<div class="max-w-6xl mx-auto">
+  <!-- App Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center">
+        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mr-4">
+          <i class="fas fa-palette text-white text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white"><%= app.name %></h1>
+          <p class="text-gray-600 dark:text-gray-400">Created <%= time_ago_in_words(app.created_at) %> ago</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <button class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+          <i class="fas fa-share mr-2"></i>Share App
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- App Description -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">About this app</h2>
+    <p class="text-gray-600 dark:text-gray-400 leading-relaxed"><%= app.description || app.prompt %></p>
+  </div>
+  
+  <!-- Quick Actions -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- App Visibility -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">App Visibility</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Control who can access your application</p>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <i class="fas fa-globe text-blue-500 mr-2"></i>
+          <span class="text-sm font-medium text-gray-900 dark:text-white">Public (Login Required)</span>
+        </div>
+        <button class="text-sm text-primary-600 hover:text-primary-700">Change</button>
+      </div>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Anyone can access but must log in first</p>
+    </div>
+    
+    <!-- Invite Users -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Invite Users</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Grow your user base by inviting others</p>
+      <div class="flex space-x-2">
+        <button class="flex-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">
+          <i class="fas fa-copy mr-2"></i>Copy Link
+        </button>
+        <button class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700">
+          Send Invites
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Stats Overview -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center">
+        <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg mr-3">
+          <i class="fas fa-users text-blue-600 dark:text-blue-400"></i>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= app.visitor_count %></p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center">
+        <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg mr-3">
+          <i class="fas fa-eye text-green-600 dark:text-green-400"></i>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= app.daily_visitors.last %></p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Today's Views</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center">
+        <div class="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg mr-3">
+          <i class="fas fa-code-branch text-purple-600 dark:text-purple-400"></i>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= app.app_versions.count %></p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Versions</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div class="flex items-center">
+        <div class="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg mr-3">
+          <i class="fas fa-database text-orange-600 dark:text-orange-400"></i>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-900 dark:text-white"><%= app.app_files.count %></p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Files</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

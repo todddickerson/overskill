@@ -1,170 +1,200 @@
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-200" 
-     data-controller="version-preview deployment publish-modal version-comparison version-actions" 
+     data-controller="version-preview deployment publish-modal version-comparison version-actions editor-layout main-tabs" 
      data-version-preview-app-id-value="<%= @app.to_param %>"
      data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
      data-deployment-app-id-value="<%= @app.to_param %>"
      data-publish-modal-app-id-value="<%= @app.to_param %>"
-     data-version-comparison-app-id-value="<%= @app.to_param %>">
-  <!-- Header -->
-  <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between transition-colors duration-200">
-    <div class="flex items-center">
-      <!-- Overskill Logo with Dropdown -->
-      <%= render "team_navigation" %>
+     data-version-comparison-app-id-value="<%= @app.to_param %>"
+     data-editor-layout-chat-visible-value="true">
+  
+  <!-- Unified Top Bar -->
+  <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 h-14 flex items-center justify-between">
+    <!-- Left Section -->
+    <div class="flex items-center space-x-4">
+      <!-- Logo/App Navigation -->
+      <div class="flex items-center">
+        <%= render "team_navigation" %>
+        <div class="h-5 w-[1px] bg-gray-300 dark:bg-gray-600 rotate-[25deg] mx-2"></div>
+        <%= render "app_navigation", app: @app %>
+      </div>
       
-      <!-- Separator -->
-      <div class="h-5 w-[1px] bg-slate-300 rotate-[25deg] mx-2"></div>
-      
-      <!-- App Logo and Name with Dropdown -->
-      <%= render "app_navigation", app: @app %>
+      <!-- Main Navigation Tabs -->
+      <div class="flex items-center ml-8">
+        <button class="px-3 py-1 text-sm font-medium text-gray-900 dark:text-white border-b-2 border-primary-500"
+                data-main-tabs-target="tab"
+                data-panel="dashboard"
+                data-action="click->main-tabs#switchTab">
+          Dashboard
+        </button>
+        <button class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent ml-4"
+                data-main-tabs-target="tab"
+                data-panel="preview"
+                data-action="click->main-tabs#switchTab">
+          Preview
+        </button>
+      </div>
     </div>
     
-    <div class="flex items-center space-x-4">
-      <button onclick="document.querySelector('[data-controller*=version-history]').dispatchEvent(new CustomEvent('open-version-history'))"
-              class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-        <i class="fas fa-history mr-1"></i> Version History
+    <!-- Right Section -->
+    <div class="flex items-center space-x-3">
+      <!-- Activity Monitor (Pulse Icon) -->
+      <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Activity Monitor"
+              data-action="click->editor-layout#toggleActivityMonitor">
+        <i class="fas fa-chart-line text-sm"></i>
       </button>
-      <% if @app.preview_url.present? %>
-        <%= link_to @app.preview_url, target: "_blank", 
-            class: "text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors",
-            data: { deployment_preview: true } do %>
-          <i class="fas fa-external-link-alt mr-1"></i> Open Preview
-        <% end %>
-      <% end %>
+      
+      <!-- Version History -->
+      <button onclick="document.querySelector('[data-controller*=version-history]').dispatchEvent(new CustomEvent('open-version-history'))"
+              class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Version History">
+        <i class="fas fa-history text-sm"></i>
+      </button>
+      
+      <!-- Help -->
+      <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Help">
+        <i class="fas fa-question-circle text-sm"></i>
+      </button>
+      
+      <!-- Share -->
+      <button class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+        Share
+      </button>
+      
+      <!-- Publish (includes deploy) -->
       <button data-action="click->publish-modal#open"
-              class="text-sm bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700">
-        <i class="fas fa-globe mr-1"></i> Publish
+              class="px-4 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
+        Publish
       </button>
     </div>
   </div>
   
-  <!-- Main Content -->
+  <!-- Main Content Area -->
   <div class="flex-1 flex overflow-hidden">
-    <!-- Left Panel - Chat -->
-    <div class="w-96 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors duration-200">
+    <!-- Left Panel - Chat (Collapsible) -->
+    <div class="bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex transition-all duration-300"
+         data-editor-layout-target="chatPanel"
+         style="width: 384px;">
       
-      <!-- Chat Messages -->
-      <div class="flex-1 overflow-y-auto px-6 py-4" id="chat_container" data-controller="chat-scroller">
-        <%= turbo_stream_from "app_#{@app.id}_chat" %>
-        <div id="chat_messages" class="space-y-4">
-          <% if @messages.any? %>
-            <% @messages.each do |message| %>
-              <%= render "chat_message", message: message %>
+      <!-- Chat Content -->
+      <div class="flex-1 flex flex-col">
+        <!-- Chat Messages -->
+        <div class="flex-1 overflow-y-auto px-6 py-4" id="chat_container" data-controller="chat-scroller">
+          <%= turbo_stream_from "app_#{@app.id}_chat" %>
+          <div id="chat_messages" class="space-y-4">
+            <% if @messages.any? %>
+              <% @messages.each do |message| %>
+                <%= render "chat_message", message: message %>
+              <% end %>
+            <% else %>
+              <div class="text-center py-12 animate-fadeIn">
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <i class="fas fa-sparkles text-white"></i>
+                </div>
+                <h3 class="text-gray-900 dark:text-gray-100 font-medium mb-2 transition-colors duration-200">Ready to help!</h3>
+                <p class="text-gray-600 dark:text-gray-400 text-sm mb-6 transition-colors duration-200">I can help you modify, improve, or debug your app.</p>
+                
+                <div class="space-y-3 text-left max-w-sm mx-auto">
+                  <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
+                    <i class="fas fa-palette text-blue-500 mr-3"></i>
+                    "Change the color scheme to dark mode"
+                  </div>
+                  <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
+                    <i class="fas fa-mobile-alt text-green-500 mr-3"></i>
+                    "Make it mobile responsive"
+                  </div>
+                  <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
+                    <i class="fas fa-plus text-purple-500 mr-3"></i>
+                    "Add a navigation menu"
+                  </div>
+                </div>
+              </div>
             <% end %>
-          <% else %>
-            <div class="text-center py-12 animate-fadeIn">
-              <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <i class="fas fa-sparkles text-white"></i>
-              </div>
-              <h3 class="text-gray-900 dark:text-gray-100 font-medium mb-2 transition-colors duration-200">Ready to help!</h3>
-              <p class="text-gray-600 dark:text-gray-400 text-sm mb-6 transition-colors duration-200">I can help you modify, improve, or debug your app.</p>
-              
-              <div class="space-y-3 text-left max-w-sm mx-auto">
-                <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
-                  <i class="fas fa-palette text-blue-500 mr-3"></i>
-                  "Change the color scheme to dark mode"
-                </div>
-                <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
-                  <i class="fas fa-mobile-alt text-green-500 mr-3"></i>
-                  "Make it mobile responsive"
-                </div>
-                <div class="flex items-center text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600 transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
-                  <i class="fas fa-plus text-purple-500 mr-3"></i>
-                  "Add a navigation menu"
-                </div>
-              </div>
-            </div>
-          <% end %>
+          </div>
         </div>
+        
+        <!-- Chat Input -->
+        <%= render "chat_input_wrapper", app: @app %>
       </div>
       
-      <!-- Chat Input -->
-      <%= render "chat_input_wrapper", app: @app %>
+      <!-- Collapse/Expand Button -->
+      <button class="w-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center"
+              data-action="click->editor-layout#toggleChat"
+              title="Toggle AI Assistant">
+        <i class="fas fa-chevron-left text-gray-600 dark:text-gray-400 text-xs" data-editor-layout-target="collapseIcon"></i>
+      </button>
     </div>
     
-    <!-- Right Panel - Preview/Code -->
-    <div class="flex-1 bg-white dark:bg-gray-900 flex flex-col"
-         data-controller="tabs"
-         data-tabs-debug="true">
-      <!-- Tabs -->
-      <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between"
-           id="tabs-container">
-        <div class="flex items-center space-x-1">
-          <button class="px-4 py-2 text-sm font-medium text-gray-900 dark:text-white border-b-2 border-primary-500"
-                  data-tabs-target="tab"
-                  data-panel="preview"
-                  data-action="click->tabs#switchTab">
-            <i class="fas fa-eye mr-2"></i>Preview
-          </button>
-          <button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent"
-                  data-tabs-target="tab"
-                  data-panel="dashboard"
-                  data-action="click->tabs#switchTab">
-            <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
-          </button>
-          <button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent"
-                  data-tabs-target="tab"
-                  data-panel="files"
-                  data-action="click->tabs#switchTab">
-            <i class="fas fa-folder mr-2"></i>Files (<%= @files.count %>)
-          </button>
-        </div>
-        
-        <div class="flex items-center space-x-2">
-          <button class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  data-tabs-target="refreshButton"
-                  data-action="click->tabs#refreshPreview"
-                  title="Refresh preview">
-            <i class="fas fa-sync-alt text-sm"></i>
-          </button>
-        </div>
+    <!-- Right Panel - Main Content -->
+    <div class="flex-1 bg-white dark:bg-gray-900 flex flex-col">
+      
+      <!-- Dashboard View -->
+      <div class="h-full" data-main-tabs-target="panel" data-panel-name="dashboard">
+        <%= render "dashboard_with_subnav", app: @app, files: @files, selected_file: @selected_file %>
       </div>
       
-      <!-- Tab Panels -->
-      <div class="flex-1 overflow-hidden relative">
-        <!-- Preview Panel -->
-        <div class="h-full absolute inset-0" data-tabs-target="panel" data-panel-name="preview">
-          <%= render "preview_frame", app: @app %>
-        </div>
-        
-        <!-- Dashboard Panel -->
-        <div class="h-full hidden absolute inset-0" data-tabs-target="panel" data-panel-name="dashboard">
-          <%= render "dashboard_panel", app: @app %>
-        </div>
-        
-        <!-- Files Panel -->
-        <div class="h-full hidden absolute inset-0" data-tabs-target="panel" data-panel-name="files">
-          <!-- Debug: Files count = <%= @files.count %> -->
-          <% if @files.any? %>
-            <div class="h-full flex">
-              <!-- File Tree -->
-              <div class="flex-shrink-0 flex-grow-0">
-                <%= render "file_tree", files: @files, selected_file: @selected_file, app: @app %>
-              </div>
-              
-              <!-- Code Display -->
-              <%= turbo_frame_tag "code_editor", class: "w-full flex-1 min-w-0 bg-white dark:bg-gray-900 overflow-hidden" do %>
-                <% if @selected_file %>
-                  <%= render "code_editor", file: @selected_file, app: @app %>
-                <% else %>
-                  <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
-                    <div class="text-center">
-                      <i class="fas fa-code text-4xl mb-4"></i>
-                      <p>Select a file to view its contents</p>
-                    </div>
-                  </div>
-                <% end %>
-              <% end %>
-          <% else %>
-            <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
-              <div class="text-center">
-                <i class="fas fa-folder-open text-6xl mb-4"></i>
-                <p class="text-xl">No files found for this app</p>
-                <p class="text-sm mt-2">Generate files using the AI Assistant</p>
-              </div>
+      <!-- Preview View -->
+      <div class="h-full hidden" data-main-tabs-target="panel" data-panel-name="preview">
+        <div class="h-full relative">
+          <!-- Preview Controls Bar -->
+          <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-3">
+            <!-- Device Toggle -->
+            <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
+              <button class="px-2 py-1 text-sm bg-white dark:bg-gray-600 rounded shadow-sm"
+                      data-action="click->preview#setDesktop"
+                      title="Desktop view">
+                <i class="fas fa-desktop text-gray-700 dark:text-gray-300"></i>
+              </button>
+              <button class="px-2 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      data-action="click->preview#setMobile"
+                      title="Mobile view">
+                <i class="fas fa-mobile-alt"></i>
+              </button>
             </div>
-          <% end %>
+            
+            <!-- Refresh -->
+            <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    data-action="click->preview#refresh"
+                    title="Refresh preview">
+              <i class="fas fa-sync-alt text-sm"></i>
+            </button>
+            
+            <!-- External Link -->
+            <% if @app.preview_url.present? %>
+              <%= link_to @app.preview_url, target: "_blank", 
+                  class: "p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700",
+                  title: "Open in new tab" do %>
+                <i class="fas fa-external-link-alt text-sm"></i>
+              <% end %>
+            <% end %>
+          </div>
+          
+          <!-- Preview Frame with rounded corners -->
+          <div class="h-full p-4">
+            <div class="h-full bg-white rounded-xl overflow-hidden shadow-xl">
+              <%= render "preview_frame", app: @app %>
+            </div>
+          </div>
         </div>
-        
+      </div>
+    </div>
+  </div>
+  
+  <!-- Activity Monitor Modal -->
+  <div class="fixed inset-0 bg-black bg-opacity-50 hidden z-50" data-editor-layout-target="activityModal">
+    <div class="flex items-center justify-center min-h-screen p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Activity Monitor</h2>
+          <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  data-action="click->editor-layout#closeActivityMonitor">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+          <%= render "activity_monitor", app: @app %>
+        </div>
       </div>
     </div>
   </div>

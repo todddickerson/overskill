@@ -1,0 +1,144 @@
+<div class="h-full flex bg-gray-50 dark:bg-gray-900">
+  <!-- Dashboard Subnav -->
+  <div class="w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
+    <nav class="p-3 space-y-1">
+      <!-- Overview -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-md"
+              data-dashboard-nav="overview"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-th-large mr-2 text-xs"></i>
+        Overview
+      </button>
+      
+      <!-- Code Files -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="files"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-code mr-2 text-xs"></i>
+        Code <span class="text-xs text-gray-500">(<%= files.count %>)</span>
+      </button>
+      
+      <!-- Tables -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="tables"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-table mr-2 text-xs"></i>
+        Tables
+      </button>
+      
+      <!-- Schema -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="schema"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-project-diagram mr-2 text-xs"></i>
+        Schema
+      </button>
+      
+      <!-- Users -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="users"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-users mr-2 text-xs"></i>
+        Users
+      </button>
+      
+      <!-- Analytics -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="analytics"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-chart-line mr-2 text-xs"></i>
+        Analytics
+      </button>
+      
+      <!-- API -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="api"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-plug mr-2 text-xs"></i>
+        API
+      </button>
+      
+      <!-- Settings -->
+      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+              data-dashboard-nav="settings"
+              data-action="click->dashboard-subnav#switchView">
+        <i class="fas fa-cog mr-2 text-xs"></i>
+        Settings
+      </button>
+    </nav>
+  </div>
+  
+  <!-- Dashboard Content Area -->
+  <div class="flex-1 overflow-hidden" data-controller="dashboard-subnav">
+    <!-- Overview Panel -->
+    <div class="h-full overflow-y-auto p-6" data-dashboard-view="overview">
+      <%= render "dashboard_overview", app: app %>
+    </div>
+    
+    <!-- Code/Files Panel -->
+    <div class="h-full hidden" data-dashboard-view="files">
+      <% if files.any? %>
+        <div class="h-full flex">
+          <!-- File Tree -->
+          <div class="flex-shrink-0 flex-grow-0">
+            <%= render "file_tree", files: files, selected_file: selected_file, app: app %>
+          </div>
+          
+          <!-- Code Display -->
+          <%= turbo_frame_tag "code_editor", class: "w-full flex-1 min-w-0 bg-white dark:bg-gray-900 overflow-hidden" do %>
+            <% if selected_file %>
+              <%= render "code_editor", file: selected_file, app: app %>
+            <% else %>
+              <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
+                <div class="text-center">
+                  <i class="fas fa-code text-4xl mb-4"></i>
+                  <p>Select a file to view its contents</p>
+                </div>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="h-full flex items-center justify-center text-gray-600 dark:text-gray-500">
+          <div class="text-center">
+            <i class="fas fa-folder-open text-6xl mb-4"></i>
+            <p class="text-xl">No files found for this app</p>
+            <p class="text-sm mt-2">Generate files using the AI Assistant</p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+    
+    <!-- Tables Panel -->
+    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="tables"
+         data-controller="database-manager"
+         data-database-manager-app-id-value="<%= app.id %>">
+      <%= render "database_tables", app: app %>
+    </div>
+    
+    <!-- Schema Panel -->
+    <div class="h-full hidden" data-dashboard-view="schema">
+      <%= render "schema_editor", app: app %>
+    </div>
+    
+    <!-- Users Panel -->
+    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="users">
+      <%= render "user_management", app: app %>
+    </div>
+    
+    <!-- Analytics Panel -->
+    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="analytics">
+      <%= render "analytics_dashboard", app: app %>
+    </div>
+    
+    <!-- API Panel -->
+    <div class="h-full hidden" data-dashboard-view="api">
+      <%= render "api_explorer", app: app %>
+    </div>
+    
+    <!-- Settings Panel -->
+    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="settings">
+      <%= render "settings_content", app: app %>
+    </div>
+  </div>
+</div>
