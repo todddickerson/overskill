@@ -81,8 +81,17 @@ class Account::AppEditorsController < Account::ApplicationController
       Rails.logger.info "[AppEditors#create_message] AI placeholder created with ID: #{ai_response.id}"
 
       # Start processing
-      job = ProcessAppUpdateJob.perform_later(@message)
-      Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJob enqueued with job ID: #{job.job_id}"
+      # Use new orchestrator if feature flag is enabled
+      if ENV['USE_AI_ORCHESTRATOR'] == 'true'
+        Rails.logger.info "[AppEditors#create_message] Using new AI orchestrator"
+        # Don't create the placeholder message - orchestrator will handle all messages
+        ai_response.destroy!
+        job = ProcessAppUpdateJobV2.perform_later(@message)
+        Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJobV2 enqueued with job ID: #{job.job_id}"
+      else
+        job = ProcessAppUpdateJob.perform_later(@message)
+        Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJob enqueued with job ID: #{job.job_id}"
+      end
 
       respond_to do |format|
         format.turbo_stream do
