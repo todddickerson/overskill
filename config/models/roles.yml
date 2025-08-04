@@ -8,6 +8,7 @@ default:
     AppTable: manage
     AppTableColumn: manage
     AppChatMessage: manage
+    AppApiCall: manage
     Follow: read
     CreatorProfile: read
     Team: read
@@ -46,6 +47,7 @@ admin:
     AppTable: manage
     AppTableColumn: manage
     AppChatMessage: manage
+    AppApiCall: manage
     Follow: manage
     CreatorProfile: manage
     Team: manage

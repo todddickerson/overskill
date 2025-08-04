@@ -111,6 +111,7 @@ Rails.application.routes.draw do
             post :create_message
             post :deploy
             get :deployment_info
+            get :activity_monitor
             patch "files/:file_id", action: :update_file, as: :file
           end
           
@@ -150,6 +151,13 @@ Rails.application.routes.draw do
           resources :app_files
           resources :app_generations
           resources :app_collaborators
+          
+          # API call logging and monitoring
+          resources :api_calls, controller: "app_api_calls", only: [:index, :show, :destroy] do
+            collection do
+              delete :clear_all
+            end
+          end
           
           # Security and audit features (transparent, unlike Base44)
           resources :security_policies, controller: "app_security_policies", only: [:index, :show]

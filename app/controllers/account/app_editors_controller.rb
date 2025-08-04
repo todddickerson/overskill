@@ -174,6 +174,13 @@ class Account::AppEditorsController < Account::ApplicationController
     @versions = @app.app_versions.order(created_at: :desc)
     render partial: "version_history_list", locals: { app: @app, versions: @versions }
   end
+  
+  def activity_monitor
+    respond_to do |format|
+      format.html { render partial: "activity_monitor", locals: { app: @app } }
+      format.json { redirect_to account_app_api_calls_path(@app) }
+    end
+  end
 
   private
 

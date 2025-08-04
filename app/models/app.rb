@@ -18,6 +18,7 @@ class App < ApplicationRecord
   has_many :app_api_integrations, dependent: :destroy
   has_many :deployment_logs, dependent: :destroy
   has_many :app_settings, dependent: :destroy
+  has_many :app_api_calls, dependent: :destroy
   # has_many :purchases # TODO: uncomment when Purchase model exists
   # has_many :app_reviews # TODO: uncomment when AppReview model exists
   # has_many :flash_sales # TODO: uncomment when FlashSale model exists

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_04_174533) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_04_210024) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,26 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_174533) do
     t.index ["user_id"], name: "index_ahoy_visits_on_user_id"
     t.index ["visit_token"], name: "index_ahoy_visits_on_visit_token", unique: true
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
+  end
+
+  create_table "app_api_calls", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "http_method"
+    t.string "path"
+    t.integer "status_code"
+    t.integer "response_time"
+    t.text "request_body"
+    t.text "response_body"
+    t.string "user_agent"
+    t.string "ip_address"
+    t.datetime "occurred_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id", "occurred_at"], name: "index_app_api_calls_on_app_id_and_occurred_at"
+    t.index ["app_id"], name: "index_app_api_calls_on_app_id"
+    t.index ["http_method"], name: "index_app_api_calls_on_http_method"
+    t.index ["occurred_at"], name: "index_app_api_calls_on_occurred_at"
+    t.index ["status_code"], name: "index_app_api_calls_on_status_code"
   end
 
   create_table "app_api_integrations", force: :cascade do |t|
@@ -722,6 +742,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_174533) do
   add_foreign_key "account_onboarding_invitation_lists", "teams"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "app_api_calls", "apps"
   add_foreign_key "app_api_integrations", "apps"
   add_foreign_key "app_chat_messages", "app_versions"
   add_foreign_key "app_chat_messages", "apps"

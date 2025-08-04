@@ -1,65 +1,122 @@
-<div class="space-y-4">
+<% api_calls = app.app_api_calls.recent.limit(50) %>
+<% total_calls = app.app_api_calls.count %>
+<% successful_calls = app.app_api_calls.successful.count %>
+<% error_calls = app.app_api_calls.errors.count %>
+
+<div class="space-y-4" data-controller="activity-monitor" data-activity-monitor-app-id-value="<%= app.id %>">
   <!-- Activity Monitor Header -->
   <div class="flex items-center justify-between mb-4">
     <div>
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">18 entries</h3>
+      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <%= total_calls %> entries
+        <% if api_calls.any? %>
+          <span class="text-xs text-gray-500 dark:text-gray-400">(last <%= api_calls.first.time_ago %>)</span>
+        <% end %>
+      </h3>
     </div>
     <div class="flex items-center space-x-2">
-      <button class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
-        <i class="fas fa-filter mr-1"></i> All
+      <select class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 border-0"
+              data-action="change->activity-monitor#filterByMethod">
+        <option value="">All Methods</option>
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="DELETE">DELETE</option>
+      </select>
+      <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              data-action="click->activity-monitor#clearAll"
+              title="Clear all logs">
+        <i class="fas fa-trash text-xs"></i>
       </button>
-      <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-        <i class="fas fa-trash"></i>
-      </button>
-      <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-        <i class="fas fa-times"></i>
+      <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              data-action="click->activity-monitor#refresh"
+              title="Refresh">
+        <i class="fas fa-sync text-xs"></i>
       </button>
     </div>
   </div>
   
-  <!-- Request Count -->
-  <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-    <span>18 requests</span>
-    <span>0 logs</span>
-  </div>
-  
-  <!-- Activity List -->
-  <div class="space-y-2">
-    <% [
-      { method: 'get', path: '/entities/User', time: 'an hour ago', status: 200 },
-      { method: 'get', path: '/entities/User', time: 'an hour ago', status: 200 },
-      { method: 'get', path: '/entities/User', time: '2 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Artwork', time: '2 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Artwork', time: '3 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Artwork', time: '3 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Client', time: '3 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Exhibition', time: '3 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Artwork', time: '3 hours ago', status: 200 },
-      { method: 'get', path: '/integration-endpoints/schema', time: '3 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Client', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Exhibition', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Artwork', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/integration-endpoints/schema', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Client', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Exhibition', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/entities/Artwork', time: '5 hours ago', status: 200 },
-      { method: 'get', path: '/integration-endpoints/schema', time: '5 hours ago', status: 200 }
-    ].each do |request| %>
-      <div class="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
-        <div class="flex items-center space-x-4">
-          <span class="text-xs font-mono text-gray-600 dark:text-gray-400 uppercase"><%= request[:method] %></span>
-          <span class="text-sm text-gray-900 dark:text-white font-mono"><%= request[:path] %></span>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="text-xs text-gray-500 dark:text-gray-400"><%= request[:time] %></span>
-          <span class="text-xs font-medium text-green-600 dark:text-green-400">
-            <i class="fas fa-check-circle mr-1"></i><%= request[:status] %>
-          </span>
-          <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <i class="fas fa-chevron-down text-xs"></i>
-          </button>
-        </div>
+  <!-- Stats Summary -->
+  <div class="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+    <div class="flex items-center space-x-2">
+      <i class="fas fa-check-circle text-green-500 text-xs"></i>
+      <span><%= successful_calls %> successful</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <i class="fas fa-exclamation-triangle text-yellow-500 text-xs"></i>
+      <span><%= error_calls %> errors</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <i class="fas fa-clock text-blue-500 text-xs"></i>
+      <span><%= app.app_api_calls.today.count %> today</span>
+    </div>
+    <% if api_calls.any? %>
+      <div class="flex items-center space-x-2">
+        <i class="fas fa-tachometer-alt text-purple-500 text-xs"></i>
+        <span>~<%= api_calls.limit(10).average(:response_time)&.round || 0 %>ms avg</span>
       </div>
     <% end %>
   </div>
+  
+  <!-- Activity List -->
+  <div class="space-y-1" data-activity-monitor-target="list">
+    <% if api_calls.any? %>
+      <% api_calls.each do |call| %>
+        <div class="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors group"
+             data-activity-monitor-target="item"
+             data-method="<%= call.http_method %>"
+             data-action="click->activity-monitor#showDetails"
+             data-call-id="<%= call.id %>">
+          <div class="flex items-center space-x-4 min-w-0 flex-1">
+            <span class="text-xs font-mono text-gray-600 dark:text-gray-400 uppercase font-semibold w-12">
+              <%= call.http_method %>
+            </span>
+            <span class="text-sm text-gray-900 dark:text-white font-mono truncate flex-1">
+              <%= call.path %>
+            </span>
+            <% if call.response_time %>
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                <%= call.response_time %>ms
+              </span>
+            <% end %>
+          </div>
+          <div class="flex items-center space-x-3">
+            <span class="text-xs text-gray-500 dark:text-gray-400">
+              <%= call.time_ago %>
+            </span>
+            <span class="text-xs font-medium <%= call.status_color %> flex items-center">
+              <i class="<%= call.status_icon %> mr-1"></i>
+              <%= call.status_code %>
+            </span>
+            <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
+              <i class="fas fa-chevron-right text-xs"></i>
+            </button>
+          </div>
+        </div>
+      <% end %>
+    <% else %>
+      <div class="text-center py-12">
+        <i class="fas fa-chart-line text-4xl text-gray-300 dark:text-gray-600 mb-4"></i>
+        <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">No API activity yet</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          API calls from your published app will appear here
+        </p>
+        <% if app.status != 'published' %>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            <i class="fas fa-info-circle mr-1"></i>
+            Publish your app to start seeing activity
+          </p>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+  
+  <% if api_calls.count >= 50 && total_calls > 50 %>
+    <div class="text-center py-4">
+      <button class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              data-action="click->activity-monitor#loadMore">
+        Load more (<%= total_calls - 50 %> remaining)
+      </button>
+    </div>
+  <% end %>
 </div>
