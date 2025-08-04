@@ -24,33 +24,35 @@
     
     <!-- App Management Items -->
     <div class="py-2">
-      <!-- App Overview -->
-      <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-        <i class="fas fa-th-large text-gray-500 dark:text-gray-400 w-4"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">App Overview</span>
-      </button>
+      <!-- Database Dashboard -->
+      <%= link_to account_app_dashboard_path(@app),
+          class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
+        <i class="fas fa-database text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Database</span>
+      <% end %>
 
-      <!-- Users -->
-      <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-        <i class="fas fa-users text-gray-500 dark:text-gray-400 w-4"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">Users</span>
-      </button>
-
-      <!-- Security -->
-      <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+      <!-- Security Policies -->
+      <%= link_to account_app_security_policies_path(@app),
+          class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
         <i class="fas fa-shield-alt text-gray-500 dark:text-gray-400 w-4"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">Security</span>
-      </button>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Security Policies</span>
+      <% end %>
+
+      <!-- Audit Logs -->
+      <%= link_to account_app_audit_logs_path(@app),
+          class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
+        <i class="fas fa-history text-gray-500 dark:text-gray-400 w-4"></i>
+        <span class="text-sm text-gray-900 dark:text-gray-100">Audit Logs</span>
+      <% end %>
+
+      <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
 
       <!-- App Settings -->
-      <button data-action="click->app-navigation#openSettings"
-              class="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+      <%= link_to edit_account_app_path(@app),
+          class: "w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" do %>
         <i class="fas fa-cog text-gray-500 dark:text-gray-400 w-4"></i>
         <span class="text-sm text-gray-900 dark:text-gray-100">App Settings</span>
-      </button>
+      <% end %>
     </div>
   </div>
 </div>

@@ -144,6 +144,16 @@ Rails.application.routes.draw do
           resources :app_files
           resources :app_generations
           resources :app_collaborators
+          
+          # Security and audit features (transparent, unlike Base44)
+          resources :security_policies, controller: "app_security_policies", only: [:index, :show]
+          resources :audit_logs, controller: "app_audit_logs", only: [:index, :show] do
+            collection do
+              get :search
+              get :compliance_report
+              get :export
+            end
+          end
         end
       end
     end
