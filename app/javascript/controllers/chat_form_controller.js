@@ -183,6 +183,28 @@ export default class extends Controller {
     }
   }
   
+  // Handle submit button click
+  handleSubmitClick(event) {
+    console.log('Submit button clicked')
+    
+    // Don't submit if already processing
+    if (this.processingValue) {
+      console.log('Already processing, preventing submission')
+      event.preventDefault()
+      return
+    }
+    
+    // Don't submit if textarea is empty or doesn't exist
+    if (!this.hasTextareaTarget || !this.textareaTarget.value.trim()) {
+      console.log('No textarea or empty value, preventing submission')
+      event.preventDefault()
+      return
+    }
+    
+    console.log('Submit validation passed, allowing form to submit')
+    // Let the form submit naturally since type="submit" is set
+  }
+
   // Handle form submission
   submit(event) {
     console.log('Submit called, processing:', this.processingValue)
