@@ -22,26 +22,38 @@ module Ai
       # Update app status
       @app.update!(status: "generating")
 
+      # Create initial progress message
+      progress_message = create_progress_message("Starting generation...", 0)
+
       # Step 1: Enhance the prompt
+      update_progress_message(progress_message, "Enhancing prompt with context...", 10)
       enhanced_prompt = enhance_prompt(@generation.prompt)
 
       # Step 2: Call AI to generate the app
+      update_progress_message(progress_message, "Generating app with AI (this may take 1-2 minutes)...", 20)
       ai_response = generate_with_ai(enhanced_prompt)
 
       if ai_response[:success]
+        update_progress_message(progress_message, "AI generation complete! Processing response...", 50)
+        
         # Step 3: Parse the AI response
+        update_progress_message(progress_message, "Parsing AI response...", 60)
         parsed_data = parse_ai_response(ai_response[:content])
 
         if parsed_data
           # Step 4: Security scan
+          update_progress_message(progress_message, "Running security scan...", 70)
           if security_scan_passed?(parsed_data[:files])
             # Step 5: Create app files
-            create_app_files(parsed_data[:files])
+            update_progress_message(progress_message, "Creating app files...", 80)
+            create_app_files_with_progress(parsed_data[:files], progress_message)
 
             # Step 6: Update app metadata
+            update_progress_message(progress_message, "Updating app metadata...", 90)
             update_app_metadata(parsed_data[:app])
 
             # Step 7: Mark generation as complete
+            update_progress_message(progress_message, "Generation complete! ✅", 100)
             @generation.update!(
               completed_at: Time.current,
               status: "completed",
@@ -59,17 +71,28 @@ module Ai
             )
 
             Rails.logger.info "[AppGenerator] Successfully generated App ##{app.id}"
+            
+            # Mark progress as complete and clean up
+            update_progress_message(progress_message, "✅ Generation complete! Your app is ready.", 100)
+            
             {success: true}
           else
+            update_progress_message(progress_message, "❌ Security scan failed - unsafe code detected", 100)
             handle_error("Security scan failed - potentially unsafe code detected")
           end
         else
+          update_progress_message(progress_message, "❌ Failed to parse AI response", 100)
           handle_error("Failed to parse AI response")
         end
       else
+        update_progress_message(progress_message, "❌ AI generation failed: #{ai_response[:error]}", 100)
         handle_error("AI generation failed: #{ai_response[:error]}")
       end
     rescue => e
+      # Update progress message on error
+      if defined?(progress_message) && progress_message
+        update_progress_message(progress_message, "❌ Generation error: #{e.message}", 100)
+      end
       handle_error("Generation error: #{e.message}")
       {success: false, error: e.message}
     end
@@ -99,12 +122,25 @@ module Ai
     end
 
     def parse_ai_response(content)
+      Rails.logger.info "[AppGenerator] Parsing AI response (#{content.length} chars)"
+      
+      # Log response preview for debugging
+      if ENV["VERBOSE_AI_LOGGING"] == "true"
+        Rails.logger.info "[AppGenerator] AI Response preview: #{content[0..1000]}..."
+      end
+      
+      # First try to extract JSON from markdown code blocks
+      extracted_content = extract_json_from_markdown(content) || content
+      
       begin
         # Try to parse as JSON
-        data = JSON.parse(content)
+        data = JSON.parse(extracted_content)
 
         # Validate required fields
-        return nil unless data["app"] && data["files"]
+        unless validate_ai_response(data)
+          Rails.logger.error "[AppGenerator] AI response validation failed"
+          return nil
+        end
 
         {
           app: data["app"],
@@ -115,16 +151,108 @@ module Ai
         }
       rescue JSON::ParserError => e
         Rails.logger.error "[AppGenerator] Failed to parse AI response as JSON: #{e.message}"
-
-        # Try to extract JSON from markdown code blocks
-        json_match = content.match(/```json\n(.*?)\n```/m)
-        if json_match
-          content = json_match[1]
-          retry
-        end
-
+        Rails.logger.error "[AppGenerator] Content preview: #{extracted_content[0..500]}..."
         nil
       end
+    end
+
+    private
+
+    def create_progress_message(message, progress)
+      # Create a system message in the chat to show progress
+      progress_msg = @app.app_chat_messages.create!(
+        team: @app.team,
+        content: build_progress_content(message, progress),
+        role: 'system'
+      )
+      
+      # Broadcast the new message via Turbo
+      broadcast_chat_message(progress_msg)
+      
+      progress_msg
+    end
+
+    def update_progress_message(progress_message, message, progress)
+      # Update the existing progress message
+      progress_message.update!(
+        content: build_progress_content(message, progress),
+        updated_at: Time.current
+      )
+      
+      # Broadcast the update via Turbo
+      broadcast_chat_message_update(progress_message)
+    end
+
+    def build_progress_content(message, progress)
+      <<~CONTENT
+        **🔄 Generation Progress**
+
+        #{message}
+
+        Progress: #{progress}%
+
+        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+          <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: #{progress}%"></div>
+        </div>
+      CONTENT
+    end
+
+    def broadcast_chat_message(message)
+      Turbo::StreamsChannel.broadcast_append_to(
+        "app_#{@app.id}_chat",
+        target: "chat_messages",
+        partial: "account/app_editors/chat_message",
+        locals: { message: message }
+      )
+    end
+
+    def broadcast_chat_message_update(message)
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}_chat",
+        target: "chat_message_#{message.id}",
+        partial: "account/app_editors/chat_message",
+        locals: { message: message }
+      )
+    end
+
+    def extract_json_from_markdown(content)
+      # Handle multiple possible markdown formats
+      patterns = [
+        /```json\s*\n?(.*?)\n?```/m,  # ```json\n...\n``` or ```json...```
+        /```\s*\n?(.*?)\n?```/m       # ```\n...\n``` (no language specified)
+      ]
+      
+      patterns.each do |pattern|
+        match = content.match(pattern)
+        return match[1].strip if match
+      end
+      
+      nil
+    end
+
+    def validate_ai_response(data)
+      required_fields = %w[app files]
+      missing_fields = required_fields.select { |field| data[field].nil? || data[field].empty? }
+      
+      if missing_fields.any?
+        Rails.logger.error "[AppGenerator] Missing required fields: #{missing_fields.join(', ')}"
+        return false
+      end
+      
+      # Validate files structure
+      if !data["files"].is_a?(Array) || data["files"].empty?
+        Rails.logger.error "[AppGenerator] Files must be a non-empty array"
+        return false
+      end
+      
+      data["files"].each_with_index do |file, index|
+        unless file.is_a?(Hash) && file["path"] && file["content"]
+          Rails.logger.error "[AppGenerator] File #{index} missing path or content"
+          return false
+        end
+      end
+      
+      true
     end
 
     def security_scan_passed?(files)
@@ -202,6 +330,10 @@ module Ai
     end
 
     def create_app_files(files)
+      # Clear existing files for regeneration
+      Rails.logger.info "[AppGenerator] Clearing existing files for regeneration"
+      @app.app_files.destroy_all
+      
       # Validate and fix files before creating
       validated_files = validate_and_fix_files(files)
       
@@ -213,6 +345,35 @@ module Ai
           file_type: determine_file_type(file_data["path"] || file_data[:path]),
           size_bytes: (file_data["content"] || file_data[:content]).bytesize
         )
+      end
+      
+      # Don't create version here - it's created by ProcessAppUpdateJob when there are actual changes
+    end
+
+    def create_app_files_with_progress(files, progress_message)
+      # Clear existing files for regeneration
+      Rails.logger.info "[AppGenerator] Clearing existing files for regeneration"
+      @app.app_files.destroy_all
+      
+      # Validate and fix files before creating
+      validated_files = validate_and_fix_files(files)
+      
+      validated_files.each_with_index do |file_data, index|
+        file_path = file_data["path"] || file_data[:path]
+        progress = 80 + (10 * (index + 1) / validated_files.length)
+        
+        update_progress_message(progress_message, "Creating #{file_path}...", progress)
+        
+        @app.app_files.create!(
+          team: @app.team,
+          path: file_path,
+          content: file_data["content"] || file_data[:content],
+          file_type: determine_file_type(file_path),
+          size_bytes: (file_data["content"] || file_data[:content]).bytesize
+        )
+        
+        # Small delay to make progress visible
+        sleep(0.1)
       end
       
       # Don't create version here - it's created by ProcessAppUpdateJob when there are actual changes

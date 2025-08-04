@@ -21,7 +21,7 @@ module Ai
           "X-Title" => "OverSkill Platform",
           "Content-Type" => "application/json"
         },
-        timeout: 600  # 10 minute timeout for long generation requests
+        timeout: 120  # 2 minute timeout - fail fast for better UX
       }
     end
 
@@ -94,7 +94,15 @@ module Ai
         {role: "user", content: spec}
       ]
 
-      chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
+      # Try Kimi K2 first, fallback to Claude Sonnet if it fails/times out
+      result = chat(messages, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
+      
+      if !result[:success] && result[:error]&.include?("timeout")
+        Rails.logger.warn "[AI] Kimi K2 timed out, falling back to Claude Sonnet"
+        result = chat(messages, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
+      end
+      
+      result
     end
 
     def update_app(user_request, current_files, app_context)
