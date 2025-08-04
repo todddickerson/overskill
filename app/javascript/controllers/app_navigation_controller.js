@@ -72,4 +72,23 @@ export default class extends Controller {
     console.log("Opening help...")
     this.close()
   }
+  
+  navigateToSection(event) {
+    event.preventDefault()
+    const section = event.currentTarget.dataset.section
+    
+    // Make sure we're on the dashboard tab
+    const dashboardTab = document.querySelector('[data-panel="dashboard"]')
+    if (dashboardTab) {
+      dashboardTab.click()
+    }
+    
+    // Navigate to the specific section
+    const sectionButton = document.querySelector(`[data-dashboard-nav="${section}"]`)
+    if (sectionButton) {
+      sectionButton.click()
+    }
+    
+    this.close()
+  }
 }

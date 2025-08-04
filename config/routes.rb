@@ -98,6 +98,9 @@ Rails.application.routes.draw do
         resources :apps do
           member do
             get :deployment_info, to: "app_editors#deployment_info"
+            post :generate_logo
+            post :upload_logo
+            post :debug_error
           end
           
           # Chat interface (may be deprecated in favor of editor)

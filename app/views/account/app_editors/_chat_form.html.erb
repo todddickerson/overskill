@@ -7,11 +7,11 @@
                 action: "submit->chat-form#submit",
                 turbo_stream: true
               } do |form| %>
-  <div class="relative bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-md transition-shadow focus-within:shadow-md focus-within:border-blue-300 dark:focus-within:border-blue-400">
+  <div class="relative bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm focus-within:shadow-md focus-within:border-blue-300 dark:focus-within:border-blue-400 transition-all">
     <%= form.text_area :content,
-        placeholder: "Tell me what you'd like to change...",
+        placeholder: "Ask AI to help with your app...",
         rows: 1,
-        class: "w-full bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border-0 rounded-2xl pl-4 pr-12 py-3 text-sm focus:outline-none focus:ring-0 resize-none",
+        class: "w-full bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 border-0 rounded-lg pl-3 pr-10 py-2.5 text-sm focus:outline-none focus:ring-0 resize-none",
         data: {
           controller: "autosize",
           action: "keydown->chat-form#handleKeydown input->autosize#resize",
@@ -19,32 +19,27 @@
           autosize_target: "element"
         } %>
     <button type="submit" 
-            class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            class="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             data-chat-form-target="submit">
-      <i class="fas fa-arrow-up text-sm"></i>
+      <i class="fas fa-arrow-up text-xs"></i>
     </button>
   </div>
   
-  <div class="flex items-center justify-between mt-2 px-1">
-    <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+  <div class="flex items-center justify-between mt-1.5 px-0.5">
+    <div class="flex items-center text-xs text-gray-400 dark:text-gray-500">
       <span class="flex items-center">
-        <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-xs font-mono">⌘</kbd>
-        <span class="mx-1">+</span>
-        <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-xs font-mono">↵</kbd>
-        <span class="ml-1">to send</span>
+        <kbd class="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-xs">⌘</kbd>
+        <span class="mx-0.5">+</span>
+        <kbd class="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-xs">↵</kbd>
+        <span class="ml-1">send</span>
       </span>
     </div>
     
-    <div class="flex items-center space-x-2">
+    <div class="flex items-center space-x-1">
       <button type="button" 
-              class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               title="Add attachment">
         <i class="fas fa-paperclip"></i>
-      </button>
-      <button type="button" 
-              class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              title="Quick actions">
-        <i class="fas fa-magic"></i>
       </button>
     </div>
   </div>

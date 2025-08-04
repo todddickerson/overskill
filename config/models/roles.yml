@@ -5,6 +5,9 @@ default:
     AppFile: read
     AppGeneration: read
     App: manage
+    AppTable: manage
+    AppTableColumn: manage
+    AppChatMessage: manage
     Follow: read
     CreatorProfile: read
     Team: read
@@ -40,6 +43,9 @@ admin:
     AppFile: manage
     AppGeneration: manage
     App: manage
+    AppTable: manage
+    AppTableColumn: manage
+    AppChatMessage: manage
     Follow: manage
     CreatorProfile: manage
     Team: manage

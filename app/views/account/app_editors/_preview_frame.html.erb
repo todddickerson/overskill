@@ -1,67 +1,8 @@
 <div id="preview_frame" class="h-full flex flex-col" 
-     data-controller="version-preview preview-mode preview-device"
-     data-version-preview-app-id-value="<%= app.id %>"
-     data-preview-mode-app-id-value="<%= app.id %>"
-     data-preview-mode-mode-value="auto"
-     data-preview-device-current-device-value="desktop">
+     data-controller="version-preview"
+     data-version-preview-app-id-value="<%= app.id %>">
   
   <div class="h-full bg-gray-50 dark:bg-gray-900 flex flex-col">
-    <!-- Unified Preview Header -->
-    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-4">
-        <!-- Device Toggle -->
-        <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
-          <button class="px-2 py-1 text-sm rounded transition-colors"
-                  data-action="click->preview-device#setDesktop"
-                  data-preview-device-target="desktopButton"
-                  title="Desktop view">
-            <i class="fas fa-desktop"></i>
-          </button>
-          <button class="px-2 py-1 text-sm text-gray-500 dark:text-gray-400 rounded transition-colors"
-                  data-action="click->preview-device#setMobile"
-                  data-preview-device-target="mobileButton"
-                  title="Mobile view">
-            <i class="fas fa-mobile-alt"></i>
-          </button>
-        </div>
-        
-        <!-- Divider -->
-        <div class="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-        
-        <!-- Preview Status -->
-        <div class="flex items-center space-x-2">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Preview</span>
-          <span class="text-xs text-gray-500 dark:text-gray-500" data-preview-mode-target="statusText">
-            Auto-refresh ON
-          </span>
-        </div>
-      </div>
-      
-      <div class="flex items-center space-x-2">
-        <!-- Auto-refresh Toggle -->
-        <button data-action="click->preview-mode#toggleMode"
-                data-preview-mode-target="modeButton"
-                class="px-3 py-1 text-xs font-medium rounded-full text-green-600 bg-green-100 dark:bg-green-900/50 hover:opacity-80 transition-opacity">
-          <i class="fas fa-sync mr-1.5"></i>Auto
-        </button>
-        
-        <!-- Manual Refresh -->
-        <button data-action="click->preview-mode#refreshPreview"
-                class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                title="Refresh preview">
-          <i class="fas fa-redo text-sm"></i>
-        </button>
-        
-        <!-- External Link -->
-        <% if app.preview_url.present? %>
-          <%= link_to app.preview_url, target: "_blank", 
-              class: "p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors",
-              title: "Open in new tab" do %>
-            <i class="fas fa-external-link-alt text-sm"></i>
-          <% end %>
-        <% end %>
-      </div>
-    </div>
     
     <!-- Version header (hidden by default) -->
     <div data-version-preview-target="versionHeader" 
@@ -91,8 +32,8 @@
       </div>
     </div>
     
-    <!-- Preview Content Area -->
-    <div class="flex-1 relative p-4" data-preview-mode-target="preview">
+    <!-- Preview Content Area -->  
+    <div class="flex-1 relative p-4">
       <div class="h-full bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden"
            data-preview-device-target="container">
         <% if app.app_files.any? %>
@@ -101,6 +42,8 @@
           <iframe 
             data-version-preview-target="iframe"
             data-preview-device-target="iframe"
+            data-controller="error-detector"
+            data-error-detector-app-id-value="<%= app.id %>"
             src="<%= preview_src %>"
             class="w-full h-full border-0"
             <% if app.preview_url %>

@@ -1,18 +1,13 @@
 <!-- Team Navigation Dropdown -->
 <div class="relative" data-controller="team-navigation">
-  <!-- Overskill Logo/Trigger -->
+  <!-- overskill Logo/Trigger -->
   <button data-team-navigation-target="trigger"
           data-action="click->team-navigation#toggle"
           class="flex items-center space-x-2 px-2 py-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-150">
     <!-- Logo -->
-    <div class="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
-      <div class="w-4 h-4 bg-white rounded-sm flex items-center justify-center">
-        <div class="w-2.5 h-0.5 bg-orange-500"></div>
-        <div class="absolute w-2.5 h-0.5 bg-orange-500 rotate-90"></div>
-      </div>
-    </div>
+    <%= image_tag "overskill-logo.svg", class: "w-6 h-6", alt: "overskill" %>
     <!-- Text -->
-    <span class="text-gray-900 dark:text-white font-semibold text-sm">OverSkill</span>
+    <span class="text-gray-900 dark:text-white font-overskill-bold text-base">overskill</span>
     <!-- Dropdown Icon -->
     <i class="fas fa-chevron-down text-gray-600 dark:text-gray-400 text-xs"></i>
   </button>

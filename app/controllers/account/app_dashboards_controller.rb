@@ -1,5 +1,5 @@
 class Account::AppDashboardsController < Account::ApplicationController
-  account_load_and_authorize_resource :app, through: :team, through_association: :apps
+  before_action :set_app
   
   def show
     # Main dashboard view - redirect to editor with dashboard tab
@@ -9,6 +9,8 @@ class Account::AppDashboardsController < Account::ApplicationController
   end
   
   def data
+    return render json: { error: "App not found" }, status: :not_found unless @app
+    
     @tables = @app.app_tables.includes(:app_table_columns)
     
     respond_to do |format|
@@ -300,5 +302,9 @@ class Account::AppDashboardsController < Account::ApplicationController
       created_at: column.created_at,
       updated_at: column.updated_at
     }
+  end
+
+  def set_app
+    @app = current_team.apps.find(params[:app_id])
   end
 end

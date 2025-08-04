@@ -2,21 +2,19 @@ import { Controller } from "@hotwired/stimulus"
 
 // Controller for dashboard subnav navigation
 export default class extends Controller {
-  static targets = ["view"]
+  static targets = ["nav"]
+  static values = { currentView: String }
   
   connect() {
-    // Initialize all views
-    this.viewTargets = this.element.querySelectorAll('[data-dashboard-view]')
-    
     // Set initial active view
-    this.showView('overview')
+    this.showView(this.currentViewValue || 'overview')
   }
   
   switchView(event) {
     const button = event.currentTarget
     const viewName = button.dataset.dashboardNav
     
-    // Update nav button styling
+    // Update nav button styling within this controller's scope
     const navButtons = this.element.querySelectorAll('[data-dashboard-nav]')
     navButtons.forEach(navButton => {
       if (navButton === button) {
@@ -30,10 +28,13 @@ export default class extends Controller {
     
     // Show the selected view
     this.showView(viewName)
+    this.currentViewValue = viewName
   }
   
   showView(viewName) {
-    this.viewTargets.forEach(view => {
+    // Find all dashboard view panels
+    const views = this.element.querySelectorAll('[data-dashboard-view]')
+    views.forEach(view => {
       if (view.dataset.dashboardView === viewName) {
         view.classList.remove('hidden')
       } else {

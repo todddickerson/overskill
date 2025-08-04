@@ -1,4 +1,4 @@
-<div class="h-full flex bg-gray-50 dark:bg-gray-900">
+<div class="h-full flex bg-gray-50 dark:bg-gray-900 min-w-0" data-controller="dashboard-subnav" data-dashboard-subnav-current-view-value="overview">
   <!-- Dashboard Subnav -->
   <div class="w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
     <nav class="p-3 space-y-1">
@@ -69,9 +69,9 @@
   </div>
   
   <!-- Dashboard Content Area -->
-  <div class="flex-1 overflow-hidden" data-controller="dashboard-subnav">
+  <div class="flex-1 overflow-hidden">
     <!-- Overview Panel -->
-    <div class="h-full overflow-y-auto p-6" data-dashboard-view="overview">
+    <div class="h-full overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="overview">
       <%= render "dashboard_overview", app: app %>
     </div>
     
@@ -110,7 +110,7 @@
     </div>
     
     <!-- Tables Panel -->
-    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="tables"
+    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="tables"
          data-controller="database-manager"
          data-database-manager-app-id-value="<%= app.id %>">
       <%= render "database_tables", app: app %>
@@ -122,12 +122,12 @@
     </div>
     
     <!-- Users Panel -->
-    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="users">
+    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="users">
       <%= render "user_management", app: app %>
     </div>
     
     <!-- Analytics Panel -->
-    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="analytics">
+    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="analytics">
       <%= render "analytics_dashboard", app: app %>
     </div>
     
@@ -137,7 +137,7 @@
     </div>
     
     <!-- Settings Panel -->
-    <div class="h-full hidden overflow-y-auto p-6" data-dashboard-view="settings">
+    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="settings">
       <%= render "settings_content", app: app %>
     </div>
   </div>
