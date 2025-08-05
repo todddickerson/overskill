@@ -1,0 +1,91 @@
+<!-- Share Modal -->
+<div id="share_modal" 
+     class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center lg:animate-fadeIn"
+     data-controller="share-modal"
+     data-share-modal-app-id-value="<%= app.to_param %>"
+     data-share-modal-target="modal"
+     data-action="click->share-modal#closeOnBackdrop">
+  
+  <div class="bg-white dark:bg-gray-800 lg:rounded-xl shadow-2xl max-w-md w-full lg:mx-4 lg:animate-slideUp transition-colors duration-200 fixed lg:relative inset-x-0 bottom-0 lg:inset-auto rounded-t-2xl lg:rounded-xl max-h-[90vh] lg:max-h-none overflow-y-auto" data-share-modal-target="content">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Share <%= app.name %></h2>
+      <button data-action="click->share-modal#close" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <!-- Content -->
+    <div class="p-6 space-y-4">
+      <!-- Share Preview Link -->
+      <div>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview Link</h3>
+        <div class="flex items-center space-x-2">
+          <input type="text" 
+                 value="https://preview-<%= app.id %>.overskill.app" 
+                 data-share-modal-target="previewUrl"
+                 class="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100"
+                 readonly>
+          <button data-action="click->share-modal#copyPreviewUrl"
+                  class="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Anyone with this link can view your app in development</p>
+      </div>
+      
+      <!-- Share Production Link -->
+      <% if app.published? %>
+        <div>
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Live App Link</h3>
+          <div class="flex items-center space-x-2">
+            <input type="text" 
+                   value="https://<%= app.slug || app.name.parameterize %>.overskill.app" 
+                   data-share-modal-target="productionUrl"
+                   class="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100"
+                   readonly>
+            <button data-action="click->share-modal#copyProductionUrl"
+                    class="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Your published app URL</p>
+        </div>
+      <% end %>
+      
+      <!-- Social Sharing -->
+      <div>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Share on Social Media</h3>
+        <div class="flex space-x-2">
+          <button data-action="click->share-modal#shareTwitter"
+                  class="flex-1 px-4 py-2 bg-[#1DA1F2] hover:bg-[#1a91da] text-white rounded-lg transition-colors text-sm font-medium">
+            <i class="fab fa-twitter mr-2"></i>Twitter
+          </button>
+          <button data-action="click->share-modal#shareLinkedIn"
+                  class="flex-1 px-4 py-2 bg-[#0077B5] hover:bg-[#006ba1] text-white rounded-lg transition-colors text-sm font-medium">
+            <i class="fab fa-linkedin mr-2"></i>LinkedIn
+          </button>
+        </div>
+      </div>
+      
+      <!-- Editor Link -->
+      <div>
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Collaborate</h3>
+        <div class="flex items-center space-x-2">
+          <input type="text" 
+                 value="<%= request.base_url %><%= account_app_editor_path(app) %>" 
+                 data-share-modal-target="editorUrl"
+                 class="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100"
+                 readonly>
+          <button data-action="click->share-modal#copyEditorUrl"
+                  class="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with team members to collaborate</p>
+      </div>
+    </div>
+  </div>
+</div>

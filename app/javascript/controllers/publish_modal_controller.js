@@ -208,4 +208,115 @@ export default class extends Controller {
     const url = `https://${this.productionUrlTarget.textContent}`
     window.open(url, '_blank')
   }
+  
+  async deployProduction(event) {
+    event.preventDefault()
+    console.log('Deploying to production...')
+    
+    // Show loading state
+    const button = event.currentTarget
+    const originalContent = button.innerHTML
+    button.disabled = true
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Deploying...</span>'
+    
+    // Show deploy status
+    if (this.hasDeployStatusTarget) {
+      this.deployStatusTarget.classList.remove('hidden')
+    }
+    
+    try {
+      const response = await fetch(`/account/apps/${this.appIdValue}/deploy`, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ environment: 'production' })
+      })
+      
+      if (response.ok) {
+        button.innerHTML = '<i class="fas fa-check"></i> <span>Deployed!</span>'
+        button.classList.remove('bg-blue-600', 'hover:bg-blue-700')
+        button.classList.add('bg-green-600')
+        
+        // Reload app data after deployment
+        setTimeout(() => {
+          this.loadAppData()
+          button.innerHTML = originalContent
+          button.classList.remove('bg-green-600')
+          button.classList.add('bg-blue-600', 'hover:bg-blue-700')
+          button.disabled = false
+          if (this.hasDeployStatusTarget) {
+            this.deployStatusTarget.classList.add('hidden')
+          }
+        }, 2000)
+      } else {
+        throw new Error('Deployment failed')
+      }
+    } catch (error) {
+      console.error('Deploy failed:', error)
+      button.innerHTML = '<i class="fas fa-times"></i> <span>Deploy Failed</span>'
+      button.classList.remove('bg-blue-600', 'hover:bg-blue-700')
+      button.classList.add('bg-red-600')
+      
+      setTimeout(() => {
+        button.innerHTML = originalContent
+        button.classList.remove('bg-red-600')
+        button.classList.add('bg-blue-600', 'hover:bg-blue-700')
+        button.disabled = false
+        if (this.hasDeployStatusTarget) {
+          this.deployStatusTarget.classList.add('hidden')
+        }
+      }, 3000)
+    }
+  }
+  
+  async deployPreview(event) {
+    event.preventDefault()
+    console.log('Deploying to preview...')
+    
+    // Show loading state
+    const button = event.currentTarget
+    const originalContent = button.innerHTML
+    button.disabled = true
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Updating...</span>'
+    
+    try {
+      const response = await fetch(`/account/apps/${this.appIdValue}/deploy`, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ environment: 'preview' })
+      })
+      
+      if (response.ok) {
+        button.innerHTML = '<i class="fas fa-check"></i> <span>Updated!</span>'
+        button.classList.remove('bg-gray-600', 'hover:bg-gray-700')
+        button.classList.add('bg-green-600')
+        
+        setTimeout(() => {
+          button.innerHTML = originalContent
+          button.classList.remove('bg-green-600')
+          button.classList.add('bg-gray-600', 'hover:bg-gray-700')
+          button.disabled = false
+        }, 2000)
+      } else {
+        throw new Error('Update failed')
+      }
+    } catch (error) {
+      console.error('Update failed:', error)
+      button.innerHTML = '<i class="fas fa-times"></i> <span>Update Failed</span>'
+      button.classList.remove('bg-gray-600', 'hover:bg-gray-700')
+      button.classList.add('bg-red-600')
+      
+      setTimeout(() => {
+        button.innerHTML = originalContent
+        button.classList.remove('bg-red-600')
+        button.classList.add('bg-gray-600', 'hover:bg-gray-700')
+        button.disabled = false
+      }, 3000)
+    }
+  }
 }

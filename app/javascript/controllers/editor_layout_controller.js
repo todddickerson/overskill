@@ -77,20 +77,38 @@ export default class extends Controller {
   
   // Open share modal
   openShareModal() {
-    // Create and show share modal
-    console.log('Share modal functionality to be implemented')
-    // For now, just copy the current URL to clipboard
-    const currentUrl = window.location.href
-    navigator.clipboard.writeText(currentUrl).then(() => {
-      // Show temporary notification
-      const notification = document.createElement('div')
-      notification.textContent = 'URL copied to clipboard!'
-      notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50'
-      document.body.appendChild(notification)
-      setTimeout(() => {
-        document.body.removeChild(notification)
-      }, 2000)
-    })
+    const shareModal = document.querySelector('#share_modal')
+    if (shareModal) {
+      const controller = this.application.getControllerForElementAndIdentifier(shareModal, 'share-modal')
+      if (controller && controller.open) {
+        controller.open()
+      } else {
+        console.error('Share modal controller not found or no open method')
+      }
+    } else {
+      console.error('Share modal element not found')
+    }
+  }
+  
+  // Open publish modal
+  openPublishModal() {
+    const publishModal = document.querySelector('#publish_modal')
+    if (publishModal) {
+      const controller = this.application.getControllerForElementAndIdentifier(publishModal, 'publish-modal')
+      if (controller && controller.open) {
+        controller.open()
+      } else {
+        console.error('Publish modal controller not found or no open method')
+      }
+    } else {
+      console.error('Publish modal element not found')
+    }
+  }
+  
+  // Open invite modal  
+  openInviteModal() {
+    console.log('Invite modal functionality to be implemented')
+    // TODO: Implement invite modal
   }
   
   // Deprecated mobile chat methods - now handled by mobile-navigation controller

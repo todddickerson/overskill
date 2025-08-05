@@ -1,9 +1,8 @@
 <div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden" 
-     data-controller="version-preview deployment publish-modal version-comparison version-actions editor-layout main-tabs preview-device mobile-navigation" 
+     data-controller="version-preview deployment version-comparison version-actions editor-layout main-tabs preview-device mobile-navigation" 
      data-version-preview-app-id-value="<%= @app.to_param %>"
      data-version-preview-current-version-value="<%= @app.app_versions.order(created_at: :desc).first&.id %>"
      data-deployment-app-id-value="<%= @app.to_param %>"
-     data-publish-modal-app-id-value="<%= @app.to_param %>"
      data-version-comparison-app-id-value="<%= @app.to_param %>"
      data-editor-layout-chat-visible-value="true"
      data-preview-device-current-device-value="desktop"
@@ -312,9 +311,8 @@
           
           <!-- Publish -->
           <div class="relative" data-controller="tooltip" data-tooltip-content-value="Deploy your app to production" data-tooltip-position-value="bottom">
-            <button data-action="click->publish-modal#open mouseenter->tooltip#show mouseleave->tooltip#hide"
-                    class="px-4 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700"
-                    onclick="console.log('Desktop publish button clicked')">
+            <button data-action="click->editor-layout#openPublishModal mouseenter->tooltip#show mouseleave->tooltip#hide"
+                    class="px-4 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
               Publish
             </button>
           </div>
@@ -353,7 +351,7 @@
           </div>
           
           <!-- Mobile Publish Button -->
-          <button data-action="click->publish-modal#open"
+          <button data-action="click->mobile-navigation#openPublishModal"
                   class="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700">
             Publish
           </button>
@@ -485,6 +483,9 @@
 
 <!-- Publish Modal -->
 <%= render "publish_modal", app: @app %>
+
+<!-- Share Modal -->
+<%= render "share_modal", app: @app %>
 
 <!-- Version Comparison Modal -->
 <%= render "version_comparison_modal", app: @app %>
