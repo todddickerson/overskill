@@ -93,6 +93,31 @@ module ApplicationHelper
     end
   end
 
+  def deployment_status_badge(status)
+    case status.to_s
+    when 'deployed', 'success', 'live'
+      content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" do
+        content_tag(:i, "", class: "fas fa-check-circle mr-1") + status.to_s.humanize
+      end
+    when 'deploying', 'pending', 'in_progress'
+      content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" do
+        content_tag(:i, "", class: "fas fa-spinner fa-spin mr-1") + status.to_s.humanize
+      end
+    when 'failed', 'error'
+      content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" do
+        content_tag(:i, "", class: "fas fa-times-circle mr-1") + status.to_s.humanize
+      end
+    when 'not_deployed', 'inactive'
+      content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" do
+        content_tag(:i, "", class: "fas fa-circle mr-1") + status.to_s.humanize
+      end
+    else
+      content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" do
+        status.to_s.humanize
+      end
+    end
+  end
+
   def html_for_preview(app)
     # Find the main HTML file
     html_file = app.app_files.find_by(file_type: "html") || app.app_files.find_by(path: "index.html")
