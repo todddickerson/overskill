@@ -62,6 +62,10 @@ class App < ApplicationRecord
   def failed?
     status == "failed"
   end
+  
+  def published?
+    status == "published"
+  end
 
   def published_url
     # Return the custom domain if set (future feature), otherwise use the default overskill.app subdomain
