@@ -192,6 +192,7 @@ class Account::AppsController < Account::ApplicationController
     end
   end
 
+
   private
 
   if defined?(Api::V1::ApplicationController)

@@ -1,37 +1,19 @@
 /* Import Neue Regrade font for overskill branding */
 
-/* Neue Regrade Font - Free Variable Font by József Ungvári */
-
-@font-face {
-  font-family: 'Neue Regrade';
-  font-style: normal;
-  font-weight: 300 800;
-  font-display: swap;
-  src: url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-Variable.woff2') format('woff2-variations');
-}
-
-@font-face {
-  font-family: 'Neue Regrade';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-Regular.woff2') format('woff2'),
-       url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-Regular.woff') format('woff');
-}
-
-@font-face {
-  font-family: 'Neue Regrade';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-SemiBold.woff2') format('woff2'),
-       url('https://cdn.jsdelivr.net/gh/ungvarijoci/neue-regrade@main/fonts/NeueRegrade-SemiBold.woff') format('woff');
-}
-
+/* Neue Regrade Bold Font - Paid license */
 @font-face {
   font-family: 'Neue Regrade';
   font-style: normal;
   font-weight: 700;
+  font-display: swap;
+  src: asset-url('NeueRegrade-Bold-Font.otf') format('opentype');
+}
+
+/* Use the bold font for all weights since we only have the bold file */
+@font-face {
+  font-family: 'Neue Regrade';
+  font-style: normal;
+  font-weight: 300 800;
   font-display: swap;
   src: asset-url('NeueRegrade-Bold-Font.otf') format('opentype');
 }

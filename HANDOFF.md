@@ -6,7 +6,16 @@
 
 The OverSkill app editor now features a fully responsive mobile UI, improved AI generation with function calling, and real-time progress tracking.
 
-### ✅ **Latest Completed: Lovable.dev Mobile UI (2025-08-05)**
+### ✅ **Latest Completed: Mobile UI Fixes (2025-08-05)**
+- **Mobile Chat Toggle**: Fixed panel visibility switching on mobile
+- **Mobile Header**: Added header with [Logo | App Name | Collaborator Avatars + Invite]
+- **Plus Menu**: Implemented camera/image upload and AI suggestions
+- **Invite Modal**: Added bottom sheet modal for inviting collaborators
+- **Panel Switching**: Improved mobile panel visibility with proper z-index
+- **AI Suggestions**: Quick action prompts for common improvements
+- **Debug Logging**: Added console logging for troubleshooting
+
+### ✅ **Previously Completed: Lovable.dev Mobile UI (2025-08-05)**
 - **Bottom Navigation**: Fixed bottom bar with Chat/Preview toggle (mobile)
 - **Contextual Actions**: Mode-specific buttons (+ in chat, history in preview)
 - **Mobile Modals**: All dropdowns use bottom sheet style on mobile

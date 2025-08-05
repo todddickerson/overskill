@@ -1,69 +1,77 @@
 <div class="h-full flex bg-gray-50 dark:bg-gray-900 min-w-0" data-controller="dashboard-subnav" data-dashboard-subnav-current-view-value="overview">
   <!-- Dashboard Subnav -->
-  <div class="w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
-    <nav class="p-3 space-y-1">
+  <div class="w-12 lg:w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 transition-all duration-300">
+    <nav class="p-1 lg:p-3 space-y-1">
       <!-- Overview -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="overview"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-th-large mr-2 text-xs"></i>
-        Overview
+              data-action="click->dashboard-subnav#switchView"
+              title="Overview">
+        <i class="fas fa-th-large text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Overview</span>
       </button>
       
       <!-- Code Files -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="files"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-code mr-2 text-xs"></i>
-        Code <span class="text-xs text-gray-500">(<%= files.count %>)</span>
+              data-action="click->dashboard-subnav#switchView"
+              title="Code Files">
+        <i class="fas fa-code text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Code <span class="text-xs text-gray-500">(<%= files.count %>)</span></span>
       </button>
       
       <!-- Tables -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="tables"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-table mr-2 text-xs"></i>
-        Tables
+              data-action="click->dashboard-subnav#switchView"
+              title="Tables">
+        <i class="fas fa-table text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Tables</span>
       </button>
       
       <!-- Schema -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="schema"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-project-diagram mr-2 text-xs"></i>
-        Schema
+              data-action="click->dashboard-subnav#switchView"
+              title="Schema">
+        <i class="fas fa-project-diagram text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Schema</span>
       </button>
       
       <!-- Users -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="users"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-users mr-2 text-xs"></i>
-        Users
+              data-action="click->dashboard-subnav#switchView"
+              title="Users">
+        <i class="fas fa-users text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Users</span>
       </button>
       
       <!-- Analytics -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="analytics"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-chart-line mr-2 text-xs"></i>
-        Analytics
+              data-action="click->dashboard-subnav#switchView"
+              title="Analytics">
+        <i class="fas fa-chart-line text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Analytics</span>
       </button>
       
       <!-- API -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="api"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-plug mr-2 text-xs"></i>
-        API
+              data-action="click->dashboard-subnav#switchView"
+              title="API">
+        <i class="fas fa-plug text-xs"></i>
+        <span class="ml-2 hidden lg:inline">API</span>
       </button>
       
       <!-- Settings -->
-      <button class="w-full text-left px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md"
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="settings"
-              data-action="click->dashboard-subnav#switchView">
-        <i class="fas fa-cog mr-2 text-xs"></i>
-        Settings
+              data-action="click->dashboard-subnav#switchView"
+              title="Settings">
+        <i class="fas fa-cog text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Settings</span>
       </button>
     </nav>
   </div>
@@ -71,7 +79,7 @@
   <!-- Dashboard Content Area -->
   <div class="flex-1 overflow-hidden">
     <!-- Overview Panel -->
-    <div class="h-full overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="overview">
+    <div class="h-full overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="overview">
       <%= render "dashboard_overview", app: app %>
     </div>
     
@@ -110,7 +118,7 @@
     </div>
     
     <!-- Tables Panel -->
-    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="tables"
+    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="tables"
          data-controller="database-manager"
          data-database-manager-app-id-value="<%= app.id %>">
       <%= render "database_tables", app: app %>
@@ -122,12 +130,12 @@
     </div>
     
     <!-- Users Panel -->
-    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="users">
+    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="users">
       <%= render "user_management", app: app %>
     </div>
     
     <!-- Analytics Panel -->
-    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="analytics">
+    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="analytics">
       <%= render "analytics_dashboard", app: app %>
     </div>
     
@@ -137,7 +145,7 @@
     </div>
     
     <!-- Settings Panel -->
-    <div class="h-full hidden overflow-y-auto p-6 custom-scrollbar" data-dashboard-view="settings">
+    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="settings">
       <%= render "settings_content", app: app %>
     </div>
   </div>

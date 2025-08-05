@@ -5,14 +5,24 @@ export default class extends Controller {
   static values = { appId: String }
   
   connect() {
+    console.log('PublishModalController connected', this.element)
+    console.log('App ID value:', this.appIdValue)
+    console.log('Has modal target:', this.hasModalTarget)
     // Load current URLs and visitor count
     this.loadAppData()
   }
   
   open() {
+    console.log('PublishModalController.open() called')
+    console.log('Has modal target:', this.hasModalTarget)
+    console.log('Modal target:', this.modalTarget)
+    
     if (this.hasModalTarget) {
+      console.log('Opening modal - removing hidden class')
       this.modalTarget.classList.remove("hidden")
       document.body.style.overflow = "hidden"
+    } else {
+      console.log('ERROR: No modal target found!')
     }
   }
   

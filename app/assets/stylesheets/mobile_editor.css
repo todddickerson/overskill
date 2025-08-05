@@ -93,8 +93,19 @@ body.mobile-editor {
   
   /* Modals */
   .mobile-modal {
-    z-index: 50;
+    z-index: 60;
   }
+}
+
+/* Mobile modal positioning fix */
+.mobile-modal {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  display: flex !important;
+  align-items: flex-end !important;
 }
 
 /* Touch-friendly button sizing */
@@ -102,5 +113,113 @@ body.mobile-editor {
   [data-controller="mobile-navigation"] button {
     min-width: 44px;
     min-height: 44px;
+  }
+  
+  /* Version history mobile improvements */
+  .modal-content-mobile .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* Better scroll indicator for version list */
+  .modal-content-mobile [data-version-history-target="content"] {
+    position: relative;
+  }
+  
+  .modal-content-mobile [data-version-history-target="content"]::after {
+    content: '';
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(to top, rgba(249, 250, 251, 0.9), transparent);
+    pointer-events: none;
+    z-index: 10;
+  }
+  
+  .dark .modal-content-mobile [data-version-history-target="content"]::after {
+    background: linear-gradient(to top, rgba(17, 24, 39, 0.9), transparent);
+  }
+}
+
+/* Mobile-responsive modals */
+@media (max-width: 1023px) {
+  /* Standard modal container adjustments */
+  .modal-mobile-responsive {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+  
+  /* Modal content slides up from bottom */
+  .modal-mobile-responsive > div > div:last-child,
+  .modal-content-mobile {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    max-height: 85vh !important;
+    margin: 0 !important;
+    animation: slideUp 0.3s ease-out;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  /* Ensure only top header is rounded on mobile sheets */
+  .modal-content-mobile > div:first-child {
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    overflow: hidden !important;
+  }
+  
+  /* Keep header layout intact - don't center close button */
+  .modal-content-mobile > div:first-child .flex {
+    justify-content: space-between !important;
+  }
+  
+  /* Modal footer styling - no rounded corners, with background */
+  .modal-content-mobile > div:last-child,
+  .modal-content-mobile .bg-gray-50,
+  .modal-content-mobile .px-6.py-4.border-t,
+  .modal-content-mobile .px-6.py-4 {
+    border-radius: 0 !important;
+    background-color: rgb(249 250 251) !important; /* bg-gray-50 */
+  }
+  
+  /* Dark mode modal footer */
+  .dark .modal-content-mobile > div:last-child,
+  .dark .modal-content-mobile .bg-gray-50,
+  .dark .modal-content-mobile .px-6.py-4.border-t,
+  .dark .modal-content-mobile .px-6.py-4 {
+    background-color: rgb(17 24 39) !important; /* bg-gray-900 */
+  }
+  
+  /* Ensure modal content area is scrollable */
+  .modal-content-mobile > div:last-child {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Animation for modal slide up */
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  
+  /* Ensure backdrop covers full screen */
+  .modal-mobile-responsive > div:first-child {
+    position: fixed !important;
+    inset: 0 !important;
   }
 }

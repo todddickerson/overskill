@@ -115,6 +115,8 @@ Rails.application.routes.draw do
             post :debug_error
           end
           
+          resources :app_files, only: [:index]
+          
           # Chat interface (may be deprecated in favor of editor)
           resource :chat, controller: "app_chats", only: [:show, :create]
           
