@@ -26,11 +26,52 @@ export default class extends Controller {
   open() {
     this.dropdownTarget.classList.remove("hidden")
     this.triggerTarget.classList.add("bg-gray-200", "dark:bg-gray-700")
+    
+    // Mobile animation
+    if (window.innerWidth < 1024) {
+      // Add backdrop for mobile
+      this.addMobileBackdrop()
+      
+      // Trigger animation after display
+      requestAnimationFrame(() => {
+        this.dropdownTarget.classList.add("active")
+        this.dropdownTarget.classList.remove("translate-y-full")
+      })
+    }
   }
   
   close() {
-    this.dropdownTarget.classList.add("hidden")
+    // Mobile animation
+    if (window.innerWidth < 1024) {
+      this.dropdownTarget.classList.remove("active")
+      this.dropdownTarget.classList.add("translate-y-full")
+      
+      // Hide after animation
+      setTimeout(() => {
+        this.dropdownTarget.classList.add("hidden")
+        this.removeMobileBackdrop()
+      }, 300)
+    } else {
+      this.dropdownTarget.classList.add("hidden")
+    }
+    
     this.triggerTarget.classList.remove("bg-gray-200", "dark:bg-gray-700")
+  }
+  
+  addMobileBackdrop() {
+    if (!this.backdrop) {
+      this.backdrop = document.createElement('div')
+      this.backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-40'
+      this.backdrop.addEventListener('click', () => this.close())
+      document.body.appendChild(this.backdrop)
+    }
+  }
+  
+  removeMobileBackdrop() {
+    if (this.backdrop) {
+      this.backdrop.remove()
+      this.backdrop = null
+    }
   }
   
   closeOnClickOutside(event) {

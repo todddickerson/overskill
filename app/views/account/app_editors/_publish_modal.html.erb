@@ -1,11 +1,11 @@
 <div id="publish_modal" 
-     class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center animate-fadeIn"
+     class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center lg:animate-fadeIn"
      data-controller="publish-modal"
      data-publish-modal-app-id-value="<%= app.id %>"
      data-publish-modal-target="modal"
      data-action="click->publish-modal#closeOnBackdrop">
   
-  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full mx-4 animate-slideUp transition-colors duration-200" data-publish-modal-target="content">
+  <div class="bg-white dark:bg-gray-800 lg:rounded-xl shadow-2xl max-w-2xl w-full lg:mx-4 lg:animate-slideUp transition-colors duration-200 fixed lg:relative inset-x-0 bottom-0 lg:inset-auto rounded-t-2xl lg:rounded-xl max-h-[90vh] lg:max-h-none overflow-y-auto" data-publish-modal-target="content">
     <!-- Header -->
     <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
       <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Publish Settings</h2>

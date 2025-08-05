@@ -1,0 +1,106 @@
+/* Mobile Editor Specific Styles */
+
+/* Mobile modal (bottom sheet) styles */
+.mobile-modal {
+  max-height: 90vh;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-modal.active {
+  transform: translateY(0);
+}
+
+/* Adjust main content for mobile bottom navigation */
+body.mobile-editor {
+  padding-bottom: 64px; /* Height of bottom nav */
+}
+
+/* Mobile-specific chat panel adjustments */
+@media (max-width: 1023px) {
+  /* Full screen chat panel on mobile */
+  [data-mobile-navigation-target="chatPanel"] {
+    position: fixed;
+    top: 3.5rem; /* Height of top header */
+    bottom: 4rem; /* Height of bottom nav */
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 20;
+  }
+  
+  /* Ensure preview takes full space */
+  [data-mobile-navigation-target="previewPanel"] {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+  
+  /* Preview controls positioning */
+  [data-mobile-navigation-target="previewControls"] {
+    top: 3.5rem; /* Below header */
+  }
+  
+  /* Hide desktop-specific elements */
+  .lg\\:flex:not([data-mobile-navigation-target]) {
+    display: none !important;
+  }
+}
+
+/* Bottom navigation styling */
+[data-controller="mobile-navigation"] {
+  box-shadow: 0 -1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Active tab styling for mobile */
+[data-controller="mobile-navigation"] button.bg-white {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Preview control overlay style */
+[data-mobile-navigation-target="previewControls"][class*="backdrop-blur"] {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Smooth transitions for panel switching */
+[data-mobile-navigation-target$="Panel"] {
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Mobile dropdown styling */
+.mobile-dropdown {
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-dropdown.active {
+  transform: translateY(0);
+}
+
+/* Ensure proper z-index stacking */
+.mobile-editor {
+  /* Header */
+  & > div:first-child {
+    z-index: 30;
+  }
+  
+  /* Bottom nav */
+  [data-controller="mobile-navigation"] {
+    z-index: 40;
+  }
+  
+  /* Modals */
+  .mobile-modal {
+    z-index: 50;
+  }
+}
+
+/* Touch-friendly button sizing */
+@media (max-width: 1023px) {
+  [data-controller="mobile-navigation"] button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

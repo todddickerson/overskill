@@ -22,6 +22,9 @@
 /* Import Neue Regrade font for overskill branding */
 @import "./fonts/neue-regrade.css";
 
+/* Import mobile editor styles */
+@import "./mobile_editor.css";
+
 /* Custom scrollbar styles - hidden by default, visible on hover */
 /* Webkit browsers (Chrome, Safari, Edge) */
 .custom-scrollbar {

@@ -10,41 +10,25 @@
 
   <!-- Mobile Header (visible only on mobile) -->
   <div class="lg:hidden h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
-    <!-- Left: Logo only -->
+    <!-- Left: Overskill Logo with Dropdown -->
     <div class="flex items-center">
       <%= render "team_navigation" %>
     </div>
     
-    <!-- Center: Dashboard/Preview Toggle -->
-    <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
-      <button class="px-3 py-1 text-xs font-medium rounded-full transition-all"
-              data-main-tabs-target="tab"
-              data-panel="dashboard"
-              data-action="click->main-tabs#switchTab">
-        Dashboard
-      </button>
-      <button class="px-3 py-1 text-xs font-medium rounded-full transition-all"
-              data-main-tabs-target="tab"
-              data-panel="preview"
-              data-action="click->main-tabs#switchTab">
-        Preview
-      </button>
+    <!-- Right: App Name with Dropdown -->
+    <div class="flex items-center">
+      <%= render "app_navigation" %>
     </div>
-    
-    <!-- Right: Publish Icon -->
-    <button data-action="click->publish-modal#open"
-            class="p-2 text-primary-600 hover:text-primary-700">
-      <i class="fas fa-rocket text-sm"></i>
-    </button>
   </div>
 
   <!-- Main Layout Container -->
   <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
   
-  <!-- Chat Panel - Left Column on Desktop, Hidden on Mobile until triggered -->
+  <!-- Chat Panel - Left Column on Desktop, Full Screen on Mobile -->
   <div class="hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r lg:border-r border-t lg:border-t-0 border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden relative 
-              lg:h-auto h-1/2 lg:w-96 w-full order-2 lg:order-1"
+              lg:h-auto lg:w-96 w-full order-2 lg:order-1"
        data-editor-layout-target="chatPanel"
+       data-mobile-navigation-target="chatPanel"
        data-controller="resizable-panel"
        data-resizable-panel-min-width-value="320"
        data-resizable-panel-max-width-value="600"
@@ -275,12 +259,12 @@
     <!-- Main Content Area -->
     <div class="flex-1 bg-white dark:bg-gray-900 overflow-hidden">
       <!-- Dashboard View -->
-      <div class="h-full hidden" data-main-tabs-target="panel" data-panel-name="dashboard">
+      <div class="h-full hidden" data-main-tabs-target="panel" data-mobile-navigation-target="dashboardPanel" data-panel-name="dashboard">
         <%= render "dashboard_with_subnav", app: @app, files: @files, selected_file: @selected_file %>
       </div>
       
       <!-- Preview View -->
-      <div class="h-full" data-main-tabs-target="panel" data-panel-name="preview">
+      <div class="h-full" data-main-tabs-target="panel" data-mobile-navigation-target="previewPanel" data-panel-name="preview">
         <%= render "preview_frame", app: @app %>
       </div>
     </div>
@@ -304,12 +288,80 @@
     </div>
   </div>
   
-  <!-- Mobile Floating Edit Button -->
-  <button class="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center z-40"
-          data-action="click->editor-layout#openMobileChat"
-          data-editor-layout-target="floatingEditButton">
-    <i class="fas fa-magic text-lg"></i>
-  </button>
+  <!-- Mobile Bottom Navigation Bar -->
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-40"
+       data-controller="mobile-navigation"
+       data-mobile-navigation-current-mode-value="preview">
+    <div class="flex items-center justify-between h-16 px-4">
+      <!-- Left Action Button (contextual) -->
+      <button class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              data-mobile-navigation-target="leftAction"
+              data-action="click->mobile-navigation#handleLeftAction">
+        <!-- Plus icon in chat mode, history in preview mode -->
+        <i class="fas fa-plus text-gray-600 dark:text-gray-400 hidden" data-mobile-navigation-target="plusIcon"></i>
+        <i class="fas fa-history text-gray-600 dark:text-gray-400" data-mobile-navigation-target="historyIcon"></i>
+      </button>
+      
+      <!-- Center: Mode Toggle -->
+      <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+        <button class="px-4 py-1.5 text-sm font-medium rounded-full transition-all"
+                data-mobile-navigation-target="chatTab"
+                data-action="click->mobile-navigation#showChat">
+          Chat
+        </button>
+        <button class="px-4 py-1.5 text-sm font-medium rounded-full transition-all"
+                data-mobile-navigation-target="previewTab"
+                data-action="click->mobile-navigation#showPreview">
+          Preview
+        </button>
+      </div>
+      
+      <!-- Right Action Button (contextual) -->
+      <button class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              data-mobile-navigation-target="rightAction"
+              data-action="click->mobile-navigation#handleRightAction">
+        <!-- Settings gear in chat mode, publish in preview mode -->
+        <i class="fas fa-cog text-gray-600 dark:text-gray-400 hidden" data-mobile-navigation-target="settingsIcon"></i>
+        <i class="fas fa-rocket text-gray-600 dark:text-gray-400" data-mobile-navigation-target="publishIcon"></i>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Mobile Preview Controls Overlay -->
+  <div class="lg:hidden fixed top-14 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-30 hidden"
+       data-mobile-navigation-target="previewControls">
+    <div class="flex items-center justify-between px-4 py-2">
+      <!-- Page Selector -->
+      <button class="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm"
+              data-action="click->mobile-navigation#openPageSelector">
+        <span class="text-gray-700 dark:text-gray-300">Page: Home</span>
+        <i class="fas fa-chevron-down text-xs text-gray-500"></i>
+      </button>
+      
+      <!-- Control Actions -->
+      <div class="flex items-center space-x-2">
+        <!-- Refresh -->
+        <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                data-action="click->mobile-navigation#refreshPreview">
+          <i class="fas fa-sync-alt text-sm"></i>
+        </button>
+        
+        <!-- Open in New Tab -->
+        <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                data-action="click->mobile-navigation#openInNewTab">
+          <i class="fas fa-external-link-alt text-sm"></i>
+        </button>
+        
+        <!-- Control Style Toggle -->
+        <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                data-action="click->mobile-navigation#toggleControlStyle"
+                data-mobile-navigation-target="controlStyleToggle">
+          <i class="fas fa-square text-sm" data-mobile-navigation-target="boxedIcon"></i>
+          <i class="fas fa-layer-group text-sm hidden" data-mobile-navigation-target="overlayIcon"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Publish Modal -->
