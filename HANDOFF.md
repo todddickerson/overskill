@@ -6,14 +6,20 @@
 
 The OverSkill app editor now features a fully responsive mobile UI, improved AI generation with function calling, and real-time progress tracking.
 
-### ✅ **Latest Completed: Mobile UI & AI Improvements (2025-08-04)**
-- **Mobile-First Editor**: Simplified mobile UI with dashboard/preview toggle
-- **Floating Edit Button**: Bottom-right FAB opens AI chat as full-screen overlay
-- **Function Calling**: OpenAI-compatible function calling eliminates JSON parsing errors
-- **Real-time Progress**: Text-based progress bars with detailed status messages
-- **Activity Monitor**: Complete API call tracking with filtering and statistics
-- **Fixed Chat Position**: Chat panel properly positioned on left for desktop
-- **Kimi K2 Integration**: Primary AI model with Claude Sonnet fallback
+### ✅ **Latest Completed: Lovable.dev Mobile UI (2025-08-05)**
+- **Bottom Navigation**: Fixed bottom bar with Chat/Preview toggle (mobile)
+- **Contextual Actions**: Mode-specific buttons (+ in chat, history in preview)
+- **Mobile Modals**: All dropdowns use bottom sheet style on mobile
+- **Preview Controls**: Overlay bar with page selector, refresh, control toggle
+- **Full-Screen Modes**: Chat and preview take full screen on mobile
+- **Professional Polish**: Smooth animations, proper z-index stacking
+- **Dashboard Access**: Via settings gear in chat mode
+
+### ✅ **Previously Completed: Supabase & AI (2025-08-04)**
+- **Supabase Phase 2**: Complete user sync infrastructure
+- **Function Calling**: OpenAI-compatible function calling
+- **Real-time Progress**: Text-based progress bars
+- **Activity Monitor**: API call tracking with statistics
 
 ### ✅ **Completed: Professional App Editor**
 - **Lovable.dev-style UI**: Split-screen layout with chat, preview, and code panels
@@ -159,7 +165,10 @@ app/javascript/controllers/
 ├── version_history_controller.js    # FIXED: Modal controller scoping
 ├── tabs_controller.js               # Tab navigation with dark mode fixes
 ├── main_tabs_controller.js          # NEW: Mobile-aware tab switching
-└── editor_layout_controller.js      # ENHANCED: Mobile chat overlay support
+├── editor_layout_controller.js      # ENHANCED: Deprecated mobile methods
+├── mobile_navigation_controller.js  # NEW: Lovable.dev-style mobile navigation
+├── team_navigation_controller.js    # ENHANCED: Mobile bottom sheet support
+└── app_navigation_controller.js     # ENHANCED: Mobile bottom sheet support
 
 app/controllers/account/
 ├── app_editors_controller.rb        # Enhanced with chat form fixes

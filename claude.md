@@ -272,6 +272,13 @@ Required environment variables (copy `.env.example` to `.env`):
 5. **Follow BulletTrain conventions**: Especially for controllers and models
 6. **Super-scaffolding strategy**: Use for any model needing CRUD/API endpoints
 7. **Dual UI approach**: Admin features in `/account/`, public UX in `/public/`
+8. **Mobile-first design**: Use Lovable.dev patterns for professional mobile UX
+   - Bottom navigation for mode switching (Chat/Preview)
+   - Bottom sheet modals for all mobile dropdowns
+   - Contextual action buttons that change per mode
+   - Full-screen panels with proper z-index stacking
+   - Touch-friendly 44px minimum tap targets
+9. **Stimulus controller naming**: Use underscores not hyphens (e.g., `mobile_navigation_controller.js`)
 
 ## BulletTrain Role System (CRITICAL)
 
@@ -457,11 +464,16 @@ SUPABASE_ANON_KEY=your-anon-key  # ⚠️ Must restart Rails after adding
 - **Schema format**: `app_{id}_tablename` for isolation
 - **AI awareness**: Database schema included in generation prompts
 
-### Mobile UI Patterns
-- **Editor layout**: Responsive with floating edit button
-- **Chat overlay**: Full-screen on mobile via `openMobileChat()`
-- **Toggle style**: Pill buttons on mobile, underline on desktop
-- **Key controller**: `editor_layout_controller.js`
+### Mobile UI Patterns (Lovable.dev Style)
+- **Bottom Navigation**: Fixed bottom bar with Chat/Preview toggle
+- **Contextual Actions**: Left/right buttons change based on mode
+  - Chat mode: [+] button (left), [⚙️] settings (right)
+  - Preview mode: [🕐] history (left), [🚀] publish (right)
+- **Mode Switching**: Full-screen panels via `mobile_navigation_controller.js`
+- **Mobile Modals**: Bottom sheet style for all dropdowns/modals
+- **Preview Controls**: Overlay bar with page selector, refresh, control style toggle
+- **Dashboard Access**: Via settings gear in chat mode
+- **Key Classes**: `.mobile-modal`, `.mobile-dropdown` with slide animations
 
 ## CRITICAL: AI Orchestration Quality Standards
 
