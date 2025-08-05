@@ -134,7 +134,7 @@ export default class extends Controller {
     
     try {
       // Trigger deployment
-      const response = await fetch(`/account/apps/${this.appIdValue}/editor/deploy`, {
+      const response = await fetch(`/account/apps/${this.appIdValue}/deploy`, {
         method: 'POST',
         headers: {
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
@@ -225,7 +225,7 @@ export default class extends Controller {
     }
     
     try {
-      const response = await fetch(`/account/apps/${this.appIdValue}/editor/deploy`, {
+      const response = await fetch(`/account/apps/${this.appIdValue}/deploy`, {
         method: 'POST',
         headers: {
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
@@ -282,7 +282,7 @@ export default class extends Controller {
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Updating...</span>'
     
     try {
-      const response = await fetch(`/account/apps/${this.appIdValue}/editor/deploy`, {
+      const response = await fetch(`/account/apps/${this.appIdValue}/deploy`, {
         method: 'POST',
         headers: {
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,

@@ -58,7 +58,7 @@ export default class extends Controller {
   
   async refresh() {
     try {
-      const response = await fetch(`/account/apps/${this.appIdValue}/editor/activity_monitor`, {
+      const response = await fetch(`/account/apps/${this.appIdValue}/activity_monitor`, {
         headers: {
           'Accept': 'text/html',
           'X-Requested-With': 'XMLHttpRequest'

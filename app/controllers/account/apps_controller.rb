@@ -192,6 +192,36 @@ class Account::AppsController < Account::ApplicationController
     end
   end
 
+  # POST /account/apps/:id/deploy
+  def deploy
+    # Check if app has files to deploy
+    unless @app.app_files.any?
+      render json: { error: "No files to deploy" }, status: :unprocessable_entity
+      return
+    end
+
+    # Determine deployment target
+    environment = params[:environment] || "production"
+    
+    # Queue deployment job with environment
+    DeployAppJob.perform_later(@app.id, environment)
+
+    respond_to do |format|
+      format.json { render json: { message: "Deployment started", status: "deploying", environment: environment } }
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace("deploy_status",
+          html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>})
+      end
+    end
+  end
+
+  # GET /account/apps/:id/activity_monitor
+  def activity_monitor
+    respond_to do |format|
+      format.html { render partial: "account/app_editors/activity_monitor", locals: { app: @app } }
+      format.json { redirect_to account_app_api_calls_path(@app) }
+    end
+  end
 
   private
 
