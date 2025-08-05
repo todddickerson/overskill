@@ -1,5 +1,8 @@
 class Account::AppsController < Account::ApplicationController
   account_load_and_authorize_resource :app, through: :team, through_association: :apps
+  
+  # Load app for custom actions that might not be covered by account_load_and_authorize_resource
+  before_action :load_app_for_custom_actions, only: [:deploy, :activity_monitor, :deployment_info, :generate_logo, :upload_logo, :debug_error]
 
   # GET /account/teams/:team_id/apps
   # GET /account/teams/:team_id/apps.json
@@ -194,14 +197,7 @@ class Account::AppsController < Account::ApplicationController
 
   # POST /account/apps/:id/deploy
   def deploy
-    Rails.logger.info "[Deploy] Starting deployment for app #{@app&.id} with params: #{params.inspect}"
-    
-    # Check if app exists
-    unless @app
-      Rails.logger.error "[Deploy] App not found or not authorized"
-      render json: { error: "App not found" }, status: :not_found
-      return
-    end
+    Rails.logger.info "[Deploy] Starting deployment for app #{@app.id} with params: #{params.inspect}"
     
     # Check if app has files to deploy
     unless @app.app_files.any?
@@ -261,6 +257,13 @@ class Account::AppsController < Account::ApplicationController
   end
 
   private
+  
+  def load_app_for_custom_actions
+    @app ||= current_team.apps.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    Rails.logger.error "[#{action_name}] App not found with ID: #{params[:id]}"
+    render json: { error: "App not found" }, status: :not_found
+  end
 
   if defined?(Api::V1::ApplicationController)
     include strong_parameters_from_api
