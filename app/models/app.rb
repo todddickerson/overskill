@@ -98,6 +98,14 @@ class App < ApplicationRecord
     [deployed_at, staging_deployed_at].compact.max
   end
 
+  def deployment_status
+    # Return deployment status based on app state
+    return 'deployed' if status == 'published' && last_deployed_at.present?
+    return 'deploying' if status == 'generating'
+    return 'failed' if status == 'failed'
+    'pending'
+  end
+
   private
 
   def generate_slug

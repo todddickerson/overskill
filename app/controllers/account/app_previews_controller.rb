@@ -1,6 +1,7 @@
 class Account::AppPreviewsController < Account::ApplicationController
   skip_before_action :verify_authenticity_token, only: [:serve_file]
   before_action :set_app
+  before_action :set_permissive_csp
   
   def show
     # Serve the main HTML file or index.html
@@ -26,6 +27,17 @@ class Account::AppPreviewsController < Account::ApplicationController
       return
     end
     
+    # Special handling for overskill.js - serve from Rails public directory
+    if path == 'overskill.js'
+      overskill_path = Rails.root.join('public', 'overskill.js')
+      if File.exist?(overskill_path)
+        response.headers['Content-Type'] = 'application/javascript'
+        response.headers['Cache-Control'] = 'no-cache'
+        send_file overskill_path, type: 'application/javascript', disposition: 'inline'
+        return
+      end
+    end
+    
     file = @app.app_files.find_by(path: path)
     
     if file
@@ -44,7 +56,7 @@ class Account::AppPreviewsController < Account::ApplicationController
       # Use send_data instead of render plain to ensure proper content type handling
       send_data file.content, type: content_type, disposition: 'inline'
     else
-      render plain: "File not found", status: :not_found
+      render plain: "File not found: #{path}", status: :not_found
     end
   end
   
@@ -52,6 +64,25 @@ class Account::AppPreviewsController < Account::ApplicationController
   
   def set_app
     @app = current_team.apps.find(params[:app_id])
+  end
+  
+  def set_permissive_csp
+    # Set very permissive CSP for generated app content
+    # This allows inline styles and scripts which are common in generated apps
+    csp_header = [
+      "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:",
+      "style-src 'self' 'unsafe-inline' https: data:",
+      "font-src 'self' https: data:",
+      "img-src 'self' https: data: blob:",
+      "connect-src 'self' https: wss: ws: data:",
+      "frame-src 'self' https:",
+      "object-src 'none'",
+      "media-src 'self' https: data: blob:",
+      "worker-src 'self' blob:"
+    ].join('; ')
+    
+    response.headers['Content-Security-Policy'] = csp_header
   end
   
   def process_html_for_preview(html)

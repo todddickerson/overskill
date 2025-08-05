@@ -655,8 +655,11 @@ export default class extends Controller {
   }
   
   openAppSettings() {
-    // Switch to dashboard mode to show app settings
-    this.showDashboard()
+    // Open the app settings modal
+    const modal = document.getElementById('app_settings_modal')
+    if (modal) {
+      modal.classList.remove('hidden')
+    }
   }
   
   // Content builders

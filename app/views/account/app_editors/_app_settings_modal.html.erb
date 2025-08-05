@@ -1,0 +1,174 @@
+<!-- App Settings Modal -->
+<div id="app_settings_modal" 
+     class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4"
+     data-controller="modal app-settings"
+     data-modal-target="modal"
+     data-app-settings-app-id-value="<%= app.to_param %>">
+  
+  <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <!-- Modal Header -->
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+        App Settings
+      </h2>
+      <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              data-action="click->modal#close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <!-- Modal Content -->
+    <div class="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+      <!-- App Basic Info -->
+      <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Basic Information</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              App Name
+            </label>
+            <input type="text" 
+                   value="<%= app.name %>"
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   data-app-settings-target="nameInput">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <textarea rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      data-app-settings-target="descriptionInput"><%= app.description %></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Visibility
+            </label>
+            <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    data-app-settings-target="visibilitySelect">
+              <option value="private" <%= 'selected' if app.visibility == 'private' %>>Private</option>
+              <option value="preview" <%= 'selected' if app.visibility == 'preview' %>>Preview</option>
+              <option value="public" <%= 'selected' if app.visibility == 'public' %>>Public</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- App Logo -->
+      <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">App Logo</h3>
+        <div class="flex items-center space-x-4">
+          <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            <% if app.logo.attached? %>
+              <%= image_tag app.logo, class: "w-full h-full object-cover rounded-lg" %>
+            <% else %>
+              <i class="fas fa-image text-gray-400 text-2xl"></i>
+            <% end %>
+          </div>
+          <div class="flex-1 space-y-2">
+            <button class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    data-action="click->app-settings#generateLogo">
+              <i class="fas fa-sparkles mr-2"></i>
+              Generate Logo with AI
+            </button>
+            <button class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                    data-action="click->app-settings#uploadLogo">
+              <i class="fas fa-upload mr-2"></i>
+              Upload Custom Logo
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- App Framework & Type -->
+      <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Technical Settings</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Framework
+            </label>
+            <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    data-app-settings-target="frameworkSelect">
+              <option value="react" <%= 'selected' if app.framework == 'react' %>>React</option>
+              <option value="vue" <%= 'selected' if app.framework == 'vue' %>>Vue</option>
+              <option value="nextjs" <%= 'selected' if app.framework == 'nextjs' %>>Next.js</option>
+              <option value="vanilla" <%= 'selected' if app.framework == 'vanilla' %>>Vanilla JS</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              App Type
+            </label>
+            <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    data-app-settings-target="typeSelect">
+              <option value="tool" <%= 'selected' if app.app_type == 'tool' %>>Tool</option>
+              <option value="saas" <%= 'selected' if app.app_type == 'saas' %>>SaaS</option>
+              <option value="landing_page" <%= 'selected' if app.app_type == 'landing_page' %>>Landing Page</option>
+              <option value="dashboard" <%= 'selected' if app.app_type == 'dashboard' %>>Dashboard</option>
+              <option value="game" <%= 'selected' if app.app_type == 'game' %>>Game</option>
+              <option value="other" <%= 'selected' if app.app_type == 'other' %>>Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- App URLs -->
+      <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">URLs</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Preview URL</label>
+            <div class="flex items-center space-x-2">
+              <input type="text" 
+                     value="<%= app.preview_url %>"
+                     readonly
+                     class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+              <% if app.preview_url.present? %>
+                <button class="px-3 py-2 text-blue-600 hover:text-blue-800"
+                        data-action="click->app-settings#openPreview">
+                  <i class="fas fa-external-link-alt"></i>
+                </button>
+              <% end %>
+            </div>
+          </div>
+          
+          <% if app.production_url.present? %>
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Production URL</label>
+              <div class="flex items-center space-x-2">
+                <input type="text" 
+                       value="<%= app.production_url %>"
+                       readonly
+                       class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                <button class="px-3 py-2 text-blue-600 hover:text-blue-800"
+                        data-action="click->app-settings#openProduction">
+                  <i class="fas fa-external-link-alt"></i>
+                </button>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal Footer -->
+    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <button class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              data-action="click->modal#close">
+        Cancel
+      </button>
+      
+      <div class="flex items-center space-x-3">
+        <button class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                data-action="click->app-settings#saveSettings">
+          <i class="fas fa-save mr-2"></i>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

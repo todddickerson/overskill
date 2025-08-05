@@ -31,6 +31,14 @@ Rails.application.configure do
     policy.font_src    :self, :https, :data,
                        "https://fonts.gstatic.com"
     
+    # Allow frames for app previews (including same-origin and external preview URLs)
+    policy.frame_src   :self, :https
+    
+    # Allow connections to localhost and preview domains for development
+    policy.connect_src :self, :https, "ws:", "wss:", 
+                       "http://localhost:*", "https://localhost:*",
+                       "https://*.overskill.app"
+    
     # Specify URI for violation reports
     # policy.report_uri "/csp-violation-report-endpoint"
   end
@@ -38,6 +46,7 @@ Rails.application.configure do
   # Generate session nonces for permitted importmap, inline scripts, and inline styles.
   config.content_security_policy_nonce_generator = ->(request) { request.session.id.to_s }
   config.content_security_policy_nonce_directives = %w(script-src style-src)
+
 
   # Report violations without enforcing the policy.
   # config.content_security_policy_report_only = true
