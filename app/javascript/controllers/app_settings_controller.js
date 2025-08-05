@@ -4,6 +4,54 @@ export default class extends Controller {
   static targets = ["variablesList"]
   static values = { appId: Number }
   
+  connect() {
+    this.appIdValue = this.getAppId()
+  }
+
+  getAppId() {
+    // Extract app ID from the URL or data attributes
+    const pathParts = window.location.pathname.split('/')
+    const appIndex = pathParts.indexOf('apps')
+    return appIndex !== -1 ? parseInt(pathParts[appIndex + 1]) : null
+  }
+
+  editApp(event) {
+    event.preventDefault()
+    
+    if (!this.appIdValue) {
+      console.error('App ID not found')
+      return
+    }
+    
+    // Navigate to the standard Rails edit form
+    window.location.href = `/account/apps/${this.appIdValue}/edit`
+  }
+
+  editDescription(event) {
+    event.preventDefault()
+    
+    if (!this.appIdValue) {
+      console.error('App ID not found')
+      return
+    }
+    
+    // For now, also redirect to edit form - could be enhanced with inline editing later
+    window.location.href = `/account/apps/${this.appIdValue}/edit`
+  }
+
+  duplicateApp(event) {
+    event.preventDefault()
+    
+    if (!this.appIdValue) {
+      console.error('App ID not found')
+      return
+    }
+    
+    // TODO: Implement app duplication functionality
+    console.log('Duplicate app functionality not yet implemented')
+    alert('App duplication feature coming soon!')
+  }
+  
   addVariable() {
     const variableRow = document.createElement('div')
     variableRow.className = 'flex items-center space-x-2'
