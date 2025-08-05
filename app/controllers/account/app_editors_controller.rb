@@ -79,43 +79,30 @@ class Account::AppEditorsController < Account::ApplicationController
     if @message.save
       Rails.logger.info "[AppEditors#create_message] User message saved with ID: #{@message.id}"
       
-      # Create initial AI response placeholder
-      ai_response = @app.app_chat_messages.create!(
-        role: "assistant",
-        content: "Analyzing your request and planning the changes...",
-        status: "planning"
-      )
-      Rails.logger.info "[AppEditors#create_message] AI placeholder created with ID: #{ai_response.id}"
-
-      # Start processing
-      # Use new orchestrator if feature flag is enabled
+      # Start processing based on orchestrator setting
       if ENV['USE_AI_ORCHESTRATOR'] == 'true'
         Rails.logger.info "[AppEditors#create_message] Using new AI orchestrator"
-        # Don't create the placeholder message - orchestrator will handle all messages
-        ai_response.destroy!
         job = ProcessAppUpdateJobV2.perform_later(@message)
         Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJobV2 enqueued with job ID: #{job.job_id}"
       else
+        # Create initial AI response placeholder for legacy mode
+        ai_response = @app.app_chat_messages.create!(
+          role: "assistant",
+          content: "Analyzing your request and planning the changes...",
+          status: "planning"
+        )
+        Rails.logger.info "[AppEditors#create_message] AI placeholder created with ID: #{ai_response.id}"
+        
         job = ProcessAppUpdateJob.perform_later(@message)
         Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJob enqueued with job ID: #{job.job_id}"
       end
 
+      # Always respond with just form reset - messages are handled by broadcasts
       respond_to do |format|
         format.turbo_stream do
-          render turbo_stream: [
-            turbo_stream.append("chat_messages",
-              partial: "account/app_editors/chat_message",
-              locals: {message: @message}),
-            turbo_stream.append("chat_messages",
-              partial: "account/app_editors/chat_message",
-              locals: {message: ai_response}),
-            turbo_stream.replace("chat_form",
-              partial: "account/app_editors/chat_input_wrapper",
-              locals: {app: @app}),
-            # Append a temporary element that will scroll the container on connection
-            turbo_stream.append("chat_messages", 
-              "<div data-controller='chat-scroller' data-chat-scroller-target='trigger'></div>")
-          ]
+          render turbo_stream: turbo_stream.replace("chat_form",
+            partial: "account/app_editors/chat_input_wrapper",
+            locals: {app: @app})
         end
       end
     else

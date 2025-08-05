@@ -76,10 +76,31 @@
         --border-primary: theme('colors.gray.700');
         --border-secondary: theme('colors.gray.600');
       }
+      
+      /* Mobile viewport fixes */
+      @supports (height: 100dvh) {
+        body {
+          height: 100dvh; /* Dynamic viewport height - excludes mobile browser UI */
+        }
+      }
+      
+      /* Ensure no unwanted scrollbars */
+      html, body {
+        overflow-x: hidden;
+      }
+      
+      /* Fix for mobile browsers that change viewport height */
+      @media screen and (max-width: 1024px) {
+        body {
+          height: 100vh;
+          height: 100dvh; /* Fallback for browsers that support it */
+          min-height: -webkit-fill-available; /* iOS Safari fallback */
+        }
+      }
     </style>
   </head>
-  <body class="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-slate-300 text-sm font-normal transition-colors duration-200" data-controller="theme">
-    <div class="h-screen flex flex-col">
+  <body class="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-slate-300 text-sm font-normal transition-colors duration-200 overflow-hidden" data-controller="theme">
+    <div class="h-full flex flex-col">
       <%= yield %>
     </div>
     

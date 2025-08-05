@@ -13,6 +13,10 @@ class AppChatMessage < ApplicationRecord
   # Ensure only assistant messages can have status
   validate :status_only_for_assistant
 
+  # Broadcast to chat channel when messages are created or updated
+  after_create_commit :broadcast_message_created
+  after_update_commit :broadcast_message_updated, if: :saved_change_to_content_or_status?
+
   scope :conversation, -> { where(role: %w[user assistant]) }
 
   def planning?
@@ -71,5 +75,34 @@ class AppChatMessage < ApplicationRecord
     if status.present? && role != 'assistant'
       errors.add(:status, 'can only be set for assistant messages')
     end
+  end
+  
+  def broadcast_message_created
+    broadcast_append_to(
+      "app_#{app.id}_chat",
+      target: "chat_messages",
+      partial: "account/app_editors/chat_message",
+      locals: { message: self }
+    )
+    
+    # Also trigger scroll to bottom
+    broadcast_append_to(
+      "app_#{app.id}_chat",
+      target: "chat_messages",
+      html: "<div data-controller='chat-scroller' data-chat-scroller-target='trigger'></div>"
+    )
+  end
+  
+  def broadcast_message_updated
+    broadcast_replace_to(
+      "app_#{app.id}_chat",
+      target: "app_chat_message_#{id}",
+      partial: "account/app_editors/chat_message",
+      locals: { message: self }
+    )
+  end
+  
+  def saved_change_to_content_or_status?
+    saved_change_to_content? || saved_change_to_status?
   end
 end
