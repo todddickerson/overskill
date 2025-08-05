@@ -107,8 +107,32 @@ export default class extends Controller {
   
   // Open invite modal  
   openInviteModal() {
-    console.log('Invite modal functionality to be implemented')
-    // TODO: Implement invite modal
+    const inviteModal = document.querySelector('#invite_modal')
+    if (inviteModal) {
+      const controller = this.application.getControllerForElementAndIdentifier(inviteModal, 'invite-modal')
+      if (controller && controller.open) {
+        controller.open()
+      } else {
+        console.error('Invite modal controller not found or no open method')
+      }
+    } else {
+      console.error('Invite modal element not found')
+    }
+  }
+  
+  // Open help modal
+  openHelpModal() {
+    const helpModal = document.querySelector('#help_modal')
+    if (helpModal) {
+      const controller = this.application.getControllerForElementAndIdentifier(helpModal, 'help-modal')
+      if (controller && controller.open) {
+        controller.open()
+      } else {
+        console.error('Help modal controller not found or no open method')
+      }
+    } else {
+      console.error('Help modal element not found')
+    }
   }
   
   // Deprecated mobile chat methods - now handled by mobile-navigation controller

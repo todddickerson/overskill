@@ -1,0 +1,143 @@
+<!-- Invite Modal -->
+<div id="invite_modal" 
+     class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center lg:animate-fadeIn"
+     data-controller="invite-modal"
+     data-invite-modal-app-id-value="<%= app.to_param %>"
+     data-invite-modal-team-id-value="<%= app.team.id %>"
+     data-invite-modal-target="modal"
+     data-action="click->invite-modal#closeOnBackdrop">
+  
+  <div class="bg-white dark:bg-gray-800 rounded-t-2xl lg:rounded-xl shadow-2xl w-full max-w-md mx-auto lg:mx-4 lg:animate-slideUp transition-colors duration-200 
+              fixed bottom-0 left-0 right-0 lg:relative lg:inset-auto 
+              max-h-[85vh] lg:max-h-[90vh] overflow-hidden flex flex-col" data-invite-modal-target="content">
+    <!-- Header -->
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+      <h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Invite to <%= app.name %></h2>
+      <button data-action="click->invite-modal#close" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+        <svg class="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
+      <!-- Invite Form -->
+      <%= form_with model: [:account, app.team, Invitation.new], 
+                    data: { 
+                      invite_modal_target: "form",
+                      action: "submit->invite-modal#submitInvite"
+                    }, 
+                    html: { class: "space-y-4" } do |form| %>
+        
+        <!-- Hidden field to track app -->
+        <%= hidden_field_tag :app_id, app.id %>
+        
+        <!-- Email Input -->
+        <div>
+          <label for="invitation_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Email address
+          </label>
+          <%= form.email_field :email, 
+                               placeholder: "colleague@example.com",
+                               required: true,
+                               data: { invite_modal_target: "emailInput" },
+                               class: "w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent" %>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            They'll receive an email invitation to collaborate on this app
+          </p>
+        </div>
+        
+        <!-- Role Selection -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            App Role
+          </label>
+          <div class="space-y-2">
+            <label class="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+              <input type="radio" name="app_role" value="editor" checked
+                     class="mt-0.5 text-primary-600 focus:ring-primary-500">
+              <div class="flex-1">
+                <div class="font-medium text-sm text-gray-900 dark:text-gray-100">Editor</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Can edit app code and settings</div>
+              </div>
+            </label>
+            
+            <label class="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+              <input type="radio" name="app_role" value="viewer"
+                     class="mt-0.5 text-primary-600 focus:ring-primary-500">
+              <div class="flex-1">
+                <div class="font-medium text-sm text-gray-900 dark:text-gray-100">Viewer</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Can view app but not make changes</div>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <!-- Team Role Info -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+          <p class="text-xs text-blue-700 dark:text-blue-300">
+            <i class="fas fa-info-circle mr-1"></i>
+            This will also give them basic access to your team "<%= app.team.name %>"
+          </p>
+        </div>
+        
+        <!-- Submit Button -->
+        <div class="pt-2">
+          <button type="submit" 
+                  data-invite-modal-target="submitButton"
+                  class="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center">
+            <i class="fas fa-paper-plane mr-2"></i>
+            Send Invitation
+          </button>
+        </div>
+      <% end %>
+      
+      <!-- Success Message (hidden by default) -->
+      <div class="hidden" data-invite-modal-target="successMessage">
+        <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
+          <i class="fas fa-check-circle text-green-600 dark:text-green-400 text-3xl mb-2"></i>
+          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">Invitation Sent!</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400" data-invite-modal-target="successText">
+            An invitation has been sent to the email address.
+          </p>
+        </div>
+      </div>
+      
+      <!-- Existing Collaborators -->
+      <% if app.app_collaborators.any? %>
+        <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Current Collaborators</h3>
+          <div class="space-y-2">
+            <% app.app_collaborators.includes(membership: :user).each do |collaborator| %>
+              <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div class="flex items-center space-x-3">
+                  <div class="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                    <span class="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <%= collaborator.membership.user.name.first.upcase %>
+                    </span>
+                  </div>
+                  <div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <%= collaborator.membership.user.name %>
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      <%= collaborator.role.humanize %>
+                    </div>
+                  </div>
+                </div>
+                <% if can? :destroy, collaborator %>
+                  <button data-action="click->invite-modal#removeCollaborator"
+                          data-collaborator-id="<%= collaborator.id %>"
+                          class="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                    <i class="fas fa-times"></i>
+                  </button>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -248,7 +248,7 @@
           <!-- Help -->
           <div class="relative" data-controller="tooltip" data-tooltip-content-value="Get help and documentation" data-tooltip-position-value="bottom">
             <button class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                    data-action="mouseenter->tooltip#show mouseleave->tooltip#hide">
+                    data-action="click->editor-layout#openHelpModal mouseenter->tooltip#show mouseleave->tooltip#hide">
               <i class="fas fa-question-circle text-sm"></i>
             </button>
           </div>
@@ -486,6 +486,12 @@
 
 <!-- Share Modal -->
 <%= render "share_modal", app: @app %>
+
+<!-- Invite Modal -->
+<%= render "invite_modal", app: @app %>
+
+<!-- Help Modal -->
+<%= render "help_modal" %>
 
 <!-- Version Comparison Modal -->
 <%= render "version_comparison_modal", app: @app %>
