@@ -165,29 +165,86 @@ class Account::AppVersionsController < Account::ApplicationController
     )
     
     if new_version.save
-      # Copy all files from the old version to the new version
-      @app_version.app_version_files.each do |version_file|
-        app_file = version_file.app_file
+      files_restored = 0
+      
+      # Handle files from files_snapshot (JSON format) - newer system
+      if @app_version.files_snapshot.present?
+        begin
+          snapshot_files = JSON.parse(@app_version.files_snapshot)
+          
+          snapshot_files.each do |file_data|
+            path = file_data['path']
+            content = file_data['content']
+            
+            # Skip non-essential files that aren't in current app structure
+            next if path.include?('src/') || path.include?('public/') || path.include?('package.json')
+            
+            # Find or create the app file
+            app_file = app.app_files.find_or_create_by(path: path) do |af|
+              af.team = app.team
+              af.file_type = determine_file_type(path)
+              af.is_entry_point = (path == 'index.html')
+            end
+            
+            # Update the app file with the restored content
+            app_file.update!(
+              content: content,
+              size_bytes: content.bytesize
+            )
+            
+            files_restored += 1
+            Rails.logger.info "[Restore] Updated #{path} from snapshot (#{content.bytesize} bytes)"
+          end
+          
+          Rails.logger.info "[Restore] Restored #{files_restored} files from files_snapshot"
+          
+        rescue JSON::ParserError => e
+          Rails.logger.error "[Restore] Failed to parse files_snapshot: #{e.message}"
+          return respond_to do |format|
+            format.json { render json: { success: false, error: "Invalid version snapshot data" }, status: :unprocessable_entity }
+          end
+        end
         
-        # Update the app file with the content from this version
-        app_file.update!(
-          content: version_file.content,
-          size_bytes: version_file.content.bytesize
-        )
+      # Handle files from app_version_files (table format) - legacy system
+      elsif @app_version.app_version_files.any?
+        @app_version.app_version_files.each do |version_file|
+          app_file = version_file.app_file
+          
+          # Update the app file with the content from this version
+          app_file.update!(
+            content: version_file.content,
+            size_bytes: version_file.content.bytesize
+          )
+          
+          # Create a new version file record
+          new_version.app_version_files.create!(
+            app_file: app_file,
+            content: version_file.content,
+            action: "restored"
+          )
+          
+          files_restored += 1
+        end
         
-        # Create a new version file record
-        new_version.app_version_files.create!(
-          app_file: app_file,
-          content: version_file.content,
-          action: "restored"
-        )
+        Rails.logger.info "[Restore] Restored #{files_restored} files from app_version_files"
+        
+      else
+        Rails.logger.warn "[Restore] No files found in version #{@app_version.version_number} - neither files_snapshot nor app_version_files"
+        return respond_to do |format|
+          format.json { render json: { success: false, error: "No files found in this version to restore" }, status: :unprocessable_entity }
+        end
       end
       
       # Update the preview deployment
       UpdatePreviewJob.perform_later(app.id)
       
       respond_to do |format|
-        format.json { render json: { success: true, new_version_id: new_version.id } }
+        format.json { render json: { 
+          success: true, 
+          new_version_id: new_version.id,
+          files_restored: files_restored,
+          message: "Successfully restored #{files_restored} files from version #{@app_version.version_number}"
+        } }
       end
     else
       respond_to do |format|
@@ -381,5 +438,26 @@ class Account::AppVersionsController < Account::ApplicationController
     end
     
     html
+  end
+  
+  def determine_file_type(path)
+    case File.extname(path).downcase
+    when '.js', '.jsx', '.ts', '.tsx'
+      'javascript'
+    when '.css', '.scss', '.sass', '.less'
+      'css'
+    when '.html', '.htm'
+      'html'
+    when '.json'
+      'json'
+    when '.md', '.markdown'
+      'markdown'
+    when '.yml', '.yaml'
+      'yaml'
+    when '.env'
+      'env'
+    else
+      'other'
+    end
   end
 end
