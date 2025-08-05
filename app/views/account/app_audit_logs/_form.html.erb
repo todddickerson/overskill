@@ -1,0 +1,24 @@
+<% cancel_path ||= app_audit_log.persisted? ? [:account, app_audit_log] : [:account, @app, :app_audit_logs] %>
+
+<%= form_with model: app_audit_log, url: (app_audit_log.persisted? ? [:account, app_audit_log] : [:account, @app, :app_audit_logs]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/text_field', method: :action_type, options: {autofocus: true} %>
+      <%= render 'shared/fields/super_select', method: :performed_by %>
+      <%= render 'shared/fields/text_field', method: :target_resource %>
+      <%= render 'shared/fields/text_field', method: :resource_id %>
+      <%= render 'shared/fields/text_area', method: :change_details %>
+      <%= render 'shared/fields/text_field', method: :ip_address %>
+      <%= render 'shared/fields/text_field', method: :user_agent %>
+      <%= render 'shared/fields/date_and_time_field', method: :occurred_at %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

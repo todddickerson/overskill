@@ -1,0 +1,147 @@
+en:
+  app_audit_logs: &app_audit_logs
+    label: &label App Audit Logs
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App Audit Log
+      create: Create App Audit Log
+      edit: Edit App Audit Log
+      update: Update App Audit Log
+      destroy: Remove App Audit Log
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_audit_log_name}? This will also remove any child resources and can't be undone.
+    app_audit_log:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App Audit Log ID
+      app_id:
+        heading: App ID
+      action_type:
+        _: &action_type Action Type
+        label: *action_type
+        heading: *action_type
+        api_title: *action_type
+        api_description: *action_type
+      performed_by:
+        _: &performed_by Performed By
+        label: *performed_by
+        heading: *performed_by
+        api_title: *performed_by
+        api_description: *performed_by
+        placeholder: None
+        options:
+          one: One
+          two: Two
+          three: Three
+      target_resource:
+        _: &target_resource Target Resource
+        label: *target_resource
+        heading: *target_resource
+        api_title: *target_resource
+        api_description: *target_resource
+      resource_id:
+        _: &resource_id Resource ID
+        label: *resource_id
+        heading: *resource_id
+        api_title: *resource_id
+        api_description: *resource_id
+      change_details:
+        _: &change_details Change Details
+        label: *change_details
+        heading: *change_details
+        api_title: *change_details
+        api_description: *change_details
+      ip_address:
+        _: &ip_address Ip Address
+        label: *ip_address
+        heading: *ip_address
+        api_title: *ip_address
+        api_description: *ip_address
+      user_agent:
+        _: &user_agent User Agent
+        label: *user_agent
+        heading: *user_agent
+        api_title: *user_agent
+        api_description: *user_agent
+      occurred_at:
+        _: &occurred_at Occurred At
+        label: *occurred_at
+        heading: *occurred_at
+        api_title: *occurred_at
+        api_description: *occurred_at
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for App Audit Logs"
+      index: "List App Audit Logs"
+      create: "Add a New App Audit Log"
+      member_actions: "Actions for an Individual App Audit Log"
+      show: "Retrieve a App Audit Log"
+      update: "Update a App Audit Log"
+      destroy: "Delete a App Audit Log"
+      fields: *fields
+    index:
+      section: "%{apps_possessive} App Audit Logs"
+      contexts:
+        app:
+          header: App Audit Logs
+          description: Below is a list of App Audit Logs that have been added for %{app_name}.
+          description_empty: No App Audit Logs have been added for %{app_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_audit_log_name}"
+      header: App Audit Log Details
+      description: Below are the details we have for %{app_audit_log_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_audit_log_name} from %{app_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App Audit Log for %{app_name}"
+      header: New App Audit Log Details
+      description: Please provide the details of the new App Audit Log you'd like to add to %{app_name}.
+      form: *form
+    edit:
+      section: "%{app_audit_log_name}"
+      header: Edit App Audit Log Details
+      description: You can update the details or settings for %{app_audit_log_name} below.
+      form: *form
+    notifications:
+      created: App Audit Log was successfully created.
+      updated: App Audit Log was successfully updated.
+      destroyed: App Audit Log was successfully destroyed.
+  account:
+    app_audit_logs: *app_audit_logs
+  activerecord:
+    attributes:
+      app_audit_log:
+        action_type: *action_type
+        performed_by: *performed_by
+        target_resource: *target_resource
+        resource_id: *resource_id
+        change_details: *change_details
+        ip_address: *ip_address
+        user_agent: *user_agent
+        occurred_at: *occurred_at
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

@@ -1,0 +1,8 @@
+<% app_audit_log ||= @app_audit_log %>
+<% app ||= @app || app_audit_log&.app %>
+<%= render 'account/apps/breadcrumbs', app: app %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, app, :app_audit_logs] %>
+<% if app_audit_log&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: app_audit_log.label_string, url: [:account, app_audit_log] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'app_audit_logs' %>

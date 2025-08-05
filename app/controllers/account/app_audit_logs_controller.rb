@@ -1,143 +1,72 @@
 class Account::AppAuditLogsController < Account::ApplicationController
-  before_action :set_app
-  before_action :authorize_audit_access
-  
+  account_load_and_authorize_resource :app_audit_log, through: :app, through_association: :app_audit_logs
+
+  # GET /account/apps/:app_id/app_audit_logs
+  # GET /account/apps/:app_id/app_audit_logs.json
   def index
-    @audit_service = Security::AuditLogService.new(@app)
-    
-    @logs = @audit_service.get_recent_activity(
-      limit: params[:limit] || 50,
-      offset: params[:offset] || 0
-    )
-    
-    @summary = @audit_service.get_activity_summary(24.hours)
-    
-    respond_to do |format|
-      format.html
-      format.json { render json: { logs: @logs, summary: @summary } }
-      format.csv do
-        send_data generate_csv(@logs),
-                  filename: "#{@app.slug}_audit_log_#{Date.current}.csv",
-                  type: 'text/csv'
-      end
-    end
+    delegate_json_to_api
   end
-  
+
+  # GET /account/app_audit_logs/:id
+  # GET /account/app_audit_logs/:id.json
   def show
-    @audit_service = Security::AuditLogService.new(@app)
-    
-    # Show audit trail for specific record
-    @logs = @audit_service.get_activity_by_record(
-      params[:table_name],
-      params[:id]
-    )
-    
-    @record_history = build_record_history(@logs)
+    delegate_json_to_api
   end
-  
-  def search
-    @audit_service = Security::AuditLogService.new(@app)
-    
-    @results = @audit_service.search_audit_logs(
-      params[:q],
-      limit: params[:limit] || 50
-    )
-    
-    render partial: "search_results", locals: { logs: @results }
+
+  # GET /account/apps/:app_id/app_audit_logs/new
+  def new
   end
-  
-  def compliance_report
-    @audit_service = Security::AuditLogService.new(@app)
-    @report = @audit_service.get_compliance_report
-    
+
+  # GET /account/app_audit_logs/:id/edit
+  def edit
+  end
+
+  # POST /account/apps/:app_id/app_audit_logs
+  # POST /account/apps/:app_id/app_audit_logs.json
+  def create
     respond_to do |format|
-      format.html
-      format.json { render json: @report }
-      format.pdf do
-        # Generate compliance PDF
-        pdf = ComplianceReportPdf.new(@report, @app)
-        send_data pdf.render,
-                  filename: "#{@app.slug}_compliance_report_#{Date.current}.pdf",
-                  type: 'application/pdf'
+      if @app_audit_log.save
+        format.html { redirect_to [:account, @app_audit_log], notice: I18n.t("app_audit_logs.notifications.created") }
+        format.json { render :show, status: :created, location: [:account, @app_audit_log] }
+      else
+        format.html { render :new, status: :unprocessable_entity }
+        format.json { render json: @app_audit_log.errors, status: :unprocessable_entity }
       end
     end
   end
-  
-  def export
-    @audit_service = Security::AuditLogService.new(@app)
-    
-    export_data = @audit_service.export_audit_trail(
-      start_date: params[:start_date]&.to_date || 30.days.ago,
-      end_date: params[:end_date]&.to_date || Date.current
-    )
-    
+
+  # PATCH/PUT /account/app_audit_logs/:id
+  # PATCH/PUT /account/app_audit_logs/:id.json
+  def update
     respond_to do |format|
-      format.json do
-        send_data export_data.to_json,
-                  filename: "#{@app.slug}_audit_export_#{Date.current}.json",
-                  type: 'application/json'
+      if @app_audit_log.update(app_audit_log_params)
+        format.html { redirect_to [:account, @app_audit_log], notice: I18n.t("app_audit_logs.notifications.updated") }
+        format.json { render :show, status: :ok, location: [:account, @app_audit_log] }
+      else
+        format.html { render :edit, status: :unprocessable_entity }
+        format.json { render json: @app_audit_log.errors, status: :unprocessable_entity }
       end
     end
   end
-  
+
+  # DELETE /account/app_audit_logs/:id
+  # DELETE /account/app_audit_logs/:id.json
+  def destroy
+    @app_audit_log.destroy
+    respond_to do |format|
+      format.html { redirect_to [:account, @app, :app_audit_logs], notice: I18n.t("app_audit_logs.notifications.destroyed") }
+      format.json { head :no_content }
+    end
+  end
+
   private
-  
-  def set_app
-    @app = current_team.apps.find(params[:app_id])
+
+  if defined?(Api::V1::ApplicationController)
+    include strong_parameters_from_api
   end
-  
-  def authorize_audit_access
-    # Only team admins can view audit logs
-    unless can?(:manage, @team)
-      redirect_to account_app_path(@app), 
-                  alert: "You don't have permission to view audit logs"
-    end
-  end
-  
-  def generate_csv(logs)
-    CSV.generate(headers: true) do |csv|
-      csv << ['Timestamp', 'Table', 'Operation', 'User', 'Record ID', 'Changes']
-      
-      logs.each do |log|
-        csv << [
-          log['created_at'],
-          log['table_name'],
-          log['operation'],
-          log['user_id'],
-          log['record_id'],
-          log['data'].to_json
-        ]
-      end
-    end
-  end
-  
-  def build_record_history(logs)
-    # Build a timeline of changes for a record
-    logs.map do |log|
-      {
-        timestamp: log['created_at'],
-        operation: log['operation'],
-        user: get_user_name(log['user_id']),
-        changes: format_changes(log['data'], log['operation'])
-      }
-    end
-  end
-  
-  def get_user_name(user_id)
-    User.find_by(id: user_id)&.name || "User #{user_id}"
-  end
-  
-  def format_changes(data, operation)
-    case operation
-    when 'INSERT'
-      "Created with: #{data['new'].to_json}"
-    when 'UPDATE'
-      changed = data['changed_fields']&.keys&.join(', ') || 'unknown fields'
-      "Updated: #{changed}"
-    when 'DELETE'
-      "Deleted record"
-    else
-      data.to_json
-    end
+
+  def process_params(strong_params)
+    assign_date_and_time(strong_params, :occurred_at)
+    # 🚅 super scaffolding will insert processing for new fields above this line.
   end
 end

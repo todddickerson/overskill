@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_05_200810) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_05_201304) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -163,6 +163,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_05_200810) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["app_id"], name: "index_app_api_integrations_on_app_id"
+  end
+
+  create_table "app_audit_logs", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "action_type"
+    t.string "performed_by"
+    t.string "target_resource"
+    t.string "resource_id"
+    t.text "change_details"
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "occurred_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_audit_logs_on_app_id"
   end
 
   create_table "app_chat_messages", force: :cascade do |t|
@@ -758,6 +773,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_05_200810) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "app_api_calls", "apps"
   add_foreign_key "app_api_integrations", "apps"
+  add_foreign_key "app_audit_logs", "apps"
   add_foreign_key "app_chat_messages", "app_versions"
   add_foreign_key "app_chat_messages", "apps"
   add_foreign_key "app_chat_messages", "users"

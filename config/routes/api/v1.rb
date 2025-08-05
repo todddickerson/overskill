@@ -40,6 +40,7 @@ shallow do
         resources :app_collaborators
         resources :app_settings
         resources :app_security_policies
+        resources :app_audit_logs
       end
     end
   end

@@ -195,6 +195,7 @@ Rails.application.routes.draw do
           # App settings (simplified for non-technical users)
           resources :app_settings
           resources :app_security_policies
+          resources :app_audit_logs
         end
       end
     end

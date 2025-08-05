@@ -25,6 +25,7 @@ class App < ApplicationRecord
   # has_many :app_analytics # TODO: uncomment when AppAnalytic model exists
   # has_many :posts # TODO: uncomment when Post model exists
   has_many :app_security_policies, dependent: :destroy
+  has_many :app_audit_logs, dependent: :destroy
   # 🚅 add has_many associations above.
 
   has_one_attached :logo
