@@ -69,21 +69,28 @@ module Ai
       clean_name = app_name.strip[0..50]
       clean_description = app_description.to_s.strip[0..200]
 
-      # Build a prompt that generates good app logos
+      # Build a prompt that generates good app logos with transparent backgrounds
       <<~PROMPT.strip
-        Create a modern, professional app icon logo for "#{clean_name}".
-        #{clean_description.present? ? "App description: #{clean_description}." : ""}
+        Create a modern app icon logo for "#{clean_name}" - #{clean_description.present? ? clean_description : "a web application"}.
         
-        Style requirements:
-        - Clean, minimalist design suitable for an app icon
-        - Bold, simple shapes that work at small sizes
-        - Modern gradient or flat design
-        - Professional color scheme
-        - No text or letters in the design
-        - Centered composition with adequate padding
-        - Tech/startup aesthetic
+        CRITICAL REQUIREMENTS:
+        • TRANSPARENT BACKGROUND - The icon must have a fully transparent background, not white or any color
+        • Single iconic symbol or abstract shape that represents the app's purpose
+        • Clean, minimalist design optimized for small display sizes
+        • Bold, geometric shapes with clear silhouettes
+        • Modern flat design or subtle gradient within the icon itself
+        • Professional color palette appropriate for the app type
+        • NO text, letters, or words in the design
+        • Centered composition with proper padding from edges
+        • High contrast design that works on both light and dark backgrounds
         
-        The logo should be instantly recognizable and work well as a square app icon.
+        Style inspiration:
+        • Think Apple App Store or Google Play Store icons
+        • Simple, memorable, and instantly recognizable
+        • Professional tech/startup aesthetic
+        • Should work at 16x16px up to 1024x1024px
+        
+        The icon should be distinctive and convey the essence of #{clean_name} through visual metaphor, not literal representation.
       PROMPT
     end
   end

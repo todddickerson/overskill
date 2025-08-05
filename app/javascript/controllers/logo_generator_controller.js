@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
+  static targets = ["fileInput", "formFileInput", "uploadForm", "generateButton"]
   static values = { appId: Number }
   
   connect() {
@@ -54,30 +55,54 @@ export default class extends Controller {
     }
   }
 
+  handleFileSelect(event) {
+    const file = event.target.files[0]
+    if (file) {
+      console.log("File selected:", file.name)
+      this.uploadFileViaForm(file)
+    }
+  }
+  
+  async uploadFileViaForm(file) {
+    // Set the file on the form's file input
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(file)
+    this.formFileInputTarget.files = dataTransfer.files
+    
+    // Submit the form
+    const form = this.uploadFormTarget
+    const formData = new FormData(form)
+    
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content,
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        console.log("Logo uploaded successfully")
+        this.showSuccess('Logo uploaded successfully!')
+        // Reload to show the new logo
+        setTimeout(() => window.location.reload(), 1000)
+      } else {
+        const error = await response.json()
+        console.error("Upload failed:", error)
+        this.showError(error.error || "Failed to upload logo")
+      }
+    } catch (error) {
+      console.error("Upload error:", error)
+      this.showError("Failed to upload logo")
+    }
+  }
+
   upload(event) {
     event.preventDefault()
-    
-    if (!this.appIdValue) {
-      console.error('App ID not found')
-      return
-    }
-    
-    // Create a file input element
-    const fileInput = document.createElement('input')
-    fileInput.type = 'file'
-    fileInput.accept = 'image/*'
-    fileInput.style.display = 'none'
-    
-    fileInput.onchange = (e) => {
-      const file = e.target.files[0]
-      if (file) {
-        this.uploadFile(file, event.target)
-      }
-    }
-    
-    document.body.appendChild(fileInput)
-    fileInput.click()
-    document.body.removeChild(fileInput)
+    // The file input click is handled by the label in the HTML
+    console.log("Upload button clicked - file input should be triggered by label")
   }
 
   async uploadFile(file, button) {

@@ -21,7 +21,7 @@
     <div class="flex flex-col sm:flex-row items-start gap-4">
       <!-- App Logo Section -->
       <div class="flex-shrink-0 relative group" data-controller="logo-generator">
-        <div class="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center group-hover:border-primary-400 transition-colors">
+        <div class="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center group-hover:border-primary-400 transition-colors">
           <% if app.logo.attached? %>
             <%= image_tag app.logo, class: "w-full h-full rounded-lg object-cover", alt: app.name %>
           <% else %>
@@ -32,18 +32,36 @@
         </div>
         
         <!-- Hover Controls -->
-        <div class="absolute inset-0 bg-black bg-opacity-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+        <div class="absolute inset-0 bg-black bg-opacity-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
           <% unless app.logo.attached? %>
-            <button class="px-2 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-                    data-action="click->logo-generator#generate">
-              <i class="fas fa-magic mr-1"></i>Generate
+            <button class="px-2 py-0.5 text-xs font-medium text-white bg-primary-600 rounded text-xs hover:bg-primary-700 transition-colors w-full"
+                    data-action="click->logo-generator#generate"
+                    data-logo-generator-target="generateButton">
+              <i class="fas fa-magic text-xs"></i>
+              <span class="ml-1">Generate</span>
             </button>
           <% end %>
-          <button class="px-2 py-1 text-xs font-medium text-white bg-gray-600 rounded hover:bg-gray-700"
-                  data-action="click->logo-generator#upload">
-            <i class="fas fa-upload mr-1"></i>Upload
-          </button>
+          <label class="px-2 py-0.5 text-xs font-medium text-white bg-gray-600 rounded text-xs hover:bg-gray-700 transition-colors cursor-pointer w-full text-center">
+            <i class="fas fa-upload text-xs"></i>
+            <span class="ml-1">Upload</span>
+            <input type="file" 
+                   accept="image/*" 
+                   class="hidden" 
+                   data-action="change->logo-generator#handleFileSelect"
+                   data-logo-generator-target="fileInput">
+          </label>
         </div>
+        
+        <!-- Hidden form for logo upload -->
+        <%= form_with url: upload_logo_account_app_path(app), 
+                      method: :post, 
+                      data: { 
+                        logo_generator_target: "uploadForm",
+                        turbo: false
+                      },
+                      class: "hidden" do |form| %>
+          <%= form.file_field :logo, data: { logo_generator_target: "formFileInput" } %>
+        <% end %>
       </div>
 
       <!-- Description Content -->
