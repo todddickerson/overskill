@@ -9,9 +9,9 @@
          data-action="click->version-history#close"></div>
     
     <!-- Modal Content -->
-    <div class="relative bg-white dark:bg-gray-800 rounded-lg lg:rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden modal-content-mobile">
+    <div class="relative bg-white dark:bg-gray-800 rounded-lg lg:rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col modal-content-mobile">
       <!-- Modal Header -->
-      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
             <i class="fas fa-history mr-2"></i>Version History
@@ -24,7 +24,7 @@
       </div>
       
       <!-- Version List -->
-      <div class="overflow-y-auto max-h-[60vh] lg:max-h-[70vh]" data-version-history-target="content">
+      <div class="overflow-y-auto flex-1" data-version-history-target="content">
         <!-- Mobile: Tighter padding, Desktop: Normal padding -->
         <div class="p-3 lg:p-6">
           <div class="space-y-3 lg:space-y-2">
@@ -86,7 +86,7 @@
       </div>
       
       <!-- Modal Footer -->
-      <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+      <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
         <div class="flex justify-between items-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
             <%= pluralize(@app.app_versions.count, 'version') %> total

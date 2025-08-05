@@ -6,10 +6,26 @@ export default class extends Controller {
   connect() {
     // Close dropdown when clicking outside
     document.addEventListener("click", this.closeOnClickOutside.bind(this))
+    
+    // Listen for other dropdowns opening
+    this.handleDropdownOpened = this.handleDropdownOpened.bind(this)
+    window.addEventListener('dropdown:opened', this.handleDropdownOpened)
   }
   
   disconnect() {
     document.removeEventListener("click", this.closeOnClickOutside.bind(this))
+    window.removeEventListener('dropdown:opened', this.handleDropdownOpened)
+  }
+  
+  handleDropdownOpened(event) {
+    // If another dropdown opened, close this one
+    if (event.detail.controller !== this) {
+      this.close()
+    }
+  }
+  
+  closeOtherDropdowns() {
+    // This will trigger the close on all other dropdowns via the event system
   }
   
   toggle(event) {
@@ -24,6 +40,9 @@ export default class extends Controller {
   }
   
   open() {
+    // Close any other open dropdowns
+    this.closeOtherDropdowns()
+    
     this.dropdownTarget.classList.remove("hidden")
     this.triggerTarget.classList.add("bg-gray-200", "dark:bg-gray-700")
     
@@ -38,6 +57,9 @@ export default class extends Controller {
         this.dropdownTarget.classList.remove("translate-y-full")
       })
     }
+    
+    // Dispatch event to notify other dropdowns
+    window.dispatchEvent(new CustomEvent('dropdown:opened', { detail: { controller: this } }))
   }
   
   close() {
