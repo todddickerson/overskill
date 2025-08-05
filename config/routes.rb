@@ -109,7 +109,7 @@ Rails.application.routes.draw do
         resources :follows
         resources :apps do
           member do
-            get :deployment_info, to: "app_editors#deployment_info"
+            get :deployment_info
             get :activity_monitor
             post :deploy
             post :generate_logo
@@ -125,7 +125,6 @@ Rails.application.routes.draw do
           # Main editor interface at /account/apps/:id/editor
           resource :editor, controller: "app_editors", only: [:show] do
             post :create_message
-            get :deployment_info
             patch "files/:file_id", action: :update_file, as: :file
           end
           
@@ -195,6 +194,7 @@ Rails.application.routes.draw do
           
           # App settings (simplified for non-technical users)
           resources :app_settings
+          resources :app_security_policies
         end
       end
     end

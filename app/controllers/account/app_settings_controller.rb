@@ -1,56 +1,71 @@
 class Account::AppSettingsController < Account::ApplicationController
-  before_action :set_app
-  before_action :set_app_setting, only: [:show, :edit, :update, :destroy]
-  
+  account_load_and_authorize_resource :app_setting, through: :app, through_association: :app_settings
+
+  # GET /account/apps/:app_id/app_settings
+  # GET /account/apps/:app_id/app_settings.json
   def index
-    @app_settings = @app.app_settings.order(:setting_type, :key)
-    @grouped_settings = @app_settings.group_by(&:setting_type)
+    delegate_json_to_api
   end
-  
+
+  # GET /account/app_settings/:id
+  # GET /account/app_settings/:id.json
+  def show
+    delegate_json_to_api
+  end
+
+  # GET /account/apps/:app_id/app_settings/new
   def new
-    @app_setting = @app.app_settings.build
   end
-  
+
+  # GET /account/app_settings/:id/edit
+  def edit
+  end
+
+  # POST /account/apps/:app_id/app_settings
+  # POST /account/apps/:app_id/app_settings.json
   def create
-    @app_setting = @app.app_settings.build(app_setting_params)
-    
-    if @app_setting.save
-      respond_to do |format|
-        format.html { redirect_to account_app_app_settings_path(@app), notice: 'Setting was successfully created.' }
-        format.turbo_stream
+    respond_to do |format|
+      if @app_setting.save
+        format.html { redirect_to [:account, @app_setting], notice: I18n.t("app_settings.notifications.created") }
+        format.json { render :show, status: :created, location: [:account, @app_setting] }
+      else
+        format.html { render :new, status: :unprocessable_entity }
+        format.json { render json: @app_setting.errors, status: :unprocessable_entity }
       end
-    else
-      render :new, status: :unprocessable_entity
     end
   end
-  
+
+  # PATCH/PUT /account/app_settings/:id
+  # PATCH/PUT /account/app_settings/:id.json
   def update
-    if @app_setting.update(app_setting_params)
-      respond_to do |format|
-        format.html { redirect_to account_app_app_settings_path(@app), notice: 'Setting was successfully updated.' }
-        format.turbo_stream
+    respond_to do |format|
+      if @app_setting.update(app_setting_params)
+        format.html { redirect_to [:account, @app_setting], notice: I18n.t("app_settings.notifications.updated") }
+        format.json { render :show, status: :ok, location: [:account, @app_setting] }
+      else
+        format.html { render :edit, status: :unprocessable_entity }
+        format.json { render json: @app_setting.errors, status: :unprocessable_entity }
       end
-    else
-      render :edit, status: :unprocessable_entity
     end
   end
-  
+
+  # DELETE /account/app_settings/:id
+  # DELETE /account/app_settings/:id.json
   def destroy
     @app_setting.destroy
-    redirect_to account_app_app_settings_path(@app), notice: 'Setting was successfully removed.'
+    respond_to do |format|
+      format.html { redirect_to [:account, @app, :app_settings], notice: I18n.t("app_settings.notifications.destroyed") }
+      format.json { head :no_content }
+    end
   end
-  
+
   private
-  
-  def set_app
-    @app = current_team.apps.find(params[:app_id])
+
+  if defined?(Api::V1::ApplicationController)
+    include strong_parameters_from_api
   end
-  
-  def set_app_setting
-    @app_setting = @app.app_settings.find(params[:id])
-  end
-  
-  def app_setting_params
-    params.require(:app_setting).permit(:key, :value, :description, :setting_type, :encrypted)
+
+  def process_params(strong_params)
+    # 🚅 super scaffolding will insert processing for new fields above this line.
   end
 end

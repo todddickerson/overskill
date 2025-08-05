@@ -29,6 +29,8 @@ components:
     <%= automatic_components_for AppFile %>
     <%= automatic_components_for AppVersion %>
     <%= automatic_components_for AppCollaborator %>
+    <%= automatic_components_for AppSetting %>
+    <%= automatic_components_for AppSecurityPolicy %>
     <%# 🚅 super scaffolding will insert new components above this line. %>
   parameters:
     id:
@@ -71,4 +73,6 @@ paths:
   <%= automatic_paths_for AppFile, App %>
   <%= automatic_paths_for AppGeneration, App %>
   <%= automatic_paths_for AppCollaborator, App %>
+  <%= automatic_paths_for AppSetting, App %>
+  <%= automatic_paths_for AppSecurityPolicy, App %>
   <%# 🚅 super scaffolding will insert new paths above this line. %>

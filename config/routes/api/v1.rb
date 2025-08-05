@@ -38,6 +38,8 @@ shallow do
         resources :app_files
         resources :app_generations
         resources :app_collaborators
+        resources :app_settings
+        resources :app_security_policies
       end
     end
   end

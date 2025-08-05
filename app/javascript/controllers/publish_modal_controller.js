@@ -43,7 +43,7 @@ export default class extends Controller {
   
   async loadAppData() {
     try {
-      const response = await fetch(`/account/apps/${this.appIdValue}/editor/deployment_info.json`)
+      const response = await fetch(`/account/apps/${this.appIdValue}/deployment_info.json`)
       if (response.ok) {
         const data = await response.json()
         this.updateUrls(data)

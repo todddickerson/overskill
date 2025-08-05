@@ -1,0 +1,27 @@
+<% app = @app || @app %>
+<% context ||= app %>
+<% collection ||= :app_security_policies %>
+<% hide_actions ||= false %>
+<% hide_back ||= false %>
+
+<% with_attribute_settings object: app_security_policy do %>
+  <tr data-id="<%= app_security_policy.id %>">
+    <%= render "shared/tables/checkbox", object: app_security_policy %>
+    <td><%= render 'shared/attributes/text', attribute: :policy_name, url: [:account, app_security_policy] %></td>
+    <td><%= render 'shared/attributes/text', attribute: :policy_type %></td>
+    <td class="text-center"><%= render 'shared/attributes/option', attribute: :enabled %></td>
+    <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <td><%= render 'shared/attributes/date_and_time', attribute: :created_at %></td>
+    <td class="buttons">
+      <% unless hide_actions %>
+        <% if can? :edit, app_security_policy %>
+          <%= link_to t('.buttons.shorthand.edit'), [:edit, :account, app_security_policy], class: 'button-secondary button-smaller' %>
+        <% end %>
+        <% if can? :destroy, app_security_policy %>
+          <%= button_to t('.buttons.shorthand.destroy'), [:account, app_security_policy], method: :delete, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(app_security_policy)) }, class: 'button-secondary button-smaller' %>
+        <% end %>
+        <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+      <% end %>
+    </td>
+  </tr>
+<% end %>

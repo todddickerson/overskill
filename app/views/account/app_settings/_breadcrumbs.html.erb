@@ -1,0 +1,8 @@
+<% app_setting ||= @app_setting %>
+<% app ||= @app || app_setting&.app %>
+<%= render 'account/apps/breadcrumbs', app: app %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, app, :app_settings] %>
+<% if app_setting&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: app_setting.label_string, url: [:account, app_setting] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'app_settings' %>

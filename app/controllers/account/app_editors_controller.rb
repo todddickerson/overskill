@@ -1,8 +1,6 @@
 class Account::AppEditorsController < Account::ApplicationController
   layout "editor"
   before_action :set_app
-  skip_before_action :set_app, only: [:deployment_info]
-  before_action :set_app_by_id, only: [:deployment_info]
 
   def show
     @messages = @app.app_chat_messages.order(created_at: :asc)
@@ -132,22 +130,6 @@ class Account::AppEditorsController < Account::ApplicationController
   end
 
 
-  def deployment_info
-    # Get deployment URLs and visitor info
-    preview_url = @app.preview_url
-    production_url = @app.published_url || @app.deployment_url
-    
-    render json: {
-      preview_url: preview_url,
-      production_url: production_url,
-      visitor_count: @app.visitor_count,
-      daily_visitors: @app.daily_visitors,
-      deployment_status: @app.deployment_status,
-      last_deployed_at: @app.last_deployed_at,
-      total_versions: @app.app_versions.count,
-      last_updated: @app.updated_at
-    }
-  end
   
   def versions
     @versions = @app.app_versions.order(created_at: :desc)
@@ -159,10 +141,6 @@ class Account::AppEditorsController < Account::ApplicationController
 
   def set_app
     @app = current_team.apps.find(params[:app_id])
-  end
-  
-  def set_app_by_id
-    @app = current_team.apps.find(params[:id])
   end
 
   def message_params

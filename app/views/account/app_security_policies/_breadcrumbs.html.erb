@@ -1,0 +1,8 @@
+<% app_security_policy ||= @app_security_policy %>
+<% app ||= @app || app_security_policy&.app %>
+<%= render 'account/apps/breadcrumbs', app: app %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, app, :app_security_policies] %>
+<% if app_security_policy&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: app_security_policy.label_string, url: [:account, app_security_policy] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'app_security_policies' %>

@@ -1,0 +1,40 @@
+<%= render 'account/shared/page' do |page| %>
+  <% page.title t('.section') %>
+  <% page.body do %>
+    <%= cable_ready_updates_for @app_security_policy do %>
+      <%= render 'account/shared/box', divider: true do |box| %>
+        <% box.title t('.header') %>
+        <% box.description do %>
+          <%= t('.description') %>
+          <%= t('.manage_description') if can? :manage, @app_security_policy %>
+        <% end %>
+
+        <% box.body do %>
+          <% with_attribute_settings object: @app_security_policy, strategy: :label do %>
+            <%= render 'shared/attributes/text', attribute: :policy_name %>
+            <%= render 'shared/attributes/text', attribute: :policy_type %>
+            <%= render 'shared/attributes/option', attribute: :enabled %>
+            <%= render 'shared/attributes/text', attribute: :configuration %>
+            <%= render 'shared/attributes/text', attribute: :description %>
+            <%= render 'shared/attributes/date_and_time', attribute: :last_violation %>
+            <%= render 'shared/attributes/number', attribute: :violation_count %>
+            <%# 🚅 super scaffolding will insert new fields above this line. %>
+          <% end %>
+        <% end %>
+
+        <% box.actions do %>
+          <%= link_to t('.buttons.edit'), [:edit, :account, @app_security_policy], class: first_button_primary if can? :edit, @app_security_policy %>
+          <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+          <%= button_to t('.buttons.destroy'), [:account, @app_security_policy], method: :delete, class: first_button_primary, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(@app_security_policy)) } if can? :destroy, @app_security_policy %>
+          <%= link_to t('global.buttons.back'), [:account, @app, :app_security_policies], class: first_button_primary %>
+        <% end %>
+
+        <% box.raw_footer do %>
+          <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%# 🚅 super scaffolding will insert new children above this line. %>
+  <% end %>
+<% end %>

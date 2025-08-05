@@ -1,88 +1,21 @@
-<%= form_with(model: [@app, app_setting], local: true) do |form| %>
-  <% if app_setting.errors.any? %>
-    <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-      <h4 class="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
-        <%= pluralize(app_setting.errors.count, "error") %> prohibited this setting from being saved:
-      </h4>
-      <ul class="text-sm text-red-700 dark:text-red-300 list-disc list-inside">
-        <% app_setting.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
+<% cancel_path ||= app_setting.persisted? ? [:account, app_setting] : [:account, @app, :app_settings] %>
+
+<%= form_with model: app_setting, url: (app_setting.persisted? ? [:account, app_setting] : [:account, @app, :app_settings]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/text_field', method: :key, options: {autofocus: true} %>
+      <%= render 'shared/fields/text_area', method: :value %>
+      <%= render 'shared/fields/text_field', method: :setting_type %>
+      <%= render 'shared/fields/text_area', method: :description %>
+      <%= render 'shared/fields/options', method: :encrypted %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
     </div>
   <% end %>
-
-  <div class="space-y-6">
-    <% if app_setting.new_record? && params[:key].present? %>
-      <!-- Pre-filled common setting -->
-      <% config = AppSetting::COMMON_SETTINGS[params[:key]] %>
-      <%= form.hidden_field :key, value: params[:key] %>
-      <%= form.hidden_field :setting_type, value: params[:type] || config&.dig(:type) %>
-      
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          <%= config&.dig(:label) || params[:key].humanize %>
-        </label>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-          <%= config&.dig(:placeholder) %>
-        </p>
-      </div>
-    <% else %>
-      <!-- Custom setting -->
-      <div>
-        <%= form.label :key, "Variable Name", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" %>
-        <div class="relative">
-          <span class="absolute left-3 top-2 text-gray-500 dark:text-gray-400 font-mono text-sm">REACT_APP_</span>
-          <%= form.text_field :key, 
-              class: "pl-24 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white",
-              placeholder: "VARIABLE_NAME",
-              pattern: "[A-Z_]+",
-              title: "Use uppercase letters and underscores only" %>
-        </div>
-        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Will be available as process.env.REACT_APP_VARIABLE_NAME in your app
-        </p>
-      </div>
-      
-      <div>
-        <%= form.label :setting_type, "Category", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" %>
-        <%= form.select :setting_type, 
-            options_for_select(AppSetting::SETTING_TYPES.map { |k, v| [v, k] }, app_setting.setting_type),
-            {},
-            class: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white" %>
-      </div>
-    <% end %>
-    
-    <div>
-      <%= form.label :value, "Value", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" %>
-      <%= form.text_area :value, 
-          rows: 3,
-          class: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white",
-          placeholder: "Enter the value for this setting" %>
-    </div>
-    
-    <div>
-      <%= form.label :description, "Description (optional)", class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" %>
-      <%= form.text_area :description, 
-          rows: 2,
-          class: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white",
-          placeholder: "What is this setting used for?" %>
-    </div>
-    
-    <div class="flex items-center">
-      <%= form.check_box :encrypted, class: "rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-800" %>
-      <%= form.label :encrypted, class: "ml-2 text-sm text-gray-700 dark:text-gray-300" do %>
-        Encrypt this value
-        <span class="text-gray-500 dark:text-gray-400">(recommended for API keys, passwords, and secrets)</span>
-      <% end %>
-    </div>
-  </div>
-
-  <div class="mt-8 flex items-center justify-between">
-    <%= link_to "Cancel", account_app_app_settings_path(@app), 
-        class: "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white" %>
-    
-    <%= form.submit app_setting.new_record? ? "Create Setting" : "Update Setting", 
-        class: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer" %>
-  </div>
 <% end %>

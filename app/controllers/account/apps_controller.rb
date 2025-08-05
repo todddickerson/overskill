@@ -223,6 +223,24 @@ class Account::AppsController < Account::ApplicationController
     end
   end
 
+  # GET /account/apps/:id/deployment_info
+  def deployment_info
+    # Get deployment URLs and visitor info
+    preview_url = @app.preview_url
+    production_url = @app.published_url || @app.deployment_url
+    
+    render json: {
+      preview_url: preview_url,
+      production_url: production_url,
+      visitor_count: @app.visitor_count,
+      daily_visitors: @app.daily_visitors,
+      deployment_status: @app.deployment_status,
+      last_deployed_at: @app.last_deployed_at,
+      total_versions: @app.app_versions.count,
+      last_updated: @app.updated_at
+    }
+  end
+
   private
 
   if defined?(Api::V1::ApplicationController)

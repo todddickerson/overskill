@@ -1,0 +1,123 @@
+en:
+  app_settings: &app_settings
+    label: &label App Settings
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App Setting
+      create: Create App Setting
+      edit: Edit App Setting
+      update: Update App Setting
+      destroy: Remove App Setting
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_setting_name}? This will also remove any child resources and can't be undone.
+    app_setting:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App Setting ID
+      app_id:
+        heading: App ID
+      key:
+        _: &key Key
+        label: *key
+        heading: *key
+        api_title: *key
+        api_description: *key
+      value:
+        _: &value Value
+        label: *value
+        heading: *value
+        api_title: *value
+        api_description: *value
+      setting_type:
+        _: &setting_type Setting Type
+        label: *setting_type
+        heading: *setting_type
+        api_title: *setting_type
+        api_description: *setting_type
+      description:
+        _: &description Description
+        label: *description
+        heading: *description
+        api_title: *description
+        api_description: *description
+      encrypted:
+        _: &encrypted Encrypted
+        label: *encrypted
+        heading: *encrypted
+        api_title: *encrypted
+        api_description: *encrypted
+        options:
+          yes: "Yes"
+          no: "No"
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for App Settings"
+      index: "List App Settings"
+      create: "Add a New App Setting"
+      member_actions: "Actions for an Individual App Setting"
+      show: "Retrieve a App Setting"
+      update: "Update a App Setting"
+      destroy: "Delete a App Setting"
+      fields: *fields
+    index:
+      section: "%{apps_possessive} App Settings"
+      contexts:
+        app:
+          header: App Settings
+          description: Below is a list of App Settings that have been added for %{app_name}.
+          description_empty: No App Settings have been added for %{app_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_setting_name}"
+      header: App Setting Details
+      description: Below are the details we have for %{app_setting_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_setting_name} from %{app_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App Setting for %{app_name}"
+      header: New App Setting Details
+      description: Please provide the details of the new App Setting you'd like to add to %{app_name}.
+      form: *form
+    edit:
+      section: "%{app_setting_name}"
+      header: Edit App Setting Details
+      description: You can update the details or settings for %{app_setting_name} below.
+      form: *form
+    notifications:
+      created: App Setting was successfully created.
+      updated: App Setting was successfully updated.
+      destroyed: App Setting was successfully destroyed.
+  account:
+    app_settings: *app_settings
+  activerecord:
+    attributes:
+      app_setting:
+        key: *key
+        value: *value
+        setting_type: *setting_type
+        encrypted: *encrypted
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

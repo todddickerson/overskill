@@ -9,6 +9,9 @@ default:
     AppTableColumn: manage
     AppChatMessage: manage
     AppApiCall: manage
+    AppSetting: manage
+    AppSecurityPolicy: read
+    AppAuditLog: read
     Follow: read
     CreatorProfile: read
     Team: read
@@ -48,6 +51,9 @@ admin:
     AppTableColumn: manage
     AppChatMessage: manage
     AppApiCall: manage
+    AppSetting: manage
+    AppSecurityPolicy: manage
+    AppAuditLog: manage
     Follow: manage
     CreatorProfile: manage
     Team: manage

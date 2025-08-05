@@ -1,42 +1,72 @@
 class Account::AppSecurityPoliciesController < Account::ApplicationController
-  before_action :set_app
-  
+  account_load_and_authorize_resource :app_security_policy, through: :app, through_association: :app_security_policies
+
+  # GET /account/apps/:app_id/app_security_policies
+  # GET /account/apps/:app_id/app_security_policies.json
   def index
-    @policy_service = Security::RlsPolicyService.new(@app)
-    @policies = @policy_service.get_all_policies
-    @security_functions = @policy_service.get_security_functions
-    @audit_config = @policy_service.get_audit_configuration
-    @security_report = @policy_service.generate_security_report
-    
+    delegate_json_to_api
+  end
+
+  # GET /account/app_security_policies/:id
+  # GET /account/app_security_policies/:id.json
+  def show
+    delegate_json_to_api
+  end
+
+  # GET /account/apps/:app_id/app_security_policies/new
+  def new
+  end
+
+  # GET /account/app_security_policies/:id/edit
+  def edit
+  end
+
+  # POST /account/apps/:app_id/app_security_policies
+  # POST /account/apps/:app_id/app_security_policies.json
+  def create
     respond_to do |format|
-      format.html
-      format.json { render json: @security_report }
-      format.pdf do
-        # Generate PDF report for compliance
-        pdf = SecurityReportPdf.new(@security_report)
-        send_data pdf.render,
-                  filename: "#{@app.slug}_security_report_#{Date.current}.pdf",
-                  type: 'application/pdf',
-                  disposition: 'inline'
+      if @app_security_policy.save
+        format.html { redirect_to [:account, @app_security_policy], notice: I18n.t("app_security_policies.notifications.created") }
+        format.json { render :show, status: :created, location: [:account, @app_security_policy] }
+      else
+        format.html { render :new, status: :unprocessable_entity }
+        format.json { render json: @app_security_policy.errors, status: :unprocessable_entity }
       end
     end
   end
-  
-  def show
-    @policy_service = Security::RlsPolicyService.new(@app)
-    @policy = @policy_service.get_all_policies.find { |p| p[:name] == params[:id] }
-    
-    if @policy
-      @explanation = @policy_service.explain_policy(@policy[:name])
-    else
-      redirect_to account_app_security_policies_path(@app), 
-                  alert: "Policy not found"
+
+  # PATCH/PUT /account/app_security_policies/:id
+  # PATCH/PUT /account/app_security_policies/:id.json
+  def update
+    respond_to do |format|
+      if @app_security_policy.update(app_security_policy_params)
+        format.html { redirect_to [:account, @app_security_policy], notice: I18n.t("app_security_policies.notifications.updated") }
+        format.json { render :show, status: :ok, location: [:account, @app_security_policy] }
+      else
+        format.html { render :edit, status: :unprocessable_entity }
+        format.json { render json: @app_security_policy.errors, status: :unprocessable_entity }
+      end
     end
   end
-  
+
+  # DELETE /account/app_security_policies/:id
+  # DELETE /account/app_security_policies/:id.json
+  def destroy
+    @app_security_policy.destroy
+    respond_to do |format|
+      format.html { redirect_to [:account, @app, :app_security_policies], notice: I18n.t("app_security_policies.notifications.destroyed") }
+      format.json { head :no_content }
+    end
+  end
+
   private
-  
-  def set_app
-    @app = current_team.apps.find(params[:app_id])
+
+  if defined?(Api::V1::ApplicationController)
+    include strong_parameters_from_api
+  end
+
+  def process_params(strong_params)
+    assign_date_and_time(strong_params, :last_violation)
+    # 🚅 super scaffolding will insert processing for new fields above this line.
   end
 end

@@ -1,0 +1,137 @@
+en:
+  app_security_policies: &app_security_policies
+    label: &label App Security Policies
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App Security Policy
+      create: Create App Security Policy
+      edit: Edit App Security Policy
+      update: Update App Security Policy
+      destroy: Remove App Security Policy
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_security_policy_name}? This will also remove any child resources and can't be undone.
+    app_security_policy:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App Security Policy ID
+      app_id:
+        heading: App ID
+      policy_name:
+        _: &policy_name Policy Name
+        label: *policy_name
+        heading: *policy_name
+        api_title: *policy_name
+        api_description: *policy_name
+      policy_type:
+        _: &policy_type Policy Type
+        label: *policy_type
+        heading: *policy_type
+        api_title: *policy_type
+        api_description: *policy_type
+      enabled:
+        _: &enabled Enabled
+        label: *enabled
+        heading: *enabled
+        api_title: *enabled
+        api_description: *enabled
+        options:
+          yes: "Yes"
+          no: "No"
+      configuration:
+        _: &configuration Configuration
+        label: *configuration
+        heading: *configuration
+        api_title: *configuration
+        api_description: *configuration
+      description:
+        _: &description Description
+        label: *description
+        heading: *description
+        api_title: *description
+        api_description: *description
+      last_violation:
+        _: &last_violation Last Violation
+        label: *last_violation
+        heading: *last_violation
+        api_title: *last_violation
+        api_description: *last_violation
+      violation_count:
+        _: &violation_count Violation Count
+        label: *violation_count
+        heading: *violation_count
+        api_title: *violation_count
+        api_description: *violation_count
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for App Security Policies"
+      index: "List App Security Policies"
+      create: "Add a New App Security Policy"
+      member_actions: "Actions for an Individual App Security Policy"
+      show: "Retrieve a App Security Policy"
+      update: "Update a App Security Policy"
+      destroy: "Delete a App Security Policy"
+      fields: *fields
+    index:
+      section: "%{apps_possessive} App Security Policies"
+      contexts:
+        app:
+          header: App Security Policies
+          description: Below is a list of App Security Policies that have been added for %{app_name}.
+          description_empty: No App Security Policies have been added for %{app_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_security_policy_name}"
+      header: App Security Policy Details
+      description: Below are the details we have for %{app_security_policy_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_security_policy_name} from %{app_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App Security Policy for %{app_name}"
+      header: New App Security Policy Details
+      description: Please provide the details of the new App Security Policy you'd like to add to %{app_name}.
+      form: *form
+    edit:
+      section: "%{app_security_policy_name}"
+      header: Edit App Security Policy Details
+      description: You can update the details or settings for %{app_security_policy_name} below.
+      form: *form
+    notifications:
+      created: App Security Policy was successfully created.
+      updated: App Security Policy was successfully updated.
+      destroyed: App Security Policy was successfully destroyed.
+  account:
+    app_security_policies: *app_security_policies
+  activerecord:
+    attributes:
+      app_security_policy:
+        policy_name: *policy_name
+        policy_type: *policy_type
+        enabled: *enabled
+        configuration: *configuration
+        last_violation: *last_violation
+        violation_count: *violation_count
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

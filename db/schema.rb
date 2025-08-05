@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_04_210024) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_05_200810) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -262,6 +262,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_210024) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["app_id"], name: "index_app_o_auth_providers_on_app_id"
+  end
+
+  create_table "app_security_policies", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "policy_name"
+    t.string "policy_type"
+    t.boolean "enabled", default: false
+    t.text "configuration"
+    t.text "description"
+    t.datetime "last_violation"
+    t.integer "violation_count"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_security_policies_on_app_id"
   end
 
   create_table "app_settings", force: :cascade do |t|
@@ -756,6 +770,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_04_210024) do
   add_foreign_key "app_generations", "apps"
   add_foreign_key "app_generations", "teams"
   add_foreign_key "app_o_auth_providers", "apps"
+  add_foreign_key "app_security_policies", "apps"
   add_foreign_key "app_settings", "apps"
   add_foreign_key "app_table_columns", "app_tables"
   add_foreign_key "app_tables", "apps"

@@ -2,6 +2,6 @@
   <% page.title t('.section') %>
   <% page.body.render 'account/shared/box', divider: true do |box| %>
     <% box.t :description, title: '.header' %>
-    <% box.body.render 'form', app_setting: @app_setting %>
+    <% box.body.render 'form', app_security_policy: @app_security_policy %>
   <% end %>
 <% end %>

@@ -103,6 +103,8 @@
     <%= render 'account/app_files/index', app_files: @app.app_files, hide_back: true %>
     <%= render 'account/app_generations/index', app_generations: @app.app_generations, hide_back: true %>
     <%= render 'account/app_collaborators/index', app_collaborators: @app.app_collaborators, hide_back: true %>
+    <%= render 'account/app_settings/index', app_settings: @app.app_settings, hide_back: true %>
+    <%= render 'account/app_security_policies/index', app_security_policies: @app.app_security_policies, hide_back: true %>
     <%# 🚅 super scaffolding will insert new children above this line. %>
   <% end %>
 <% end %>

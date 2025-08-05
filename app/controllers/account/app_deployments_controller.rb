@@ -126,15 +126,15 @@ class Account::AppDeploymentsController < Account::ApplicationController
     {
       production: {
         status: @app.deployment_status || 'not_deployed',
-        url: @app.published_url,
+        url: @app.production_url || @app.deployment_url,
         deployed_at: @app.deployed_at,
-        version: @app.deployed_version
+        version: get_deployed_version(@app, 'production')
       },
       staging: {
-        status: @app.staging_deployment_status || 'not_deployed',
+        status: 'not_deployed', # No staging_deployment_status field exists
         url: @app.staging_url,
         deployed_at: @app.staging_deployed_at,
-        version: @app.staging_version
+        version: get_deployed_version(@app, 'staging')
       },
       preview: {
         status: 'live',
@@ -142,11 +142,27 @@ class Account::AppDeploymentsController < Account::ApplicationController
         updated_at: @app.updated_at
       },
       visitor_stats: {
-        total: @app.visitor_count,
-        daily: @app.daily_visitors,
-        trend: calculate_trend(@app.daily_visitors)
+        total: @app.total_users || 0,
+        daily: [], # No daily_visitors field exists
+        trend: 'neutral'
       }
     }
+  end
+  
+  def get_deployed_version(app, environment)
+    # Get the latest successful deployment for this environment
+    latest_deployment = app.deployment_logs
+                          .where(environment: environment, status: 'success')
+                          .order(completed_at: :desc)
+                          .first
+    
+    if latest_deployment&.deployed_version.present?
+      latest_deployment.deployed_version
+    else
+      # Fallback to latest app version if no deployment version is recorded
+      latest_version = app.app_versions.order(created_at: :desc).first
+      latest_version&.version_number || '1.0.0'
+    end
   end
   
   def calculate_trend(daily_visitors)
