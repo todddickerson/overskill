@@ -1,6 +1,6 @@
-<div class="h-full flex bg-gray-50 dark:bg-gray-900 min-w-0" data-controller="dashboard-subnav" data-dashboard-subnav-current-view-value="overview">
+<div class="h-full flex bg-gray-50 dark:bg-gray-900 min-w-0 overflow-hidden" data-controller="dashboard-subnav" data-dashboard-subnav-current-view-value="overview">
   <!-- Dashboard Subnav -->
-  <div class="w-12 lg:w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 transition-all duration-300">
+  <div class="w-12 lg:w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 transition-all duration-300 overflow-y-auto">
     <nav class="p-1 lg:p-3 space-y-1">
       <!-- Overview -->
       <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
@@ -77,14 +77,14 @@
   </div>
   
   <!-- Dashboard Content Area -->
-  <div class="flex-1 overflow-hidden">
+  <div class="flex-1 min-w-0 relative">
     <!-- Overview Panel -->
-    <div class="h-full overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="overview">
+    <div class="absolute inset-0 overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="overview">
       <%= render "dashboard_overview", app: app %>
     </div>
     
     <!-- Code/Files Panel -->
-    <div class="h-full hidden" data-dashboard-view="files">
+    <div class="absolute inset-0 hidden" data-dashboard-view="files">
       <% if files.any? %>
         <div class="h-full flex">
           <!-- File Tree -->
@@ -118,34 +118,34 @@
     </div>
     
     <!-- Tables Panel -->
-    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="tables"
+    <div class="absolute inset-0 hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="tables"
          data-controller="database-manager"
          data-database-manager-app-id-value="<%= app.id %>">
       <%= render "database_tables", app: app %>
     </div>
     
     <!-- Schema Panel -->
-    <div class="h-full hidden" data-dashboard-view="schema">
+    <div class="absolute inset-0 hidden overflow-y-auto" data-dashboard-view="schema">
       <%= render "schema_editor", app: app %>
     </div>
     
     <!-- Users Panel -->
-    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="users">
+    <div class="absolute inset-0 hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="users">
       <%= render "user_management", app: app %>
     </div>
     
     <!-- Analytics Panel -->
-    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="analytics">
+    <div class="absolute inset-0 hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="analytics">
       <%= render "analytics_dashboard", app: app %>
     </div>
     
     <!-- API Panel -->
-    <div class="h-full hidden" data-dashboard-view="api">
+    <div class="absolute inset-0 hidden overflow-y-auto" data-dashboard-view="api">
       <%= render "api_explorer", app: app %>
     </div>
     
     <!-- Settings Panel -->
-    <div class="h-full hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="settings">
+    <div class="absolute inset-0 hidden overflow-y-auto p-4 sm:p-6 custom-scrollbar" data-dashboard-view="settings">
       <%= render "settings_content", app: app %>
     </div>
   </div>

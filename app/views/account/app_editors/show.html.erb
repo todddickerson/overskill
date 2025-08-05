@@ -362,7 +362,7 @@
     <!-- Main Content Area -->
     <div class="flex-1 bg-white dark:bg-gray-900 overflow-hidden">
       <!-- Dashboard View -->
-      <div id="dashboard_panel" class="h-full hidden" data-main-tabs-target="panel" data-mobile-navigation-target="dashboardPanel" data-panel-name="dashboard">
+      <div id="dashboard_panel" class="h-full hidden overflow-hidden" data-main-tabs-target="panel" data-mobile-navigation-target="dashboardPanel" data-panel-name="dashboard">
         <%= render "dashboard_with_subnav", app: @app, files: @files, selected_file: @selected_file %>
       </div>
       

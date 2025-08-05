@@ -209,8 +209,15 @@ export default class extends Controller {
           if (chatContainer) {
             chatContainer.classList.remove('pb-20')
           }
+        } else if (this.currentModeValue === "dashboard") {
+          // Dashboard needs similar mobile styling to fill the viewport
+          activePanel.classList.remove('hidden')
+          activePanel.classList.add('fixed', 'inset-0', 'top-14', 'bottom-16', 'z-10')
+          activePanel.style.display = 'block'
+          activePanel.style.width = '100%'
+          activePanel.style.height = 'calc(100vh - 8rem)' // Account for header and bottom nav
         } else {
-          // Preview and dashboard just need to be shown
+          // Preview just needs to be shown
           activePanel.classList.remove('hidden')
         }
         
