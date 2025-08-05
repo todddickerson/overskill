@@ -194,24 +194,43 @@ class Account::AppsController < Account::ApplicationController
 
   # POST /account/apps/:id/deploy
   def deploy
+    Rails.logger.info "[Deploy] Starting deployment for app #{@app&.id} with params: #{params.inspect}"
+    
+    # Check if app exists
+    unless @app
+      Rails.logger.error "[Deploy] App not found or not authorized"
+      render json: { error: "App not found" }, status: :not_found
+      return
+    end
+    
     # Check if app has files to deploy
     unless @app.app_files.any?
+      Rails.logger.info "[Deploy] App #{@app.id} has no files to deploy"
       render json: { error: "No files to deploy" }, status: :unprocessable_entity
       return
     end
 
     # Determine deployment target
     environment = params[:environment] || "production"
+    Rails.logger.info "[Deploy] Deploying app #{@app.id} to #{environment}"
     
-    # Queue deployment job with environment
-    DeployAppJob.perform_later(@app.id, environment)
+    begin
+      # Queue deployment job with environment
+      job = DeployAppJob.perform_later(@app.id, environment)
+      Rails.logger.info "[Deploy] Successfully queued deployment job #{job.job_id} for app #{@app.id}"
 
-    respond_to do |format|
-      format.json { render json: { message: "Deployment started", status: "deploying", environment: environment } }
-      format.turbo_stream do
-        render turbo_stream: turbo_stream.replace("deploy_status",
-          html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>})
+      respond_to do |format|
+        format.json { render json: { message: "Deployment started", status: "deploying", environment: environment } }
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.replace("deploy_status",
+            html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>})
+        end
       end
+    rescue => e
+      Rails.logger.error "[Deploy] Failed to queue deployment job for app #{@app.id}: #{e.message}"
+      Rails.logger.error "[Deploy] Error backtrace: #{e.backtrace.join("\n")}"
+      
+      render json: { error: "Failed to start deployment: #{e.message}" }, status: :internal_server_error
     end
   end
 
