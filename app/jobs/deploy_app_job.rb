@@ -5,7 +5,7 @@ class DeployAppJob < ApplicationJob
     app = App.find(app_id)
     
     # Update status to deploying
-    app.update!(deployment_status: 'deploying')
+    app.update!(status: 'generating')
     
     # Use the new preview service
     service = Deployment::CloudflarePreviewService.new(app)
@@ -35,13 +35,13 @@ class DeployAppJob < ApplicationJob
     else
       Rails.logger.error "Failed to deploy app #{app.id}: #{result[:error]}"
       
-      app.update!(deployment_status: 'failed')
+      app.update!(status: 'failed')
       broadcast_deployment_update(app, 'failed', result[:error])
     end
   rescue => e
     Rails.logger.error "Deployment job failed for app #{app_id}: #{e.message}"
     
-    app&.update!(deployment_status: 'failed')
+    app&.update!(status: 'failed')
     broadcast_deployment_update(app, 'failed', e.message) if app
   end
   

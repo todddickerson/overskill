@@ -17,8 +17,15 @@ export default class extends Controller {
   }
 
   connect() {
-    this.setupEditor()
-    this.updateTimer = null
+    console.log('[CodeMirror] Controller connecting...')
+    try {
+      this.setupEditor()
+      this.updateTimer = null
+      console.log('[CodeMirror] Controller connected successfully')
+    } catch (error) {
+      console.error('[CodeMirror] Failed to connect:', error)
+      this.showFallbackEditor()
+    }
   }
 
   disconnect() {
@@ -39,40 +46,65 @@ export default class extends Controller {
   }
 
   setupEditor() {
-    const extensions = [
-      basicSetup,
-      oneDark,
-      this.getLanguageExtension(),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          this.handleChange()
-        }
-        this.updateCursorPosition(update)
-      }),
-      EditorView.theme({
-        "&": {
-          height: "100%"
-        },
-        ".cm-scroller": {
-          fontFamily: "ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace"
-        }
+    console.log('[CodeMirror] Setting up editor...')
+    try {
+      const extensions = [
+        basicSetup,
+        oneDark,
+        this.getLanguageExtension(),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            this.handleChange()
+          }
+          this.updateCursorPosition(update)
+        }),
+        EditorView.theme({
+          "&": {
+            height: "100%"
+          },
+          ".cm-scroller": {
+            fontFamily: "ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace"
+          }
+        })
+      ]
+
+      const state = EditorState.create({
+        doc: this.contentValue,
+        extensions
       })
-    ]
 
-    const state = EditorState.create({
-      doc: this.contentValue,
-      extensions
-    })
+      this.editor = new EditorView({
+        state,
+        parent: this.editorTarget
+      })
 
-    this.editor = new EditorView({
-      state,
-      parent: this.editorTarget
-    })
-
-    // Hide the original textarea
+      // Hide the original textarea
+      const textarea = this.element.querySelector('textarea')
+      if (textarea) {
+        textarea.style.display = 'none'
+      }
+      
+      console.log('[CodeMirror] Editor setup complete')
+    } catch (error) {
+      console.error('[CodeMirror] Failed to setup editor:', error)
+      this.showFallbackEditor()
+    }
+  }
+  
+  showFallbackEditor() {
+    console.log('[CodeMirror] Showing fallback textarea editor')
     const textarea = this.element.querySelector('textarea')
     if (textarea) {
-      textarea.style.display = 'none'
+      textarea.style.display = 'block'
+      textarea.style.position = 'static'
+      // Make it work with the simple code editor controller as fallback
+      textarea.setAttribute('data-controller', 'code-editor')
+      textarea.setAttribute('data-code-editor-target', 'editor')
+      textarea.setAttribute('data-file-id', this.fileIdValue)
+      
+      if (this.statusTarget) {
+        this.statusTarget.textContent = 'CodeMirror failed - using fallback editor'
+      }
     }
   }
 
