@@ -425,9 +425,43 @@ SUPABASE_ANON_KEY=your-anon-key  # ⚠️ Must restart Rails after adding
 - **AI Orchestration Standards**: `/docs/ai-orchestration-design-standards.md` ⭐ **CRITICAL**
 - AI platform constraints: `/docs/ai-app-development-constraints.md`
 - OpenRouter monitoring: `/docs/openrouter-kimi-monitoring.md`
+- **Supabase Integration**: `/docs/supabase-integration.md` (auth sync & usage)
 - Business plan: `/docs/business-plan.md`
 - Architecture: `/docs/architecture.md`
 - BulletTrain docs: https://bullettrain.co/docs
+
+## Key Integration Points
+
+### Supabase Authentication Sync
+- **Purpose**: Hybrid auth - Rails primary, Supabase for generated apps
+- **When to use**: User lifecycle events, OAuth logins, admin monitoring
+- **Admin panel**: `/account/supabase_sync` (requires admin role)
+- **Key commands**: 
+  - `rake supabase:sync_all_users` - Batch sync existing users
+  - `rake supabase:sync_status` - Check sync health
+  - `rake supabase:sync_user[email]` - Sync specific user
+- **Background jobs**: `SyncUsersToSupabaseJob`, `SupabaseAuthSyncJob`
+- **Full docs**: `/docs/supabase-integration.md`
+
+### AI Generation with Function Calling
+- **Primary model**: Kimi K2 via OpenRouter (cost-effective)
+- **Fallback model**: Claude Sonnet (reliable function calling)
+- **Key service**: `AI::OpenRouterClient#chat_with_tools`
+- **Progress tracking**: Real-time updates via `AppChatMessage` broadcasts
+- **Error handling**: Automatic retry, timeout management, JSON parsing elimination
+
+### Database Management System
+- **Dashboard location**: Dashboard tab in app editor
+- **Supabase integration**: Multi-tenant with RLS policies
+- **Service**: `Supabase::AppDatabaseService`
+- **Schema format**: `app_{id}_tablename` for isolation
+- **AI awareness**: Database schema included in generation prompts
+
+### Mobile UI Patterns
+- **Editor layout**: Responsive with floating edit button
+- **Chat overlay**: Full-screen on mobile via `openMobileChat()`
+- **Toggle style**: Pill buttons on mobile, underline on desktop
+- **Key controller**: `editor_layout_controller.js`
 
 ## CRITICAL: AI Orchestration Quality Standards
 
