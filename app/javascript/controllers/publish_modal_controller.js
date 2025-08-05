@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["modal", "content", "previewUrl", "productionUrl", "visitorCount", "updateButton", "todayVisitors", "visitorChart", "totalVersions", "lastUpdated"]
+  static targets = ["modal", "content", "previewUrl", "productionUrl", "visitorCount", "updateButton", "todayVisitors", "visitorChart", "totalVersions", "lastUpdated", "deployStatus", "deployButton"]
   static values = { appId: String }
   
   connect() {
@@ -219,10 +219,8 @@ export default class extends Controller {
     button.disabled = true
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Deploying...</span>'
     
-    // Show deploy status
-    if (this.hasDeployStatusTarget) {
-      this.deployStatusTarget.classList.remove('hidden')
-    }
+    // Show enhanced deploy status with progress
+    this.showDeployProgress('Starting deployment...')
     
     try {
       const response = await fetch(`/account/apps/${this.appIdValue}/deploy`, {
@@ -235,40 +233,160 @@ export default class extends Controller {
       })
       
       if (response.ok) {
-        button.innerHTML = '<i class="fas fa-check"></i> <span>Deployed!</span>'
-        button.classList.remove('bg-blue-600', 'hover:bg-blue-700')
-        button.classList.add('bg-green-600')
+        const result = await response.json()
+        console.log('Deploy response:', result)
         
-        // Reload app data after deployment
-        setTimeout(() => {
-          this.loadAppData()
-          button.innerHTML = originalContent
-          button.classList.remove('bg-green-600')
-          button.classList.add('bg-blue-600', 'hover:bg-blue-700')
-          button.disabled = false
-          if (this.hasDeployStatusTarget) {
-            this.deployStatusTarget.classList.add('hidden')
-          }
-        }, 2000)
+        // Start polling for deployment status
+        this.pollDeploymentStatus(button, originalContent)
       } else {
-        throw new Error('Deployment failed')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Deployment failed')
       }
     } catch (error) {
       console.error('Deploy failed:', error)
-      button.innerHTML = '<i class="fas fa-times"></i> <span>Deploy Failed</span>'
-      button.classList.remove('bg-blue-600', 'hover:bg-blue-700')
-      button.classList.add('bg-red-600')
-      
-      setTimeout(() => {
-        button.innerHTML = originalContent
-        button.classList.remove('bg-red-600')
-        button.classList.add('bg-blue-600', 'hover:bg-blue-700')
-        button.disabled = false
-        if (this.hasDeployStatusTarget) {
-          this.deployStatusTarget.classList.add('hidden')
-        }
-      }, 3000)
+      this.showDeployError(error.message, button, originalContent)
     }
+  }
+  
+  showDeployProgress(message, percentage = null) {
+    if (this.hasDeployStatusTarget) {
+      this.deployStatusTarget.classList.remove('hidden')
+      
+      // Update the progress message
+      let progressHtml = `
+        <div class="flex items-center space-x-3">
+          <i class="fas fa-spinner fa-spin text-blue-600 dark:text-blue-400"></i>
+          <div class="flex-1">
+            <div class="text-sm text-blue-700 dark:text-blue-300">${message}</div>
+            ${percentage !== null ? `
+              <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 mt-2">
+                <div class="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `
+      
+      this.deployStatusTarget.innerHTML = progressHtml
+      this.deployStatusTarget.className = 'mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800'
+    }
+  }
+  
+  showDeployError(message, button, originalContent) {
+    // Show error in status
+    if (this.hasDeployStatusTarget) {
+      this.deployStatusTarget.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <i class="fas fa-times-circle text-red-600 dark:text-red-400"></i>
+          <span class="text-sm text-red-700 dark:text-red-300">${message}</span>
+        </div>
+      `
+      this.deployStatusTarget.className = 'mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800'
+    }
+    
+    // Update button
+    button.innerHTML = '<i class="fas fa-times"></i> <span>Deploy Failed</span>'
+    button.classList.remove('bg-blue-600', 'hover:bg-blue-700')
+    button.classList.add('bg-red-600')
+    
+    // Reset after delay
+    setTimeout(() => {
+      button.innerHTML = originalContent
+      button.classList.remove('bg-red-600')
+      button.classList.add('bg-blue-600', 'hover:bg-blue-700')
+      button.disabled = false
+      if (this.hasDeployStatusTarget) {
+        this.deployStatusTarget.classList.add('hidden')
+      }
+    }, 5000)
+  }
+  
+  async pollDeploymentStatus(button, originalContent) {
+    let attempts = 0
+    const maxAttempts = 30 // 30 attempts = 60 seconds max
+    
+    const poll = async () => {
+      attempts++
+      
+      try {
+        const response = await fetch(`/account/apps/${this.appIdValue}/deployment_info.json`)
+        if (response.ok) {
+          const data = await response.json()
+          const status = data.deployment_status
+          
+          console.log('Deployment status:', status, 'Attempt:', attempts)
+          
+          if (status === 'deployed' || status === 'published') {
+            // Success!
+            this.showDeploySuccess(button, originalContent)
+            return
+          } else if (status === 'failed') {
+            // Failed
+            this.showDeployError('Deployment failed', button, originalContent)
+            return
+          } else if (status === 'deploying' || status === 'generating') {
+            // Still in progress
+            const percentage = Math.min((attempts / maxAttempts) * 80, 80) // Max 80% until completion
+            this.showDeployProgress('Deploying to Cloudflare...', percentage)
+            
+            if (attempts < maxAttempts) {
+              setTimeout(poll, 2000) // Poll every 2 seconds
+            } else {
+              this.showDeployError('Deployment timed out', button, originalContent)
+            }
+          } else {
+            // Unknown status, keep polling
+            if (attempts < maxAttempts) {
+              setTimeout(poll, 2000)
+            } else {
+              this.showDeployError('Deployment status unknown', button, originalContent)
+            }
+          }
+        } else {
+          throw new Error('Failed to check deployment status')
+        }
+      } catch (error) {
+        console.error('Polling error:', error)
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000)
+        } else {
+          this.showDeployError('Could not verify deployment status', button, originalContent)
+        }
+      }
+    }
+    
+    // Start polling after a brief delay
+    setTimeout(poll, 3000)
+  }
+  
+  showDeploySuccess(button, originalContent) {
+    // Show success in status
+    if (this.hasDeployStatusTarget) {
+      this.deployStatusTarget.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <i class="fas fa-check-circle text-green-600 dark:text-green-400"></i>
+          <span class="text-sm text-green-700 dark:text-green-300">Successfully deployed!</span>
+        </div>
+      `
+      this.deployStatusTarget.className = 'mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800'
+    }
+    
+    // Update button
+    button.innerHTML = '<i class="fas fa-check"></i> <span>Deployed!</span>'
+    button.classList.remove('bg-blue-600', 'hover:bg-blue-700')
+    button.classList.add('bg-green-600')
+    
+    // Reload app data and reset
+    setTimeout(() => {
+      this.loadAppData()
+      button.innerHTML = originalContent
+      button.classList.remove('bg-green-600')
+      button.classList.add('bg-blue-600', 'hover:bg-blue-700')
+      button.disabled = false
+      if (this.hasDeployStatusTarget) {
+        this.deployStatusTarget.classList.add('hidden')
+      }
+    }, 3000)
   }
   
   async deployPreview(event) {

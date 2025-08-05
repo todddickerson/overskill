@@ -70,9 +70,14 @@ class App < ApplicationRecord
   end
 
   def published_url
-    # Return the custom domain if set (future feature), otherwise use the default overskill.app subdomain
-    # TODO: Add custom_domain column when implementing entri.com integration
-    "https://#{slug}.overskill.app"
+    # Return the actual deployment URL if deployed, otherwise use the predicted subdomain
+    return deployment_url if deployment_url.present?
+    
+    # Generate the subdomain the same way the deployment service does
+    subdomain = name.downcase.gsub(/[^a-z0-9\-]/, '-').gsub(/-+/, '-').gsub(/^-|-$/, '')
+    subdomain = "app-#{id}" if subdomain.blank?
+    
+    "https://#{subdomain}.overskill.app"
   end
 
   def visitor_count
