@@ -167,15 +167,17 @@ export default class extends Controller {
   handleKeydown(event) {
     console.log('Keydown event:', event.key, 'Meta:', event.metaKey, 'Ctrl:', event.ctrlKey)
     
-    // Check for cmd+enter or ctrl+enter
+    // Check for cmd+enter or ctrl+enter (Mac uses metaKey, Windows/Linux use ctrlKey)
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      console.log('Cmd+Enter detected, triggering form submission...')
+      console.log('Cmd/Ctrl+Enter detected, triggering form submission...')
       event.preventDefault() // Prevent default textarea behavior
       
       // Find the form element and submit it
       const form = this.element
       if (form && form.tagName === 'FORM') {
         console.log('Submitting form via requestSubmit...')
+        // Directly call the submit method to trigger the form submission
+        this.submit(event)
         if (form.requestSubmit) {
           form.requestSubmit()
         } else {
@@ -195,10 +197,14 @@ export default class extends Controller {
   handleSubmitClick(event) {
     console.log('Submit button clicked')
     
+    // Don't prevent default here - let the button work naturally
+    // The validation will happen in the submit handler
+    
     // Don't submit if already processing
     if (this.processingValue) {
       console.log('Already processing, preventing submission')
       event.preventDefault()
+      event.stopPropagation()
       return
     }
     
@@ -212,18 +218,19 @@ export default class extends Controller {
       const isDesktop = window.innerWidth >= 1024
       const isVisible = isDesktop ? desktopContainer : mobileContainer
       
-      console.log(`Checking textarea visibility - isDesktop: ${isDesktop}, hasValue: ${!!textarea.value.trim()}`)
+      console.log(`Checking textarea visibility - isDesktop: ${isDesktop}, hasValue: ${!!textarea.value.trim()}, value: "${textarea.value}"`)
       return isVisible && textarea.value.trim()
     })
     
     if (!visibleTextarea) {
       console.log('No visible textarea with content, preventing submission')
       event.preventDefault()
+      event.stopPropagation()
       return
     }
     
-    console.log('Submit validation passed, allowing form to submit')
-    // Let the form submit naturally since type="submit" is set
+    console.log('Submit validation passed, allowing form to submit naturally')
+    // Don't call preventDefault - let the button submit the form naturally
   }
 
   // Handle form submission
