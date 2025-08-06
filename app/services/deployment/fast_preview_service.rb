@@ -59,15 +59,17 @@ module Deployment
     def generate_fast_preview_worker
       <<~JAVASCRIPT
         // Fast Preview Worker with on-the-fly TypeScript transformation
+        // Using module format for better secret handling
         
-        addEventListener('fetch', event => {
-          event.respondWith(handleRequest(event.request, event))
-        })
+        export default {
+          async fetch(request, env, ctx) {
+            return handleRequest(request, env, ctx);
+          }
+        };
         
-        async function handleRequest(request, event) {
+        async function handleRequest(request, env, ctx) {
           const url = new URL(request.url)
           let pathname = url.pathname
-          const env = event.env || {}
           
           // API routes
           if (pathname.startsWith('/api/')) {

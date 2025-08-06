@@ -84,15 +84,104 @@ class Deployment::CloudflarePreviewService
   private
   
   def set_worker_env_vars(worker_name)
-    return unless @app.app_env_vars.any?
+    # Set environment variables via Cloudflare API
+    all_env_vars = build_env_vars_for_app
     
-    env_vars = @app.env_vars_for_deployment
+    # Cloudflare API expects both plaintext vars and secrets in specific format
+    plaintext_bindings = []
+    secret_bindings = []
     
-    # Cloudflare Workers API to set environment variables
-    # Note: This is simplified - actual implementation may need to batch these
-    env_vars.each do |key, value|
-      Rails.logger.info "Would set env var #{key} for worker #{worker_name}"
-      # TODO: Implement actual Cloudflare API call when API is available
+    all_env_vars.each do |key, value|
+      if key.include?('SECRET') || key.include?('SERVICE_KEY') || key.include?('PRIVATE')
+        # Treat as secret
+        secret_bindings << { name: key, type: 'secret_text' }
+        # Secrets need to be set separately via PATCH endpoint
+        set_worker_secret(worker_name, key, value)
+      else
+        # Treat as plaintext
+        plaintext_bindings << { 
+          name: key, 
+          type: 'plain_text',
+          text: value
+        }
+      end
+    end
+    
+    # Update worker with env var bindings
+    if plaintext_bindings.any?
+      update_worker_env_vars(worker_name, plaintext_bindings)
+    end
+    
+    Rails.logger.info "[CloudflarePreview] Set #{plaintext_bindings.size} env vars and #{secret_bindings.size} secrets"
+  end
+  
+  def build_env_vars_for_app
+    vars = {}
+    
+    # System vars
+    vars['APP_ID'] = @app.id.to_s
+    vars['APP_NAME'] = @app.name
+    vars['ENVIRONMENT'] = 'preview'
+    
+    # Supabase configuration (from app's shard)
+    if @app.database_shard
+      vars['SUPABASE_URL'] = @app.database_shard.supabase_url
+      vars['SUPABASE_ANON_KEY'] = @app.database_shard.supabase_anon_key
+      vars['SUPABASE_SERVICE_KEY'] = @app.database_shard.supabase_service_key
+    end
+    
+    # Custom app env vars
+    @app.env_vars_for_deployment.each do |key, value|
+      vars[key] = value
+    end
+    
+    # OAuth secrets (from Rails env)
+    vars['GOOGLE_CLIENT_ID'] = ENV['GOOGLE_CLIENT_ID'] if ENV['GOOGLE_CLIENT_ID']
+    vars['GOOGLE_CLIENT_SECRET'] = ENV['GOOGLE_CLIENT_SECRET'] if ENV['GOOGLE_CLIENT_SECRET']
+    
+    vars
+  end
+  
+  def set_worker_secret(worker_name, key, value)
+    # Set individual secret via PATCH endpoint
+    begin
+      response = self.class.patch(
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
+        body: {
+          name: key,
+          text: value,
+          type: 'secret_text'
+        }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      
+      Rails.logger.info "[CloudflarePreview] Set secret #{key} for worker #{worker_name}"
+    rescue => e
+      Rails.logger.warn "[CloudflarePreview] Failed to set secret #{key}: #{e.message}"
+    end
+  end
+  
+  def update_worker_env_vars(worker_name, bindings)
+    # Update worker metadata with environment variable bindings
+    begin
+      metadata = {
+        bindings: bindings,
+        compatibility_date: '2024-01-01',
+        main_module: 'worker.js'
+      }
+      
+      # This might need adjustment based on Cloudflare's exact API
+      response = self.class.patch(
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
+        body: {
+          metadata: metadata
+        }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      
+      Rails.logger.info "[CloudflarePreview] Updated env vars for worker #{worker_name}"
+    rescue => e
+      Rails.logger.warn "[CloudflarePreview] Failed to update env vars: #{e.message}"
     end
   end
   
