@@ -11,23 +11,30 @@ class SessionsController < Devise::SessionsController
     respond_to do |format|
       format.html do
         if pending_prompt
-          # If we have a pending prompt, redirect back to generator with the prompt
-          redirect_to generator_index_path(prompt: pending_prompt), notice: "Signed in successfully. Creating your app..."
+          # If we have a pending prompt, go directly to create action
+          redirect_to generator_index_path, 
+                      notice: "Signed in successfully. Creating your app...",
+                      params: { prompt: pending_prompt }
         else
           redirect_to after_sign_in_path_for(resource)
         end
       end
       format.json do
         if pending_prompt
-          render json: { success: true, redirect_url: generator_index_path(prompt: pending_prompt) }
+          # For AJAX, we'll handle the app creation directly
+          render json: { success: true, redirect_url: after_sign_in_path_for(resource), pending_prompt: pending_prompt }
         else
           render json: { success: true, redirect_url: after_sign_in_path_for(resource) }
         end
       end
     end
-  rescue Warden::Strategies::Base
+  rescue
     respond_to do |format|
-      format.html { super }
+      format.html { 
+        flash.now[:alert] = "Invalid email or password"
+        self.resource = User.new
+        render :new
+      }
       format.json { render json: { success: false, error: "Invalid email or password" }, status: :unauthorized }
     end
   end

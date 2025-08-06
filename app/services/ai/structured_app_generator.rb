@@ -9,7 +9,7 @@ module Ai
     end
     
     def generate(prompt, framework: "react", app_type: "saas")
-      Rails.logger.info "[StructuredGenerator] Starting generation with Kimi K2"
+      Rails.logger.info "[StructuredGenerator] Starting generation"
       
       # Load standards
       standards = File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
@@ -17,13 +17,13 @@ module Ai
       # Build structured prompt that returns JSON without function calling
       structured_prompt = build_structured_prompt(prompt, standards)
       
-      # Try Kimi K2 first (much cheaper)
-      result = generate_with_kimi(structured_prompt)
+      # Use Claude as primary for reliability with complex prompts
+      result = generate_with_claude(structured_prompt)
       
-      # Fallback to Claude if Kimi fails
+      # Try Kimi as fallback if Claude fails (unlikely but good to have)
       if !result[:success] || result[:files].empty?
-        Rails.logger.warn "[StructuredGenerator] Kimi K2 failed, falling back to Claude"
-        result = generate_with_claude(structured_prompt)
+        Rails.logger.warn "[StructuredGenerator] Claude failed, trying Kimi K2"
+        result = generate_with_kimi(structured_prompt)
       end
       
       result
@@ -35,25 +35,44 @@ module Ai
       <<~PROMPT
         Create a React TypeScript app: #{user_prompt}
         
-        Return JSON with this structure:
+        CRITICAL REQUIREMENTS:
+        - React 18+ with TypeScript (.tsx/.ts files)
+        - Tailwind CSS for styling
+        - Vite as build tool
+        - Cloudflare Workers deployment (wrangler.toml)
+        - Supabase integration with RLS
+        - Analytics tracking
+        
+        Return JSON:
         {
           "app": {
-            "name": "string",
-            "description": "string"
+            "name": "App Name",
+            "description": "Brief description"
           },
           "files": [
-            {"path": "index.html", "content": "HTML content"},
-            {"path": "src/App.tsx", "content": "React component"},
-            {"path": "src/main.tsx", "content": "Entry point"},
-            {"path": "package.json", "content": "Dependencies"}
+            {"path": "index.html", "content": "<!DOCTYPE html>..."},
+            {"path": "src/App.tsx", "content": "import React..."},
+            {"path": "src/main.tsx", "content": "import React..."},
+            {"path": "src/lib/supabase.ts", "content": "import { createClient }..."},
+            {"path": "src/lib/analytics.ts", "content": "class OverskillAnalytics..."},
+            {"path": "package.json", "content": "{...}"},
+            {"path": "vite.config.ts", "content": "import { defineConfig }..."},
+            {"path": "tailwind.config.js", "content": "module.exports = {..."},
+            {"path": "tsconfig.json", "content": "{...}"},
+            {"path": "wrangler.toml", "content": "name = ..."}
           ]
         }
         
-        Requirements:
-        - React 18 with TypeScript
-        - Include Tailwind CSS via CDN
-        - Simple, working code
-        - Return ONLY valid JSON
+        REQUIRED in src/lib/supabase.ts:
+        - createClient with env vars VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+        - setRLSContext function for row-level security
+        
+        REQUIRED in src/lib/analytics.ts:
+        - OverskillAnalytics class
+        - track() method posting to https://overskill.app/api/v1/analytics/track
+        - Auto-track page_view on init
+        
+        Create COMPLETE, working files. Return ONLY valid JSON.
       PROMPT
     end
     
@@ -73,7 +92,7 @@ module Ai
         messages,
         model: :kimi_k2,
         temperature: 0.3,
-        max_tokens: 16000  # Reduced for faster response
+        max_tokens: 12000  # Balanced for performance
       )
       
       if response[:success]

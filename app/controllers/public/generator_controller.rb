@@ -44,6 +44,12 @@ class Public::GeneratorController < Public::ApplicationController
   def index
     # Simple landing page with prompt selection
     @starter_prompts = STARTER_PROMPTS
+    
+    # Check if we have a prompt parameter (from post-auth redirect)
+    if params[:prompt].present? && user_signed_in?
+      # Auto-submit the form with the pending prompt
+      create
+    end
   end
   
   def create

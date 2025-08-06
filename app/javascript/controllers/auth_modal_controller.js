@@ -79,8 +79,29 @@ export default class extends Controller {
       if (response.ok) {
         const data = await response.json
         if (data.success) {
-          // If we have a redirect URL, go there
-          if (data.redirect_url) {
+          // If we have a pending prompt, submit the generator form
+          if (data.pending_prompt) {
+            // Create and submit a form with the prompt
+            const form = document.createElement('form')
+            form.method = 'POST'
+            form.action = '/generator'
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content
+            const csrfInput = document.createElement('input')
+            csrfInput.type = 'hidden'
+            csrfInput.name = 'authenticity_token'
+            csrfInput.value = csrfToken
+            form.appendChild(csrfInput)
+            
+            const promptInput = document.createElement('input')
+            promptInput.type = 'hidden'
+            promptInput.name = 'prompt'
+            promptInput.value = data.pending_prompt
+            form.appendChild(promptInput)
+            
+            document.body.appendChild(form)
+            form.submit()
+          } else if (data.redirect_url) {
             window.location.href = data.redirect_url
           } else if (this.returnUrlValue) {
             window.location.href = this.returnUrlValue
@@ -119,8 +140,29 @@ export default class extends Controller {
       if (response.ok) {
         const data = await response.json
         if (data.success) {
-          // If we have a redirect URL, go there
-          if (data.redirect_url) {
+          // If we have a pending prompt, submit the generator form
+          if (data.pending_prompt) {
+            // Create and submit a form with the prompt
+            const form = document.createElement('form')
+            form.method = 'POST'
+            form.action = '/generator'
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content
+            const csrfInput = document.createElement('input')
+            csrfInput.type = 'hidden'
+            csrfInput.name = 'authenticity_token'
+            csrfInput.value = csrfToken
+            form.appendChild(csrfInput)
+            
+            const promptInput = document.createElement('input')
+            promptInput.type = 'hidden'
+            promptInput.name = 'prompt'
+            promptInput.value = data.pending_prompt
+            form.appendChild(promptInput)
+            
+            document.body.appendChild(form)
+            form.submit()
+          } else if (data.redirect_url) {
             window.location.href = data.redirect_url
           } else if (this.returnUrlValue) {
             window.location.href = this.returnUrlValue

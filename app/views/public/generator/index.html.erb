@@ -12,7 +12,12 @@
 
     <!-- Custom Prompt Input -->
     <div class="max-w-3xl mx-auto mb-12">
-      <%= form_with url: generator_index_path, method: :post, local: true, 
+      <%= form_with url: generator_index_path, method: :post, local: false,
+                    data: { 
+                      controller: "generator-form",
+                      action: "submit->generator-form#submit",
+                      generator_form_target: "form"
+                    },
                     class: "bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6" do |f| %>
         
         <div class="mb-4">
@@ -29,6 +34,7 @@
         </div>
         
         <button type="submit" 
+                data-generator-form-target="submitButton"
                 class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white 
                        font-semibold py-3 px-6 rounded-lg
                        hover:from-blue-700 hover:to-indigo-700 
@@ -60,7 +66,12 @@
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
       <% @starter_prompts.each do |template| %>
         <% if template[:prompt] %>
-          <%= form_with url: generator_index_path, method: :post, local: true do |f| %>
+          <%= form_with url: generator_index_path, method: :post, local: false,
+                        data: { 
+                          controller: "generator-form",
+                          action: "submit->generator-form#submit",
+                          generator_form_target: "form"
+                        } do |f| %>
             <%= hidden_field_tag :prompt, template[:prompt] %>
             <button type="submit"
                     class="w-full text-left bg-white dark:bg-gray-800 rounded-xl shadow-lg 
@@ -137,19 +148,13 @@
 </div>
 
 <script>
-  // Simple loading state
-  document.querySelectorAll('form').forEach(form => {
-    form.addEventListener('submit', function(e) {
-      const btn = this.querySelector('button[type="submit"]');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Generating...';
-      }
+  // Focus custom prompt when clicking custom template
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelector('[onclick*="custom-prompt"]')?.addEventListener('click', function() {
+      document.getElementById('custom-prompt').focus();
     });
   });
-  
-  // Focus custom prompt when clicking custom template
-  document.querySelector('[onclick*="custom-prompt"]')?.addEventListener('click', function() {
-    document.getElementById('custom-prompt').focus();
-  });
 </script>
+
+<!-- Include Auth Modal -->
+<%= render 'shared/auth_modal' %>
