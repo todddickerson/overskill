@@ -10,6 +10,8 @@ class User < ApplicationRecord
   has_many :following, through: :active_follows, source: :followed
   # 🚅 add has_many associations above.
 
+  has_many :oauth_google_oauth2_accounts, class_name: 'Oauth::GoogleOauth2Account' if google_oauth2_enabled?
+  has_many :oauth_github_accounts, class_name: 'Oauth::GithubAccount' if github_enabled?
   # 🚅 add oauth providers above.
 
   # has_one :referral_code # TODO: uncomment when ReferralCode model exists

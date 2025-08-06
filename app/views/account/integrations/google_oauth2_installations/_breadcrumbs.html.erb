@@ -1,0 +1,8 @@
+<% google_oauth2_installation ||= @google_oauth2_installation %>
+<% team ||= @team || google_oauth2_installation&.team %>
+<%= render 'account/teams/breadcrumbs', team: team %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :integrations_google_oauth2_installations] %>
+<% if google_oauth2_installation&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: google_oauth2_installation.label_string, url: [:account, google_oauth2_installation] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'integrations/google_oauth2_installations' %>

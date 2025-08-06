@@ -1,0 +1,96 @@
+en:
+  integrations/github_installations: &github_installations
+    label: &label Github Installations
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fab fa-github-s ti ti-github
+    buttons: &buttons
+      new: Add New Github Installation
+      create: Create Github Installation
+      edit: Edit Github Settings
+      update: Update Installation Settings
+      destroy: Remove Github Installation
+      shorthand:
+        edit: Settings
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to disconnect %{github_installation_name} from %{team_name}? This won't remove this Github account from any connections it has to a user account for single sign-on. This will remove any data associated with this installation on %{team_name}. This can't be undone.
+        destroy_from_user: Are you sure you want to disconnect this Github account from %{team_name}? This will remove any data associated with this installation on %{team_name}. This can't be undone.
+    fields: &fields
+      name:
+        _: &name Name
+        label: *name
+        heading: *name
+        api_title: *name
+        api_description: *name
+
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+        api_title: *created_at
+        api_description: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+        api_title: *updated_at
+        api_description: *updated_at
+    list:
+      section: "Github Installations"
+      contexts:
+        user:
+          header: Integration Installations
+          description: Since you are the registered owner of this Github account, you have the ability to disconnect it from any Teams where it's currently installed as an integration.
+          description_empty: This Github account hasn't been installed as an integration on any Teams.
+          authentication_note: "You can also <a href=\"%{authentication_url}\">connect and manage Github accounts for single sign-on authentication</a>."
+      fields: *fields
+      buttons: *buttons
+    index:
+      section: "%{teams_possessive} Github Installations"
+      contexts:
+        team:
+          header: Github Installations
+          description: Below is a list of Github Installations that have been added for %{team_name}.
+          description_empty: No Github Installations have been added for %{team_name}.
+          authentication_note: "You can also <a href=\"%{authentication_url}\">connect and manage Github accounts for single sign-on authentication</a>."
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{github_installation_name}"
+      header: Github Installation Details
+      description: Below are the details we have for %{github_installation_name}.
+      manage_description: You'll also find options for updating these details or removing %{github_installation_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New Github Installation for %{team_name}"
+      header: New Github Installation Details
+      description: Please provide the details of the new Github Installation you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{github_installation_name}"
+      header: Edit Github Installation Details
+      description: You can update the details or settings for %{github_installation_name} below.
+      form: *form
+    notifications:
+      created: Github Installation was successfully created.
+      updated: Github Installation was successfully updated.
+      destroyed: Github Installation was successfully removed.
+  account:
+    integrations:
+      github_installations: *github_installations
+  activerecord:
+    attributes:
+      integrations/github_installation:
+        name: *name
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

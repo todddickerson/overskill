@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_06_201026) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -251,6 +251,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
     t.boolean "is_entry_point", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "is_built"
     t.index ["app_id", "path"], name: "index_app_files_on_app_id_and_path", unique: true
     t.index ["app_id"], name: "index_app_files_on_app_id"
     t.index ["team_id"], name: "index_app_files_on_team_id"
@@ -435,6 +436,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
     t.bigint "database_shard_id"
     t.string "shard_app_id"
     t.string "supabase_project_url"
+    t.string "build_status"
+    t.text "build_error"
+    t.datetime "last_built_at"
+    t.string "build_id"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
@@ -537,6 +542,26 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
     t.index ["team_id"], name: "index_follows_on_team_id"
   end
 
+  create_table "integrations_github_installations", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "oauth_github_account_id", null: false
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["oauth_github_account_id"], name: "index_github_installations_on_oauth_github_account_id"
+    t.index ["team_id"], name: "index_integrations_github_installations_on_team_id"
+  end
+
+  create_table "integrations_google_oauth2_installations", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "oauth_google_oauth2_account_id", null: false
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["oauth_google_oauth2_account_id"], name: "idx_google_oauth2_inst_on_oauth_account_id"
+    t.index ["team_id"], name: "index_integrations_google_oauth2_installations_on_team_id"
+  end
+
   create_table "integrations_stripe_installations", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "oauth_stripe_account_id", null: false
@@ -625,6 +650,24 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
     t.bigint "team_id"
     t.index ["team_id"], name: "index_oauth_applications_on_team_id"
     t.index ["uid"], name: "index_oauth_applications_on_uid", unique: true
+  end
+
+  create_table "oauth_github_accounts", force: :cascade do |t|
+    t.string "uid"
+    t.jsonb "data"
+    t.bigint "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_oauth_github_accounts_on_user_id"
+  end
+
+  create_table "oauth_google_oauth2_accounts", force: :cascade do |t|
+    t.string "uid"
+    t.jsonb "data"
+    t.bigint "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_oauth_google_oauth2_accounts_on_user_id"
   end
 
   create_table "oauth_stripe_accounts", force: :cascade do |t|
@@ -762,6 +805,26 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
     t.datetime "verified_at", precision: nil
   end
 
+  create_table "webhooks_incoming_oauth_github_account_webhooks", force: :cascade do |t|
+    t.jsonb "data"
+    t.datetime "processed_at"
+    t.datetime "verified_at"
+    t.bigint "oauth_github_account_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["oauth_github_account_id"], name: "index_github_webhooks_on_oauth_github_account_id"
+  end
+
+  create_table "webhooks_incoming_oauth_google_oauth2_account_webhooks", force: :cascade do |t|
+    t.jsonb "data"
+    t.datetime "processed_at"
+    t.datetime "verified_at"
+    t.bigint "oauth_google_oauth2_account_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["oauth_google_oauth2_account_id"], name: "idx_google_oauth2_webhooks_on_oauth_account_id"
+  end
+
   create_table "webhooks_incoming_oauth_stripe_account_webhooks", force: :cascade do |t|
     t.jsonb "data"
     t.datetime "processed_at", precision: nil
@@ -868,6 +931,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
   add_foreign_key "follows", "creator_profiles", column: "followed_id"
   add_foreign_key "follows", "teams"
   add_foreign_key "follows", "users", column: "follower_id"
+  add_foreign_key "integrations_github_installations", "oauth_github_accounts"
+  add_foreign_key "integrations_github_installations", "teams"
+  add_foreign_key "integrations_google_oauth2_installations", "oauth_google_oauth2_accounts"
+  add_foreign_key "integrations_google_oauth2_installations", "teams"
   add_foreign_key "integrations_stripe_installations", "oauth_stripe_accounts"
   add_foreign_key "integrations_stripe_installations", "teams"
   add_foreign_key "invitations", "account_onboarding_invitation_lists", column: "invitation_list_id"
@@ -880,6 +947,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
   add_foreign_key "oauth_access_grants", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_applications", "teams"
+  add_foreign_key "oauth_github_accounts", "users"
+  add_foreign_key "oauth_google_oauth2_accounts", "users"
   add_foreign_key "oauth_stripe_accounts", "users"
   add_foreign_key "scaffolding_absolutely_abstract_creative_concepts", "teams"
   add_foreign_key "scaffolding_completely_concrete_tangible_things", "scaffolding_absolutely_abstract_creative_concepts", column: "absolutely_abstract_creative_concept_id"
@@ -887,6 +956,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "scaffolding_completely_concrete_tangible_things", column: "tangible_thing_id"
   add_foreign_key "team_database_configs", "teams"
   add_foreign_key "users", "oauth_applications", column: "platform_agent_of_id"
+  add_foreign_key "webhooks_incoming_oauth_github_account_webhooks", "oauth_github_accounts"
+  add_foreign_key "webhooks_incoming_oauth_google_oauth2_account_webhooks", "oauth_google_oauth2_accounts"
   add_foreign_key "webhooks_outgoing_endpoints", "scaffolding_absolutely_abstract_creative_concepts"
   add_foreign_key "webhooks_outgoing_endpoints", "teams"
   add_foreign_key "webhooks_outgoing_events", "teams"

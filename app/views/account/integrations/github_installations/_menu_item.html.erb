@@ -1,0 +1,10 @@
+<% if can? :read, Integrations::GithubInstallation.new(team: current_team) %>
+  <%= render 'account/shared/menu/item', {
+    url: main_app.polymorphic_path([:account, current_team, :integrations_github_installations]),
+    label: t('integrations/github_installations.navigation.label'),
+  } do |p| %>
+    <% p.icon do %>
+      <i class="<%= t('integrations/github_installations.navigation.icon') %>"></i>
+    <% end %>
+  <% end %>
+<% end %>

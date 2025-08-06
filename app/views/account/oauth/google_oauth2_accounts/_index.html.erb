@@ -1,0 +1,52 @@
+<% context ||= @user %>
+<% hide_actions ||= false %>
+
+<%= render 'account/shared/box' do |box| %>
+  <% box.title t(".contexts.#{context.class.name.underscore}.header") %>
+  <% box.description do %>
+    <%= raw t(".contexts.#{context.class.name.underscore}.#{google_oauth2_accounts.any? ? 'description' : 'description_empty'}") %>
+  <% end %>
+
+  <% box.body do %>
+    <% if google_oauth2_accounts.any? %>
+      <div class="space-y-0 border border-slate-200 shadow-sm rounded-md divide-y divide-slate-200">
+        <% google_oauth2_accounts.each do |google_oauth2_account| %>
+          <div class="flex py-1.5 px-3 items-center">
+            <div class="flex-1 min-w-0">
+              <% if google_oauth2_account.integrations_google_oauth2_installations.any? %>
+                <%= link_to google_oauth2_account.name, [:account, google_oauth2_account] %>
+              <% else %>
+                <%= google_oauth2_account.name %>
+              <% end %>
+            </div>
+            <div class="flex-0 min-w-0 space-x-2 text-lg">
+              <% if can? :destroy, google_oauth2_account %>
+                <%= link_to [:account, google_oauth2_account], data: { turbo_method: :delete, turbo_confirm: t('.buttons.confirmations.destroy', model_locales(google_oauth2_account)) }, class: 'inline-block text-slate-300 hover:text-slate-400 hover:no-underline' do %>
+                  <i class="ti ti-close"></i>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% unless hide_actions %>
+    <% box.actions do %>
+      <% if can? :create, Oauth::GoogleOauth2Account.new(user: @user) %>
+        <span data-turbo="false">
+          <%= button_to user_google_oauth2_omniauth_authorize_path, class: "#{first_button_primary(:integrations_google_oauth2_installation)} new" do %>
+            <%= google_oauth2_accounts.empty? ? t('.buttons.new') : t('.buttons.another') %>
+          <% end %>
+        </span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% box.footer do %>
+    <% if current_team %>
+      <%= raw t(".contexts.user.integration_note", integration_url: url_for([:account, current_team, :integrations_google_oauth2_installations])) %>
+    <% end %>
+  <% end %>
+<% end %>

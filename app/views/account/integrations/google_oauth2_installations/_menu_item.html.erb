@@ -1,0 +1,10 @@
+<% if can? :read, Integrations::GoogleOauth2Installation.new(team: current_team) %>
+  <%= render 'account/shared/menu/item', {
+    url: main_app.polymorphic_path([:account, current_team, :integrations_google_oauth2_installations]),
+    label: t('integrations/google_oauth2_installations.navigation.label'),
+  } do |p| %>
+    <% p.icon do %>
+      <i class="<%= t('integrations/google_oauth2_installations.navigation.icon') %>"></i>
+    <% end %>
+  <% end %>
+<% end %>

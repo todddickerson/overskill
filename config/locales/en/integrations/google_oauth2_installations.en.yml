@@ -1,0 +1,96 @@
+en:
+  integrations/google_oauth2_installations: &google_oauth2_installations
+    label: &label GoogleOauth2 Installations
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fab fa-google_oauth2-s ti ti-google
+    buttons: &buttons
+      new: Add New GoogleOauth2 Installation
+      create: Create GoogleOauth2 Installation
+      edit: Edit GoogleOauth2 Settings
+      update: Update Installation Settings
+      destroy: Remove GoogleOauth2 Installation
+      shorthand:
+        edit: Settings
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to disconnect %{google_oauth2_installation_name} from %{team_name}? This won't remove this Google Oauth2 account from any connections it has to a user account for single sign-on. This will remove any data associated with this installation on %{team_name}. This can't be undone.
+        destroy_from_user: Are you sure you want to disconnect this Google Oauth2 account from %{team_name}? This will remove any data associated with this installation on %{team_name}. This can't be undone.
+    fields: &fields
+      name:
+        _: &name Name
+        label: *name
+        heading: *name
+        api_title: *name
+        api_description: *name
+
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+        api_title: *created_at
+        api_description: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+        api_title: *updated_at
+        api_description: *updated_at
+    list:
+      section: "GoogleOauth2 Installations"
+      contexts:
+        user:
+          header: Integration Installations
+          description: Since you are the registered owner of this Google Oauth2 account, you have the ability to disconnect it from any Teams where it's currently installed as an integration.
+          description_empty: This Google Oauth2 account hasn't been installed as an integration on any Teams.
+          authentication_note: "You can also <a href=\"%{authentication_url}\">connect and manage Google Oauth2 accounts for single sign-on authentication</a>."
+      fields: *fields
+      buttons: *buttons
+    index:
+      section: "%{teams_possessive} GoogleOauth2 Installations"
+      contexts:
+        team:
+          header: GoogleOauth2 Installations
+          description: Below is a list of GoogleOauth2 Installations that have been added for %{team_name}.
+          description_empty: No GoogleOauth2 Installations have been added for %{team_name}.
+          authentication_note: "You can also <a href=\"%{authentication_url}\">connect and manage Google Oauth2 accounts for single sign-on authentication</a>."
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{google_oauth2_installation_name}"
+      header: GoogleOauth2 Installation Details
+      description: Below are the details we have for %{google_oauth2_installation_name}.
+      manage_description: You'll also find options for updating these details or removing %{google_oauth2_installation_name} from %{team_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New GoogleOauth2 Installation for %{team_name}"
+      header: New GoogleOauth2 Installation Details
+      description: Please provide the details of the new GoogleOauth2 Installation you'd like to add to %{team_name}.
+      form: *form
+    edit:
+      section: "%{google_oauth2_installation_name}"
+      header: Edit GoogleOauth2 Installation Details
+      description: You can update the details or settings for %{google_oauth2_installation_name} below.
+      form: *form
+    notifications:
+      created: GoogleOauth2 Installation was successfully created.
+      updated: GoogleOauth2 Installation was successfully updated.
+      destroyed: GoogleOauth2 Installation was successfully removed.
+  account:
+    integrations:
+      google_oauth2_installations: *google_oauth2_installations
+  activerecord:
+    attributes:
+      integrations/google_oauth2_installation:
+        name: *name
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

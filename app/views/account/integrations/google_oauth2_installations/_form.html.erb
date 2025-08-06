@@ -1,0 +1,18 @@
+<%= form_with model: google_oauth2_installation, url: (google_oauth2_installation.persisted? ? [:account, google_oauth2_installation] : [:account, @team, :integrations_google_oauth2_installations]), class: 'form' do |form| %>
+  <%= render 'account/shared/forms/errors', form: form %>
+
+  <% with_field_settings form: form do %>
+    <%= render 'shared/fields/text_field', method: :name, options: {autofocus: true} %>
+    <%# 🚅 super scaffolding will insert new fields above this line. %>
+  <% end %>
+
+  <div class="buttons">
+    <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+    <% if form.object.persisted? %>
+    <%= link_to t('global.buttons.cancel'), [:account, google_oauth2_installation], class: "button-secondary" %>
+    <% else %>
+    <%= link_to t('global.buttons.cancel'), [:account, @team, :integrations_google_oauth2_installations], class: "button-secondary" %>
+    <% end %>
+  </div>
+
+<% end %>

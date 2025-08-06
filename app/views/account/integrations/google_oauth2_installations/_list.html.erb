@@ -1,0 +1,32 @@
+<% context ||= @user %>
+<% collection ||= :integrations_google_oauth2_installations %>
+
+<%= render 'account/shared/box' do |box| %>
+  <% box.title t(".contexts.#{context.class.name.underscore}.header") %>
+  <% box.description t(".contexts.#{context.class.name.underscore}.description") %>
+
+  <% box.body do %>
+    <% if google_oauth2_installations.any? %>
+      <div class="space-y-0 border border-slate-200 shadow-sm rounded-md divide-y divide-slate-200">
+        <% google_oauth2_installations.each do |google_oauth2_installation| %>
+          <div class="flex py-1.5 px-3 items-center">
+            <div class="flex-1 min-w-0">
+              <% if can? :show, google_oauth2_installation.team %>
+                <%= link_to google_oauth2_installation.team.name, [:account, google_oauth2_installation.team, :integrations, :google_oauth2_installations] %>
+              <% else %>
+                <%= google_oauth2_installation.team.name %>
+              <% end %>
+            </div>
+            <div class="flex-0 min-w-0 space-x-2 text-lg">
+              <% if can? :destroy, google_oauth2_installation %>
+                <%= link_to [:account, google_oauth2_installation, return_to: request.path], data: { turbo_method: :delete, turbo_confirm: t('.buttons.confirmations.destroy_from_user', team_name: google_oauth2_installation.team.label_string) }, class: 'inline-block text-slate-300 hover:text-slate-400 hover:no-underline' do %>
+                  <i class="ti ti-close"></i>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

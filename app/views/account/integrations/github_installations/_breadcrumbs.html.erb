@@ -1,0 +1,8 @@
+<% github_installation ||= @github_installation %>
+<% team ||= @team || github_installation&.team %>
+<%= render 'account/teams/breadcrumbs', team: team %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, team, :integrations_github_installations] %>
+<% if github_installation&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: github_installation.label_string, url: [:account, github_installation] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'integrations/github_installations' %>

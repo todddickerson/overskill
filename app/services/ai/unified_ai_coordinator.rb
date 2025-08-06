@@ -369,7 +369,8 @@ module Ai
     end
     
     def queue_deployment
-      UpdatePreviewJob.perform_later(app.id)
+      # Use fast preview for instant deployment (< 3 seconds)
+      FastPreviewDeploymentJob.perform_later(app.id)
     end
     
     def handle_error(error)

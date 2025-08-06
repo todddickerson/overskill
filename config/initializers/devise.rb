@@ -5,6 +5,14 @@ Devise.setup do |config|
   config.responder.redirect_status = :see_other
 
   config.omniauth :stripe_connect, ENV["STRIPE_CLIENT_ID"], ENV["STRIPE_SECRET_KEY"], scope: "read_write"
+  config.omniauth :google_oauth2, ENV['GOOGLE_OAUTH_CLIENT_ID'], ENV['GOOGLE_OAUTH_CLIENT_SECRET'], {
+      ## specify options for your oauth provider here, e.g.:
+      # scope: 'read_products,read_orders,write_content',
+    }
+  config.omniauth :github, ENV['GITHUB_OAUTH_CLIENT_ID'], ENV['GITHUB_OAUTH_CLIENT_SECRET'], {
+      ## specify options for your oauth provider here, e.g.:
+      # scope: 'read_products,read_orders,write_content',
+    }
   # 🚅 super scaffolding will insert new oauth providers above this line.
 
   if two_factor_authentication_enabled?

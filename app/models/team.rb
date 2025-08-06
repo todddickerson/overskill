@@ -14,6 +14,8 @@ class Team < ApplicationRecord
   has_many :app_collaborators, dependent: :destroy
   # 🚅 add has_many associations above.
 
+  has_many :integrations_google_oauth2_installations, class_name: 'Integrations::GoogleOauth2Installation', dependent: :destroy if google_oauth2_enabled?
+  has_many :integrations_github_installations, class_name: 'Integrations::GithubInstallation', dependent: :destroy if github_enabled?
   # 🚅 add oauth providers above.
 
   has_one :team_database_config, dependent: :destroy

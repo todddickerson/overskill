@@ -11,6 +11,8 @@
   <% @menu_orientation = :side %>
   <% integrations = capture do %>
     <%= render 'account/integrations/stripe_installations/menu_item' if stripe_enabled? %>
+    <%= render 'account/integrations/google_oauth2_installations/menu_item' if google_oauth2_enabled? %>
+    <%= render 'account/integrations/github_installations/menu_item' if github_enabled? %>
     <%# 🚅 super scaffolding will insert new oauth providers above this line. %>
   <% end %>
   <% @menu_orientation = @last_menu_orientation %>

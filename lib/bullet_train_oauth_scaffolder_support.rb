@@ -9,11 +9,19 @@
 # see this GitHub issue:
 # https://github.com/bullet-train-co/bullet_train/issues/941#issuecomment-2447355572
 
+def google_oauth2_enabled?
+  ENV['GOOGLE_OAUTH_CLIENT_ID'].present? && ENV['GOOGLE_OAUTH_CLIENT_SECRET'].present?
+end
+def github_enabled?
+  ENV['GITHUB_OAUTH_CLIENT_ID'].present? && ENV['GITHUB_OAUTH_CLIENT_SECRET'].present?
+end
 # 🚅 super scaffolding will insert new oauth providers above this line.
 
 def any_oauth_enabled?
   [
     stripe_enabled?,
+    google_oauth2_enabled?,
+    github_enabled?,
     # 🚅 super scaffolding will insert new oauth provider checks above this line.
   ].select(&:present?).any?
 end

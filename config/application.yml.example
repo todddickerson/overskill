@@ -1,3 +1,27 @@
 BASE_URL: http://localhost:3000
 MARKETING_SITE_URL: /account
 # STRIPE_SECRET_KEY: ...
+
+# Google OAuth Credentials
+# Get these from: https://console.cloud.google.com/
+# 1. Create a new project or select existing
+# 2. Enable Google+ API
+# 3. Go to Credentials → Create Credentials → OAuth Client ID
+# 4. Choose "Web application"
+# 5. Add authorized redirect URIs:
+#    - Development: http://localhost:3000/users/auth/google_oauth2/callback
+#    - Production: https://yourdomain.com/users/auth/google_oauth2/callback
+GOOGLE_OAUTH_CLIENT_ID: your_google_client_id_here
+GOOGLE_OAUTH_CLIENT_SECRET: your_google_client_secret_here
+
+# GitHub OAuth Credentials
+# Get these from: https://github.com/settings/developers
+# 1. Click "New OAuth App"
+# 2. Fill in:
+#    - Application name: OverSkill
+#    - Homepage URL: Your app URL
+#    - Authorization callback URLs:
+#      - Development: http://localhost:3000/users/auth/github/callback
+#      - Production: https://yourdomain.com/users/auth/github/callback
+GITHUB_OAUTH_CLIENT_ID: your_github_client_id_here
+GITHUB_OAUTH_CLIENT_SECRET: your_github_client_secret_here

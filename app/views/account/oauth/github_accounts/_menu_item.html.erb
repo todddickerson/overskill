@@ -1,0 +1,10 @@
+<% if can? :read, Oauth::GithubAccount.new(user: current_user) %>
+  <%= render 'account/shared/menu/item', {
+    url: main_app.polymorphic_path([:account, current_user, :oauth_github_accounts]),
+    label: t('oauth/github_accounts.navigation.label'),
+  } do |p| %>
+    <% p.icon do %>
+      <i class="<%= t('oauth/github_accounts.navigation.icon') %>"></i>
+    <% end %>
+  <% end %>
+<% end %>

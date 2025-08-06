@@ -37,6 +37,8 @@ Rails.application.routes.draw do
     
     namespace :incoming do
       namespace :oauth do
+        resources :google_oauth2_account_webhooks if google_oauth2_enabled?
+        resources :github_account_webhooks if github_enabled?
         # 🚅 super scaffolding will insert new oauth provider webhooks above this line.
       end
     end
@@ -61,6 +63,8 @@ Rails.application.routes.draw do
       # user specific resources.
       resources :users, extending do
         namespace :oauth do
+          resources :google_oauth2_accounts if google_oauth2_enabled?
+          resources :github_accounts if github_enabled?
           # 🚅 super scaffolding will insert new oauth providers above this line.
         end
 
@@ -94,6 +98,8 @@ Rails.application.routes.draw do
         end
 
         namespace :integrations do
+          resources :google_oauth2_installations if google_oauth2_enabled?
+          resources :github_installations if github_enabled?
           # 🚅 super scaffolding will insert new integration installations above this line.
         end
 

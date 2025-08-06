@@ -6,5 +6,11 @@ class Account::Oauth::OmniauthCallbacksController < Devise::OmniauthCallbacksCon
     callback("Stripe", team_id_from_env)
   end
 
+  def google_oauth2
+      callback("GoogleOauth2", team_id_from_env)
+    end
+  def github
+      callback("Github", team_id_from_env)
+    end
   # 🚅 super scaffolding will insert new oauth providers above this line.
 end

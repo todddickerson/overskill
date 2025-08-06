@@ -4,6 +4,8 @@
   <%= render 'account/shared/decision_line' %>
   <div class="grid grid-cols-1 gap-2">
     <%= render 'devise/shared/oauth/stripe', verb: verb if stripe_enabled? %>
+    <%= render 'devise/shared/oauth/google_oauth2', verb: verb if google_oauth2_enabled? %>
+    <%= render 'devise/shared/oauth/github', verb: verb if github_enabled? %>
     <%# 🚅 super scaffolding will insert new oauth providers above this line. %>
   </div>
 <% end %>

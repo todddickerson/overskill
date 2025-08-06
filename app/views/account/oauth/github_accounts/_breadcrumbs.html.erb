@@ -1,0 +1,8 @@
+<% github_account ||= @github_account %>
+<% user ||= @user || github_account&.user %>
+<%= render 'account/users/breadcrumbs', user: user %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, user, :oauth, :github_accounts] %>
+<% if github_account&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: github_account.label_string, url: [:account, github_account] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'oauth/github_accounts' %>

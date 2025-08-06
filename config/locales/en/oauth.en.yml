@@ -1,3 +1,5 @@
 en:
   stripe_connect: Stripe
+  google_oauth2: Google Oauth2
+  github: Github
   # 🚅 super scaffolding will insert new oauth providers above this line.

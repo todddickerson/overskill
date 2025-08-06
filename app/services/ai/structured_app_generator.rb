@@ -32,47 +32,68 @@ module Ai
     private
     
     def build_structured_prompt(user_prompt, standards)
+      # Keep critical requirements but optimize for performance
       <<~PROMPT
         Create a React TypeScript app: #{user_prompt}
         
-        CRITICAL REQUIREMENTS:
-        - React 18+ with TypeScript (.tsx/.ts files)
-        - Tailwind CSS for styling
-        - Vite as build tool
-        - Cloudflare Workers deployment (wrangler.toml)
-        - Supabase integration with RLS
+        REQUIREMENTS:
+        - React 18+ with TypeScript
+        - Tailwind CSS styling
+        - Supabase integration
         - Analytics tracking
         
-        Return JSON:
+        Return JSON with these EXACT files:
         {
           "app": {
-            "name": "App Name",
-            "description": "Brief description"
+            "name": "descriptive name",
+            "description": "what it does"
           },
           "files": [
             {"path": "index.html", "content": "<!DOCTYPE html>..."},
-            {"path": "src/App.tsx", "content": "import React..."},
-            {"path": "src/main.tsx", "content": "import React..."},
-            {"path": "src/lib/supabase.ts", "content": "import { createClient }..."},
-            {"path": "src/lib/analytics.ts", "content": "class OverskillAnalytics..."},
-            {"path": "package.json", "content": "{...}"},
-            {"path": "vite.config.ts", "content": "import { defineConfig }..."},
-            {"path": "tailwind.config.js", "content": "module.exports = {..."},
-            {"path": "tsconfig.json", "content": "{...}"},
-            {"path": "wrangler.toml", "content": "name = ..."}
+            {"path": "src/App.tsx", "content": "// React TypeScript component"},
+            {"path": "src/main.tsx", "content": "// Entry point"},
+            {"path": "src/lib/supabase.ts", "content": "// Use template below"},
+            {"path": "src/lib/analytics.ts", "content": "// Use template below"},
+            {"path": "package.json", "content": "// Dependencies"},
+            {"path": "vite.config.ts", "content": "// Vite config"},
+            {"path": "tsconfig.json", "content": "// TypeScript config"}
           ]
         }
         
-        REQUIRED in src/lib/supabase.ts:
-        - createClient with env vars VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-        - setRLSContext function for row-level security
+        TEMPLATES for critical files:
         
-        REQUIRED in src/lib/analytics.ts:
-        - OverskillAnalytics class
-        - track() method posting to https://overskill.app/api/v1/analytics/track
-        - Auto-track page_view on init
+        src/lib/supabase.ts MUST include:
+        ```
+        import { createClient } from '@supabase/supabase-js'
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+        export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+        export const setRLSContext = async (userId: string) => {
+          await supabase.rpc('set_config', {
+            setting_name: 'app.current_user_id',
+            new_value: userId,
+            is_local: true
+          })
+        }
+        ```
         
-        Create COMPLETE, working files. Return ONLY valid JSON.
+        src/lib/analytics.ts MUST include:
+        ```
+        class OverskillAnalytics {
+          appId: string = import.meta.env.VITE_APP_ID || 'unknown'
+          track(event: string, data: any = {}) {
+            fetch('https://overskill.app/api/v1/analytics/track', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ app_id: this.appId, event, data })
+            })
+          }
+        }
+        export const analytics = new OverskillAnalytics()
+        analytics.track('page_view')
+        ```
+        
+        Return ONLY valid JSON. Create COMPLETE working files.
       PROMPT
     end
     

@@ -29,6 +29,16 @@ class Ability
         can :destroy, Integrations::StripeInstallation, oauth_stripe_account: {user_id: user.id}
       end
 
+      if google_oauth2_enabled?
+              can [:read, :create, :destroy], Oauth::GoogleOauth2Account, user_id: user.id
+              can :manage, Integrations::GoogleOauth2Installation, team_id: user.team_ids
+              can :destroy, Integrations::GoogleOauth2Installation, oauth_google_oauth2_account: {user_id: user.id}
+            end
+      if github_enabled?
+              can [:read, :create, :destroy], Oauth::GithubAccount, user_id: user.id
+              can :manage, Integrations::GithubInstallation, team_id: user.team_ids
+              can :destroy, Integrations::GithubInstallation, oauth_github_account: {user_id: user.id}
+            end
       # 🚅 super scaffolding will insert any new oauth providers above.
 
       if billing_enabled?
