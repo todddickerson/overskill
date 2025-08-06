@@ -51,15 +51,23 @@ class Public::GeneratorController < Public::ApplicationController
     prompt = params[:prompt] || params[:custom_prompt]
     
     if prompt.blank?
-      redirect_to root_path, alert: "Please provide an app description"
+      respond_to do |format|
+        format.html { redirect_to root_path, alert: "Please provide an app description" }
+        format.json { render json: { error: "Please provide an app description" }, status: :unprocessable_entity }
+      end
       return
     end
     
-    # Ensure user is signed in or create guest account
+    # Check if user is signed in
     unless user_signed_in?
-      # Create guest user for trial
-      guest_user = create_guest_user
-      sign_in(guest_user)
+      # Store the prompt in session to use after authentication
+      session[:pending_app_prompt] = prompt
+      
+      respond_to do |format|
+        format.html { redirect_to new_user_session_path, alert: "Please sign in to create an app" }
+        format.json { render json: { requires_auth: true, prompt: prompt }, status: :unauthorized }
+      end
+      return
     end
     
     # Create app with our single optimized stack
@@ -95,8 +103,11 @@ class Public::GeneratorController < Public::ApplicationController
       AppGenerationJob.perform_later(generation)
     end
     
-    # Redirect to editor
-    redirect_to account_app_editor_path(app), notice: "Creating your app..."
+    # Respond appropriately
+    respond_to do |format|
+      format.html { redirect_to account_app_editor_path(app), notice: "Creating your app..." }
+      format.json { render json: { success: true, redirect_url: account_app_editor_path(app) } }
+    end
   end
   
   private

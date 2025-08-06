@@ -12,7 +12,7 @@
 
     <!-- Custom Prompt Input -->
     <div class="max-w-3xl mx-auto mb-12">
-      <%= form_with url: public_generator_index_path, method: :post, local: true, 
+      <%= form_with url: generator_index_path, method: :post, local: true, 
                     class: "bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6" do |f| %>
         
         <div class="mb-4">
@@ -60,7 +60,7 @@
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
       <% @starter_prompts.each do |template| %>
         <% if template[:prompt] %>
-          <%= form_with url: public_generator_index_path, method: :post, local: true do |f| %>
+          <%= form_with url: generator_index_path, method: :post, local: true do |f| %>
             <%= hidden_field_tag :prompt, template[:prompt] %>
             <button type="submit"
                     class="w-full text-left bg-white dark:bg-gray-800 rounded-xl shadow-lg 
