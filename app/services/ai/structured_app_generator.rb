@@ -6,6 +6,7 @@ module Ai
     
     def initialize
       @client = OpenRouterClient.new
+      @template_service = AppTemplateService.new
     end
     
     def generate(prompt, framework: "react", app_type: "saas")
@@ -32,9 +33,12 @@ module Ai
     private
     
     def build_structured_prompt(user_prompt, standards)
+      # Enhance prompt with template if applicable
+      enhanced_prompt = @template_service.enhance_prompt_with_template(user_prompt)
+      
       # Keep critical requirements but optimize for performance
       <<~PROMPT
-        Create a React TypeScript app: #{user_prompt}
+        Create a React TypeScript app: #{enhanced_prompt}
         
         REQUIREMENTS:
         - React 18+ with TypeScript

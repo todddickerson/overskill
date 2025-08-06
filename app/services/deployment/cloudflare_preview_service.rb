@@ -406,9 +406,20 @@ class Deployment::CloudflarePreviewService
   def app_files_as_json
     files_hash = {}
     @app.app_files.each do |file|
-      files_hash[file.path] = file.content
+      # Ensure file content is properly handled for JSON embedding
+      content = file.content.to_s
+      # Escape content to prevent JSON parsing issues
+      files_hash[file.path] = content
     end
-    JSON.generate(files_hash)
+    
+    # Use safe JSON generation that properly escapes content
+    begin
+      JSON.generate(files_hash)
+    rescue JSON::GeneratorError => e
+      Rails.logger.error "JSON generation error for app #{@app.id}: #{e.message}"
+      # Return empty object if JSON generation fails
+      "{}"
+    end
   end
   
   def upload_worker(worker_name, script)

@@ -256,34 +256,166 @@ module Deployment
             .replace(/export default/g, 'window.App =') // Export as global
         }
         
-        // API request handling
+        // API request handling with comprehensive Supabase proxy
         async function handleApiRequest(request, env, path) {
-          // Supabase proxy
+          const url = new URL(request.url)
+          
+          // Database operations via Supabase proxy
           if (path.startsWith('/api/db/')) {
-            const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL
-            const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY
-            
-            if (!supabaseUrl || !supabaseKey) {
-              return new Response(
-                JSON.stringify({ error: 'Database not configured' }), 
-                { status: 503, headers: { 'Content-Type': 'application/json' } }
-              )
-            }
-            
-            const supabasePath = path.replace('/api/db', '')
-            const targetUrl = supabaseUrl + '/rest/v1' + supabasePath
-            
-            const proxyRequest = new Request(targetUrl, request)
-            proxyRequest.headers.set('apikey', supabaseKey)
-            proxyRequest.headers.set('Authorization', `Bearer ${supabaseKey}`)
-            
-            return fetch(proxyRequest)
+            return handleSupabaseProxy(request, env, path)
+          }
+          
+          // Authentication endpoints
+          if (path.startsWith('/api/auth/')) {
+            return handleAuthProxy(request, env, path)
+          }
+          
+          // Session management
+          if (path.startsWith('/api/session')) {
+            return handleSessionManagement(request, env)
+          }
+          
+          // File operations
+          if (path.startsWith('/api/files/')) {
+            return handleFileOperations(request, env, path)
           }
           
           return new Response(
             JSON.stringify({ error: 'API endpoint not found' }), 
             { status: 404, headers: { 'Content-Type': 'application/json' } }
           )
+        }
+        
+        // Enhanced Supabase proxy with RLS support
+        async function handleSupabaseProxy(request, env, path) {
+          const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL
+          const serviceKey = env.SUPABASE_SERVICE_KEY
+          const anonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY
+          
+          if (!supabaseUrl || (!serviceKey && !anonKey)) {
+            return new Response(
+              JSON.stringify({ error: 'Database not configured' }), 
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          
+          // Determine which key to use based on operation
+          const isAdminOperation = request.method === 'DELETE' || 
+                                 path.includes('/admin/') ||
+                                 request.headers.get('x-admin-operation')
+          
+          const apiKey = isAdminOperation && serviceKey ? serviceKey : anonKey
+          
+          // Convert /api/db/* to Supabase REST API path
+          const supabasePath = path.replace('/api/db', '/rest/v1')
+          const targetUrl = supabaseUrl + supabasePath + url.search
+          
+          // Create proxy request
+          const proxyRequest = new Request(targetUrl, {
+            method: request.method,
+            headers: request.headers,
+            body: request.body
+          })
+          
+          // Set Supabase headers
+          proxyRequest.headers.set('apikey', apiKey)
+          proxyRequest.headers.set('Authorization', `Bearer ${apiKey}`)
+          proxyRequest.headers.set('Content-Type', 'application/json')
+          
+          // Add app-specific RLS context if available
+          if (env.APP_ID) {
+            proxyRequest.headers.set('x-app-id', env.APP_ID)
+          }
+          
+          try {
+            const response = await fetch(proxyRequest)
+            
+            // Clone response with CORS headers
+            const newResponse = new Response(response.body, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            })
+            
+            // Add CORS headers
+            newResponse.headers.set('Access-Control-Allow-Origin', '*')
+            newResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+            newResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-app-id, x-admin-operation')
+            
+            return newResponse
+          } catch (error) {
+            console.error('Supabase proxy error:', error)
+            return new Response(
+              JSON.stringify({ error: 'Database request failed', details: error.message }),
+              { status: 500, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+        }
+        
+        // Authentication proxy for OAuth and session management
+        async function handleAuthProxy(request, env, path) {
+          const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL
+          const anonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY
+          
+          if (!supabaseUrl || !anonKey) {
+            return new Response(
+              JSON.stringify({ error: 'Authentication not configured' }),
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          
+          // Convert /api/auth/* to Supabase auth API
+          const authPath = path.replace('/api/auth', '/auth/v1')
+          const targetUrl = supabaseUrl + authPath + url.search
+          
+          const proxyRequest = new Request(targetUrl, {
+            method: request.method,
+            headers: request.headers,
+            body: request.body
+          })
+          
+          proxyRequest.headers.set('apikey', anonKey)
+          proxyRequest.headers.set('Authorization', `Bearer ${anonKey}`)
+          
+          return fetch(proxyRequest)
+        }
+        
+        // Simple session management using headers/localStorage
+        async function handleSessionManagement(request, env) {
+          if (request.method === 'GET') {
+            // Return session info from Authorization header
+            const authHeader = request.headers.get('Authorization')
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+              return new Response(JSON.stringify({ 
+                authenticated: true,
+                token: authHeader.replace('Bearer ', '')
+              }), {
+                headers: { 'Content-Type': 'application/json' }
+              })
+            }
+            
+            return new Response(JSON.stringify({ authenticated: false }), {
+              headers: { 'Content-Type': 'application/json' }
+            })
+          }
+          
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+            status: 405,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        }
+        
+        // File operations (future: integrate with R2)
+        async function handleFileOperations(request, env, path) {
+          // For now, return not implemented
+          // Future: integrate with Cloudflare R2 for file storage
+          return new Response(JSON.stringify({ 
+            error: 'File operations not yet implemented',
+            message: 'Will be integrated with Cloudflare R2 storage'
+          }), { 
+            status: 501,
+            headers: { 'Content-Type': 'application/json' }
+          })
         }
         
         // Get file from embedded files
