@@ -204,8 +204,16 @@ export default class extends Controller {
     
     // Don't submit if no visible textarea has content
     const visibleTextarea = this.textareaTargets.find(textarea => {
-      const parent = textarea.closest('.hidden, .lg\\:hidden')
-      return !parent && textarea.value.trim()
+      // Check if the textarea is in a visible container
+      const desktopContainer = textarea.closest('.hidden.lg\\:block')
+      const mobileContainer = textarea.closest('.lg\\:hidden')
+      
+      // Determine if visible based on screen size
+      const isDesktop = window.innerWidth >= 1024
+      const isVisible = isDesktop ? desktopContainer : mobileContainer
+      
+      console.log(`Checking textarea visibility - isDesktop: ${isDesktop}, hasValue: ${!!textarea.value.trim()}`)
+      return isVisible && textarea.value.trim()
     })
     
     if (!visibleTextarea) {
@@ -247,12 +255,21 @@ export default class extends Controller {
     
     // Don't submit if no visible textarea has content
     const visibleTextarea = this.textareaTargets.find(textarea => {
-      const parent = textarea.closest('.hidden, .lg\\:hidden')
-      return !parent && textarea.value.trim()
+      // Check if the textarea is in a visible container
+      const desktopContainer = textarea.closest('.hidden.lg\\:block')
+      const mobileContainer = textarea.closest('.lg\\:hidden')
+      
+      // Determine if visible based on screen size
+      const isDesktop = window.innerWidth >= 1024
+      const isVisible = isDesktop ? desktopContainer : mobileContainer
+      
+      console.log(`Checking textarea visibility - isDesktop: ${isDesktop}, hasValue: ${!!textarea.value.trim()}, value: "${textarea.value}"`)
+      return isVisible && textarea.value.trim()
     })
     
     if (!visibleTextarea) {
       console.log('No visible textarea with content, preventing submission')
+      console.log('All textarea values:', this.textareaTargets.map(t => t.value))
       if (event) event.preventDefault()
       return
     }
