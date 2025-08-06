@@ -6,6 +6,7 @@ class App < ApplicationRecord
 
   belongs_to :team
   belongs_to :creator, class_name: "Membership"
+  belongs_to :database_shard, optional: true
   # 🚅 add belongs_to associations above.
 
   has_many :app_versions, dependent: :destroy

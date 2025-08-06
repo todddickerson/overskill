@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_06_184700) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_06_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -432,7 +432,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_184700) do
     t.text "logo_prompt"
     t.datetime "logo_generated_at"
     t.boolean "use_custom_database", default: false, null: false
+    t.bigint "database_shard_id"
+    t.string "shard_app_id"
+    t.string "supabase_project_url"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
+    t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
+    t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
     t.index ["featured"], name: "index_apps_on_featured"
     t.index ["slug"], name: "index_apps_on_slug", unique: true
     t.index ["status"], name: "index_apps_on_status"
@@ -472,6 +477,24 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_184700) do
     t.index ["slug"], name: "index_creator_profiles_on_slug", unique: true
     t.index ["team_id"], name: "index_creator_profiles_on_team_id"
     t.index ["username"], name: "index_creator_profiles_on_username", unique: true
+  end
+
+  create_table "database_shards", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "shard_number", null: false
+    t.string "supabase_project_id", null: false
+    t.string "supabase_url", null: false
+    t.text "supabase_anon_key", null: false
+    t.text "supabase_service_key", null: false
+    t.integer "app_count", default: 0, null: false
+    t.integer "status", default: 1, null: false
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_count"], name: "index_database_shards_on_app_count"
+    t.index ["name"], name: "index_database_shards_on_name", unique: true
+    t.index ["status"], name: "index_database_shards_on_status"
+    t.index ["supabase_project_id"], name: "index_database_shards_on_supabase_project_id", unique: true
   end
 
   create_table "deployment_logs", force: :cascade do |t|
@@ -833,6 +856,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_184700) do
   add_foreign_key "app_versions", "apps"
   add_foreign_key "app_versions", "teams"
   add_foreign_key "app_versions", "users"
+  add_foreign_key "apps", "database_shards"
   add_foreign_key "apps", "memberships", column: "creator_id"
   add_foreign_key "apps", "teams"
   add_foreign_key "build_logs", "deployment_logs"

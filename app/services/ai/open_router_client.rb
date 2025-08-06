@@ -15,7 +15,7 @@ module Ai
       gemini_flash: "google/gemini-1.5-flash" # Quick tasks
     }.freeze
 
-    DEFAULT_MODEL = :claude_4  # Use Claude 4 Sonnet for best results
+    DEFAULT_MODEL = :kimi_k2  # Use Kimi K2 for 82% cost savings with great quality
 
     def initialize(api_key = nil)
       @api_key = api_key || ENV.fetch("OPENROUTER_API_KEY")
@@ -216,15 +216,43 @@ module Ai
     end
 
     def generate_app(prompt, framework: "react", app_type: nil)
+      # Load the generated app standards
+      standards = File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
+      
+      # Build comprehensive prompt with tech stack requirements
+      full_prompt = <<~PROMPT
+        Create a production-ready web application with these requirements:
+        
+        USER REQUEST: #{prompt}
+        
+        MANDATORY TECH STACK:
+        - Frontend: React 18+ with TypeScript (NOT JavaScript)
+        - Build: Vite
+        - Styling: Tailwind CSS
+        - Deployment: Cloudflare Workers (NOT Node.js)
+        - Database: Supabase with Row-Level Security
+        - State: Zustand
+        - Forms: React Hook Form + Zod
+        
+        CRITICAL REQUIREMENTS:
+        1. Include Supabase client with RLS context setting (setRLSContext function)
+        2. Include Overskill analytics integration (auto-track page views)
+        3. Include wrangler.toml for Cloudflare Workers deployment
+        4. Use TypeScript for ALL code files (.tsx, .ts)
+        5. Include complete package.json with exact dependencies
+        
+        #{standards}
+      PROMPT
+      
       # Use function calling for structured output - no more JSON parsing errors!
       messages = [
         {
           role: "system", 
-          content: "You are an expert web developer. Use the generate_app function to create a complete web application based on the user's requirements."
+          content: "You are an expert full-stack developer specializing in React, TypeScript, Cloudflare Workers, and Supabase. Generate complete, production-ready applications."
         },
         {
           role: "user", 
-          content: "Create a #{framework} application: #{prompt}"
+          content: full_prompt
         }
       ]
 
@@ -283,16 +311,16 @@ module Ai
         }
       ]
 
-      # Use Claude 4 Sonnet for best function calling
-      Rails.logger.info "[AI] Using Claude 4 Sonnet for reliable function calling"
-      result = chat_with_tools(messages, tools, model: :claude_4, temperature: 0.7, max_tokens: 16000)
+      # Use Kimi K2 as primary (82% cost savings!)
+      Rails.logger.info "[AI] Using Kimi K2 for cost-effective generation"
+      result = chat_with_tools(messages, tools, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
       
       # Check if function calling was successful
       if result[:success] && result[:tool_calls]&.any?
-        Rails.logger.info "[AI] Claude 4 Sonnet function calling successful!"
+        Rails.logger.info "[AI] Kimi K2 function calling successful!"
       else
-        Rails.logger.warn "[AI] Claude 4 function calling failed, trying Claude 3.5 Sonnet"
-        result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
+        Rails.logger.warn "[AI] Kimi K2 failed, trying Claude 4 as fallback"
+        result = chat_with_tools(messages, tools, model: :claude_4, temperature: 0.7, max_tokens: 16000)
         
         # Track the fallback for monitoring
         Rails.logger.info "[AI] Claude Sonnet 3.5 fallback result: success=#{result[:success]}, tool_calls=#{result[:tool_calls]&.any?}"
