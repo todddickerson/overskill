@@ -1,5 +1,4 @@
 import { Controller } from "@hotwired/stimulus"
-import { post } from "@rails/request.js"
 
 export default class extends Controller {
   static targets = ["form", "submitButton", "spinner"]
@@ -14,26 +13,51 @@ export default class extends Controller {
     this.showLoading()
     
     try {
-      const response = await post(form.action, {
+      // Use native fetch for better error handling
+      const response = await fetch(form.action, {
+        method: 'POST',
         body: formData,
         headers: {
-          "Accept": "application/json"
-        }
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
       })
       
-      const data = await response.json
+      console.log("Response status:", response.status)
       
-      if (response.status === 401 || (response.ok && data.requires_auth)) {
+      // Check for 401 before trying to parse JSON
+      if (response.status === 401) {
         // User needs to authenticate - trigger the auth modal
         this.hideLoading()
         
-        // Dispatch event to open auth modal with the prompt
-        const authModal = document.querySelector('[data-controller="auth-modal"]')
-        if (authModal) {
-          const controller = this.application.getControllerForElementAndIdentifier(authModal, 'auth-modal')
-          controller.open({ detail: { prompt: data.prompt || formData.get('prompt') || formData.get('custom_prompt') } })
+        // Try to get the prompt from the response if possible
+        let promptData = { prompt: formData.get('prompt') || formData.get('custom_prompt') }
+        try {
+          const data = await response.json()
+          if (data.prompt) {
+            promptData.prompt = data.prompt
+          }
+        } catch (e) {
+          // If JSON parsing fails, use the form data
+          console.log("Could not parse 401 response JSON, using form data for prompt")
         }
-      } else if (response.ok && data.redirect_url) {
+        
+        console.log("Opening auth modal with prompt:", promptData.prompt)
+        
+        // Open auth modal using a custom event
+        const event = new CustomEvent('auth-modal:open', {
+          detail: promptData,
+          bubbles: true
+        })
+        document.dispatchEvent(event)
+        return
+      }
+      
+      // Parse JSON response
+      const data = await response.json()
+      
+      if (response.ok && data.redirect_url) {
         // Success - redirect to the app editor
         window.location.href = data.redirect_url
       } else {
@@ -43,6 +67,7 @@ export default class extends Controller {
       }
     } catch (error) {
       console.error("Form submission error:", error)
+      console.error("Error details:", error.message, error.stack)
       this.hideLoading()
       this.showError("An error occurred. Please try again.")
     }

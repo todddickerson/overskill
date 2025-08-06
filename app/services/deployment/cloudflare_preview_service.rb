@@ -408,8 +408,21 @@ class Deployment::CloudflarePreviewService
     @app.app_files.each do |file|
       # Ensure file content is properly handled for JSON embedding
       content = file.content.to_s
-      # Escape content to prevent JSON parsing issues
-      files_hash[file.path] = content
+      
+      # Remove problematic characters that can cause Cloudflare Workers to fail
+      # Replace emojis and other non-ASCII characters with safe alternatives
+      sanitized_content = content.gsub(/[^\x20-\x7E\n\r\t]/) do |char|
+        case char
+        when '📝' then '// TODO:'
+        when '🎯' then '// GOAL:'
+        when '✅' then '// DONE:'
+        when '❌' then '// ERROR:'
+        when '🚀' then '// LAUNCH:'
+        else ''  # Remove other non-ASCII characters
+        end
+      end
+      
+      files_hash[file.path] = sanitized_content
     end
     
     # Use safe JSON generation that properly escapes content
@@ -429,7 +442,34 @@ class Deployment::CloudflarePreviewService
       body: script
     )
     
-    JSON.parse(response.body)
+    Rails.logger.debug "[CloudflarePreview] Upload response: #{response.code} - #{response.body[0..200]}..."
+    
+    if response.success?
+      begin
+        parsed_response = JSON.parse(response.body)
+        # Convert Cloudflare format to our expected format
+        if parsed_response['success']
+          { 'success' => true, 'result' => parsed_response['result'] }
+        else
+          { 'success' => false, 'error' => parsed_response['errors']&.first&.dig('message') || 'Upload failed' }
+        end
+      rescue JSON::ParserError => e
+        Rails.logger.error "[CloudflarePreview] Failed to parse response: #{e.message}"
+        { 'success' => false, 'error' => 'Invalid JSON response' }
+      end
+    else
+      Rails.logger.error "[CloudflarePreview] Upload failed: #{response.code} - #{response.body}"
+      
+      # Try to parse error details
+      begin
+        error_details = JSON.parse(response.body)
+        error_message = error_details['errors']&.first&.dig('message') || "Upload failed with status #{response.code}"
+      rescue
+        error_message = "Upload failed with status #{response.code}: #{response.body[0..200]}"
+      end
+      
+      { 'success' => false, 'error' => error_message }
+    end
   end
   
   def enable_workers_dev_subdomain(worker_name)

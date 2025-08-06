@@ -11,6 +11,17 @@ export default class extends Controller {
   connect() {
     // Hide modal on initial load
     this.element.classList.add("hidden")
+    
+    // Listen for custom event to open modal
+    this.openHandler = (event) => {
+      this.open(event)
+    }
+    document.addEventListener('auth-modal:open', this.openHandler)
+  }
+  
+  disconnect() {
+    // Clean up event listener
+    document.removeEventListener('auth-modal:open', this.openHandler)
   }
   
   open(event) {

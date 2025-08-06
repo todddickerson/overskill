@@ -68,10 +68,20 @@ if result[:success] && result[:files]
   
   # Check if Cloudflare credentials are available
   if ENV['CLOUDFLARE_ACCOUNT_ID'] && ENV['CLOUDFLARE_API_TOKEN']
-    deploy_result = preview_service.deploy_instant_preview!
-    puts "Deploy Result: #{deploy_result[:success] ? '✅' : '❌'}"
-    puts "Preview URL: #{deploy_result[:preview_url]}" if deploy_result[:preview_url]
-    puts "Error: #{deploy_result[:error]}" if deploy_result[:error]
+    begin
+      deploy_result = preview_service.deploy_instant_preview!
+      puts "Deploy Result: #{deploy_result[:success] ? '✅' : '❌'}"
+      puts "Preview URL: #{deploy_result[:preview_url]}" if deploy_result[:preview_url]
+      puts "Error: #{deploy_result[:error]}" if deploy_result[:error]
+      
+      if deploy_result[:success]
+        puts "🎉 FULL DEPLOYMENT SUCCESSFUL!"
+        puts "   Worker deployed and accessible at: #{deploy_result[:preview_url]}"
+      end
+    rescue => e
+      puts "❌ Deployment exception: #{e.message}"
+      puts "   Backtrace: #{e.backtrace.first(3).join("\n   ")}"
+    end
   else
     puts "⚠️  Cloudflare credentials not configured - skipping deployment test"
     puts "   Worker script size: #{preview_service.send(:generate_fast_preview_worker).size} chars"

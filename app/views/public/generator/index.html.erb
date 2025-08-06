@@ -46,6 +46,15 @@
       <% end %>
     </div>
 
+    <!-- Debug Test Button -->
+    <div class="max-w-3xl mx-auto mb-8 text-center" style="display: none;" id="debug-auth-test">
+      <button type="button" 
+              onclick="document.dispatchEvent(new CustomEvent('auth-modal:open', { detail: { prompt: 'Test prompt' }, bubbles: true }))"
+              class="bg-red-500 text-white px-4 py-2 rounded">
+        Test Auth Modal (Debug)
+      </button>
+    </div>
+
     <!-- Divider -->
     <div class="max-w-3xl mx-auto mb-12">
       <div class="relative">
@@ -121,7 +130,7 @@
       <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-8">
         Every App Includes
       </h2>
-      <div class="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+      <div class="grid md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-6xl mx-auto">
         <div class="text-center">
           <div class="text-3xl mb-2">🔐</div>
           <div class="font-semibold text-gray-900 dark:text-white">Secure Auth</div>
@@ -142,6 +151,19 @@
           <div class="font-semibold text-gray-900 dark:text-white">Real-time</div>
           <div class="text-sm text-gray-600 dark:text-gray-400">Live updates</div>
         </div>
+        <div class="text-center">
+          <div class="text-3xl mb-2">🗄️</div>
+          <div class="font-semibold text-gray-900 dark:text-white">Database</div>
+          <div class="text-sm text-gray-600 dark:text-gray-400">Secure data storage</div>
+        </div>
+        <div class="text-center relative">
+          <div class="text-3xl mb-2">🏢</div>
+          <div class="font-semibold text-gray-900 dark:text-white">Enterprise OAuth</div>
+          <div class="text-sm text-gray-600 dark:text-gray-400">Org SSO support</div>
+          <span class="absolute -top-2 -right-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs px-2 py-1 rounded-full">
+            Coming Soon
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -152,6 +174,15 @@
   document.addEventListener('DOMContentLoaded', function() {
     document.querySelector('[onclick*="custom-prompt"]')?.addEventListener('click', function() {
       document.getElementById('custom-prompt').focus();
+    });
+    
+    // Debug: Check if auth modal is present
+    const authModal = document.querySelector('[data-controller="auth-modal"]');
+    console.log('Auth modal found:', !!authModal);
+    
+    // Debug: Test the event system
+    document.addEventListener('auth-modal:open', function(event) {
+      console.log('Auth modal open event received:', event.detail);
     });
   });
 </script>

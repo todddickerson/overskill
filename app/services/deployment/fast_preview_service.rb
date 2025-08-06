@@ -22,7 +22,7 @@ module Deployment
       # Upload worker
       upload_response = upload_worker(worker_name, worker_script)
       
-      return { success: false, error: "Failed to upload worker" } unless upload_response['success']
+      return { success: false, error: "Failed to upload worker: #{upload_response['error']}" } unless upload_response['success']
       
       # Set environment variables
       set_worker_env_vars(worker_name)
@@ -59,17 +59,16 @@ module Deployment
     def generate_fast_preview_worker
       <<~JAVASCRIPT
         // Fast Preview Worker with on-the-fly TypeScript transformation
-        // Using module format for better secret handling
+        // Using service worker format for Cloudflare compatibility
         
-        export default {
-          async fetch(request, env, ctx) {
-            return handleRequest(request, env, ctx);
-          }
-        };
+        addEventListener('fetch', event => {
+          event.respondWith(handleRequest(event.request, event))
+        })
         
-        async function handleRequest(request, env, ctx) {
+        async function handleRequest(request, event) {
           const url = new URL(request.url)
           let pathname = url.pathname
+          const env = event.env || {} // Access environment variables
           
           // API routes
           if (pathname.startsWith('/api/')) {
