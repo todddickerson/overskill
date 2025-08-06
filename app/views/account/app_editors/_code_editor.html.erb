@@ -1,10 +1,12 @@
 <%= turbo_frame_tag "code_editor" do %>
 <div class="h-full w-full flex flex-col bg-white dark:bg-gray-900" 
-     data-controller="codemirror" 
+     data-controller="codemirror simple-code-editor" 
      data-codemirror-content-value="<%= html_escape(file.content || '') %>"
      data-codemirror-file-type-value="<%= file.file_type %>"
      data-codemirror-file-id-value="<%= file.id %>"
-     data-codemirror-update-url-value="<%= file_account_app_editor_path(app, file_id: file.id) %>">
+     data-codemirror-update-url-value="<%= file_account_app_editor_path(app, file_id: file.id) %>"
+     data-simple-code-editor-file-id-value="<%= file.id %>"
+     data-simple-code-editor-update-url-value="<%= file_account_app_editor_path(app, file_id: ':id') %>">
   
   <!-- Editor Header -->
   <div class="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
@@ -21,7 +23,7 @@
   </div>
   
   <!-- CodeMirror Editor Container -->
-  <div class="flex-1 relative" data-codemirror-target="editor">
+  <div class="flex-1 relative min-h-0" data-codemirror-target="editor">
     <!-- CodeMirror will be mounted here -->
     
     <!-- Fallback textarea (hidden when CodeMirror loads) -->
@@ -29,12 +31,14 @@
       id="editor_<%= file.id %>"
       class="absolute inset-0 w-full h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
       spellcheck="false"
+      data-simple-code-editor-target="editor"
+      data-codemirror-target="fallback"
     ><%= file.content || '' %></textarea>
   </div>
   
   <!-- Status Bar -->
   <div class="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
-    <span data-codemirror-target="status">Ready</span>
+    <span data-codemirror-target="status" data-simple-code-editor-target="status">Ready</span>
     <span class="float-right">
       Line <span data-codemirror-target="line">1</span>, 
       Column <span data-codemirror-target="column">1</span>

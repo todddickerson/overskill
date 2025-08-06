@@ -26,6 +26,7 @@ class App < ApplicationRecord
   # has_many :posts # TODO: uncomment when Post model exists
   has_many :app_security_policies, dependent: :destroy
   has_many :app_audit_logs, dependent: :destroy
+  has_many :app_env_vars, dependent: :destroy
   # 🚅 add has_many associations above.
 
   has_one_attached :logo
@@ -43,6 +44,7 @@ class App < ApplicationRecord
   # 🚅 add validations above.
 
   before_validation :generate_slug
+  after_create :create_default_env_vars
   # 🚅 add callbacks above.
 
   # Delegate to team's database config for hybrid architecture
@@ -111,10 +113,30 @@ class App < ApplicationRecord
     'pending'
   end
 
+  # Get all environment variables for deployment
+  def env_vars_for_deployment
+    vars = {}
+    app_env_vars.each do |env_var|
+      vars[env_var.key] = env_var.value
+    end
+    vars
+  end
+
+  # Get environment variables available to AI (non-secret)
+  def env_vars_for_ai
+    app_env_vars.select(&:available_for_ai?).map do |env_var|
+      { key: env_var.key, description: env_var.description }
+    end
+  end
+
   private
 
   def generate_slug
     self.slug ||= name&.parameterize
+  end
+
+  def create_default_env_vars
+    AppEnvVar.create_defaults_for_app(self)
   end
 
   # 🚅 add methods above.

@@ -33,6 +33,9 @@
 <% # Font Awesome Free CDN %>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+<% # Load polyfills safely before other scripts %>
+<script src="https://unpkg.com/@ungap/custom-elements-builtin" async></script>
+
 <% # Ahoy analytics tracking %>
 <%= javascript_include_tag "https://unpkg.com/ahoy.js@0.4.2/dist/ahoy.js" %>
 <script>

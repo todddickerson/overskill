@@ -34,13 +34,16 @@ class Account::AppEditorsController < Account::ApplicationController
       # Update size based on content
       @file.update(size_bytes: content.bytesize)
       
-      # Create a version for manual edits
+      # Create a version for manual edits with file snapshot
       @app.app_versions.create!(
         team: @app.team,
         user: current_user,
         version_number: next_version_number(@app),
         changelog: "Manual edit: #{@file.path}",
-        changed_files: @file.path
+        changed_files: @file.path,
+        files_snapshot: @app.app_files.map { |f| 
+          { path: f.path, content: f.content, file_type: f.file_type }
+        }.to_json
       )
       
       # Update preview worker with latest changes
@@ -66,52 +69,91 @@ class Account::AppEditorsController < Account::ApplicationController
     end
   end
 
+  # POST /account/apps/:app_id/editor/messages
+  # Creates a new chat message and queues AI processing
   def create_message
-    Rails.logger.info "[AppEditors#create_message] Starting message creation for app #{@app.id}"
-    Rails.logger.info "[AppEditors#create_message] Message params: #{message_params.inspect}"
+    # Build and save the user's message
+    @message = build_user_message
     
-    @message = @app.app_chat_messages.build(message_params)
-    @message.role = "user"
-    @message.user = current_user
-    
-    Rails.logger.info "[AppEditors#create_message] Built message: #{@message.inspect}"
-
     if @message.save
-      Rails.logger.info "[AppEditors#create_message] User message saved with ID: #{@message.id}"
+      # Queue AI processing of the message
+      queue_ai_processing(@message)
       
-      # Start processing based on orchestrator setting
-      if ENV['USE_AI_ORCHESTRATOR'] == 'true'
-        Rails.logger.info "[AppEditors#create_message] Using new AI orchestrator"
-        job = ProcessAppUpdateJobV2.perform_later(@message)
-        Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJobV2 enqueued with job ID: #{job.job_id}"
-      else
-        # Create initial AI response placeholder for legacy mode
-        ai_response = @app.app_chat_messages.create!(
-          role: "assistant",
-          content: "Analyzing your request and planning the changes...",
-          status: "planning"
-        )
-        Rails.logger.info "[AppEditors#create_message] AI placeholder created with ID: #{ai_response.id}"
-        
-        job = ProcessAppUpdateJob.perform_later(@message)
-        Rails.logger.info "[AppEditors#create_message] ProcessAppUpdateJob enqueued with job ID: #{job.job_id}"
-      end
-
-      # Always respond with just form reset - messages are handled by broadcasts
-      respond_to do |format|
-        format.turbo_stream do
-          render turbo_stream: turbo_stream.replace("chat_form",
-            partial: "account/app_editors/chat_input_wrapper",
-            locals: {app: @app})
-        end
-      end
+      # Reset the chat form (messages appear via ActionCable broadcasts)
+      render_chat_form_reset
     else
-      respond_to do |format|
-        format.turbo_stream do
-          render turbo_stream: turbo_stream.replace("chat_form",
-            partial: "account/app_editors/chat_input_wrapper",
-            locals: {app: @app, message: @message})
-        end
+      # Re-render form with errors
+      render_chat_form_with_errors
+    end
+  end
+  
+  private
+  
+  # Build a new user message from params
+  def build_user_message
+    message = @app.app_chat_messages.build(message_params)
+    message.role = "user"
+    message.user = current_user
+    message
+  end
+  
+  # Queue the appropriate AI processing job
+  def queue_ai_processing(message)
+    # Use unified coordinator for all AI operations
+    if use_unified_ai?
+      Rails.logger.info "[AI] Queueing unified AI processing for message ##{message.id}"
+      UnifiedAiProcessingJob.perform_later(message)
+    else
+      # Legacy path - to be deprecated
+      queue_legacy_processing(message)
+    end
+  end
+  
+  # Legacy processing - to be removed after migration
+  def queue_legacy_processing(message)
+    Rails.logger.info "[AI] Using legacy processing for message ##{message.id}"
+    
+    if ENV['USE_AI_ORCHESTRATOR'] == 'true'
+      ProcessAppUpdateJobV2.perform_later(message)
+    else
+      # Create placeholder for old system
+      @app.app_chat_messages.create!(
+        role: "assistant",
+        content: "Analyzing your request...",
+        status: "planning"
+      )
+      ProcessAppUpdateJob.perform_later(message)
+    end
+  end
+  
+  # Check if we should use the new unified AI system
+  # Default to true since we're in alpha/dev mode
+  def use_unified_ai?
+    true
+  end
+  
+  # Render the chat form reset (successful message creation)
+  def render_chat_form_reset
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          "chat_form",
+          partial: "account/app_editors/chat_input_wrapper",
+          locals: { app: @app }
+        )
+      end
+    end
+  end
+  
+  # Render the chat form with errors
+  def render_chat_form_with_errors
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          "chat_form",
+          partial: "account/app_editors/chat_input_wrapper",
+          locals: { app: @app, message: @message }
+        )
       end
     end
   end
@@ -124,25 +166,86 @@ class Account::AppEditorsController < Account::ApplicationController
   end
   
 
+  def update_preview
+    # Trigger preview update (already handled by UpdatePreviewJob)
+    UpdatePreviewJob.perform_later(@app.id)
+    render json: { success: true }
+  end
+
+  def restore_version
+    version = @app.app_versions.find(params[:version_id])
+    
+    begin
+      # Restore files from version snapshot
+      files_data = JSON.parse(version.files_snapshot)
+      
+      files_data.each do |file_data|
+        file = @app.app_files.find_or_initialize_by(path: file_data['path'])
+        file.team = @app.team if file.new_record?
+        file.content = file_data['content']
+        file.file_type = file_data['file_type']
+        file.size_bytes = file_data['content'].bytesize
+        file.save!
+      end
+      
+      # Create a new version for the restore action
+      restore_version = @app.app_versions.create!(
+        team: @app.team,
+        user: current_user,
+        version_number: next_version_number(@app),
+        changelog: "Restored from version #{version.version_number}",
+        files_snapshot: version.files_snapshot
+      )
+      
+      # Update preview
+      UpdatePreviewJob.perform_later(@app.id)
+      
+      render json: { success: true, message: "Successfully restored to version #{version.version_number}" }
+    rescue => e
+      Rails.logger.error "Version restore failed: #{e.message}"
+      render json: { success: false, error: e.message }
+    end
+  end
+
+  def bookmark_version
+    version = @app.app_versions.find(params[:version_id])
+    version.update!(bookmarked: !version.bookmarked)
+    
+    render json: { 
+      success: true, 
+      bookmarked: version.bookmarked,
+      message: version.bookmarked? ? "Version bookmarked" : "Bookmark removed"
+    }
+  end
+
+  def compare_version
+    version = @app.app_versions.find(params[:version_id])
+    
+    # For now, redirect to a comparison view (could be enhanced)
+    redirect_to account_app_path(@app, version: version.id)
+  end
+
   private
 
   def set_app
     @app = current_team.apps.find(params[:app_id])
   end
-
-  def message_params
-    content = params.require(:app_chat_message)[:content] || params.require(:app_chat_message)[:content_mobile]
-    { content: content }
-  end
-
+  
+  # Generate the next version number for an app
   def next_version_number(app)
     last_version = app.app_versions.order(created_at: :desc).first
     if last_version
-      parts = last_version.version_number.split(".")
-      parts[-1] = (parts[-1].to_i + 1).to_s
+      # Increment patch version (1.0.0 -> 1.0.1)
+      parts = last_version.version_number.split(".").map(&:to_i)
+      parts[2] = (parts[2] || 0) + 1
       parts.join(".")
     else
       "1.0.0"
     end
+  end
+
+  def message_params
+    content = params.require(:app_chat_message)[:content] || params.require(:app_chat_message)[:content_mobile]
+    { content: content }
   end
 end

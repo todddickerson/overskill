@@ -1,0 +1,64 @@
+<%# Individual file progress item %>
+<div class="flex items-center justify-between py-2 px-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-600/50"
+     data-file-path="<%= file_path %>"
+     data-version-progress-target="fileItem">
+  
+  <!-- File Info -->
+  <div class="flex items-center space-x-3">
+    <!-- Status Icon -->
+    <div class="flex-shrink-0">
+      <% case status %>
+      <% when 'pending' %>
+        <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600"></div>
+      <% when 'editing' %>
+        <div class="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+      <% when 'completed' %>
+        <div class="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+          <i class="fas fa-check text-white text-xs"></i>
+        </div>
+      <% when 'error' %>
+        <div class="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+          <i class="fas fa-times text-white text-xs"></i>
+        </div>
+      <% end %>
+    </div>
+    
+    <!-- File Details -->
+    <div class="flex items-center space-x-2">
+      <!-- File Type Icon -->
+      <i class="<%= file_extension_icon(file_path) %> <%= file_extension_color(file_path) %> text-sm"></i>
+      
+      <!-- File Name -->
+      <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+        <%= File.basename(file_path) %>
+      </span>
+      
+      <!-- File Path (subdued) -->
+      <% if File.dirname(file_path) != '.' %>
+        <span class="text-xs text-gray-500 dark:text-gray-400">
+          in <%= File.dirname(file_path) %>
+        </span>
+      <% end %>
+    </div>
+  </div>
+  
+  <!-- Status Text -->
+  <div class="text-xs text-gray-600 dark:text-gray-400">
+    <% case status %>
+    <% when 'pending' %>
+      <span class="text-gray-500 dark:text-gray-400">Queued</span>
+    <% when 'editing' %>
+      <span class="text-blue-600 dark:text-blue-400 font-medium">Editing...</span>
+    <% when 'completed' %>
+      <span class="text-green-600 dark:text-green-400 font-medium">
+        <% if defined?(lines_changed) && lines_changed %>
+          +<%= lines_changed %> lines
+        <% else %>
+          Updated
+        <% end %>
+      </span>
+    <% when 'error' %>
+      <span class="text-red-600 dark:text-red-400 font-medium">Failed</span>
+    <% end %>
+  </div>
+</div>

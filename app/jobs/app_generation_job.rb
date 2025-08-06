@@ -28,7 +28,8 @@ class AppGenerationJob < ApplicationJob
       return
     end
 
-    # Run the generation
+    # Use the main AppGeneratorService which has all our enhancements
+    # LovableStyleGenerator is deprecated - it wasn't using AI properly
     service = Ai::AppGeneratorService.new(app, app_generation)
     result = service.generate!
 
@@ -83,5 +84,14 @@ class AppGenerationJob < ApplicationJob
       partial: "account/apps/status_badge",
       locals: {app: app}
     )
+    
+    # If generation is complete, redirect to editor
+    if status == "generated"
+      Turbo::StreamsChannel.broadcast_append_to(
+        "app_#{app.id}_generation",
+        target: "body",
+        html: "<script>window.location.href = '/account/apps/#{app.to_param}/editor';</script>"
+      )
+    end
   end
 end

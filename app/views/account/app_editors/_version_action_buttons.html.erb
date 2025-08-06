@@ -1,0 +1,46 @@
+<%# Reusable version action buttons %>
+<% 
+  button_container_class = is_dynamic ? 
+    "flex items-center space-x-1" : 
+    "flex items-center space-x-1 bg-white dark:bg-gray-800 rounded-full shadow-md border border-gray-200 dark:border-gray-700 px-1.5 py-0.5"
+  
+  button_class = is_dynamic ?
+    "px-3 py-1 text-xs bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" :
+    "text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-2 py-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+%>
+
+<div class="<%= button_container_class %>">
+  <!-- Preview Button -->
+  <button class="<%= button_class %>"
+          <%= is_dynamic ? 'data-action="click->version-progress#preview" data-version-progress-version-id-param=""' : "onclick=\"window.postMessage({action: 'preview', version: '#{version_id}'}, '*')\"" %>
+          title="Preview this version">
+    <i class="fas fa-eye <%= is_dynamic ? 'mr-1' : '' %> text-xs"></i>
+    <%= 'Preview' if is_dynamic %>
+  </button>
+  
+  <!-- Compare Button -->
+  <button class="<%= button_class %>"
+          <%= is_dynamic ? 'data-action="click->version-progress#compare" data-version-progress-version-id-param=""' : "onclick=\"window.postMessage({action: 'compare', version: '#{version_id}'}, '*')\"" %>
+          title="Compare with current">
+    <i class="fas fa-code-branch <%= is_dynamic ? 'mr-1' : '' %> text-xs"></i>
+    <%= 'Compare' if is_dynamic %>
+  </button>
+  
+  <!-- Restore Button (dynamic only) -->
+  <% if is_dynamic %>
+    <button class="<%= button_class %>"
+            data-action="click->version-progress#restore"
+            data-version-progress-version-id-param=""
+            title="Restore to this version">
+      <i class="fas fa-undo mr-1 text-xs"></i> Restore
+    </button>
+  <% end %>
+  
+  <!-- Bookmark Button -->
+  <button class="<%= button_class %> <%= !is_dynamic && version_id ? (AppVersion.find(version_id).bookmarked? ? 'text-yellow-500' : '') : '' %>"
+          <%= is_dynamic ? 'data-action="click->version-progress#bookmark" data-version-progress-version-id-param=""' : "data-action=\"click->version-actions#bookmark\" data-version-actions-version-id-value=\"#{version_id}\"" %>
+          title="<%= is_dynamic ? 'Save this version' : (version_id && AppVersion.find(version_id).bookmarked? ? 'Remove bookmark' : 'Bookmark this version') %>">
+    <i class="fas fa-bookmark <%= is_dynamic ? 'mr-1' : '' %> text-xs"></i>
+    <%= 'Save' if is_dynamic %>
+  </button>
+</div>

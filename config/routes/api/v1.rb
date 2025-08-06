@@ -41,6 +41,7 @@ shallow do
         resources :app_settings
         resources :app_security_policies
         resources :app_audit_logs
+        resources :app_env_vars
       end
     end
   end

@@ -32,6 +32,7 @@ components:
     <%= automatic_components_for AppSetting %>
     <%= automatic_components_for AppSecurityPolicy %>
     <%= automatic_components_for AppAuditLog %>
+    <%= automatic_components_for AppEnvVar %>
     <%# 🚅 super scaffolding will insert new components above this line. %>
   parameters:
     id:
@@ -77,4 +78,5 @@ paths:
   <%= automatic_paths_for AppSetting, App %>
   <%= automatic_paths_for AppSecurityPolicy, App %>
   <%= automatic_paths_for AppAuditLog, App %>
+  <%= automatic_paths_for AppEnvVar, App %>
   <%# 🚅 super scaffolding will insert new paths above this line. %>

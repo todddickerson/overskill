@@ -23,11 +23,14 @@ class DeployAppJob < ApplicationJob
     if result[:success]
       Rails.logger.info "Successfully deployed app #{app.id} to #{result[:message]}"
       
-      # Create a new version to track this deployment
+      # Create a new version to track this deployment with snapshot
       app.app_versions.create!(
         version_number: generate_version_number(app),
         changelog: "Deployed to production at #{result[:message]}",
-        team: app.team
+        team: app.team,
+        files_snapshot: app.app_files.map { |f| 
+          { path: f.path, content: f.content, file_type: f.file_type }
+        }.to_json
       )
       
       # Broadcast success to any connected clients

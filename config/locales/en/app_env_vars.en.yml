@@ -1,0 +1,126 @@
+en:
+  app_env_vars: &app_env_vars
+    label: &label App Env Vars
+    breadcrumbs:
+      label: *label
+    navigation:
+      label: *label
+      icon: fal fa-puzzle-piece
+    buttons: &buttons
+      new: Add New App Env Var
+      create: Create App Env Var
+      edit: Edit App Env Var
+      update: Update App Env Var
+      destroy: Remove App Env Var
+      shorthand:
+        edit: Edit
+        destroy: Delete
+      confirmations:
+        # TODO customize for your use-case.
+        destroy: Are you sure you want to remove %{app_env_var_name}? This will also remove any child resources and can't be undone.
+    app_env_var:
+      buttons: *buttons
+    fields: &fields
+      id:
+        heading: App Env Var ID
+      app_id:
+        heading: App ID
+      key:
+        _: &key Key
+        label: *key
+        heading: *key
+        api_title: *key
+        api_description: *key
+      value:
+        _: &value Value
+        label: *value
+        heading: *value
+        api_title: *value
+        api_description: *value
+      description:
+        _: &description Description
+        label: *description
+        heading: *description
+        api_title: *description
+        api_description: *description
+      is_secret:
+        _: &is_secret Is Secret
+        label: *is_secret
+        heading: *is_secret
+        api_title: *is_secret
+        api_description: *is_secret
+        options:
+          yes: "Yes"
+          no: "No"
+      is_system:
+        _: &is_system Is System
+        label: *is_system
+        heading: *is_system
+        api_title: *is_system
+        api_description: *is_system
+        options:
+          yes: "Yes"
+          no: "No"
+      # 🚅 super scaffolding will insert new fields above this line.
+      created_at:
+        _: &created_at Added
+        label: *created_at
+        heading: *created_at
+      updated_at:
+        _: &updated_at Updated
+        label: *updated_at
+        heading: *updated_at
+    api:
+      collection_actions: "Collection Actions for App Env Vars"
+      index: "List App Env Vars"
+      create: "Add a New App Env Var"
+      member_actions: "Actions for an Individual App Env Var"
+      show: "Retrieve a App Env Var"
+      update: "Update a App Env Var"
+      destroy: "Delete a App Env Var"
+      fields: *fields
+    index:
+      section: "%{apps_possessive} App Env Vars"
+      contexts:
+        app:
+          header: App Env Vars
+          description: Below is a list of App Env Vars that have been added for %{app_name}.
+          description_empty: No App Env Vars have been added for %{app_name}.
+      fields: *fields
+      buttons: *buttons
+    show:
+      section: "%{app_env_var_name}"
+      header: App Env Var Details
+      description: Below are the details we have for %{app_env_var_name}.
+      manage_description: You'll also find options for updating these details or removing %{app_env_var_name} from %{app_name} entirely.
+      fields: *fields
+      buttons: *buttons
+    form: &form
+      buttons: *buttons
+      fields: *fields
+    new:
+      section: "New App Env Var for %{app_name}"
+      header: New App Env Var Details
+      description: Please provide the details of the new App Env Var you'd like to add to %{app_name}.
+      form: *form
+    edit:
+      section: "%{app_env_var_name}"
+      header: Edit App Env Var Details
+      description: You can update the details or settings for %{app_env_var_name} below.
+      form: *form
+    notifications:
+      created: App Env Var was successfully created.
+      updated: App Env Var was successfully updated.
+      destroyed: App Env Var was successfully destroyed.
+  account:
+    app_env_vars: *app_env_vars
+  activerecord:
+    attributes:
+      app_env_var:
+        key: *key
+        value: *value
+        is_secret: *is_secret
+        is_system: *is_system
+        # 🚅 super scaffolding will insert new activerecord attributes above this line.
+        created_at: *created_at
+        updated_at: *updated_at

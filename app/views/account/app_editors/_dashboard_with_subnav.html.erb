@@ -65,6 +65,15 @@
         <span class="ml-2 hidden lg:inline">API</span>
       </button>
       
+      <!-- Environment Variables -->
+      <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
+              data-dashboard-nav="env_vars"
+              data-action="click->dashboard-subnav#switchView"
+              title="Environment Variables">
+        <i class="fas fa-key text-xs"></i>
+        <span class="ml-2 hidden lg:inline">Env Vars</span>
+      </button>
+      
       <!-- Settings -->
       <button class="w-full text-left px-2 lg:px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md flex items-center justify-center lg:justify-start"
               data-dashboard-nav="settings"
@@ -142,6 +151,11 @@
     <!-- API Panel -->
     <div class="absolute inset-0 hidden overflow-y-auto" data-dashboard-view="api">
       <%= render "api_explorer", app: app %>
+    </div>
+    
+    <!-- Environment Variables Panel -->
+    <div class="absolute inset-0 hidden overflow-y-auto" data-dashboard-view="env_vars">
+      <%= render "env_vars_panel", app: app %>
     </div>
     
     <!-- Settings Panel -->

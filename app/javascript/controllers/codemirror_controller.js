@@ -8,29 +8,65 @@ import { html } from "@codemirror/lang-html"
 import { json } from "@codemirror/lang-json"
 
 export default class extends Controller {
-  static targets = ["editor", "status", "line", "column"]
+  static targets = ["editor", "status", "line", "column", "fallback"]
   static values = { 
     content: String, 
     fileType: String,
     fileId: String,
     updateUrl: String
   }
+  
+  initialize() {
+    this.connectDebounce = null
+  }
 
   connect() {
     console.log('[CodeMirror] Controller connecting...')
-    try {
-      this.setupEditor()
-      this.updateTimer = null
-      console.log('[CodeMirror] Controller connected successfully')
-    } catch (error) {
-      console.error('[CodeMirror] Failed to connect:', error)
-      this.showFallbackEditor()
+    
+    // Clear any pending connection
+    if (this.connectDebounce) {
+      clearTimeout(this.connectDebounce)
     }
+    
+    // Debounce the actual connection to prevent rapid reconnections
+    this.connectDebounce = setTimeout(() => {
+      console.log('[CodeMirror] Targets:', {
+        hasEditor: this.hasEditorTarget,
+        hasStatus: this.hasStatusTarget,
+        editorTarget: this.editorTarget
+      })
+      console.log('[CodeMirror] Values:', {
+        content: this.contentValue?.substring(0, 50) + '...',
+        fileType: this.fileTypeValue,
+        fileId: this.fileIdValue
+      })
+      
+      // Prevent multiple initializations
+      if (this.editor) {
+        console.log('[CodeMirror] Editor already exists, destroying old instance')
+        this.editor.destroy()
+        this.editor = null
+      }
+      
+      try {
+        this.setupEditor()
+        this.updateTimer = null
+        console.log('[CodeMirror] Controller connected successfully')
+      } catch (error) {
+        console.error('[CodeMirror] Failed to connect:', error)
+        console.error('[CodeMirror] Error stack:', error.stack)
+        this.showFallbackEditor()
+      }
+    }, 100) // Small delay to batch rapid reconnections
   }
 
   disconnect() {
+    if (this.connectDebounce) {
+      clearTimeout(this.connectDebounce)
+    }
     if (this.editor) {
       this.editor.destroy()
+      this.editor = null
     }
     if (this.updateTimer) {
       clearTimeout(this.updateTimer)
@@ -48,6 +84,15 @@ export default class extends Controller {
   setupEditor() {
     console.log('[CodeMirror] Setting up editor...')
     try {
+      // Ensure the editor target has proper dimensions
+      const editorHeight = this.editorTarget.offsetHeight
+      console.log('[CodeMirror] Editor target height:', editorHeight)
+      
+      if (editorHeight === 0) {
+        console.warn('[CodeMirror] Editor target has no height, setting minimum height')
+        this.editorTarget.style.minHeight = '400px'
+      }
+      
       const extensions = [
         basicSetup,
         oneDark,
@@ -62,8 +107,15 @@ export default class extends Controller {
           "&": {
             height: "100%"
           },
+          ".cm-editor": {
+            height: "100%"
+          },
           ".cm-scroller": {
-            fontFamily: "ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace"
+            fontFamily: "ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace",
+            overflow: "auto"
+          },
+          ".cm-content": {
+            minHeight: "100%"
           }
         })
       ]

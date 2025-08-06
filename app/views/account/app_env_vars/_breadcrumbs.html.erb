@@ -1,0 +1,8 @@
+<% app_env_var ||= @app_env_var %>
+<% app ||= @app || app_env_var&.app %>
+<%= render 'account/apps/breadcrumbs', app: app %>
+<%= render 'account/shared/breadcrumb', label: t('.label'), url: [:account, app, :app_env_vars] %>
+<% if app_env_var&.persisted? %>
+  <%= render 'account/shared/breadcrumb', label: app_env_var.label_string, url: [:account, app_env_var] %>
+<% end %>
+<%= render 'account/shared/breadcrumbs/actions', only_for: 'app_env_vars' %>

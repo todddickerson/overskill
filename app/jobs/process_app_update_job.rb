@@ -204,11 +204,13 @@ class ProcessAppUpdateJob < ApplicationJob
         user: @user,
         version_number: next_version_number(app),
         changelog: result[:changes][:summary],
-        changed_files: result[:changes][:files_modified]&.join(", ")
+        changed_files: result[:changes][:files_modified]&.join(", "),
+        files_snapshot: app.app_files.map { |f| 
+          { path: f.path, content: f.content, file_type: f.file_type }
+        }.to_json
       )
       
-      # Create version file snapshots for all current files
-      create_version_file_snapshots(app_version, result[:files])
+      # No longer creating individual version files - using files_snapshot instead
       
       # Update preview worker with latest changes
       UpdatePreviewJob.perform_later(app.id)

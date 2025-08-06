@@ -1,12 +1,20 @@
 class Account::AppPreviewsController < Account::ApplicationController
   skip_before_action :verify_authenticity_token, only: [:serve_file]
+  skip_before_action :authenticate_user!, only: [:serve_file]
+  skip_before_action :ensure_onboarding_is_complete_and_set_next_step, only: [:serve_file]
   before_action :set_app
   before_action :set_permissive_csp
   
   def show
-    # Serve the main HTML file or index.html
-    # TODO: Serve from Cloudflare Workers w/ real NodeJS app
-    @html_file = @app.app_files.find_by(file_type: "html") || @app.app_files.find_by(path: "index.html")
+    # Get the requested page from params, default to index.html
+    requested_page = params[:page] || "index.html"
+    
+    # Find the HTML file by path
+    @html_file = @app.app_files.find_by(path: requested_page, file_type: "html")
+    
+    # Fall back to any HTML file if specific page not found
+    @html_file ||= @app.app_files.find_by(path: "index.html", file_type: "html")
+    @html_file ||= @app.app_files.find_by(file_type: "html")
     
     if @html_file
       render html: process_html_for_preview(@html_file.content).html_safe
@@ -63,26 +71,24 @@ class Account::AppPreviewsController < Account::ApplicationController
   private
   
   def set_app
-    @app = current_team.apps.find(params[:app_id])
+    # For serve_file action, we need to find the app without authentication
+    if action_name == 'serve_file'
+      # Use the obfuscated ID to find the app directly
+      @app = App.find(params[:app_id])
+    else
+      # For authenticated actions, use the team scope
+      @app = current_team.apps.find(params[:app_id])
+    end
   end
   
   def set_permissive_csp
-    # Set very permissive CSP for generated app content
-    # This allows inline styles and scripts which are common in generated apps
-    csp_header = [
-      "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:",
-      "style-src 'self' 'unsafe-inline' https: data:",
-      "font-src 'self' https: data:",
-      "img-src 'self' https: data: blob:",
-      "connect-src 'self' https: wss: ws: data:",
-      "frame-src 'self' https:",
-      "object-src 'none'",
-      "media-src 'self' https: data: blob:",
-      "worker-src 'self' blob:"
-    ].join('; ')
+    # Completely disable CSP to avoid any restrictions on generated apps
+    # This removes all Content Security Policy restrictions
+    response.headers.delete('Content-Security-Policy')
+    response.headers.delete('Content-Security-Policy-Report-Only')
     
-    response.headers['Content-Security-Policy'] = csp_header
+    # Also disable X-Frame-Options to allow embedding
+    response.headers['X-Frame-Options'] = 'ALLOWALL'
   end
   
   def process_html_for_preview(html)
@@ -92,12 +98,16 @@ class Account::AppPreviewsController < Account::ApplicationController
     # Replace script src references (including those with query params)
     html.gsub!(/src=["']([^"']+\.js(?:\?[^"']*)?)["']/) do |match|
       src = $1
+      # Skip external URLs
+      next match if src.start_with?('http://', 'https://', '//')
       %Q{src="#{file_account_app_preview_path(@app, path: src)}"}
     end
     
     # Replace link href references for CSS (including those with query params)
     html.gsub!(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/) do |match|
       href = $1
+      # Skip external URLs
+      next match if href.start_with?('http://', 'https://', '//')
       %Q{href="#{file_account_app_preview_path(@app, path: href)}"}
     end
     

@@ -1,0 +1,29 @@
+<% app = @app || @app %>
+<% context ||= app %>
+<% collection ||= :app_env_vars %>
+<% hide_actions ||= false %>
+<% hide_back ||= false %>
+
+<% with_attribute_settings object: app_env_var do %>
+  <tr data-id="<%= app_env_var.id %>">
+    <%= render "shared/tables/checkbox", object: app_env_var %>
+    <td><%= render 'shared/attributes/text', attribute: :key, url: [:account, app_env_var] %></td>
+    <td><%= render 'shared/attributes/text', attribute: :value %></td>
+    <td><%= render 'shared/attributes/text', attribute: :description %></td>
+    <td class="text-center"><%= render 'shared/attributes/option', attribute: :is_secret %></td>
+    <td class="text-center"><%= render 'shared/attributes/option', attribute: :is_system %></td>
+    <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <td><%= render 'shared/attributes/date_and_time', attribute: :created_at %></td>
+    <td class="buttons">
+      <% unless hide_actions %>
+        <% if can? :edit, app_env_var %>
+          <%= link_to t('.buttons.shorthand.edit'), [:edit, :account, app_env_var], class: 'button-secondary button-smaller' %>
+        <% end %>
+        <% if can? :destroy, app_env_var %>
+          <%= button_to t('.buttons.shorthand.destroy'), [:account, app_env_var], method: :delete, data: { turbo_confirm: t('.buttons.confirmations.destroy', model_locales(app_env_var)) }, class: 'button-secondary button-smaller' %>
+        <% end %>
+        <%# 🚅 super scaffolding will insert new action model buttons above this line. %>
+      <% end %>
+    </td>
+  </tr>
+<% end %>

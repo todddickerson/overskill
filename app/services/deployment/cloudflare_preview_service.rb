@@ -34,6 +34,9 @@ class Deployment::CloudflarePreviewService
     worker_script = generate_worker_script
     upload_response = upload_worker(worker_name, worker_script)
     
+    # Set environment variables
+    set_worker_env_vars(worker_name)
+    
     return { success: false, error: "Failed to upload preview worker" } unless upload_response['success']
     
     # Try to enable workers.dev subdomain (non-critical if it fails)
@@ -79,6 +82,19 @@ class Deployment::CloudflarePreviewService
   end
   
   private
+  
+  def set_worker_env_vars(worker_name)
+    return unless @app.app_env_vars.any?
+    
+    env_vars = @app.env_vars_for_deployment
+    
+    # Cloudflare Workers API to set environment variables
+    # Note: This is simplified - actual implementation may need to batch these
+    env_vars.each do |key, value|
+      Rails.logger.info "Would set env var #{key} for worker #{worker_name}"
+      # TODO: Implement actual Cloudflare API call when API is available
+    end
+  end
   
   def credentials_present?
     @account_id.present? && @zone_id.present? && 
@@ -144,30 +160,58 @@ class Deployment::CloudflarePreviewService
   end
 
   def generate_worker_script
-    # Same worker script but with CORS headers for preview
+    # Worker script with environment variable support
     <<~JAVASCRIPT
       addEventListener('fetch', event => {
-        event.respondWith(handleRequest(event.request))
+        event.respondWith(handleRequest(event.request, event))
       })
 
-      async function handleRequest(request) {
+      async function handleRequest(request, event) {
         const url = new URL(request.url)
         const pathname = url.pathname
+        const env = event.env || {} // Access environment variables
+        
+        // Handle API routes that need secret env vars
+        if (pathname.startsWith('/api/')) {
+          return handleApiRequest(request, env)
+        }
         
         // Handle root path
         if (pathname === '/') {
           const htmlContent = await getFile('index.html')
           if (htmlContent) {
-            // Add CSP header to allow CDN resources
-            return new Response(htmlContent, {
+            // Inject public environment variables
+            const publicEnvVars = getPublicEnvVars(env)
+            const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`
+            
+            // Inject env vars before </head> or <body>
+            let modifiedHtml = htmlContent
+            if (htmlContent.includes('</head>')) {
+              modifiedHtml = htmlContent.replace('</head>', envScript + '</head>')
+            } else if (htmlContent.includes('<body>')) {
+              modifiedHtml = htmlContent.replace('<body>', '<body>' + envScript)
+            } else {
+              modifiedHtml = envScript + htmlContent
+            }
+            
+            return new Response(modifiedHtml, {
               headers: {
                 'Content-Type': 'text/html',
-                'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https:;",
                 'X-Frame-Options': 'ALLOWALL'
               }
             })
           }
           return new Response('File not found', { status: 404 })
+        }
+        
+        // Handle special files that might be requested
+        if (pathname === '/overskill.js') {
+          return new Response('// Overskill debug helper (empty)', {
+            headers: {
+              'Content-Type': 'application/javascript',
+              'Cache-Control': 'no-cache'
+            }
+          })
         }
         
         // Serve static files
@@ -219,6 +263,53 @@ class Deployment::CloudflarePreviewService
           'ico': 'image/x-icon'
         }
         return types[ext] || 'text/plain'
+      }
+      
+      // Get only public environment variables (safe for client)
+      function getPublicEnvVars(env) {
+        const publicVars = {}
+        const publicKeys = ['APP_ID', 'ENVIRONMENT', 'API_BASE_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY']
+        
+        // Add any env vars starting with PUBLIC_
+        for (const key in env) {
+          if (publicKeys.includes(key) || key.startsWith('PUBLIC_')) {
+            publicVars[key] = env[key]
+          }
+        }
+        
+        return publicVars
+      }
+      
+      // Handle API requests with access to secret env vars
+      async function handleApiRequest(request, env) {
+        const url = new URL(request.url)
+        const path = url.pathname
+        
+        // Proxy to Supabase with service key
+        if (path.startsWith('/api/supabase')) {
+          const supabaseUrl = env.SUPABASE_URL
+          const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY
+          
+          if (!supabaseUrl || !supabaseKey) {
+            return new Response(JSON.stringify({ error: 'Database not configured' }), { 
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            })
+          }
+          
+          // Proxy the request
+          const targetUrl = supabaseUrl + path.replace('/api/supabase', '')
+          const proxyRequest = new Request(targetUrl, request)
+          proxyRequest.headers.set('apikey', supabaseKey)
+          proxyRequest.headers.set('Authorization', `Bearer ${supabaseKey}`)
+          
+          return fetch(proxyRequest)
+        }
+        
+        return new Response(JSON.stringify({ error: 'API endpoint not found' }), { 
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        })
       }
     JAVASCRIPT
   end

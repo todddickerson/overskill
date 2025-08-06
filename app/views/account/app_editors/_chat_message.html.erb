@@ -21,9 +21,9 @@
   <% else %>
     <!-- Assistant message - small icon + text -->
     <div class="flex items-start space-x-2">
-      <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-        <i class="fas fa-sparkles text-white" style="font-size: 10px;"></i>
-      </div>
+      <%= image_tag "overskill-logo.svg", 
+          alt: "OverSkill AI", 
+          class: "w-6 h-6 flex-shrink-0 mt-0.5" %>
       
       <div class="flex-1">
         <div class="text-sm leading-relaxed break-words text-gray-700 dark:text-gray-300" 
@@ -48,6 +48,9 @@
         <% end %>
       </div>
     </div>
+    
+    <!-- Unified Version Card (handles both progress and completed states) -->
+    <%= render "account/app_editors/unified_version_card", message: message, next_version_number: next_app_version_number(message.app) %>
     
     <!-- Check for What's next section and quick actions -->
     <% if message.role == 'assistant' && message.content.include?("What's next?") %>
@@ -102,65 +105,6 @@
           </div>
         </div>
       <% end %>
-    <% end %>
-  <% end %>
-  
-  <% if message.role == 'assistant' && message.status == 'completed' && message.app_version.present? %>
-    <% version = message.app_version %>
-    <% if version %>
-      <div class="ml-8 mt-3 relative group">
-        <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-          <!-- Version info -->
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center space-x-2">
-              <span class="text-sm font-medium text-gray-900 dark:text-gray-100"><%= version.formatted_display_name %></span>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                <%= time_ago_in_words(version.created_at) %> ago
-              </span>
-              <% if version.bookmarked? %>
-                <i class="fas fa-bookmark text-yellow-500 text-xs" title="Bookmarked"></i>
-              <% end %>
-            </div>
-          </div>
-          
-          <!-- Changelog content -->
-          <% if version.changelog.present? %>
-            <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
-              <%= version.changelog %>
-            </p>
-          <% end %>
-          
-          <!-- Files changed summary -->
-          <% file_changes = version.formatted_file_changes %>
-          <% if file_changes.any? %>
-            <div class="text-xs text-gray-500 dark:text-gray-500">
-              <%= file_changes.count %> file<%= 's' if file_changes.count > 1 %> changed
-            </div>
-          <% end %>
-        </div>
-        
-        <!-- Hover pill buttons -->
-        <div class="absolute -bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-          <div class="flex items-center space-x-1 bg-white dark:bg-gray-800 rounded-full shadow-md border border-gray-200 dark:border-gray-700 px-1.5 py-0.5">
-            <button onclick="window.postMessage({action: 'preview', version: '<%= version.id %>'}, '*')"
-                    class="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-2 py-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="Preview this version">
-              <i class="fas fa-eye text-xs"></i>
-            </button>
-            <button onclick="window.postMessage({action: 'compare', version: '<%= version.id %>'}, '*')"
-                    class="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-2 py-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="Compare with current">
-              <i class="fas fa-code-branch text-xs"></i>
-            </button>
-            <button data-action="click->version-actions#bookmark"
-                    data-version-actions-version-id-value="<%= version.id %>"
-                    class="text-xs <%= version.bookmarked? ? 'text-yellow-500' : 'text-gray-600 dark:text-gray-300' %> hover:text-yellow-500 px-2 py-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="<%= version.bookmarked? ? 'Remove bookmark' : 'Bookmark this version' %>">
-              <i class="fas fa-bookmark text-xs"></i>
-            </button>
-          </div>
-        </div>
-      </div>
     <% end %>
   <% end %>
 </div>

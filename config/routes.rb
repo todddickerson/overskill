@@ -20,6 +20,10 @@ Rails.application.routes.draw do
     # The root `/` path is routed to `Public::HomeController#index` by default. You can set it
     # to whatever you want by doing something like this:
     # root to: "my_new_root_controller#index"
+    
+    # Simple app generator - the main entry point
+    root to: "generator#index"
+    resources :generator, only: [:index, :create]
   end
 
   # Admin analytics dashboard (protected)
@@ -128,6 +132,12 @@ Rails.application.routes.draw do
             patch "files/:file_id", action: :update_file, as: :file
           end
           
+          # Version management actions
+          post :update_preview, controller: "app_editors"
+          post "versions/:version_id/restore", action: :restore_version, controller: "app_editors", as: :restore_version
+          post "versions/:version_id/bookmark", action: :bookmark_version, controller: "app_editors", as: :bookmark_version  
+          get "versions/:version_id/compare", action: :compare_version, controller: "app_editors", as: :compare_version
+          
           # Version list for history modal
           get :versions, controller: "app_editors"
           
@@ -196,6 +206,7 @@ Rails.application.routes.draw do
           resources :app_settings
           resources :app_security_policies
           resources :app_audit_logs
+          resources :app_env_vars
         end
       end
     end

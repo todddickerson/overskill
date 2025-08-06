@@ -3,6 +3,24 @@
   background-color: #2d3748;
 }
 
+/* CodeMirror container styling */
+[data-codemirror-target="editor"] {
+  min-height: 400px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* CodeMirror editor styling */
+.cm-editor {
+  height: 100%;
+  flex: 1;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
 /* Code editor syntax highlighting (basic) */
 .code-editor textarea {
   tab-size: 2;

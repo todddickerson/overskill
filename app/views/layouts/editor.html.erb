@@ -98,8 +98,34 @@
         }
       }
     </style>
+    <script>
+      // Immediate error prevention to stop page from going blank
+      (function() {
+        // Override document.write immediately
+        const originalWrite = document.write;
+        document.write = function(content) {
+          console.warn('[Early] Blocked document.write:', content.substring(0, 50));
+          if (content.includes('@ungap/custom-elements-builtin')) {
+            // Already loaded via script tag
+            return;
+          }
+          if (document.readyState === 'complete') {
+            originalWrite.call(document, content);
+          }
+        };
+        
+        // Catch early errors
+        window.addEventListener('error', function(e) {
+          if (e.message && (e.message.includes('chrome-extension://') || 
+                           e.message.includes('document.write'))) {
+            e.preventDefault();
+            console.warn('[Early] Suppressed error:', e.message);
+          }
+        }, true);
+      })();
+    </script>
   </head>
-  <body class="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-slate-300 text-sm font-normal transition-colors duration-200 overflow-hidden" data-controller="theme">
+  <body class="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-slate-300 text-sm font-normal transition-colors duration-200 overflow-hidden" data-controller="theme error-handler">
     <div class="h-full flex flex-col">
       <%= yield %>
     </div>

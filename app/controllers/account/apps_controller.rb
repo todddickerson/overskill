@@ -13,7 +13,10 @@ class Account::AppsController < Account::ApplicationController
   # GET /account/apps/:id
   # GET /account/apps/:id.json
   def show
-    delegate_json_to_api
+    respond_to do |format|
+      format.html { redirect_to account_app_editor_path(@app) }
+      format.json { delegate_json_to_api }
+    end
   end
 
   # GET /account/teams/:team_id/apps/new
@@ -40,7 +43,8 @@ class Account::AppsController < Account::ApplicationController
           AppGenerationJob.perform_later(generation)
         end
 
-        format.html { redirect_to [:account, @app], notice: I18n.t("apps.notifications.created") }
+        # Redirect to editor for new apps
+        format.html { redirect_to account_app_editor_path(@app), notice: I18n.t("apps.notifications.created") }
         format.json { render :show, status: :created, location: [:account, @app] }
       else
         format.html { render :new, status: :unprocessable_entity }

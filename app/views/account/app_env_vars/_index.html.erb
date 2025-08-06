@@ -1,0 +1,66 @@
+<% app_env_vars = app_env_vars.accessible_by(current_ability) %>
+<% app = @app %>
+<% context ||= app %>
+<% collection ||= :app_env_vars %>
+<% hide_actions ||= false %>
+<% hide_back ||= false %>
+
+<% pagy ||= nil %>
+<% pagy, app_env_vars = pagy(app_env_vars, page_param: :app_env_vars_page) unless pagy %>
+
+<%= action_model_select_controller do %>
+  <% cable_ready_updates_for context, collection do %>
+    <%= render 'account/shared/box', pagy: pagy do |box| %>
+      <% box.title t(".contexts.#{context.class.name.underscore}.header") %>
+      <% box.description do %>
+        <%= t(".contexts.#{context.class.name.underscore}.description#{"_empty" unless app_env_vars.any?}") %>
+        <%= render "shared/limits/index", model: app_env_vars.model %>
+      <% end %>
+
+      <% box.table do %>
+        <% if app_env_vars.any? %>
+          <table class="table">
+            <thead>
+              <tr>
+                <%= render "shared/tables/select_all" %>
+                <th><%= t('.fields.key.heading') %></th>
+                <th><%= t('.fields.value.heading') %></th>
+                <th><%= t('.fields.description.heading') %></th>
+                <th  class="text-center"><%= t('.fields.is_secret.heading') %></th>
+                <th  class="text-center"><%= t('.fields.is_system.heading') %></th>
+                <%# 🚅 super scaffolding will insert new field headers above this line. %>
+                <th><%= t('.fields.created_at.heading') %></th>
+                <th class="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= render partial: 'account/app_env_vars/app_env_var', collection: app_env_vars %>
+            </tbody>
+          </table>
+        <% end %>
+      <% end %>
+
+      <% box.actions do %>
+        <% unless hide_actions %>
+          <% if context == app %>
+            <% if can? :create, AppEnvVar.new(app: app) %>
+              <%= link_to t('.buttons.new'), [:new, :account, app, :app_env_var], class: "#{first_button_primary(:app_env_var)} new" %>
+            <% end %>
+          <% end %>
+
+          <%# 🚅 super scaffolding will insert new targets one parent action model buttons above this line. %>
+          <%# 🚅 super scaffolding will insert new bulk action model buttons above this line. %>
+          <%= render "shared/bulk_action_select" if app_env_vars.any? %>
+
+          <% unless hide_back %>
+            <%= link_to t('global.buttons.back'), [:account, context], class: "#{first_button_primary(:app_env_var)} back" %>
+          <% end %>
+        <% end %>
+      <% end %>
+
+      <% box.raw_footer do %>
+        <%# 🚅 super scaffolding will insert new action model index views above this line. %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

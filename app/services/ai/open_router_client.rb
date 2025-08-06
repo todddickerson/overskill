@@ -4,13 +4,18 @@ module Ai
     base_uri ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
     MODELS = {
-      kimi_k2: "moonshotai/kimi-k2",  # Main model for app generation
+      claude_4: "anthropic/claude-sonnet-4", # Claude 4 Sonnet - latest and most capable
+      claude_opus_4_1: "anthropic/claude-opus-4.1", # Claude Opus 4.1 for high-quality evaluation
+      claude_sonnet: "anthropic/claude-3.5-sonnet-20241022", # Claude 3.5 Sonnet with function calling
+      claude_sonnet_june: "anthropic/claude-3.5-sonnet-20240620", # June 2024 version
+      claude_3_7: "anthropic/claude-3.7-sonnet", # Claude 3.7 if available
+      openai_o4_mini: "openai/o4-mini-high", # OpenAI O4 Mini for alternative perspective
+      kimi_k2: "moonshotai/kimi-k2",  # TODO: Re-evaluate when OpenRouter fixes function calling support
       deepseek_v3: "deepseek/deepseek-chat",  # Fallback model
-      gemini_flash: "google/gemini-1.5-flash", # Quick tasks
-      claude_sonnet: "anthropic/claude-3.5-sonnet" # High quality tasks
+      gemini_flash: "google/gemini-1.5-flash" # Quick tasks
     }.freeze
 
-    DEFAULT_MODEL = :kimi_k2
+    DEFAULT_MODEL = :claude_4  # Use Claude 4 Sonnet for best results
 
     def initialize(api_key = nil)
       @api_key = api_key || ENV.fetch("OPENROUTER_API_KEY")
@@ -85,6 +90,61 @@ module Ai
       }
     end
 
+    def stream_chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: 16000, &block)
+      model_id = MODELS[model] || model
+      
+      body = {
+        model: model_id,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: max_tokens,
+        stream: true  # Enable streaming
+      }
+      
+      Rails.logger.info "[AI] Starting streaming chat with model: #{model_id}"
+      
+      uri = URI.parse("https://openrouter.ai/api/v1/chat/completions")
+      
+      Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
+        request = Net::HTTP::Post.new(uri.path)
+        request['Authorization'] = "Bearer #{@api_key}"
+        request['Content-Type'] = 'application/json'
+        request['HTTP-Referer'] = 'https://overskill.com'
+        request['X-Title'] = 'OverSkill App Generation'
+        request.body = body.to_json
+        
+        http.request(request) do |response|
+          response.read_body do |chunk|
+            # Parse SSE chunks
+            chunk.split("\n").each do |line|
+              next unless line.start_with?("data: ")
+              
+              data = line[6..-1].strip
+              next if data == "[DONE]"
+              
+              begin
+                json = JSON.parse(data)
+                content = json.dig("choices", 0, "delta", "content")
+                
+                if content
+                  # Yield the content chunk to the block
+                  block.call(content)
+                end
+              rescue JSON::ParserError => e
+                Rails.logger.warn "[AI] Failed to parse streaming chunk: #{e.message}"
+              end
+            end
+          end
+        end
+      end
+      
+      Rails.logger.info "[AI] Streaming completed"
+      { success: true }
+    rescue => e
+      Rails.logger.error "[AI] Streaming error: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
     def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: 8000)
       model_id = MODELS[model] || model
 
@@ -130,28 +190,15 @@ module Ai
         # Check if the model used function calling
         tool_calls = message&.dig("tool_calls")
         
-        if tool_calls&.any?
-          Rails.logger.info "[AI] Function calls detected: #{tool_calls.length}"
-          
-          {
-            success: true,
-            content: message["content"],
-            tool_calls: tool_calls,
-            usage: usage,
-            model: model_id
-          }
-        else
-          # No function calls - this might be an issue with the model
-          Rails.logger.warn "[AI] No function calls in response for model #{model_id}"
-          
-          {
-            success: false,
-            error: "Model did not use function calling",
-            content: message&.dig("content"),
-            usage: usage,
-            model: model_id
-          }
-        end
+        # Return successful response regardless of whether tools were called
+        # The AI might choose not to use tools, which is valid
+        {
+          success: true,
+          content: message&.dig("content") || "",
+          tool_calls: tool_calls || [],  # Return empty array if no tool calls
+          usage: usage,
+          model: model_id
+        }
       else
         Rails.logger.error "[AI] OpenRouter error: #{response.code} - #{response.body}"
         {
@@ -236,32 +283,19 @@ module Ai
         }
       ]
 
-      # Try Kimi K2 first for cost savings, fallback to Claude Sonnet if function calling fails
-      Rails.logger.info "[AI] Attempting Kimi K2 function calling for cost efficiency"
-      result = chat_with_tools(messages, tools, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
+      # Use Claude 4 Sonnet for best function calling
+      Rails.logger.info "[AI] Using Claude 4 Sonnet for reliable function calling"
+      result = chat_with_tools(messages, tools, model: :claude_4, temperature: 0.7, max_tokens: 16000)
       
-      # Enhanced error detection for OpenRouter Kimi K2 issues
-      kimi_failed = false
-      if !result[:success]
-        Rails.logger.error "[AI] Kimi K2 API call failed: #{result[:error]}"
-        kimi_failed = true
-      elsif !result[:tool_calls]&.any?
-        Rails.logger.error "[AI] Kimi K2 did not return function calls - OpenRouter issue detected"
-        kimi_failed = true
-      elsif result[:content]&.include?("```json")
-        Rails.logger.error "[AI] Kimi K2 returned JSON in content instead of function call - OpenRouter function calling broken"
-        kimi_failed = true
-      end
-      
-      # Fallback to Claude Sonnet if Kimi K2 has issues
-      if kimi_failed
-        Rails.logger.warn "[AI] Kimi K2 OpenRouter function calling unreliable, falling back to Claude Sonnet"
+      # Check if function calling was successful
+      if result[:success] && result[:tool_calls]&.any?
+        Rails.logger.info "[AI] Claude 4 Sonnet function calling successful!"
+      else
+        Rails.logger.warn "[AI] Claude 4 function calling failed, trying Claude 3.5 Sonnet"
         result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
         
         # Track the fallback for monitoring
-        Rails.logger.info "[AI] Claude Sonnet fallback result: success=#{result[:success]}, tool_calls=#{result[:tool_calls]&.any?}"
-      else
-        Rails.logger.info "[AI] Kimi K2 function calling successful!"
+        Rails.logger.info "[AI] Claude Sonnet 3.5 fallback result: success=#{result[:success]}, tool_calls=#{result[:tool_calls]&.any?}"
       end
       
       result
@@ -313,12 +347,12 @@ module Ai
         }
       ]
 
-      # Try Kimi K2 first, fallback to Claude Sonnet if needed
-      result = chat_with_tools(messages, tools, model: :kimi_k2, temperature: 0.7, max_tokens: 8000)
+      # Use Claude 4 Sonnet as primary model with increased token limit for complex apps
+      result = chat_with_tools(messages, tools, model: :claude_4, temperature: 0.7, max_tokens: 16000)
       
       if !result[:success] || !result[:tool_calls]&.any?
-        Rails.logger.warn "[AI] Kimi K2 app update function calling failed, falling back to Claude Sonnet"
-        result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 8000)
+        Rails.logger.warn "[AI] Claude 4 app update function calling failed, trying Claude 3.5 Sonnet"
+        result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
       end
       
       result
@@ -330,7 +364,7 @@ module Ai
         {role: "user", content: build_analysis_prompt(request, current_files, app_context)}
       ]
       
-      response = chat(messages, model: :kimi_k2, temperature: 0.3, max_tokens: 2000)
+      response = chat(messages, model: :claude_sonnet, temperature: 0.3, max_tokens: 2000)
       
       if response[:success]
         begin

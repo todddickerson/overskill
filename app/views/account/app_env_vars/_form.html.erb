@@ -1,0 +1,20 @@
+<% cancel_path ||= app_env_var.persisted? ? [:account, app_env_var] : [:account, @app, :app_env_vars] %>
+
+<%= form_with model: app_env_var, url: (app_env_var.persisted? ? [:account, app_env_var] : [:account, @app, :app_env_vars]), class: 'form' do |form| %>
+  <%= render "shared/limits/form", form: form, cancel_path: cancel_path do %>
+    <%= render 'account/shared/forms/errors', form: form %>
+
+    <% with_field_settings form: form do %>
+      <%= render 'shared/fields/text_field', method: :key, options: {autofocus: true} %>
+      <%= render 'shared/fields/text_field', method: :value %>
+      <%= render 'shared/fields/text_field', method: :description %>
+      <%= render 'shared/fields/options', method: :is_secret %>
+      <%# 🚅 super scaffolding will insert new fields above this line. %>
+    <% end %>
+
+    <div class="buttons">
+      <%= form.submit (form.object.persisted? ? t('.buttons.update') : t('.buttons.create')), class: "button" %>
+      <%= link_to t('global.buttons.cancel'), cancel_path, class: "button-secondary" %>
+    </div>
+  <% end %>
+<% end %>

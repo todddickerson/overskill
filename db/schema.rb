@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_05_201304) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_06_184700) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -228,6 +228,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_05_201304) do
     t.index ["app_id"], name: "index_app_domains_on_app_id"
   end
 
+  create_table "app_env_vars", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "key"
+    t.string "value"
+    t.string "description"
+    t.boolean "is_secret", default: false
+    t.boolean "is_system", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_env_vars_on_app_id"
+  end
+
   create_table "app_files", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "app_id", null: false
@@ -277,6 +289,29 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_05_201304) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["app_id"], name: "index_app_o_auth_providers_on_app_id"
+  end
+
+  create_table "app_oauth_providers", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.bigint "team_id", null: false
+    t.string "provider_type", null: false
+    t.string "client_id", null: false
+    t.text "client_secret"
+    t.string "authorization_endpoint"
+    t.string "token_endpoint"
+    t.string "scope"
+    t.text "refresh_token"
+    t.text "access_token"
+    t.datetime "token_expires_at"
+    t.boolean "enabled", default: true, null: false
+    t.jsonb "settings", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id", "provider_type"], name: "index_app_oauth_providers_on_app_id_and_provider_type", unique: true
+    t.index ["app_id"], name: "index_app_oauth_providers_on_app_id"
+    t.index ["enabled"], name: "index_app_oauth_providers_on_enabled"
+    t.index ["provider_type"], name: "index_app_oauth_providers_on_provider_type"
+    t.index ["team_id"], name: "index_app_oauth_providers_on_team_id"
   end
 
   create_table "app_security_policies", force: :cascade do |t|
@@ -781,11 +816,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_05_201304) do
   add_foreign_key "app_collaborators", "memberships"
   add_foreign_key "app_collaborators", "teams"
   add_foreign_key "app_domains", "apps"
+  add_foreign_key "app_env_vars", "apps"
   add_foreign_key "app_files", "apps"
   add_foreign_key "app_files", "teams"
   add_foreign_key "app_generations", "apps"
   add_foreign_key "app_generations", "teams"
   add_foreign_key "app_o_auth_providers", "apps"
+  add_foreign_key "app_oauth_providers", "apps"
+  add_foreign_key "app_oauth_providers", "teams"
   add_foreign_key "app_security_policies", "apps"
   add_foreign_key "app_settings", "apps"
   add_foreign_key "app_table_columns", "app_tables"

@@ -20,6 +20,17 @@ module ApplicationHelper
     end
   end
   
+  def next_app_version_number(app)
+    last_version = app.app_versions.order(created_at: :desc).first
+    if last_version
+      parts = last_version.version_number.split(".")
+      parts[-1] = (parts[-1].to_i + 1).to_s
+      parts.join(".")
+    else
+      "1.0.0"
+    end
+  end
+  
   def organize_files_into_tree(files)
     tree = {}
     

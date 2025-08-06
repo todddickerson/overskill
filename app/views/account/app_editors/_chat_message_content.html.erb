@@ -1,0 +1,40 @@
+<div id="message_content_<%= message.id %>" class="message-content prose prose-sm dark:prose-invert max-w-none">
+  <% if message.status == "executing" %>
+    <!-- Show animated indicator for executing status -->
+    <div class="flex items-start space-x-2">
+      <div class="animate-pulse">
+        <% if message.content.include?("📝") %>
+          <span class="text-lg">📝</span>
+        <% elsif message.content.include?("🔍") %>
+          <span class="text-lg">🔍</span>
+        <% elsif message.content.include?("📋") %>
+          <span class="text-lg">📋</span>
+        <% elsif message.content.include?("⚡") %>
+          <span class="text-lg">⚡</span>
+        <% elsif message.content.include?("✅") %>
+          <span class="text-lg">✅</span>
+        <% else %>
+          <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+        <% end %>
+      </div>
+      <div class="flex-1">
+        <%= simple_format(message.content) %>
+      </div>
+    </div>
+  <% else %>
+    <!-- Regular message display -->
+    <%= simple_format(message.content) %>
+  <% end %>
+  
+  <% if message.status == "failed" %>
+    <div class="mt-2 text-xs text-red-600 dark:text-red-400">
+      <i class="fas fa-exclamation-circle mr-1"></i>
+      Failed
+    </div>
+  <% elsif message.status == "completed" %>
+    <div class="mt-2 text-xs text-green-600 dark:text-green-400">
+      <i class="fas fa-check-circle mr-1"></i>
+      Completed
+    </div>
+  <% end %>
+</div>

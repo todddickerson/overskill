@@ -15,8 +15,16 @@
     return;
   }
 
+  // Environment variables injected by Cloudflare Workers
+  window.ENV = window.ENV || {};
+  
+  // Helper function to get environment variables
+  window.getEnv = function(key, defaultValue = '') {
+    return window.ENV[key] || defaultValue;
+  };
+
   window.OverSkill = {
-    version: '1.0.0',
+    version: '1.1.0',
     
     /**
      * Cross-frame communication with OverSkill editor
@@ -265,6 +273,67 @@
           element.style.backgroundColor = '';
           OverSkill.selection.currentHighlight = null;
         }
+      }
+    },
+    
+    /**
+     * Environment variable utilities
+     */
+    env: {
+      /**
+       * Get environment variable value
+       * @param {string} key - Environment variable key
+       * @param {*} defaultValue - Default value if not found
+       * @returns {*} Environment variable value
+       */
+      get: function(key, defaultValue = '') {
+        return window.getEnv(key, defaultValue);
+      },
+      
+      /**
+       * Get all available environment variables
+       * @returns {Object} All environment variables
+       */
+      getAll: function() {
+        return window.ENV || {};
+      },
+      
+      /**
+       * Check if environment variable exists
+       * @param {string} key - Environment variable key
+       * @returns {boolean} True if exists
+       */
+      has: function(key) {
+        return window.ENV && window.ENV.hasOwnProperty(key);
+      },
+      
+      /**
+       * Get Supabase configuration if available
+       * @returns {Object|null} Supabase config or null
+       */
+      getSupabaseConfig: function() {
+        const url = this.get('SUPABASE_URL');
+        const key = this.get('SUPABASE_ANON_KEY');
+        
+        if (!url || !key) {
+          console.warn('[OverSkill] Supabase credentials not configured');
+          return null;
+        }
+        
+        return { url, key };
+      },
+      
+      /**
+       * Get API configuration
+       * @returns {Object} API configuration
+       */
+      getApiConfig: function() {
+        return {
+          baseUrl: this.get('API_BASE_URL', '/api'),
+          apiKey: this.get('API_KEY'),
+          appId: this.get('APP_ID'),
+          environment: this.get('ENVIRONMENT', 'development')
+        };
       }
     },
     

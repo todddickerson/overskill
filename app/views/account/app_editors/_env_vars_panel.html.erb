@@ -1,0 +1,214 @@
+<div class="p-4 sm:p-6 max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-6">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+        Environment Variables
+      </h2>
+      <button class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
+              data-controller="env-var-modal"
+              data-action="click->env-var-modal#open">
+        <i class="fas fa-plus mr-2"></i>
+        Add Variable
+      </button>
+    </div>
+    <p class="text-sm text-gray-600 dark:text-gray-400">
+      Configure environment variables that will be available to your app in Cloudflare Workers.
+    </p>
+  </div>
+
+  <!-- Environment Variables List -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="divide-y divide-gray-200 dark:divide-gray-700">
+      <% if app.app_env_vars.any? %>
+        <% app.app_env_vars.order(:is_system, :key).each do |env_var| %>
+          <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+               data-controller="env-var-item"
+               data-env-var-item-id-value="<%= env_var.id %>">
+            <div class="flex items-start justify-between">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center space-x-3 mb-1">
+                  <span class="font-mono text-sm font-medium text-gray-900 dark:text-white">
+                    <%= env_var.key %>
+                  </span>
+                  <% if env_var.is_system? %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                      System
+                    </span>
+                  <% end %>
+                  <% if env_var.is_secret? %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                      <i class="fas fa-lock mr-1"></i>
+                      Secret
+                    </span>
+                  <% end %>
+                </div>
+                
+                <!-- Value Display -->
+                <div class="mb-2">
+                  <code class="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">
+                    <%= env_var.display_value %>
+                  </code>
+                </div>
+                
+                <% if env_var.description.present? %>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">
+                    <%= env_var.description %>
+                  </p>
+                <% end %>
+              </div>
+              
+              <!-- Actions -->
+              <div class="flex items-center space-x-2 ml-4">
+                <% unless env_var.is_system? %>
+                  <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          data-action="click->env-var-item#edit"
+                          title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                          data-action="click->env-var-item#delete"
+                          data-turbo-method="delete"
+                          data-turbo-confirm="Are you sure you want to delete this environment variable?"
+                          title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <!-- Empty State -->
+        <div class="p-8 text-center">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+            <i class="fas fa-key text-2xl text-gray-400"></i>
+          </div>
+          <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-1">
+            No environment variables
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Add environment variables to configure your app's runtime settings.
+          </p>
+          <button class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
+                  data-controller="env-var-modal"
+                  data-action="click->env-var-modal#open">
+            <i class="fas fa-plus mr-2"></i>
+            Add Your First Variable
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Info Box -->
+  <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+    <div class="flex">
+      <div class="flex-shrink-0">
+        <i class="fas fa-info-circle text-blue-400 mt-0.5"></i>
+      </div>
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">
+          About Environment Variables
+        </h3>
+        <div class="mt-2 text-sm text-blue-700 dark:text-blue-300 space-y-1">
+          <p>• Environment variables are securely deployed to Cloudflare Workers</p>
+          <p>• Access them in your code using <code class="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">window.getEnv('KEY')</code></p>
+          <p>• System variables are managed automatically and cannot be edited</p>
+          <p>• Secret values are masked in the UI but deployed securely</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="hidden" data-env-var-modal-target="modal">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50"></div>
+  <div class="fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+        <form data-env-var-modal-target="form"
+              data-turbo-frame="_top"
+              action="<%= account_app_app_env_vars_path(app) %>"
+              method="post">
+          <%= csrf_meta_tags %>
+          
+          <div class="mb-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+              Add Environment Variable
+            </h3>
+          </div>
+          
+          <div class="space-y-4">
+            <!-- Key Input -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Variable Name
+              </label>
+              <input type="text"
+                     name="app_env_var[key]"
+                     placeholder="API_KEY"
+                     required
+                     pattern="[A-Z][A-Z0-9_]*"
+                     class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                     data-env-var-modal-target="keyInput">
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Use uppercase letters, numbers, and underscores only
+              </p>
+            </div>
+            
+            <!-- Value Input -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Value
+              </label>
+              <input type="text"
+                     name="app_env_var[value]"
+                     required
+                     class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                     data-env-var-modal-target="valueInput">
+            </div>
+            
+            <!-- Description Input -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description <span class="text-gray-400">(optional)</span>
+              </label>
+              <input type="text"
+                     name="app_env_var[description]"
+                     placeholder="What this variable is used for"
+                     class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500">
+            </div>
+            
+            <!-- Is Secret Checkbox -->
+            <div>
+              <label class="flex items-center">
+                <input type="checkbox"
+                       name="app_env_var[is_secret]"
+                       value="1"
+                       class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500">
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                  Mark as secret (value will be masked in UI)
+                </span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Modal Actions -->
+          <div class="mt-6 flex justify-end space-x-3">
+            <button type="button"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    data-action="click->env-var-modal#close">
+              Cancel
+            </button>
+            <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md">
+              Add Variable
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

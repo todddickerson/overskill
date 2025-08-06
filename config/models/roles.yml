@@ -1,5 +1,6 @@
 default:
   models:
+    AppEnvVar: read
     AppAuditLog: read
     AppCollaborator: read
     AppVersion: read
@@ -42,6 +43,7 @@ admin:
     - admin
     - editor
   models:
+    AppEnvVar: manage
     AppAuditLog: manage
     AppCollaborator: manage
     AppVersion: manage

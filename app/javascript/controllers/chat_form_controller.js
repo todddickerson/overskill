@@ -12,10 +12,14 @@ export default class extends Controller {
     this.boundBeforeSubmit = this.beforeSubmit.bind(this)
     this.boundAfterSubmit = this.afterSubmit.bind(this)
     this.boundStreamRender = this.handleStreamRender.bind(this)
+    this.boundHandleError = this.handleError.bind(this)
+    this.boundHandleComplete = this.handleComplete.bind(this)
     
     document.addEventListener('turbo:submit-start', this.boundBeforeSubmit)
     document.addEventListener('turbo:submit-end', this.boundAfterSubmit)
     document.addEventListener('turbo:before-stream-render', this.boundStreamRender)
+    document.addEventListener('chat:error', this.boundHandleError)
+    document.addEventListener('chat:complete', this.boundHandleComplete)
     
     // Initialize timeout tracking
     this.processingTimeout = null
@@ -26,6 +30,8 @@ export default class extends Controller {
     document.removeEventListener('turbo:submit-start', this.boundBeforeSubmit)
     document.removeEventListener('turbo:submit-end', this.boundAfterSubmit)
     document.removeEventListener('turbo:before-stream-render', this.boundStreamRender)
+    document.removeEventListener('chat:error', this.boundHandleError)
+    document.removeEventListener('chat:complete', this.boundHandleComplete)
     
     // Clear any existing timeout
     if (this.processingTimeout) {
@@ -36,7 +42,31 @@ export default class extends Controller {
   checkProcessingState() {
     // Check if there's any assistant message with status 'planning', 'executing', or 'generating'
     const processingMessages = document.querySelectorAll('[data-message-status="planning"], [data-message-status="executing"], [data-message-status="generating"]')
-    this.processingValue = processingMessages.length > 0
+    
+    // Also check for failed or completed messages to ensure we're not stuck
+    const failedMessages = document.querySelectorAll('[data-message-status="failed"]')
+    const completedMessages = document.querySelectorAll('[data-message-status="completed"]')
+    
+    // If we have failed or completed messages and no processing messages, we're not processing
+    if ((failedMessages.length > 0 || completedMessages.length > 0) && processingMessages.length === 0) {
+      this.processingValue = false
+    } else {
+      this.processingValue = processingMessages.length > 0
+    }
+  }
+  
+  handleError(event) {
+    console.log('Chat error event received:', event.detail)
+    // Force enable the form when an error occurs
+    this.processingValue = false
+    this.enable()
+  }
+  
+  handleComplete(event) {
+    console.log('Chat complete event received')
+    // Enable the form when generation is complete
+    this.processingValue = false
+    this.enable()
   }
   
   beforeSubmit(event) {
@@ -167,25 +197,51 @@ export default class extends Controller {
   handleKeydown(event) {
     console.log('Keydown event:', event.key, 'Meta:', event.metaKey, 'Ctrl:', event.ctrlKey)
     
-    // Check for cmd+enter or ctrl+enter (Mac uses metaKey, Windows/Linux use ctrlKey)
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+    // Check for cmd+enter (Mac) or ctrl+enter (Windows/Linux)
+    // On Mac, we want to accept ONLY metaKey (Cmd), not ctrlKey
+    // On Windows/Linux, we accept ctrlKey
+    // However, we'll be flexible and accept either to ensure it works
+    const isSubmitShortcut = (event.metaKey || event.ctrlKey) && event.key === 'Enter'
+    
+    if (isSubmitShortcut) {
       console.log('Cmd/Ctrl+Enter detected, triggering form submission...')
       event.preventDefault() // Prevent default textarea behavior
+      event.stopPropagation() // Stop event from bubbling
+      
+      // Don't submit if already processing
+      if (this.processingValue) {
+        console.log('Already processing, ignoring keyboard shortcut')
+        return
+      }
+      
+      // Check if the current textarea has content
+      const currentTextarea = event.target
+      if (!currentTextarea.value.trim()) {
+        console.log('No content in textarea, ignoring keyboard shortcut')
+        return
+      }
       
       // Find the form element and submit it
       const form = this.element
       if (form && form.tagName === 'FORM') {
         console.log('Submitting form via requestSubmit...')
-        // Directly call the submit method to trigger the form submission
-        this.submit(event)
+        
+        // Use requestSubmit for proper form validation and Turbo handling
         if (form.requestSubmit) {
-          form.requestSubmit()
+          // Find the submit button and use it for requestSubmit
+          const submitButton = this.hasSubmitTarget ? this.submitTarget : form.querySelector('[type="submit"]')
+          if (submitButton) {
+            form.requestSubmit(submitButton)
+          } else {
+            form.requestSubmit()
+          }
         } else {
-          // Fallback for older browsers
+          // Fallback for older browsers - click the submit button
           const submitButton = this.hasSubmitTarget ? this.submitTarget : form.querySelector('[type="submit"]')
           if (submitButton) {
             submitButton.click()
           } else {
+            // Last resort - direct form submission
             form.submit()
           }
         }
@@ -193,45 +249,6 @@ export default class extends Controller {
     }
   }
   
-  // Handle submit button click
-  handleSubmitClick(event) {
-    console.log('Submit button clicked')
-    
-    // Don't prevent default here - let the button work naturally
-    // The validation will happen in the submit handler
-    
-    // Don't submit if already processing
-    if (this.processingValue) {
-      console.log('Already processing, preventing submission')
-      event.preventDefault()
-      event.stopPropagation()
-      return
-    }
-    
-    // Don't submit if no visible textarea has content
-    const visibleTextarea = this.textareaTargets.find(textarea => {
-      // Check if the textarea is in a visible container
-      const desktopContainer = textarea.closest('.hidden.lg\\:block')
-      const mobileContainer = textarea.closest('.lg\\:hidden')
-      
-      // Determine if visible based on screen size
-      const isDesktop = window.innerWidth >= 1024
-      const isVisible = isDesktop ? desktopContainer : mobileContainer
-      
-      console.log(`Checking textarea visibility - isDesktop: ${isDesktop}, hasValue: ${!!textarea.value.trim()}, value: "${textarea.value}"`)
-      return isVisible && textarea.value.trim()
-    })
-    
-    if (!visibleTextarea) {
-      console.log('No visible textarea with content, preventing submission')
-      event.preventDefault()
-      event.stopPropagation()
-      return
-    }
-    
-    console.log('Submit validation passed, allowing form to submit naturally')
-    // Don't call preventDefault - let the button submit the form naturally
-  }
 
   // Handle form submission
   submit(event) {
@@ -260,23 +277,11 @@ export default class extends Controller {
       return
     }
     
-    // Don't submit if no visible textarea has content
-    const visibleTextarea = this.textareaTargets.find(textarea => {
-      // Check if the textarea is in a visible container
-      const desktopContainer = textarea.closest('.hidden.lg\\:block')
-      const mobileContainer = textarea.closest('.lg\\:hidden')
-      
-      // Determine if visible based on screen size
-      const isDesktop = window.innerWidth >= 1024
-      const isVisible = isDesktop ? desktopContainer : mobileContainer
-      
-      console.log(`Checking textarea visibility - isDesktop: ${isDesktop}, hasValue: ${!!textarea.value.trim()}, value: "${textarea.value}"`)
-      return isVisible && textarea.value.trim()
-    })
+    // Check if any textarea has content (Rails will handle which one to use based on parameter names)
+    const hasContent = this.textareaTargets.some(textarea => textarea.value.trim())
     
-    if (!visibleTextarea) {
-      console.log('No visible textarea with content, preventing submission')
-      console.log('All textarea values:', this.textareaTargets.map(t => t.value))
+    if (!hasContent) {
+      console.log('No content to submit, preventing submission')
       if (event) event.preventDefault()
       return
     }
