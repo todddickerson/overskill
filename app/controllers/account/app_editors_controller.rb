@@ -131,7 +131,8 @@ class Account::AppEditorsController < Account::ApplicationController
   end
 
   def message_params
-    params.require(:app_chat_message).permit(:content)
+    content = params.require(:app_chat_message)[:content] || params.require(:app_chat_message)[:content_mobile]
+    { content: content }
   end
 
   def next_version_number(app)

@@ -111,12 +111,12 @@ export default class extends Controller {
   }
   
   disable() {
-    // Disable textarea
-    if (this.hasTextareaTarget) {
-      this.textareaTarget.disabled = true
-      this.textareaTarget.placeholder = "Waiting for response..."
-      this.textareaTarget.classList.add('opacity-50', 'cursor-not-allowed')
-    }
+    // Disable all textareas
+    this.textareaTargets.forEach(textarea => {
+      textarea.disabled = true
+      textarea.placeholder = "Waiting for response..."
+      textarea.classList.add('opacity-50', 'cursor-not-allowed')
+    })
     
     // Disable submit button
     if (this.hasSubmitTarget) {
@@ -133,12 +133,20 @@ export default class extends Controller {
   }
   
   enable() {
-    // Enable textarea
-    if (this.hasTextareaTarget) {
-      this.textareaTarget.disabled = false
-      this.textareaTarget.placeholder = "Tell me what you'd like to change..."
-      this.textareaTarget.classList.remove('opacity-50', 'cursor-not-allowed')
-      this.textareaTarget.focus()
+    // Enable all textareas
+    this.textareaTargets.forEach(textarea => {
+      textarea.disabled = false
+      const isDesktop = textarea.closest('.hidden')
+      textarea.placeholder = isDesktop ? "Ask AI to help with your app..." : "Ask Overskill..."
+      textarea.classList.remove('opacity-50', 'cursor-not-allowed')
+    })
+    
+    // Focus the visible textarea
+    const visibleTextarea = this.textareaTargets.find(textarea => 
+      !textarea.closest('.hidden') && !textarea.closest('.lg\\:hidden')
+    )
+    if (visibleTextarea) {
+      visibleTextarea.focus()
     }
     
     // Enable submit button
@@ -194,9 +202,14 @@ export default class extends Controller {
       return
     }
     
-    // Don't submit if textarea is empty or doesn't exist
-    if (!this.hasTextareaTarget || !this.textareaTarget.value.trim()) {
-      console.log('No textarea or empty value, preventing submission')
+    // Don't submit if no visible textarea has content
+    const visibleTextarea = this.textareaTargets.find(textarea => {
+      const parent = textarea.closest('.hidden, .lg\\:hidden')
+      return !parent && textarea.value.trim()
+    })
+    
+    if (!visibleTextarea) {
+      console.log('No visible textarea with content, preventing submission')
       event.preventDefault()
       return
     }
@@ -210,8 +223,11 @@ export default class extends Controller {
     console.log('Submit called, processing:', this.processingValue)
     console.log('Event type:', event ? event.type : 'no event')
     console.log('Form element:', this.element)
-    console.log('Has textarea target:', this.hasTextareaTarget)
-    console.log('Textarea value:', this.hasTextareaTarget ? this.textareaTarget.value : 'N/A')
+    console.log('Textarea targets count:', this.textareaTargets.length)
+    this.textareaTargets.forEach((textarea, index) => {
+      console.log(`Textarea ${index} value:`, textarea.value)
+      console.log(`Textarea ${index} visible:`, !textarea.closest('.hidden'))
+    })
     
     // Log form data
     if (this.element && this.element.tagName === 'FORM') {
@@ -229,9 +245,14 @@ export default class extends Controller {
       return
     }
     
-    // Don't submit if textarea is empty or doesn't exist
-    if (!this.hasTextareaTarget || !this.textareaTarget.value.trim()) {
-      console.log('No textarea or empty value, preventing submission')
+    // Don't submit if no visible textarea has content
+    const visibleTextarea = this.textareaTargets.find(textarea => {
+      const parent = textarea.closest('.hidden, .lg\\:hidden')
+      return !parent && textarea.value.trim()
+    })
+    
+    if (!visibleTextarea) {
+      console.log('No visible textarea with content, preventing submission')
       if (event) event.preventDefault()
       return
     }
