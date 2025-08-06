@@ -1,4 +1,4 @@
-module AI
+module Ai
   # Service for providing app templates and accelerating AI generation
   # Templates reduce generation time and ensure consistent quality
   class AppTemplateService

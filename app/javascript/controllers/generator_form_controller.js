@@ -23,21 +23,19 @@ export default class extends Controller {
       
       const data = await response.json
       
-      if (response.ok) {
-        if (data.requires_auth) {
-          // User needs to authenticate - trigger the auth modal
-          this.hideLoading()
-          
-          // Dispatch event to open auth modal with the prompt
-          const authModal = document.querySelector('[data-controller="auth-modal"]')
-          if (authModal) {
-            const controller = this.application.getControllerForElementAndIdentifier(authModal, 'auth-modal')
-            controller.open({ detail: { prompt: formData.get('prompt') || formData.get('custom_prompt') } })
-          }
-        } else if (data.redirect_url) {
-          // Success - redirect to the app editor
-          window.location.href = data.redirect_url
+      if (response.status === 401 || (response.ok && data.requires_auth)) {
+        // User needs to authenticate - trigger the auth modal
+        this.hideLoading()
+        
+        // Dispatch event to open auth modal with the prompt
+        const authModal = document.querySelector('[data-controller="auth-modal"]')
+        if (authModal) {
+          const controller = this.application.getControllerForElementAndIdentifier(authModal, 'auth-modal')
+          controller.open({ detail: { prompt: data.prompt || formData.get('prompt') || formData.get('custom_prompt') } })
         }
+      } else if (response.ok && data.redirect_url) {
+        // Success - redirect to the app editor
+        window.location.href = data.redirect_url
       } else {
         // Handle errors
         this.hideLoading()

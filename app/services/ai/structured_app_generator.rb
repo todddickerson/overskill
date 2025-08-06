@@ -146,7 +146,7 @@ module Ai
         messages,
         model: :claude_4,  # Use Claude 4 Sonnet
         temperature: 0.3,
-        max_tokens: 16000
+        max_tokens: 8000  # Reduced to prevent truncation issues
       )
       
       if response[:success]
@@ -160,13 +160,46 @@ module Ai
     end
     
     def parse_structured_response(content)
-      # Extract JSON from response
-      json_match = content.match(/```json\s*\n?(.*?)```/m) || 
-                   content.match(/\{.*"files".*\}/m)
+      Rails.logger.debug "[StructuredGenerator] Response length: #{content.length} characters"
+      
+      # Clean content first - remove reserved tokens and artifacts
+      cleaned_content = content.gsub(/<\|reserved_token_\d+\|>/, '')
+                              .gsub(/<\|.*?\|>/, '')
+                              .gsub(/<\|.*$/, '') # Remove partial tokens at end
+      
+      # Extract JSON from response with multiple strategies
+      json_match = cleaned_content.match(/```json\s*\n?(.*?)```/m) || 
+                   cleaned_content.match(/```\s*\n?(\{.*?"files".*?\})\s*```/m) ||
+                   cleaned_content.match(/(\{.*?"files".*?\})/m)
       
       return { success: false, error: "No JSON found in response" } unless json_match
       
-      json_str = json_match[1] || json_match[0]
+      json_str = (json_match[1] || json_match[0]).strip
+      
+      Rails.logger.debug "[StructuredGenerator] Extracted JSON length: #{json_str.length} characters"
+      
+      # Additional cleaning for malformed JSON
+      json_str = json_str.gsub(/,\s*\}/, '}')  # Remove trailing commas
+                         .gsub(/,\s*\]/, ']')  # Remove trailing commas in arrays
+      
+      # Check for truncated JSON and try to fix
+      if json_str.count('{') > json_str.count('}')
+        Rails.logger.warn "[StructuredGenerator] JSON appears truncated, attempting repair"
+        # Add missing closing braces
+        missing_braces = json_str.count('{') - json_str.count('}')
+        json_str += '}' * missing_braces
+      end
+      
+      # If JSON is still malformed, try to extract just the files array
+      if json_str.length > 40000 # Very large response
+        Rails.logger.warn "[StructuredGenerator] Large JSON response, attempting simplified parsing"
+        files_match = json_str.match(/"files"\s*:\s*\[(.*?)\]/m)
+        if files_match
+          # Create minimal valid structure
+          json_str = %{{"app": {"name": "Generated App", "description": "AI Generated Application"}, "files": [#{files_match[1]}]}}
+        end
+      end
+      
       data = JSON.parse(json_str)
       
       # Validate structure
