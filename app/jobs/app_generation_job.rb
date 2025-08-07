@@ -35,6 +35,9 @@ class AppGenerationJob < ApplicationJob
 
     if result[:success]
       Rails.logger.info "[AppGenerationJob] Successfully generated app ##{app.id}"
+      
+      # Automatically create database tables
+      setup_database_tables(app)
 
       # Broadcast success via Turbo
       broadcast_status(app, "generated", "Your app has been generated successfully!")
@@ -67,6 +70,36 @@ class AppGenerationJob < ApplicationJob
   end
 
   private
+  
+  def setup_database_tables(app)
+    Rails.logger.info "[AppGenerationJob] Setting up database tables for app #{app.id}"
+    
+    begin
+      # Use the automatic table creation service
+      table_service = Supabase::AutoTableService.new(app)
+      result = table_service.ensure_tables_exist!
+      
+      if result[:success]
+        Rails.logger.info "[AppGenerationJob] Created tables: #{result[:tables].join(', ')}"
+        
+        # Broadcast table creation success
+        ActionCable.server.broadcast(
+          "app_#{app.id}_generation",
+          {
+            type: 'database_ready',
+            tables: result[:tables],
+            message: 'Database tables created automatically'
+          }
+        )
+      else
+        Rails.logger.error "[AppGenerationJob] Failed to create tables: #{result[:error]}"
+      end
+    rescue => e
+      Rails.logger.error "[AppGenerationJob] Table creation error: #{e.message}"
+      # Don't fail the whole job if table creation fails
+      # Tables will be auto-created on first use anyway
+    end
+  end
 
   def broadcast_status(app, status, message)
     # Broadcast to the app's channel

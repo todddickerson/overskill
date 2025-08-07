@@ -30,6 +30,9 @@ class Deployment::CloudflarePreviewService
     worker_name = "preview-#{@app.id}"
     preview_subdomain = "preview-#{@app.id}" # Use preview-{uuid} as subdomain
     
+    # Ensure database tables exist before building
+    ensure_database_tables_exist!
+    
     # Build app with Vite first
     Rails.logger.info "[CloudflarePreview] Building app #{@app.id} with Vite"
     build_service = Deployment::ViteBuildService.new(@app)
@@ -213,6 +216,23 @@ class Deployment::CloudflarePreviewService
       Rails.logger.info "[CloudflarePreview] Updated env vars for worker #{worker_name}"
     rescue => e
       Rails.logger.warn "[CloudflarePreview] Failed to update env vars: #{e.message}"
+    end
+  end
+  
+  def ensure_database_tables_exist!
+    Rails.logger.info "[CloudflarePreview] Ensuring database tables exist for app #{@app.id}"
+    
+    begin
+      # Use the automatic table creation service
+      table_service = Supabase::AutoTableService.new(@app)
+      result = table_service.ensure_tables_exist!
+      
+      if result[:success] && result[:tables].any?
+        Rails.logger.info "[CloudflarePreview] Tables ready: #{result[:tables].join(', ')}"
+      end
+    rescue => e
+      Rails.logger.warn "[CloudflarePreview] Could not ensure tables: #{e.message}"
+      # Continue with deployment - tables will be created on first use
     end
   end
   

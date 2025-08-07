@@ -66,6 +66,9 @@ class ProcessAppUpdateJobV2 < ApplicationJob
       end
     end
     
+    # Update database tables if needed
+    update_database_tables(chat_message.app)
+    
     total_time = Time.current - start_time
     Rails.logger.info "[ProcessAppUpdateJobV2] 🎉 Orchestrated update completed successfully!"
     Rails.logger.info "[ProcessAppUpdateJobV2] ⏱️ Total execution time: #{total_time.round(2)}s"
@@ -82,6 +85,30 @@ class ProcessAppUpdateJobV2 < ApplicationJob
   end
   
   private
+  
+  def update_database_tables(app)
+    Rails.logger.info "[ProcessAppUpdateJobV2] 🗄️ Checking for database table updates..."
+    
+    begin
+      # Use table update service to add any new tables or columns
+      update_service = Supabase::TableUpdateService.new(app)
+      result = update_service.update_tables_for_app!
+      
+      if result[:success]
+        if result[:new_tables].any?
+          Rails.logger.info "[ProcessAppUpdateJobV2] ✅ Created new tables: #{result[:new_tables].join(', ')}"
+        end
+        if result[:updated_tables].any?
+          Rails.logger.info "[ProcessAppUpdateJobV2] ✅ Updated tables: #{result[:updated_tables].join(', ')}"
+        end
+      else
+        Rails.logger.warn "[ProcessAppUpdateJobV2] ⚠️ Table update failed: #{result[:error]}"
+      end
+    rescue => e
+      Rails.logger.error "[ProcessAppUpdateJobV2] ❌ Database update error: #{e.message}"
+      # Don't fail the job - tables will be created on first use
+    end
+  end
   
   def handle_timeout_error(chat_message)
     Rails.logger.error "[ProcessAppUpdateJobV2] ⏰ TIMEOUT: Job exceeded 10 minute limit for message ##{chat_message.id}"
