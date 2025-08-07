@@ -39,7 +39,7 @@ module Ai
           "X-Title" => "OverSkill Platform",
           "Content-Type" => "application/json"
         },
-        timeout: 120  # 2 minute timeout - fail fast for better UX
+        timeout: 300  # 5 minute timeout - GPT-5 needs more time for reasoning
       }
       @context_cache = ContextCacheService.new
       @error_handler = EnhancedErrorHandler.new

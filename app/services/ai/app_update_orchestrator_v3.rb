@@ -53,29 +53,24 @@ module Ai
       current_files = get_cached_or_load_files || []
       env_vars = get_cached_or_load_env_vars || []
       
-      # Load AI standards (V2's approach)
-      ai_standards = File.read(Rails.root.join('AI_APP_STANDARDS.md'))
-      
+      # Use simplified standards for GPT-5 to avoid timeout
       analysis_prompt = <<~PROMPT
-        #{ai_standards}
-        
-        Analyze this app structure for user request: "#{chat_message.content}"
+        You are an expert React developer. Analyze this app for the user request: "#{chat_message.content}"
         
         Current Files:
-        #{current_files.map { |f| "#{f[:path]}: #{f[:content][0..200]}..." }.join("\n\n")}
+        #{current_files.map { |f| "#{f[:path]}: #{f[:content][0..100]}..." }.join("\n")}
         
-        App Context:
-        - Name: #{app.name}
-        - Framework: #{app.framework}
-        - Type: #{app.app_type}
+        App Context: #{app.framework} #{app.app_type} app named "#{app.name}"
         
-        Provide analysis as JSON:
+        Standards: Use React, Tailwind CSS, modern JavaScript. Create professional, working apps.
+        
+        Respond with JSON only:
         {
-          "current_structure": "Description of current app",
-          "required_changes": ["List of changes needed"],
+          "current_structure": "Brief description",
+          "required_changes": ["List 3-5 key changes needed"],
           "complexity_level": "simple|moderate|complex",
           "estimated_files": 3,
-          "technology_stack": ["react", "tailwind", "etc"]
+          "technology_stack": ["react", "tailwind"]
         }
       PROMPT
       
@@ -123,31 +118,24 @@ module Ai
         "executing"
       )
       
-      # Use V2's sophisticated planning approach but with GPT-5
+      # Simplified planning for GPT-5 efficiency
       plan_prompt = <<~PROMPT
-        Based on analysis, create a detailed execution plan for: "#{chat_message.content}"
+        Create execution plan for: "#{chat_message.content}"
         
         Analysis: #{analysis.to_json}
         
-        Available Tools: read_file, write_file, update_file, delete_file, broadcast_progress
-        
-        Create step-by-step plan that:
-        1. Reads current files to understand implementation
-        2. Makes incremental changes with progress updates
-        3. Follows AI_APP_STANDARDS (React, Tailwind, proper architecture)
-        4. Creates professional-quality code
-        5. Provides user feedback
+        Tools: create_file, update_file, broadcast_progress, finish_app
         
         Return JSON plan:
         {
-          "summary": "What will be implemented",
+          "summary": "What will be built",
           "steps": [
             {
-              "description": "Step description", 
-              "operations": ["read index.html", "update with new features"]
+              "description": "Step description",
+              "operations": ["create index.html", "add functionality"]
             }
           ],
-          "estimated_files": 4,
+          "estimated_files": 3,
           "complexity": "simple"
         }
       PROMPT
@@ -264,29 +252,23 @@ module Ai
       file_contents = {}
       app.app_files.each { |file| file_contents[file.path] = file.content }
       
-      # Load AI standards
-      ai_standards = File.read(Rails.root.join('AI_APP_STANDARDS.md'))
-      
-      # Build comprehensive prompt combining V2's sophistication with working approach
+      # Simplified execution prompt for GPT-5 efficiency
       execution_prompt = <<~PROMPT
-        #{ai_standards}
-        
-        EXECUTE THE PLAN: "#{chat_message.content}"
+        IMPLEMENT: "#{chat_message.content}"
         
         Plan: #{plan.to_json}
         
         Current Files:
-        #{file_contents.map { |path, content| "#{path}:\n#{content[0..500]}..." }.join("\n\n")}
+        #{file_contents.map { |path, content| "#{path}:\n#{content[0..200]}..." }.join("\n")}
         
-        IMPLEMENTATION REQUIREMENTS:
-        1. Follow AI_APP_STANDARDS exactly (React, Tailwind, proper structure)
-        2. Create professional-quality, production-ready code
-        3. Use broadcast_progress to update user on progress
-        4. Use create_file for new files, update_file for modifications
-        5. Implement complete, working functionality
-        6. End with finish_app summarizing changes
+        Requirements:
+        1. Use React, Tailwind CSS, modern JavaScript
+        2. Create clean, professional code
+        3. Use broadcast_progress for status updates
+        4. Use create_file for new files, update_file for changes
+        5. End with finish_app when complete
         
-        CRITICAL: Create apps that rival Lovable.dev in quality and functionality.
+        Build a working, professional app step by step.
       PROMPT
       
       messages = [
