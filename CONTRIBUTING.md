@@ -128,6 +128,18 @@ bin/dev
 - Add inline code comments
 - Include examples for new features
 
+### Assets (JS/CSS)
+
+- JS is built with esbuild; CSS (including mailers) is built with PostCSS/Tailwind.
+- Common commands:
+  - npm run build (all)
+  - npm run build:js, npm run build:css, npm run build:mailer:css
+  - Watchers: npm run build:js:watch, npm run build:css:watch, npm run build:mailer:css:watch
+- Theme control via THEME environment variable:
+  - Default theme is used if THEME is unset
+  - Example: THEME=light npm run build:css and THEME=light npm run build:mailer:css
+  - Convenience watchers: npm run light:build:css and npm run light:build:mailer:css
+
 ### Testing
 
 #### Running Tests
