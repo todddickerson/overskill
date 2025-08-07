@@ -38,6 +38,9 @@ class AppGenerationJob < ApplicationJob
       
       # Automatically create database tables
       setup_database_tables(app)
+      
+      # Create auth settings if not present
+      create_auth_settings(app)
 
       # Broadcast success via Turbo
       broadcast_status(app, "generated", "Your app has been generated successfully!")
@@ -70,6 +73,40 @@ class AppGenerationJob < ApplicationJob
   end
 
   private
+  
+  def create_auth_settings(app)
+    return if app.app_auth_setting.present?
+    
+    # Determine if app needs authentication based on its type/prompt
+    needs_auth = app_needs_authentication?(app)
+    
+    visibility = if needs_auth
+      'public_login_required'  # Default: anyone can sign up but must login
+    else
+      'public_no_login'  # No auth needed
+    end
+    
+    app.create_app_auth_setting!(
+      visibility: visibility,
+      allowed_providers: ['email', 'google', 'github'],
+      allowed_email_domains: [],
+      require_email_verification: false,  # NOTE: Supabase email verification is PROJECT-LEVEL, not app-level
+      allow_signups: true,
+      allow_anonymous: false
+    )
+    
+    Rails.logger.info "[AppGenerationJob] Created auth settings for app ##{app.id} with visibility: #{visibility}"
+  rescue => e
+    Rails.logger.error "[AppGenerationJob] Failed to create auth settings: #{e.message}"
+  end
+  
+  def app_needs_authentication?(app)
+    # Check if app prompt mentions users, authentication, accounts, or personal data
+    keywords = ['user', 'login', 'auth', 'account', 'personal', 'private', 'todo', 'note', 'diary', 'dashboard']
+    prompt_text = "#{app.prompt} #{app.name}".downcase
+    
+    keywords.any? { |keyword| prompt_text.include?(keyword) }
+  end
   
   def setup_database_tables(app)
     Rails.logger.info "[AppGenerationJob] Setting up database tables for app #{app.id}"

@@ -164,6 +164,18 @@ class Deployment::CloudflarePreviewService
     vars['SUPABASE_ANON_KEY'] = ENV['SUPABASE_ANON_KEY'] if ENV['SUPABASE_ANON_KEY']
     vars['SUPABASE_SERVICE_KEY'] = ENV['SUPABASE_SERVICE_KEY'] if ENV['SUPABASE_SERVICE_KEY']
     
+    # Add auth settings if present
+    if @app.app_auth_setting
+      auth_config = @app.app_auth_setting.to_frontend_config
+      vars['AUTH_VISIBILITY'] = auth_config[:visibility].to_s
+      vars['AUTH_REQUIRES_AUTH'] = auth_config[:requires_auth].to_s
+      vars['AUTH_ALLOW_SIGNUPS'] = auth_config[:allow_signups].to_s
+      vars['AUTH_ALLOW_ANONYMOUS'] = auth_config[:allow_anonymous].to_s
+      vars['AUTH_REQUIRE_EMAIL_VERIFICATION'] = auth_config[:require_email_verification].to_s
+      vars['AUTH_ALLOWED_PROVIDERS'] = auth_config[:allowed_providers].to_json
+      vars['AUTH_ALLOWED_EMAIL_DOMAINS'] = auth_config[:allowed_email_domains].to_json
+    end
+    
     # Custom app env vars (but don't override system vars)
     @app.env_vars_for_deployment.each do |key, value|
       vars[key] = value unless ['APP_ID', 'ENVIRONMENT', 'DEPLOYED_AT', 'BUILD_ID'].include?(key)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_06_201026) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -178,6 +178,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_201026) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["app_id"], name: "index_app_audit_logs_on_app_id"
+  end
+
+  create_table "app_auth_settings", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.integer "visibility", default: 1, null: false
+    t.text "allowed_providers", default: "[\"email\", \"google\", \"github\"]"
+    t.text "allowed_email_domains", default: "[]"
+    t.boolean "require_email_verification", default: false, null: false
+    t.boolean "allow_signups", default: true, null: false
+    t.boolean "allow_anonymous", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_app_auth_settings_on_app_id", unique: true
+    t.index ["visibility"], name: "index_app_auth_settings_on_visibility"
   end
 
   create_table "app_chat_messages", force: :cascade do |t|
@@ -895,6 +909,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_06_201026) do
   add_foreign_key "app_api_calls", "apps"
   add_foreign_key "app_api_integrations", "apps"
   add_foreign_key "app_audit_logs", "apps"
+  add_foreign_key "app_auth_settings", "apps"
   add_foreign_key "app_chat_messages", "app_versions"
   add_foreign_key "app_chat_messages", "apps"
   add_foreign_key "app_chat_messages", "users"
