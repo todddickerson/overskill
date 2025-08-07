@@ -464,28 +464,84 @@ module Ai
 
       def auth_callback_page
         <<~TSX
-          import { useEffect } from 'react'
-          import { useNavigate } from 'react-router-dom'
+          import { useEffect, useState } from 'react'
+          import { useNavigate, useSearchParams } from 'react-router-dom'
           import { supabase } from '../../lib/supabase'
 
           export function AuthCallback() {
             const navigate = useNavigate()
+            const [searchParams] = useSearchParams()
+            const [error, setError] = useState<string | null>(null)
 
             useEffect(() => {
-              supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'SIGNED_IN' && session) {
+              const handleCallback = async () => {
+                // Check for error in URL params
+                const errorParam = searchParams.get('error')
+                const errorDescription = searchParams.get('error_description')
+                
+                if (errorParam) {
+                  setError(errorDescription || errorParam)
+                  setTimeout(() => {
+                    navigate('/login?error=' + encodeURIComponent(errorParam))
+                  }, 3000)
+                  return
+                }
+
+                // Exchange code for session
+                const code = searchParams.get('code')
+                if (code) {
+                  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+                  
+                  if (error) {
+                    console.error('Session exchange error:', error)
+                    setError(error.message)
+                    setTimeout(() => {
+                      navigate('/login?error=auth_failed')
+                    }, 3000)
+                    return
+                  }
+                  
+                  if (data.session) {
+                    // Success! Redirect to dashboard
+                    navigate('/dashboard')
+                    return
+                  }
+                }
+
+                // If no code or error, check if already authenticated
+                const { data: { session } } = await supabase.auth.getSession()
+                if (session) {
                   navigate('/dashboard')
-                } else if (event === 'SIGNED_OUT') {
+                } else {
                   navigate('/login')
                 }
-              })
-            }, [navigate])
+              }
+
+              handleCallback()
+            }, [navigate, searchParams])
+
+            if (error) {
+              return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                  <div className="text-center max-w-md">
+                    <div className="text-red-500 mb-4">
+                      <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-lg font-medium text-gray-900 mb-2">Authentication Failed</h2>
+                    <p className="text-sm text-gray-600 mb-4">{error}</p>
+                    <p className="text-sm text-gray-500">Redirecting to login...</p>
+                  </div>
+                </div>
+              )
+            }
 
             return (
               <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Authenticating...</p>
+                  <p className="mt-4 text-gray-600">Completing sign in...</p>
                 </div>
               </div>
             )

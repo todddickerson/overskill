@@ -325,47 +325,52 @@ class Deployment::CloudflarePreviewService
           return handleApiRequest(request, env)
         }
         
-        // Handle root path - serve index.html
-        if (pathname === '/') {
-          const indexHtml = getBuiltFile('index.html')
-          if (indexHtml) {
-            // Inject environment variables into HTML
-            const publicEnvVars = getPublicEnvVars(env)
-            const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`
-            
-            // Add version meta tags
-            const versionMeta = `
-              <meta name="overskill-app-id" content="${env.APP_ID}">
-              <meta name="overskill-app-name" content="${env.APP_NAME}">
-              <meta name="overskill-environment" content="${env.ENVIRONMENT}">
-              <meta name="overskill-deployed-at" content="${env.DEPLOYED_AT || new Date().toISOString()}">
-              <meta name="overskill-build-id" content="${env.BUILD_ID || 'unknown'}">
-              <meta name="overskill-version" content="${Date.now()}">
-            `
-            
-            // Inject into HTML
-            let modifiedHtml = indexHtml.content
-            if (indexHtml.content.includes('</head>')) {
-              modifiedHtml = indexHtml.content.replace('</head>', versionMeta + envScript + '</head>')
-            } else if (indexHtml.content.includes('<body>')) {
-              modifiedHtml = indexHtml.content.replace('<body>', '<body>' + versionMeta + envScript)
-            } else {
-              modifiedHtml = versionMeta + envScript + indexHtml.content
-            }
-            
-            return new Response(modifiedHtml, {
-              headers: {
-                'Content-Type': 'text/html',
-                'X-Frame-Options': 'ALLOWALL'
-              }
-            })
+        // Try to serve static files first (JS, CSS, images, etc.)
+        if (pathname !== '/' && pathname !== '/index.html') {
+          const cleanPath = pathname.startsWith('/') ? pathname.slice(1) : pathname
+          const file = getBuiltFile(cleanPath)
+          if (file) {
+            return serveBuiltFile(cleanPath)
           }
-          return new Response('File not found', { status: 404 })
         }
         
-        // Serve static built files
-        const cleanPath = pathname.startsWith('/') ? pathname.slice(1) : pathname
-        return serveBuiltFile(cleanPath)
+        // For all other routes (including root), serve index.html for React Router
+        // This includes: /, /login, /signup, /dashboard, etc.
+        const indexHtml = getBuiltFile('index.html')
+        if (indexHtml) {
+          // Inject environment variables into HTML
+          const publicEnvVars = getPublicEnvVars(env)
+          const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`
+          
+          // Add version meta tags
+          const versionMeta = `
+            <meta name="overskill-app-id" content="${env.APP_ID}">
+            <meta name="overskill-app-name" content="${env.APP_NAME}">
+            <meta name="overskill-environment" content="${env.ENVIRONMENT}">
+            <meta name="overskill-deployed-at" content="${env.DEPLOYED_AT || new Date().toISOString()}">
+            <meta name="overskill-build-id" content="${env.BUILD_ID || 'unknown'}">
+            <meta name="overskill-version" content="${Date.now()}">
+          `
+          
+          // Inject into HTML
+          let modifiedHtml = indexHtml.content
+          if (indexHtml.content.includes('</head>')) {
+            modifiedHtml = indexHtml.content.replace('</head>', versionMeta + envScript + '</head>')
+          } else if (indexHtml.content.includes('<body>')) {
+            modifiedHtml = indexHtml.content.replace('<body>', '<body>' + versionMeta + envScript)
+          } else {
+            modifiedHtml = versionMeta + envScript + indexHtml.content
+          }
+          
+          return new Response(modifiedHtml, {
+            headers: {
+              'Content-Type': 'text/html',
+              'X-Frame-Options': 'ALLOWALL'
+            }
+          })
+        }
+        
+        return new Response('File not found', { status: 404 })
       }
       
       function getBuiltFile(path) {
