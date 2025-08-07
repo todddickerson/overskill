@@ -11,8 +11,22 @@ try {
   themeConfig = require(themeConfigFile)
 } catch (error) {
   // Fallback config for when running outside Rails context (e.g., IDE extensions)
-  console.warn('Using fallback Tailwind config. Set THEME env variable for full config.')
-  themeConfig = require('./tmp/gems/bullet_train-themes-light/tailwind.light.config.js')
+  console.warn('Using minimal fallback Tailwind config. Set THEME env variable for full config.')
+  themeConfig = {
+    content: [
+      './config/initializers/theme.rb',
+      './app/views/**/*.html.{erb,slim,haml}',
+      './app/helpers/**/*.rb',
+      './app/assets/stylesheets/**/*.css',
+      './app/javascript/**/*.js',
+      './tmp/gems/*/app/views/**/*.html.erb',
+      './tmp/gems/*/app/helpers/**/*.rb',
+      './tmp/gems/*/app/assets/stylesheets/**/*.css',
+      './tmp/gems/*/app/javascript/**/*.js',
+    ],
+    theme: { extend: { colors: {}, fontFamily: {}, fontSize: { '2xs': ['0.65rem', { lineHeight: '0.9rem', letterSpacing: '1px' }] } } },
+    plugins: [],
+  }
 }
 
 // *** Uncomment these if required for your overrides ***

@@ -4,6 +4,16 @@
   "description": "OAuth Authentication Testing Suite for OverSkill Apps",
   "main": "run-oauth-tests.js",
   "scripts": {
+    "build": "npm run build:js && npm run build:css && npm run build:mailer:css",
+    "build:js": "node esbuild.config.js",
+    "build:js:watch": "node esbuild.config.js --watch",
+    "build:css": "postcss app/assets/stylesheets/application.css -o app/assets/builds/application.css",
+    "build:css:watch": "npm run build:css -- --watch",
+    "build:mailer:css": "postcss -c postcss.mailer.config.js app/assets/stylesheets/mailer.css -o app/assets/builds/mailer.css",
+    "build:mailer:css:watch": "npm run build:mailer:css -- --watch",
+    "js": "npm run build:js:watch",
+    "light:build:css": "THEME=light npm run build:css:watch",
+    "light:build:mailer:css": "THEME=light npm run build:mailer:css:watch",
     "test": "node run-oauth-tests.js",
     "test:playwright": "npx playwright test playwright-oauth-tests.spec.js --project=chromium",
     "test:all": "npm run test && npm run test:playwright",
@@ -11,7 +21,17 @@
     "report": "npx playwright show-report"
   },
   "devDependencies": {
-    "@playwright/test": "^1.40.0"
+    "@playwright/test": "^1.40.0",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.8",
+    "glob": "^11.0.3",
+    "postcss": "^8.5.6",
+    "postcss-cli": "^11.0.1",
+    "postcss-css-variables": "^0.19.0",
+    "postcss-extend-rule": "^4.0.0",
+    "postcss-import": "^16.1.1",
+    "postcss-nesting": "^13.0.2",
+    "tailwindcss": "^3.4.14"
   },
   "keywords": [
     "oauth",
@@ -21,5 +41,29 @@
     "playwright"
   ],
   "author": "OverSkill",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "yarn@4.2.2+sha512.c44e283c54e02de9d1da8687025b030078c1b9648d2895a65aab8e64225bfb7becba87e1809fc0b4b6778bbd47a1e2ab6ac647de4c5e383a53a7c17db6c3ff4b",
+  "dependencies": {
+    "@bullet-train/bullet-train": "^1.26.1",
+    "@bullet-train/bullet-train-sortable": "^1.26.1",
+    "@bullet-train/fields": "^1.26.1",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.9",
+    "@codemirror/lang-javascript": "^6.2.4",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@hotwired/stimulus": "^3.2.2",
+    "@hotwired/turbo-rails": "^8.0.16",
+    "@icon/themify-icons": "1.0.1-alpha.3",
+    "@rails/actioncable": "^8.0.200",
+    "@rails/actiontext": "^8.0.200",
+    "@rails/activestorage": "^8.0.200",
+    "cable_ready": "^5.0.6",
+    "codemirror": "^6.0.2",
+    "jstz": "^2.1.1",
+    "stimulus-reveal": "^1.4.2",
+    "stimulus-scroll-reveal": "^3.2.0",
+    "trix": "^2.1.15"
+  }
 }

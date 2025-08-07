@@ -247,3 +247,40 @@ All test scripts generate detailed reports including:
 - Specific recommendations for fixes
 
 These tools are essential for verifying that Cloudflare Worker deployments are functioning correctly and that TypeScript transformation is working without introducing runtime errors.
+
+### Autonomous Testing System
+Comprehensive AI generation quality monitoring and testing framework:
+
+#### Main Testing Script
+- **`test_autonomous.rb`** - CLI interface for autonomous testing
+  - `ruby test_autonomous.rb quick` - Fast GPT-5 demo (30 seconds, recommended first test)
+  - `ruby test_autonomous.rb health` - Single health check test
+  - `ruby test_autonomous.rb suite` - Full comprehensive test suite (4 app types)
+  - `ruby test_autonomous.rb status` - Show current system metrics
+  - `ruby test_autonomous.rb monitor [min]` - Continuous monitoring
+
+#### Supporting Files
+- **`lib/autonomous_testing_system.rb`** - Production testing system with metrics
+- **`gpt5_autonomous_demo.rb`** - Proven GPT-5 generation demo (100% success rate)
+
+#### Key Features
+- **Real-time Progress**: Shows files being created during generation
+- **Quality Metrics**: Success rate, generation time, pattern matching
+- **GPT-5 Integration**: Direct OpenAI API with proper temperature handling
+- **Comprehensive Scenarios**: Counter, todo, calculator, weather apps
+- **Continuous Monitoring**: Background quality assessment
+- **Detailed Reporting**: JSON logs and test reports in test_results/
+
+#### Usage for Development
+```bash
+# Quick verification GPT-5 is working
+ruby test_autonomous.rb quick
+
+# Full quality assessment
+ruby test_autonomous.rb suite
+
+# Background monitoring every hour
+ruby test_autonomous.rb monitor 60
+```
+
+This system enables rapid iteration and quality monitoring of AI app generation capabilities.

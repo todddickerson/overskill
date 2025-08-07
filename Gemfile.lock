@@ -373,6 +373,9 @@ GEM
     get_process_mem (1.0.0)
       bigdecimal (>= 2.0)
       ffi (~> 1.0)
+    git (1.19.1)
+      addressable (~> 2.8)
+      rchardet (~> 1.8)
     globalid (1.2.1)
       activesupport (>= 6.1)
     groupdate (6.7.0)
@@ -635,6 +638,7 @@ GEM
       activerecord (>= 6.1.5)
       activesupport (>= 6.1.5)
       i18n
+    rchardet (1.9.0)
     rdoc (6.14.2)
       erb
       psych (>= 4.0.0)
@@ -859,6 +863,7 @@ DEPENDENCIES
   faker
   foreman
   friendly_id (~> 5.5)
+  git (~> 1.18)
   groupdate
   httparty
   invisible_captcha

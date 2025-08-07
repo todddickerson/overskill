@@ -44,5 +44,16 @@ shallow do
         resources :app_env_vars
       end
     end
+    
+    # Iframe bridge routes - outside of teams scope for direct app access
+    resources :iframe_bridge, only: [], param: :app_id do
+      member do
+        post :log
+        get :console_logs
+        get :network_requests
+        post :setup
+        delete :clear
+      end
+    end
   end
 end

@@ -2,7 +2,7 @@
   "mainApp": {
     "success": true,
     "status": 200,
-    "contentLength": 797,
+    "contentLength": 1234,
     "hasReact": false,
     "hasRootDiv": true,
     "hasScript": true,
@@ -19,7 +19,7 @@
       "TaskFlow",
       "taskflow"
     ],
-    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>TaskFlow - Todo Manager</title>\n  \n        <meta name=\"overskill-app-id\" content=\"undefined\">\n        <meta name=\"overskill-app-name\" content=\"undefined\">\n        <meta name=\"overskill-environment\" content=\"undefined\">\n        <meta name=\"overskill-deployed-at\" content=\"2025-08-06T21:27:41.919Z\">\n        <meta name=\"overskill-build-id\" content=\"unknown\">\n        <meta name=\"overskill-version\" content=\"1754515661919\">\n      <script>window.ENV = {};</script></head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.tsx\"></script>\n  </body>\n</html>"
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>TaskFlow - Todo Manager</title>\n    <script type=\"module\" crossorigin src=\"/assets/index-CP_sK9Eg.js\"></script>\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-DiMxsNoI.css\">\n  \n        <meta name=\"overskill-app-id\" content=\"57\">\n        <meta name=\"overskill-app-name\" content=\"Test App 1754514106\">\n        <meta name=\"overskill-environment\" content=\"preview\">\n        <meta name=\"overskill-deployed-at\" content=\"2025-08-07T13:35:42Z\">\n        <meta name=\"overskill-build-id\" content=\"preview-20250807-134203\">\n        <meta name=\"overskill-version\" content=\"1754592750700\">\n      <script>window.ENV = {\"APP_ID\":\"57\",\"ENVIRONMENT\":\"preview\",\"SUPABASE_URL\":\"https://bsbgwixlklvgeoxvjmtb.supabase.co\",\"SUPABASE_ANON_KEY\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO"
   },
   "ngrok": {
     "success": false,

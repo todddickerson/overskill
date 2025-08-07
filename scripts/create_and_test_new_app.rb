@@ -24,16 +24,43 @@ creator = team.memberships.first || team.memberships.create!(
   role_ids: ["admin"]
 )
 
-app_name = "Task Manager #{Time.current.to_i}"
-prompt = "Create a modern task management app with:
-1. User authentication (login/signup)
-2. Task list with CRUD operations (create, read, update, delete)
-3. Task properties: title, description, priority (low/medium/high), due date, status (pending/in-progress/completed)
-4. Filter tasks by status and priority
-5. Sort tasks by due date or priority
-6. Mark tasks as complete with checkbox
-7. Modern UI with Tailwind CSS and smooth animations
-8. Responsive design for mobile and desktop"
+app_name = "TaskFlow Pro #{Time.current.to_i}"
+prompt = "Create a comprehensive task management app with:
+
+**Authentication System:**
+- User login/signup with email and password
+- Social login (Google and GitHub OAuth) 
+- Secure password reset functionality
+- Protected routes requiring authentication
+
+**Task Management Features:**
+- Full CRUD operations for tasks (create, read, update, delete)
+- Task properties: title, description, priority (low/medium/high), due date, status (pending/in-progress/completed), category
+- User-scoped data (each user sees only their own tasks)
+- Real-time updates and data persistence with Supabase
+
+**Advanced Functionality:**
+- Filter tasks by status, priority, category, and due date
+- Sort tasks by due date, priority, or creation date
+- Mark tasks as complete with smooth animations
+- Task search functionality
+- Task categories/labels with color coding
+- Bulk operations (select multiple tasks, bulk complete/delete)
+
+**Modern UI/UX:**
+- Professional design with Tailwind CSS
+- Smooth animations and micro-interactions
+- Dark/light theme support
+- Responsive design optimized for mobile, tablet, and desktop
+- Loading states and empty states
+- Toast notifications for actions
+
+**Technical Requirements:**
+- React with TypeScript for type safety
+- Supabase for database and authentication
+- Modern React patterns (hooks, context)
+- Error handling and loading states
+- Performance optimization
 
 app = team.apps.create!(
   name: app_name,
@@ -125,10 +152,16 @@ puts "\n📁 File Structure Test:"
 expected_files = [
   "index.html",
   "package.json",
-  "src/App.tsx",
   "src/main.tsx",
-  "src/components/Auth.tsx",
   "src/lib/supabase.ts",
+  "src/pages/auth/Login.tsx",
+  "src/pages/auth/Signup.tsx", 
+  "src/pages/auth/AuthCallback.tsx",
+  "src/pages/auth/ForgotPassword.tsx",
+  "src/components/auth/SocialButtons.tsx",
+  "src/components/auth/ProtectedRoute.tsx",
+  "src/hooks/useAuth.ts",
+  "src/contexts/AuthContext.tsx",
   "tailwind.config.js",
   "vite.config.ts"
 ]
@@ -179,23 +212,78 @@ detected_tables.each do |table|
   end
 end
 
-# Test 4: Live app test
-puts "\n🌐 Live App Test:"
+# Test 4: OAuth integration test
+puts "\n🔐 OAuth Integration Test:"
+oauth_checks = {}
+if app.preview_url
+  begin
+    require 'net/http'
+    require 'uri'
+    
+    # Check main app
+    uri = URI(app.preview_url)
+    response = Net::HTTP.get_response(uri)
+    oauth_checks["Main app accessible"] = response.code == '200'
+    
+    # Check auth pages exist in HTML
+    if response.code == '200'
+      body = response.body
+      oauth_checks["Auth components loaded"] = body.include?('Auth') || body.include?('Login') || body.include?('auth')
+      oauth_checks["Supabase client"] = body.include?('supabase') || body.include?('createClient')
+      oauth_checks["OAuth providers"] = body.include?('google') || body.include?('github') || body.include?('oauth')
+      oauth_checks["React router"] = body.include?('router') || body.include?('Route')
+    end
+    
+    # Test auth-specific routes
+    auth_routes = ['/login', '/signup', '/auth/callback']
+    auth_routes.each do |route|
+      begin
+        auth_uri = URI("#{app.preview_url.chomp('/')}#{route}")
+        auth_response = Net::HTTP.get_response(auth_uri)
+        oauth_checks["#{route} accessible"] = auth_response.code == '200'
+      rescue => e
+        oauth_checks["#{route} accessible"] = false
+      end
+    end
+    
+  rescue => e
+    oauth_checks["OAuth test error"] = "#{e.message}"
+  end
+else
+  oauth_checks["No preview URL"] = false
+end
+
+oauth_checks.each do |check, result|
+  if result.is_a?(String) && result.include?("error")
+    puts "  ❌ #{check}: #{result}"
+  else
+    status = result ? "✅" : "❌"
+    puts "  #{status} #{check}"
+  end
+end
+
+# Test 5: Live app performance test
+puts "\n🌐 Live App Performance Test:"
 if app.preview_url
   require 'net/http'
   require 'uri'
+  require 'benchmark'
   
   begin
-    uri = URI(app.preview_url)
-    response = Net::HTTP.get_response(uri)
+    # Performance timing
+    load_time = Benchmark.measure do
+      uri = URI(app.preview_url)
+      @response = Net::HTTP.get_response(uri)
+    end
     
     live_checks = {
-      "App accessible": response.code == '200',
-      "HTML served": response.body.include?('<html'),
-      "React root": response.body.include?('id="root"'),
-      "JavaScript bundled": response.body.include?('.js'),
-      "CSS bundled": response.body.include?('.css'),
-      "Vite powered": response.body.include?('vite')
+      "App accessible": @response.code == '200',
+      "HTML served": @response.body.include?('<html'),
+      "React root": @response.body.include?('id="root"'),
+      "JavaScript bundled": @response.body.include?('.js'),
+      "CSS bundled": @response.body.include?('.css'),
+      "Vite powered": @response.body.include?('vite'),
+      "TypeScript support": @response.body.include?('tsx') || @response.body.include?('typescript')
     }
     
     live_checks.each do |check, passed|
@@ -203,7 +291,8 @@ if app.preview_url
       puts "  #{status} #{check}"
     end
     
-    puts "  📊 Response size: #{response.body.length} bytes"
+    puts "  📊 Response size: #{@response.body.length} bytes"
+    puts "  ⏱️  Load time: #{(load_time.real * 1000).round(0)}ms"
   rescue => e
     puts "  ❌ Error accessing app: #{e.message}"
   end

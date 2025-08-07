@@ -5,18 +5,44 @@ export default class extends Controller {
   static values = { userSignedIn: Boolean }
   
   connect() {
-    // If user is not signed in, we'll intercept form submission
-    if (!this.userSignedInValue) {
-      this.element.addEventListener('turbo:submit-start', this.handleSubmit.bind(this))
-    }
+    this.restorePrompt()
+    this.bindPersistence()
+    this.focusPrimaryCtaIfReturning()
+    
+    // If user is not signed in, remember prompt on submit so we can resume post-login
+    if (!this.userSignedInValue) this.element.addEventListener('turbo:submit-start', this.rememberPrompt)
   }
   
-  handleSubmit(event) {
-    // Store the prompt value before submission
-    const prompt = this.promptTarget.value
-    if (prompt) {
-      // The controller will handle storing in cookies
-      console.log("Submitting prompt for unauthenticated user:", prompt)
+  // Persist prompt locally while typing (no network)
+  bindPersistence() {
+    if (!this.hasPromptTarget) return
+    this.promptTarget.addEventListener('input', () => {
+      localStorage.setItem('overskill:pending_prompt', this.promptTarget.value)
+    })
+  }
+
+  restorePrompt() {
+    if (!this.hasPromptTarget) return
+    const saved = localStorage.getItem('overskill:pending_prompt')
+    if (saved && !this.promptTarget.value) this.promptTarget.value = saved
+  }
+
+  rememberPrompt = () => {
+    if (!this.hasPromptTarget) return
+    localStorage.setItem('overskill:pending_prompt', this.promptTarget.value)
+  }
+
+  focusPrimaryCtaIfReturning() {
+    // If user just logged in (body data attribute), highlight prompt and focus the CTA button
+    const signedIn = document.body.dataset.userSignedIn === 'true'
+    if (signedIn) {
+      const btn = document.getElementById('generate-btn')
+      const prompt = this.promptTarget
+      if (prompt) {
+        prompt.classList.add('ring-2', 'ring-primary-500', 'ring-offset-2')
+        setTimeout(() => prompt.classList.remove('ring-2', 'ring-primary-500', 'ring-offset-2'), 1200)
+      }
+      if (btn) btn.focus()
     }
   }
   

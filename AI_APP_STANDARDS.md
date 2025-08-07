@@ -58,7 +58,7 @@ src/components/  - Reusable React components (JSX only)
 
 ### MANDATORY: Apps with User Data MUST Include Authentication
 
-When generating ANY app with user-specific data (todos, notes, posts, etc.):
+When generating ANY app with user-specific data (items, records, posts, etc.):
 
 1. **ALWAYS create Auth component** at `src/components/Auth.jsx`:
 ```jsx
@@ -147,25 +147,25 @@ if (!user) return <Auth onAuth={setUser} />
 3. **ALWAYS use full table names with app ID**:
 ```jsx
 // ✅ CORRECT - uses app ID from environment
-const tableName = `app_${window.ENV.APP_ID}_todos`
+const tableName = `app_${window.ENV.APP_ID}_items`
 await supabase.from(tableName).select('*')
 
 // ❌ WRONG - missing app ID prefix
-await supabase.from('todos').select('*')
+await supabase.from('items').select('*')
 ```
 
 4. **ALWAYS include user_id in queries**:
 ```jsx
 // ✅ CORRECT - filtered by user
 await supabase
-  .from(`app_${window.ENV.APP_ID}_todos`)
+  .from(`app_${window.ENV.APP_ID}_items`)
   .select('*')
   .eq('user_id', user.id)
 
 // ✅ CORRECT - include user_id when creating
 await supabase
-  .from(`app_${window.ENV.APP_ID}_todos`)
-  .insert([{ text, user_id: user.id }])
+  .from(`app_${window.ENV.APP_ID}_items`)
+  .insert([{ title, user_id: user.id }])
 ```
 
 ### React App Template (CDN-based)

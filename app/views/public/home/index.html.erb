@@ -26,7 +26,15 @@
             </p>
 
             <div class="py-2 text-center">
-              <%= link_to t('global.buttons.sign_in'), new_user_session_path, class: first_button_primary %>
+              <!-- Magical email-first flow: single input that figures out login vs signup -->
+              <%= form_with url: users_pre_otp_path, method: :post, data: { turbo_frame: "auth_modal" }, class: "max-w-md mx-auto" do %>
+                <div class="flex items-center gap-2">
+                  <input type="email" name="email" required placeholder="you@company.com"
+                         class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                  <button type="submit" class="btn-primary">Continue</button>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">We’ll detect if you already have an account and show the right option.</p>
+              <% end %>
             </div>
           </div>
         </div>

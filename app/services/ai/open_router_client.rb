@@ -4,18 +4,31 @@ module Ai
     base_uri ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
     MODELS = {
-      claude_4: "anthropic/claude-sonnet-4", # Claude 4 Sonnet - latest and most capable
-      claude_opus_4_1: "anthropic/claude-opus-4.1", # Claude Opus 4.1 for high-quality evaluation
-      claude_sonnet: "anthropic/claude-3.5-sonnet-20241022", # Claude 3.5 Sonnet with function calling
-      claude_sonnet_june: "anthropic/claude-3.5-sonnet-20240620", # June 2024 version
-      claude_3_7: "anthropic/claude-3.7-sonnet", # Claude 3.7 if available
-      openai_o4_mini: "openai/o4-mini-high", # OpenAI O4 Mini for alternative perspective
-      kimi_k2: "moonshotai/kimi-k2",  # TODO: Re-evaluate when OpenRouter fixes function calling support
-      deepseek_v3: "deepseek/deepseek-chat",  # Fallback model
-      gemini_flash: "google/gemini-1.5-flash" # Quick tasks
+      gpt5: "openai/gpt-5",  # Primary: 40% cheaper, larger context, advanced reasoning
+      claude_sonnet_4: "anthropic/claude-sonnet-4", # Fallback: Reliable function calling
+      kimi_k2: "moonshotai/kimi-k2",  # Alternative: Cost-effective with great quality
     }.freeze
 
-    DEFAULT_MODEL = :kimi_k2  # Use Kimi K2 for 82% cost savings with great quality
+    # Model specifications for dynamic token allocation
+    MODEL_SPECS = {
+      "openai/gpt-5" => { 
+        context: 272_000,  # GPT-5 has 272K input context
+        max_output: 128_000, # GPT-5 supports 128K output
+        cost_per_1k: 0.00125 # $1.25/M input, $10/M output averaged
+      },
+      "moonshotai/kimi-k2" => { 
+        context: 64_000, 
+        max_output: 32_000, # Leave room for input in 64k total context
+        cost_per_1k: 0.012 # Very cost-effective
+      },
+      "anthropic/claude-sonnet-4" => { 
+        context: 200_000, 
+        max_output: 60_000,  # Claude Sonnet 4 supports up to 64k output, use 60k for safety  
+        cost_per_1k: 0.30   # Higher quality but more expensive
+      }
+    }.freeze
+
+    DEFAULT_MODEL = :gpt5  # GPT-5 as default: 40% cheaper, better performance
 
     def initialize(api_key = nil)
       @api_key = api_key || ENV.fetch("OPENROUTER_API_KEY")
@@ -28,10 +41,77 @@ module Ai
         },
         timeout: 120  # 2 minute timeout - fail fast for better UX
       }
+      @context_cache = ContextCacheService.new
+      @error_handler = EnhancedErrorHandler.new
+      
+      # Initialize Anthropic client for prompt caching
+      @anthropic_client = AnthropicClient.new if ENV["ANTHROPIC_API_KEY"]
+      
+      # Initialize GPT-5 client for OpenAI models
+      @gpt5_client = OpenaiGpt5Client.instance if ENV["OPENAI_API_KEY"]
     end
 
-    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: 8000)
+    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, use_anthropic: true)
+      # Use GPT-5 direct API for OpenAI models if available
+      if @gpt5_client && (model == :gpt5 || model.to_s.include?("gpt"))
+        Rails.logger.info "[AI] Using OpenAI GPT-5 direct API" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        
+        # Determine reasoning level based on context
+        reasoning_level = determine_reasoning_level(messages)
+        
+        begin
+          # GPT-5 only supports default temperature (1.0)
+          gpt5_temperature = model.to_s.include?('gpt-5') ? 1.0 : temperature
+          
+          return @gpt5_client.chat(
+            messages,
+            model: model == :gpt5 ? 'gpt-5' : model,
+            temperature: gpt5_temperature,
+            max_tokens: max_tokens,
+            reasoning_level: reasoning_level,
+            use_cache: use_cache
+          )
+        rescue => e
+          Rails.logger.error "[AI] GPT-5 failed: #{e.message}"
+          # Return failure instead of fallback to avoid tool_use_id issues  
+          return { success: false, error: "GPT-5 failed: #{e.message}" }
+        end
+      end
+      
+      # Use Anthropic direct API for Claude models if available and requested
+      if use_anthropic && @anthropic_client && model.to_s.include?("claude")
+        Rails.logger.info "[AI] Using Anthropic direct API for #{model}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        
+        # Create cache breakpoints for optimal caching
+        ai_standards = get_ai_standards_content
+        cache_breakpoints = @anthropic_client.create_cache_breakpoints(ai_standards)
+        
+        return @anthropic_client.chat(
+          messages, 
+          model: model, 
+          temperature: temperature, 
+          max_tokens: max_tokens,
+          use_cache: use_cache,
+          cache_breakpoints: cache_breakpoints
+        )
+      end
+
       model_id = MODELS[model] || model
+      
+      # Calculate optimal max_tokens if not provided
+      if max_tokens.nil?
+        max_tokens = calculate_optimal_max_tokens(messages, model_id)
+      end
+
+      # Check cache first if enabled
+      if use_cache
+        request_hash = generate_request_hash(messages, model_id, temperature)
+        cached_response = @context_cache.get_cached_model_response(request_hash)
+        if cached_response
+          Rails.logger.info "[AI] Using cached response for model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+          return cached_response
+        end
+      end
 
       body = {
         model: model_id,
@@ -43,55 +123,58 @@ module Ai
 
       Rails.logger.info "[AI] Calling OpenRouter with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
-      retries = 0
-      max_retries = 2
-      
-      begin
+      # Use enhanced error handling with retry logic
+      retry_result = @error_handler.execute_with_retry("openrouter_chat_#{model_id}") do |attempt|
         response = self.class.post("/chat/completions", @options.merge(body: body.to_json))
-      rescue Net::ReadTimeout => e
-        retries += 1
-        if retries <= max_retries
-          Rails.logger.warn "[AI] Timeout occurred, retrying (#{retries}/#{max_retries})..."
-          sleep(retries * 2) # Exponential backoff
-          retry
-        else
-          Rails.logger.error "[AI] Timeout after #{max_retries} retries"
-          raise e
+        
+        unless response.success?
+          error_message = response.parsed_response["error"] || "HTTP #{response.code}"
+          raise HTTParty::Error.new("OpenRouter API error: #{error_message}")
         end
+        
+        response
       end
-
-      if response.success?
-        result = response.parsed_response
-        usage = result.dig("usage")
-
-        if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
-          Rails.logger.info "[AI] Token usage - Prompt: #{usage["prompt_tokens"]}, Completion: #{usage["completion_tokens"]}, Cost: $#{calculate_cost(usage, model_id)}"
-        end
-
-        {
-          success: true,
-          content: result.dig("choices", 0, "message", "content"),
-          usage: usage,
-          model: model_id
-        }
-      else
-        Rails.logger.error "[AI] OpenRouter error: #{response.code} - #{response.body}"
-        {
+      
+      unless retry_result[:success]
+        return {
           success: false,
-          error: response.parsed_response["error"] || "Unknown error",
-          code: response.code
+          error: retry_result[:error],
+          suggestion: retry_result[:suggestion],
+          attempts: retry_result[:attempt]
         }
       end
-    rescue => e
-      Rails.logger.error "[AI] OpenRouter exception: #{e.message}"
-      {
-        success: false,
-        error: e.message
+      
+      response = retry_result[:result]
+      result = response.parsed_response
+      usage = result.dig("usage")
+
+      if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
+        Rails.logger.info "[AI] Token usage - Prompt: #{usage["prompt_tokens"]}, Completion: #{usage["completion_tokens"]}, Cost: $#{calculate_cost(usage, model_id)}"
+      end
+
+      response_data = {
+        success: true,
+        content: result.dig("choices", 0, "message", "content"),
+        usage: usage,
+        model: model_id
       }
+
+      # Cache successful response if caching is enabled
+      if use_cache
+        request_hash = generate_request_hash(messages, model_id, temperature)
+        @context_cache.cache_model_response(request_hash, response_data)
+      end
+
+      response_data
     end
 
-    def stream_chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: 16000, &block)
+    def stream_chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, &block)
       model_id = MODELS[model] || model
+      
+      # Calculate optimal max_tokens if not provided
+      if max_tokens.nil?
+        max_tokens = calculate_optimal_max_tokens(messages, model_id)
+      end
       
       body = {
         model: model_id,
@@ -145,8 +228,63 @@ module Ai
       { success: false, error: e.message }
     end
     
-    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: 8000)
+    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_anthropic: true)
+      # Use GPT-5 direct API for OpenAI models if available
+      if @gpt5_client && (model == :gpt5 || model.to_s.include?("gpt"))
+        Rails.logger.info "[AI] Using OpenAI GPT-5 direct API with tools" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        
+        # Determine reasoning level based on context
+        reasoning_level = determine_reasoning_level(messages)
+        
+        begin
+          # GPT-5 only supports default temperature (1.0)
+          gpt5_temperature = model.to_s.include?('gpt-5') ? 1.0 : temperature
+          
+          return @gpt5_client.chat_with_tools(
+            messages,
+            tools,
+            model: model == :gpt5 ? 'gpt-5' : model,
+            reasoning_level: reasoning_level,
+            temperature: gpt5_temperature
+          )
+        rescue => e
+          Rails.logger.error "[AI] GPT-5 with tools failed: #{e.message}"
+          # Return failure instead of fallback to avoid tool_use_id issues
+          return { success: false, error: "GPT-5 failed: #{e.message}" }
+        end
+      end
+      
+      # Use Anthropic direct API for Claude models if available and requested
+      if use_anthropic && @anthropic_client && model.to_s.include?("claude")
+        Rails.logger.info "[AI] Using Anthropic direct API with tools for #{model}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        
+        # Convert OpenAI format tools to Anthropic format
+        anthropic_tools = convert_openai_tools_to_anthropic(tools)
+        
+        # Convert OpenAI format messages to Anthropic format
+        anthropic_messages = convert_openai_messages_to_anthropic(messages)
+        
+        # Create cache breakpoints for optimal caching
+        ai_standards = get_ai_standards_content
+        cache_breakpoints = @anthropic_client.create_cache_breakpoints(ai_standards)
+        
+        return @anthropic_client.chat_with_tools(
+          anthropic_messages, 
+          anthropic_tools,
+          model: model, 
+          temperature: temperature, 
+          max_tokens: max_tokens,
+          use_cache: true,
+          cache_breakpoints: cache_breakpoints
+        )
+      end
+
       model_id = MODELS[model] || model
+      
+      # Calculate optimal max_tokens if not provided
+      if max_tokens.nil?
+        max_tokens = calculate_optimal_max_tokens(messages, model_id)
+      end
 
       body = {
         model: model_id,
@@ -160,58 +298,49 @@ module Ai
 
       Rails.logger.info "[AI] Calling OpenRouter with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
-      retries = 0
-      max_retries = 2
-      
-      begin
+      # Use enhanced error handling with retry logic
+      retry_result = @error_handler.execute_with_retry("openrouter_tools_#{model_id}") do |attempt|
         response = self.class.post("/chat/completions", @options.merge(body: body.to_json))
-      rescue Net::ReadTimeout => e
-        retries += 1
-        if retries <= max_retries
-          Rails.logger.warn "[AI] Timeout occurred, retrying (#{retries}/#{max_retries})..."
-          sleep(retries * 2) # Exponential backoff
-          retry
-        else
-          Rails.logger.error "[AI] Timeout after #{max_retries} retries"
-          raise e
-        end
-      end
-
-      if response.success?
-        result = response.parsed_response
-        usage = result.dig("usage")
-        choice = result.dig("choices", 0)
-        message = choice&.dig("message")
-
-        if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
-          Rails.logger.info "[AI] Token usage - Prompt: #{usage["prompt_tokens"]}, Completion: #{usage["completion_tokens"]}, Cost: $#{calculate_cost(usage, model_id)}"
-        end
-
-        # Check if the model used function calling
-        tool_calls = message&.dig("tool_calls")
         
-        # Return successful response regardless of whether tools were called
-        # The AI might choose not to use tools, which is valid
-        {
-          success: true,
-          content: message&.dig("content") || "",
-          tool_calls: tool_calls || [],  # Return empty array if no tool calls
-          usage: usage,
-          model: model_id
-        }
-      else
-        Rails.logger.error "[AI] OpenRouter error: #{response.code} - #{response.body}"
-        {
+        unless response.success?
+          error_message = response.parsed_response["error"] || "HTTP #{response.code}"
+          raise HTTParty::Error.new("OpenRouter API error: #{error_message}")
+        end
+        
+        response
+      end
+      
+      unless retry_result[:success]
+        return {
           success: false,
-          error: response.parsed_response["error"] || "Unknown error",
-          code: response.code
+          error: retry_result[:error],
+          suggestion: retry_result[:suggestion],
+          attempts: retry_result[:attempt]
         }
       end
-    rescue => e
-      Rails.logger.error "[AI] OpenRouter tools exception: #{e.message}"
+      
+      response = retry_result[:result]
+
+      result = response.parsed_response
+      usage = result.dig("usage")
+      choice = result.dig("choices", 0)
+      message = choice&.dig("message")
+
+      if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
+        Rails.logger.info "[AI] Token usage - Prompt: #{usage["prompt_tokens"]}, Completion: #{usage["completion_tokens"]}, Cost: $#{calculate_cost(usage, model_id)}"
+      end
+
+      # Check if the model used function calling
+      tool_calls = message&.dig("tool_calls")
+      
+      # Return successful response regardless of whether tools were called
+      # The AI might choose not to use tools, which is valid
       {
-        success: false,
-        error: e.message
+        success: true,
+        content: message&.dig("content") || "",
+        tool_calls: tool_calls || [],  # Return empty array if no tool calls
+        usage: usage,
+        model: model_id
       }
     end
 
@@ -311,19 +440,19 @@ module Ai
         }
       ]
 
-      # Use Kimi K2 as primary (82% cost savings!)
-      Rails.logger.info "[AI] Using Kimi K2 for cost-effective generation"
-      result = chat_with_tools(messages, tools, model: :kimi_k2, temperature: 0.7, max_tokens: 16000)
+      # Use GPT-5 as primary (40% cost savings vs Sonnet-4!)
+      Rails.logger.info "[AI] Using GPT-5 for superior generation with cost savings"
+      result = chat_with_tools(messages, tools, model: :gpt5, temperature: 0.7, max_tokens: 32000)
       
       # Check if function calling was successful
       if result[:success] && result[:tool_calls]&.any?
-        Rails.logger.info "[AI] Kimi K2 function calling successful!"
+        Rails.logger.info "[AI] GPT-5 function calling successful! Cost savings: 40-45%"
       else
-        Rails.logger.warn "[AI] Kimi K2 failed, trying Claude 4 as fallback"
-        result = chat_with_tools(messages, tools, model: :claude_4, temperature: 0.7, max_tokens: 16000)
+        Rails.logger.warn "[AI] GPT-5 failed, trying Claude Sonnet 4 as fallback"
+        result = chat_with_tools(messages, tools, model: :claude_sonnet_4, temperature: 0.7, max_tokens: 16000)
         
         # Track the fallback for monitoring
-        Rails.logger.info "[AI] Claude Sonnet 3.5 fallback result: success=#{result[:success]}, tool_calls=#{result[:tool_calls]&.any?}"
+        Rails.logger.info "[AI] Claude Sonnet 4 fallback result: success=#{result[:success]}, tool_calls=#{result[:tool_calls]&.any?}"
       end
       
       result
@@ -375,12 +504,12 @@ module Ai
         }
       ]
 
-      # Use Claude 4 Sonnet as primary model with increased token limit for complex apps
-      result = chat_with_tools(messages, tools, model: :claude_4, temperature: 0.7, max_tokens: 16000)
+      # Use GPT-5 as primary model with increased token limit for complex apps
+      result = chat_with_tools(messages, tools, model: :gpt5, temperature: 0.7, max_tokens: 32000)
       
       if !result[:success] || !result[:tool_calls]&.any?
-        Rails.logger.warn "[AI] Claude 4 app update function calling failed, trying Claude 3.5 Sonnet"
-        result = chat_with_tools(messages, tools, model: :claude_sonnet, temperature: 0.7, max_tokens: 16000)
+        Rails.logger.warn "[AI] GPT-5 app update function calling failed, trying Claude Sonnet 4"
+        result = chat_with_tools(messages, tools, model: :claude_sonnet_4, temperature: 0.7, max_tokens: 16000)
       end
       
       result
@@ -462,6 +591,104 @@ module Ai
     end
 
     private
+    
+    # Convert OpenAI format tools to Anthropic format
+    def convert_openai_tools_to_anthropic(openai_tools)
+      return [] unless openai_tools.is_a?(Array)
+      
+      openai_tools.map do |tool|
+        if tool[:type] == "function" && tool[:function]
+          {
+            name: tool[:function][:name],
+            description: tool[:function][:description],
+            input_schema: tool[:function][:parameters] || {
+              type: "object",
+              properties: {},
+              required: []
+            }
+          }
+        else
+          # If it's not in OpenAI format, log and skip
+          Rails.logger.warn "[OpenRouterClient] Skipping tool with unexpected format: #{tool.inspect}"
+          nil
+        end
+      end.compact
+    end
+    
+    # Convert OpenAI format messages to Anthropic format
+    def convert_openai_messages_to_anthropic(messages)
+      return messages unless messages.is_a?(Array)
+      
+      Rails.logger.info "[OpenRouterClient] Converting #{messages.length} messages to Anthropic format" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      
+      # Filter out any messages that might cause issues
+      valid_messages = messages.select do |message|
+        message.is_a?(Hash) && message[:role]
+      end
+      
+      valid_messages.map do |message|
+        if message[:role] == "tool"
+          # Convert OpenAI tool result to Anthropic user message with tool_result
+          tool_call_id = message[:tool_call_id] || message["tool_call_id"]
+          content_value = message[:content] || message["content"]
+          
+          Rails.logger.debug "[OpenRouterClient] Converting tool result with ID: #{tool_call_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+          
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: tool_call_id,
+                content: content_value
+              }
+            ]
+          }
+        elsif message[:role] == "assistant" && message[:tool_calls]
+          # Convert OpenAI assistant message with tool_calls to Anthropic format
+          content_parts = []
+          
+          # Add text content if present
+          if message[:content] && !message[:content].empty?
+            content_parts << { type: "text", text: message[:content] }
+          end
+          
+          # Add tool use calls
+          message[:tool_calls].each do |tool_call|
+            if tool_call[:function]
+              tool_id = tool_call[:id] || tool_call["id"]
+              function_name = tool_call[:function][:name] || tool_call["function"]["name"]
+              function_args = tool_call[:function][:arguments] || tool_call["function"]["arguments"] || "{}"
+              
+              arguments = begin
+                JSON.parse(function_args)
+              rescue
+                {}
+              end
+              
+              Rails.logger.debug "[OpenRouterClient] Converting tool_use with ID: #{tool_id}, name: #{function_name}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+              
+              content_parts << {
+                type: "tool_use",
+                id: tool_id,
+                name: function_name,
+                input: arguments
+              }
+            end
+          end
+          
+          {
+            role: "assistant",
+            content: content_parts
+          }
+        else
+          # Return message as-is but remove tool_calls field if it exists for non-assistant messages
+          clean_message = message.dup
+          clean_message.delete(:tool_calls) unless message[:role] == "assistant"
+          clean_message
+        end
+      end
+    end
     
     def build_analysis_prompt(request, current_files, app_context)
       prompt = <<~PROMPT
@@ -720,6 +947,7 @@ module Ai
     def calculate_cost(usage, model_id)
       # Cost estimates per 1M tokens from OpenRouter
       costs = {
+        "openai/gpt-5" => {prompt: 1.25, completion: 10.00},  # GPT-5 pricing
         "moonshotai/kimi-k2" => {prompt: 0.30, completion: 0.30},  # $0.30 per 1M tokens
         "deepseek/deepseek-chat" => {prompt: 0.001, completion: 0.002},
         "google/gemini-1.5-flash" => {prompt: 0.00015, completion: 0.0006},
@@ -733,5 +961,71 @@ module Ai
 
       (prompt_cost + completion_cost).round(6)
     end
+    
+    # Determine reasoning level based on request complexity
+    def determine_reasoning_level(messages)
+      content = messages.map { |m| m[:content] || m['content'] || '' }.join(' ')
+      
+      # High reasoning for complex tasks
+      if content.match?(/complex|analyze|debug|architect|plan|strategy|optimize/i)
+        :high
+      # Low reasoning for simple queries
+      elsif content.match?(/simple|quick|list|explain|what is|how to/i)
+        :low
+      # Minimal for basic responses
+      elsif content.length < 200
+        :minimal
+      # Default to medium for most tasks
+      else
+        :medium
+      end
+    end
+
+    private
+
+    # Calculate optimal max_tokens based on prompt length and model capabilities
+    def calculate_optimal_max_tokens(messages, model_id)
+      specs = MODEL_SPECS[model_id]
+      return 16000 unless specs # Fallback for unknown models - more generous
+      
+      # Estimate token count for messages (rough approximation: 1 token ≈ 3.5 characters for better accuracy)
+      prompt_chars = messages.sum { |msg| msg[:content].to_s.length }
+      estimated_prompt_tokens = (prompt_chars / 3.5).ceil
+      
+      # Calculate available space in context window
+      safety_margin = 1000  # Larger safety margin for system messages, etc.
+      available_tokens = specs[:context] - estimated_prompt_tokens - safety_margin
+      
+      # For app generation, prioritize maximum output space
+      # Use 90% of available context or full max_output, whichever is smaller
+      max_possible_output = [available_tokens, specs[:max_output]].min
+      desired_output = (max_possible_output * 0.9).to_i
+      
+      # For very short prompts, ensure we get substantial output
+      if estimated_prompt_tokens < 1000
+        desired_output = [desired_output, specs[:max_output] * 0.8].max.to_i
+      end
+      
+      # Ensure minimum viable output for app generation
+      optimal_tokens = [desired_output, 4000].max
+      
+      Rails.logger.info "[AI] Token allocation for #{model_id}: prompt ~#{estimated_prompt_tokens}, available #{available_tokens}, output #{optimal_tokens}/#{specs[:max_output]} max" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      
+      optimal_tokens
+    end
+    
+    # Generate a consistent hash for request caching
+    def generate_request_hash(messages, model_id, temperature)
+      content = "#{messages.to_json}:#{model_id}:#{temperature}"
+      Digest::SHA256.hexdigest(content)
+    end
+    
+    # Get AI standards content for prompt caching
+    def get_ai_standards_content
+      @ai_standards ||= begin
+        File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
+      end
+    end
+    
   end
 end

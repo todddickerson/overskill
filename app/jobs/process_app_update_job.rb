@@ -300,6 +300,9 @@ class ProcessAppUpdateJob < ApplicationJob
 
 
   def handle_timeout_error(chat_message)
+    # If chat_message is an ID, load the actual message
+    chat_message = AppChatMessage.find(chat_message) if chat_message.is_a?(Integer)
+    
     Rails.logger.error "[ProcessAppUpdate] Job timed out after 10 minutes for chat_message #{chat_message.id}"
     
     # Note: Don't update user message status - only assistant messages can have status
@@ -317,6 +320,9 @@ class ProcessAppUpdateJob < ApplicationJob
   def handle_error(chat_message, error_message)
     Rails.logger.error "[ProcessAppUpdate] Error: #{error_message}"
 
+    # If chat_message is an ID, load the actual message
+    chat_message = AppChatMessage.find(chat_message) if chat_message.is_a?(Integer)
+    
     # Note: Don't update user message status - only assistant messages can have status
 
     # Create error message

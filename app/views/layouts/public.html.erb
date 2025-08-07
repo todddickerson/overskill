@@ -30,7 +30,7 @@
     <meta name="twitter:image" content="<%= content_for(:twitter_image) || image_url('logo/logo.png') %>">
   </head>
 
-  <body class="min-h-screen bg-gray-50">
+  <body class="min-h-screen bg-gray-50" data-user-signed-in="<%= user_signed_in? %>">
     <!-- Header -->
     <%= render 'shared/header' %>
     

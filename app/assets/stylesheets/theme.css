@@ -70,7 +70,21 @@
 
 /* Custom button styles */
 .btn-primary {
-  @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-500 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all hover:shadow-md;
+  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-md text-white transition-all;
+  background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%); /* indigo → blue */
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.25);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 10px 22px rgba(59, 130, 246, 0.30);
+}
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(227, 243, 0, 0.45); /* subtle brand ring */
+}
+.btn-primary:disabled {
+  @apply opacity-70 cursor-not-allowed;
 }
 
 .btn-secondary {
@@ -94,6 +108,20 @@
 
 .animate-pulse-primary {
   animation: pulse-primary 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Ghost link/button for clean navigation hovers */
+.btn-ghost {
+  @apply inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md transition-colors;
+}
+.btn-ghost:hover {
+  @apply text-gray-900 bg-gray-100;
+}
+
+/* Brand pill for small accents */
+.pill-brand {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium text-gray-900;
+  background-color: var(--primary-500);
 }
 
 /* Dark mode adjustments */

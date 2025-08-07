@@ -95,6 +95,8 @@ erd.pdf
 # 🚅 add your files to ignore here.
 
 # Environment files
+.env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
