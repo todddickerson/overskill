@@ -1,0 +1,105 @@
+/* Overskill Brand Colors and Theme Variables */
+:root {
+  /* Primary Colors - Based on Overskill Logo */
+  --primary-50: #fefce8;
+  --primary-100: #fef9c3;
+  --primary-200: #fef08a;
+  --primary-300: #fde047;
+  --primary-400: #facc15;
+  --primary-500: #E3F300; /* Main brand color from logo */
+  --primary-600: #ca8a04;
+  --primary-700: #a16207;
+  --primary-800: #854d0e;
+  --primary-900: #713f12;
+
+  /* Secondary Colors - Based on logo icon color */
+  --secondary-50: #f7f8e8;
+  --secondary-100: #ecedbc;
+  --secondary-200: #dde08a;
+  --secondary-300: #c9cd4f;
+  --secondary-400: #b3b424;
+  --secondary-500: #9a9618;
+  --secondary-600: #7c7613;
+  --secondary-700: #6A7107; /* Dark olive from logo */
+  --secondary-800: #504613;
+  --secondary-900: #433a15;
+
+  /* Accent Colors */
+  --accent-green: #10b981;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-pink: #ec4899;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--secondary-300) 0%, var(--secondary-700) 100%);
+  --gradient-vibrant: linear-gradient(135deg, var(--primary-500) 0%, var(--accent-green) 100%);
+  
+  /* Shadows with brand colors */
+  --shadow-primary: 0 4px 6px -1px rgba(227, 243, 0, 0.1), 0 2px 4px -2px rgba(227, 243, 0, 0.1);
+  --shadow-primary-lg: 0 10px 15px -3px rgba(227, 243, 0, 0.1), 0 4px 6px -4px rgba(227, 243, 0, 0.1);
+}
+
+/* Custom utility classes */
+.bg-gradient-primary {
+  background: var(--gradient-primary);
+}
+
+.bg-gradient-secondary {
+  background: var(--gradient-secondary);
+}
+
+.bg-gradient-vibrant {
+  background: var(--gradient-vibrant);
+}
+
+.text-gradient-primary {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.shadow-primary {
+  box-shadow: var(--shadow-primary);
+}
+
+.shadow-primary-lg {
+  box-shadow: var(--shadow-primary-lg);
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-500 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all hover:shadow-md;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+/* Brand-specific animations */
+@keyframes pulse-primary {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-pulse-primary {
+  animation: pulse-primary 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-500: #cbd407; /* Slightly darker in dark mode */
+    --primary-600: #a3b000;
+  }
+}

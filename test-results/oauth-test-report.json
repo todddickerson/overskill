@@ -1,0 +1,53 @@
+{
+  "timestamp": "2025-08-07T15:43:46.287Z",
+  "appUrl": "https://preview-69.overskill.app",
+  "testResults": {
+    "connectivity": {
+      "success": true,
+      "loadTime": 146,
+      "statusCode": 200
+    },
+    "authPages": {
+      "/login": {
+        "success": true,
+        "statusCode": 200,
+        "loadTime": 28,
+        "contentLength": 1149
+      },
+      "/signup": {
+        "success": true,
+        "statusCode": 200,
+        "loadTime": 28,
+        "contentLength": 1149
+      },
+      "/forgot-password": {
+        "success": true,
+        "statusCode": 200,
+        "loadTime": 30,
+        "contentLength": 1149
+      },
+      "/auth/callback": {
+        "success": true,
+        "statusCode": 200,
+        "loadTime": 28,
+        "contentLength": 1149
+      }
+    },
+    "supabaseConfig": {
+      "hasSupabaseUrl": true,
+      "hasAnonKey": true,
+      "supabaseUrl": "https://bsbgwixlklvgeoxvjmtb.supabase.co"
+    },
+    "oauthEndpoints": {
+      "hasGoogleOAuth": false,
+      "hasGitHubOAuth": false,
+      "hasOAuthButtons": false,
+      "callbackStatus": 200
+    }
+  },
+  "summary": {
+    "totalTests": 4,
+    "passedTests": 4,
+    "failedTests": 0
+  }
+}

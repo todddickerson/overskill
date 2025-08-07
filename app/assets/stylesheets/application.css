@@ -22,6 +22,9 @@
 /* Import Neue Regrade font for overskill branding */
 @import "./fonts/neue-regrade.css";
 
+/* Import Overskill brand theme and colors */
+@import "./theme.css";
+
 /* Import mobile editor styles */
 @import "./mobile_editor.css";
 
