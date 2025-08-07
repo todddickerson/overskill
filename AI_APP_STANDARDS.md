@@ -86,14 +86,47 @@ export function Auth({ onAuth }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      <button type="submit">{isSignUp ? 'Sign Up' : 'Sign In'}</button>
-      <button type="button" onClick={() => setIsSignUp(!isSignUp)}>
-        {isSignUp ? 'Have account? Sign In' : 'Need account? Sign Up'}
-      </button>
-    </form>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+        <h2 className="text-center text-3xl font-extrabold text-gray-900">
+          {isSignUp ? 'Create Account' : 'Sign In'}
+        </h2>
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-4">
+            <input 
+              type="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Email address"
+              required 
+            />
+            <input 
+              type="password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Password"
+              required 
+            />
+          </div>
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="w-full text-center text-indigo-600 hover:text-indigo-500"
+          >
+            {isSignUp ? 'Have account? Sign In' : 'Need account? Sign Up'}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }
 ```
@@ -428,12 +461,21 @@ Always use HSL-based color systems for easy theming:
 ```
 
 #### Form Inputs
+
+**CRITICAL: Always include text-slate-900 for input text color to prevent white-on-white text issues**
+
 ```html
 <div class="space-y-2">
   <label class="text-sm font-medium text-slate-700">Label</label>
-  <input type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+  <input type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
 </div>
 ```
+
+**Required input classes:**
+- `text-slate-900` or `text-gray-900` - ALWAYS include for text color
+- `placeholder-slate-500` - For placeholder text visibility
+- `bg-white` - Explicit background if needed
+- `focus:outline-none focus:ring-2` - For accessibility
 
 ## JavaScript Standards
 
@@ -984,7 +1026,7 @@ const auth = {
       Field Label
     </label>
     <input type="text" 
-           class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+           class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
   </div>
   
   <button type="submit" 
