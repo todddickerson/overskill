@@ -163,4 +163,87 @@ orchestrator = Ai::AppUpdateOrchestratorV2.new(message)
 orchestrator.execute!
 ```
 
-[Rest of the file remains the same...]
+## DevUX and Testing Tools
+
+### Deployment Testing Suite
+Comprehensive test scripts for verifying deployed app functionality:
+
+#### Core Test Scripts (JavaScript/Node.js)
+- **`test_todo_deployment.js`** - Main deployment verification
+  - Tests app accessibility and HTTP status
+  - Analyzes HTML structure for React elements
+  - Detects TypeScript transformation errors
+  - Validates todo app content and patterns
+  - Generates comprehensive test reports
+
+- **`test_app_functionality.js`** - JavaScript/React functionality testing
+  - Tests main script loading and execution
+  - Analyzes React component patterns
+  - Checks for modern JavaScript syntax
+  - Validates environment variable injection
+  - Provides code samples and detailed analysis
+
+- **`test_app_components.js`** - Component-level testing
+  - Tests individual React component files
+  - Validates CSS and styling resources
+  - Checks for proper React hooks usage
+  - Analyzes JSX transformation quality
+
+- **`test_dev_url.js`** - Development URL testing
+  - Tests dev.overskill.app accessibility
+  - Validates development environment setup
+  - Checks for proper CNAME configuration
+
+#### Browser-based Testing
+- **`test_deployed_todo_app.html`** - Interactive browser test
+  - Live iframe testing of deployed apps
+  - Real-time JavaScript error detection
+  - Cross-origin frame testing capabilities
+  - Visual status reporting with styled interface
+  - Screenshot placeholders for manual testing
+
+#### Usage Examples
+```bash
+# Run comprehensive deployment test
+node test_todo_deployment.js
+
+# Test React functionality specifically  
+node test_app_functionality.js
+
+# Analyze all app components
+node test_app_components.js
+
+# Test development URLs
+node test_dev_url.js
+
+# Open browser-based interactive test
+open test_deployed_todo_app.html
+```
+
+#### Key Testing Patterns
+- **TypeScript Error Detection**: Specifically looks for transformation issues
+  - "Invalid regular expression flags"
+  - "missing ) after argument list" 
+  - Syntax errors in transpiled JavaScript
+  
+- **React Validation**: Checks for proper React loading
+  - useState/useEffect hooks
+  - JSX rendering
+  - Component mounting
+  - Modern JavaScript patterns
+
+- **Todo App Validation**: Verifies app-specific functionality
+  - Task management features
+  - State persistence
+  - UI interaction patterns
+  - External library integration
+
+#### Test Report Generation
+All test scripts generate detailed reports including:
+- HTTP status codes and response analysis
+- JavaScript error detection and categorization
+- React component structure validation
+- Performance and loading metrics
+- Specific recommendations for fixes
+
+These tools are essential for verifying that Cloudflare Worker deployments are functioning correctly and that TypeScript transformation is working without introducing runtime errors.

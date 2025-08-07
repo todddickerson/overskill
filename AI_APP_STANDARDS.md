@@ -17,25 +17,8 @@ You are building professional-grade web applications that rival Lovable.dev, Cur
 
 ## Required Technology Stack
 
-### Base Technologies (MANDATORY)
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App Name</title>
-  <!-- ALWAYS include Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Professional fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
-<body class="font-['Inter'] antialiased">
-  <!-- Content here -->
-  <script src="app.js"></script>
-</body>
-</html>
-```
+### Base Technologies (React Only)
+ALL applications must be React single-page applications (SPAs) using CDN-based React, not bundled.
 
 ### Approved External Resources
 - ✅ **Tailwind CSS**: Via CDN (https://cdn.tailwindcss.com) with custom configuration
@@ -49,15 +32,176 @@ You are building professional-grade web applications that rival Lovable.dev, Cur
 - ✅ **date-fns**: For date formatting (via CDN)
 - ✅ **DOMPurify**: For sanitizing user content (via CDN)
 
-### File Structure Requirements
+#### React-Specific Resources (CDN Only)
+- ✅ **React + ReactDOM**: Via CDN with Babel transformer for JSX
+- ✅ **@heroicons/react**: Icons optimized for React (via CDN)
+- ✅ **React Router**: For client-side routing (via CDN)
+- ✅ **Supabase JS**: Database client (via CDN)
+
+### File Structure Requirements (React Apps Only)
+
+**ALL apps are React applications. NO vanilla HTML/JS apps.**
+
 ```
-index.html       - Main HTML file with proper meta tags (REQUIRED)
-app.js           - Main JavaScript application logic (REQUIRED)
-styles.css       - Custom styles and CSS variables for theming
-components.js    - Reusable UI components and utilities
-api.js           - API integration and data management
-config.js        - App configuration and environment setup
-data.json        - Sample data for development
+index.html       - HTML entry point with React CDN scripts (REQUIRED)
+src/App.jsx      - Main React component (JSX, NOT TSX)
+src/main.jsx     - ReactDOM render entry point (JSX, NOT TSX)  
+src/index.css    - Global styles and Tailwind imports
+src/lib/supabase.js - Supabase client configuration
+src/lib/analytics.js - Analytics tracking utilities
+src/components/  - Reusable React components (JSX only)
+```
+
+**CRITICAL: ALL files must use .jsx extension, NEVER .tsx TypeScript files**
+
+## Database & Authentication Rules
+
+### MANDATORY: Apps with User Data MUST Include Authentication
+
+When generating ANY app with user-specific data (todos, notes, posts, etc.):
+
+1. **ALWAYS create Auth component** at `src/components/Auth.jsx`:
+```jsx
+import { useState } from 'react'
+import { supabase } from '../lib/supabase'
+
+export function Auth({ onAuth }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    
+    const { data, error } = isSignUp
+      ? await supabase.auth.signUp({ email, password })
+      : await supabase.auth.signInWithPassword({ email, password })
+    
+    if (error) alert(error.message)
+    else if (data.user) onAuth(data.user)
+    
+    setLoading(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+      <button type="submit">{isSignUp ? 'Sign Up' : 'Sign In'}</button>
+      <button type="button" onClick={() => setIsSignUp(!isSignUp)}>
+        {isSignUp ? 'Have account? Sign In' : 'Need account? Sign Up'}
+      </button>
+    </form>
+  )
+}
+```
+
+2. **ALWAYS check authentication in App.jsx**:
+```jsx
+const [user, setUser] = useState(null)
+
+useEffect(() => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setUser(session?.user ?? null)
+  })
+}, [])
+
+if (!user) return <Auth onAuth={setUser} />
+```
+
+3. **ALWAYS use full table names with app ID**:
+```jsx
+// ✅ CORRECT - uses app ID from environment
+const tableName = `app_${window.ENV.APP_ID}_todos`
+await supabase.from(tableName).select('*')
+
+// ❌ WRONG - missing app ID prefix
+await supabase.from('todos').select('*')
+```
+
+4. **ALWAYS include user_id in queries**:
+```jsx
+// ✅ CORRECT - filtered by user
+await supabase
+  .from(`app_${window.ENV.APP_ID}_todos`)
+  .select('*')
+  .eq('user_id', user.id)
+
+// ✅ CORRECT - include user_id when creating
+await supabase
+  .from(`app_${window.ENV.APP_ID}_todos`)
+  .insert([{ text, user_id: user.id }])
+```
+
+### React App Template (CDN-based)
+
+#### index.html Template
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Name</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="font-['Inter'] antialiased">
+  <div id="root"></div>
+  
+  <!-- React via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Supabase client -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  
+  <!-- Load app -->
+  <script type="text/babel" src="src/main.jsx"></script>
+</body>
+</html>
+```
+
+#### src/main.jsx Template
+```javascript
+const { createRoot } = ReactDOM;
+const { StrictMode } = React;
+
+createRoot(document.getElementById('root')).render(
+  React.createElement(StrictMode, null,
+    React.createElement(App, null)
+  )
+);
+```
+
+#### Component Pattern (NO TypeScript syntax)
+```javascript
+// Use React.createElement or JSX with Babel transform
+function MyComponent({ title, children }) {
+  const [state, setState] = React.useState(false);
+  
+  return React.createElement('div', {
+    className: 'p-4 bg-white rounded-lg'
+  }, 
+    React.createElement('h2', { className: 'text-xl font-bold' }, title),
+    children
+  );
+}
+
+// Or with JSX (requires Babel transform in browser)
+function MyComponent({ title, children }) {
+  const [state, setState] = React.useState(false);
+  
+  return (
+    <div className="p-4 bg-white rounded-lg">
+      <h2 className="text-xl font-bold">{title}</h2>
+      {children}
+    </div>
+  );
+}
 ```
 
 ### Multi-Page App Structure

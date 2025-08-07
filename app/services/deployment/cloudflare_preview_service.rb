@@ -30,8 +30,15 @@ class Deployment::CloudflarePreviewService
     worker_name = "preview-#{@app.id}"
     preview_subdomain = "preview-#{@app.id}" # Use preview-{uuid} as subdomain
     
-    # Upload worker script with latest files
-    worker_script = generate_worker_script
+    # Build app with Vite first
+    Rails.logger.info "[CloudflarePreview] Building app #{@app.id} with Vite"
+    build_service = Deployment::ViteBuildService.new(@app)
+    build_result = build_service.build_app!
+    
+    return { success: false, error: "Build failed: #{build_result[:error]}" } unless build_result[:success]
+    
+    # Upload worker script with built files
+    worker_script = generate_worker_script_with_built_files(build_result[:files])
     upload_response = upload_worker(worker_name, worker_script)
     
     # Set environment variables
@@ -83,22 +90,23 @@ class Deployment::CloudflarePreviewService
   
   private
   
-  def set_worker_env_vars(worker_name)
+  def set_worker_env_vars(worker_name, environment = :preview)
     # Set environment variables via Cloudflare API
-    all_env_vars = build_env_vars_for_app
+    all_env_vars = build_env_vars_for_app(environment)
     
     # Cloudflare API expects both plaintext vars and secrets in specific format
     plaintext_bindings = []
     secret_bindings = []
     
     all_env_vars.each do |key, value|
-      if key.include?('SECRET') || key.include?('SERVICE_KEY') || key.include?('PRIVATE')
+      # SUPABASE_ANON_KEY is public (for browser), SERVICE_KEY is secret (for server)
+      if (key.include?('SECRET') || key.include?('SERVICE_KEY') || key.include?('PRIVATE')) && !key.include?('ANON_KEY')
         # Treat as secret
         secret_bindings << { name: key, type: 'secret_text' }
         # Secrets need to be set separately via PATCH endpoint
         set_worker_secret(worker_name, key, value)
       else
-        # Treat as plaintext
+        # Treat as plaintext (including SUPABASE_ANON_KEY)
         plaintext_bindings << { 
           name: key, 
           type: 'plain_text',
@@ -115,24 +123,47 @@ class Deployment::CloudflarePreviewService
     Rails.logger.info "[CloudflarePreview] Set #{plaintext_bindings.size} env vars and #{secret_bindings.size} secrets"
   end
   
-  def build_env_vars_for_app
+  def build_env_vars_for_app(environment = :preview)
     vars = {}
     
     # System vars
     vars['APP_ID'] = @app.id.to_s
     vars['APP_NAME'] = @app.name
-    vars['ENVIRONMENT'] = 'preview'
+    vars['ENVIRONMENT'] = environment.to_s
     
-    # Supabase configuration (from app's shard)
-    if @app.database_shard
-      vars['SUPABASE_URL'] = @app.database_shard.supabase_url
-      vars['SUPABASE_ANON_KEY'] = @app.database_shard.supabase_anon_key
-      vars['SUPABASE_SERVICE_KEY'] = @app.database_shard.supabase_service_key
+    # Set deployed timestamp based on environment
+    case environment
+    when :preview
+      vars['DEPLOYED_AT'] = @app.preview_updated_at&.iso8601 || Time.current.iso8601
+      vars['BUILD_ID'] = @app.build_id || "preview-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+    when :staging
+      vars['DEPLOYED_AT'] = @app.staging_deployed_at&.iso8601 || Time.current.iso8601
+      vars['BUILD_ID'] = @app.build_id || "staging-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+    when :production
+      vars['DEPLOYED_AT'] = @app.deployed_at&.iso8601 || Time.current.iso8601
+      vars['BUILD_ID'] = @app.build_id || "production-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+    else
+      vars['DEPLOYED_AT'] = Time.current.iso8601
+      vars['BUILD_ID'] = @app.build_id || "#{environment}-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
     end
     
-    # Custom app env vars
+    # Supabase configuration (from app's shard)
+    # Temporarily skip database shard access due to association issue
+    # TODO: Fix database shard association circular reference
+    # if @app.database_shard
+    #   vars['SUPABASE_URL'] = @app.database_shard.supabase_url
+    #   vars['SUPABASE_ANON_KEY'] = @app.database_shard.supabase_anon_key
+    #   vars['SUPABASE_SERVICE_KEY'] = @app.database_shard.supabase_service_key
+    # end
+    
+    # Use fallback Supabase config from environment for testing
+    vars['SUPABASE_URL'] = ENV['SUPABASE_URL'] if ENV['SUPABASE_URL']
+    vars['SUPABASE_ANON_KEY'] = ENV['SUPABASE_ANON_KEY'] if ENV['SUPABASE_ANON_KEY']
+    vars['SUPABASE_SERVICE_KEY'] = ENV['SUPABASE_SERVICE_KEY'] if ENV['SUPABASE_SERVICE_KEY']
+    
+    # Custom app env vars (but don't override system vars)
     @app.env_vars_for_deployment.each do |key, value|
-      vars[key] = value
+      vars[key] = value unless ['APP_ID', 'ENVIRONMENT', 'DEPLOYED_AT', 'BUILD_ID'].include?(key)
     end
     
     # OAuth secrets (from Rails env)
@@ -209,6 +240,9 @@ class Deployment::CloudflarePreviewService
     worker_script = generate_worker_script
     upload_response = upload_worker(worker_name, worker_script)
     
+    # Set environment variables
+    set_worker_env_vars(worker_name, environment)
+    
     return { success: false, error: "Failed to upload #{environment} worker" } unless upload_response['success']
     
     # Enable workers.dev subdomain
@@ -248,6 +282,161 @@ class Deployment::CloudflarePreviewService
     { success: false, error: e.message }
   end
 
+  def generate_worker_script_with_built_files(built_files)
+    # Worker script that serves pre-built Vite files
+    # Include environment variables directly in script for simplicity
+    env_vars_js = build_env_vars_for_app(:preview).to_json
+    
+    <<~JAVASCRIPT
+      // Environment variables embedded at build time
+      const ENV_VARS = #{env_vars_js};
+
+      addEventListener('fetch', event => {
+        event.respondWith(handleRequest(event.request))
+      })
+
+      async function handleRequest(request) {
+        const url = new URL(request.url)
+        const pathname = url.pathname
+        const env = ENV_VARS // Use embedded environment variables
+        
+        // Handle API routes that need secret env vars
+        if (pathname.startsWith('/api/')) {
+          return handleApiRequest(request, env)
+        }
+        
+        // Handle root path - serve index.html
+        if (pathname === '/') {
+          const indexHtml = getBuiltFile('index.html')
+          if (indexHtml) {
+            // Inject environment variables into HTML
+            const publicEnvVars = getPublicEnvVars(env)
+            const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`
+            
+            // Add version meta tags
+            const versionMeta = `
+              <meta name="overskill-app-id" content="${env.APP_ID}">
+              <meta name="overskill-app-name" content="${env.APP_NAME}">
+              <meta name="overskill-environment" content="${env.ENVIRONMENT}">
+              <meta name="overskill-deployed-at" content="${env.DEPLOYED_AT || new Date().toISOString()}">
+              <meta name="overskill-build-id" content="${env.BUILD_ID || 'unknown'}">
+              <meta name="overskill-version" content="${Date.now()}">
+            `
+            
+            // Inject into HTML
+            let modifiedHtml = indexHtml.content
+            if (indexHtml.content.includes('</head>')) {
+              modifiedHtml = indexHtml.content.replace('</head>', versionMeta + envScript + '</head>')
+            } else if (indexHtml.content.includes('<body>')) {
+              modifiedHtml = indexHtml.content.replace('<body>', '<body>' + versionMeta + envScript)
+            } else {
+              modifiedHtml = versionMeta + envScript + indexHtml.content
+            }
+            
+            return new Response(modifiedHtml, {
+              headers: {
+                'Content-Type': 'text/html',
+                'X-Frame-Options': 'ALLOWALL'
+              }
+            })
+          }
+          return new Response('File not found', { status: 404 })
+        }
+        
+        // Serve static built files
+        const cleanPath = pathname.startsWith('/') ? pathname.slice(1) : pathname
+        return serveBuiltFile(cleanPath)
+      }
+      
+      function getBuiltFile(path) {
+        const files = #{built_files_as_json(built_files)}
+        return files[path]
+      }
+
+      async function serveBuiltFile(path) {
+        try {
+          const files = #{built_files_as_json(built_files)}
+          const file = files[path]
+          
+          if (!file) {
+            return new Response('File not found', { status: 404 })
+          }
+          
+          let content = file.content
+          
+          // Handle binary files
+          if (file.binary) {
+            // Decode base64 for binary files
+            const binaryString = atob(content)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            content = bytes
+          }
+          
+          return new Response(content, {
+            headers: {
+              'Content-Type': file.content_type,
+              'Cache-Control': 'public, max-age=31536000', // Cache built assets for 1 year
+              'Access-Control-Allow-Origin': '*',
+              'X-Frame-Options': 'ALLOWALL'
+            }
+          })
+        } catch (error) {
+          return new Response('Internal Server Error', { status: 500 })
+        }
+      }
+
+      // Get only public environment variables (safe for client)
+      function getPublicEnvVars(env) {
+        const publicVars = {}
+        const publicKeys = ['APP_ID', 'ENVIRONMENT', 'API_BASE_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY']
+        
+        // Add any env vars starting with PUBLIC_
+        for (const key in env) {
+          if (publicKeys.includes(key) || key.startsWith('PUBLIC_') || key.startsWith('VITE_')) {
+            publicVars[key] = env[key]
+          }
+        }
+        
+        return publicVars
+      }
+      
+      // Handle API requests with access to secret env vars
+      async function handleApiRequest(request, env) {
+        const url = new URL(request.url)
+        const path = url.pathname
+        
+        // Proxy to Supabase with service key
+        if (path.startsWith('/api/supabase')) {
+          const supabaseUrl = env.SUPABASE_URL
+          const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY
+          
+          if (!supabaseUrl || !supabaseKey) {
+            return new Response(JSON.stringify({ error: 'Database not configured' }), { 
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            })
+          }
+          
+          // Proxy the request
+          const targetUrl = supabaseUrl + path.replace('/api/supabase', '')
+          const proxyRequest = new Request(targetUrl, request)
+          proxyRequest.headers.set('apikey', supabaseKey)
+          proxyRequest.headers.set('Authorization', `Bearer ${supabaseKey}`)
+          
+          return fetch(proxyRequest)
+        }
+        
+        return new Response(JSON.stringify({ error: 'API endpoint not found' }), { 
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+    JAVASCRIPT
+  end
+
   def generate_worker_script
     # Worker script with environment variable support
     <<~JAVASCRIPT
@@ -269,18 +458,28 @@ class Deployment::CloudflarePreviewService
         if (pathname === '/') {
           const htmlContent = await getFile('index.html')
           if (htmlContent) {
-            // Inject public environment variables
+            // Inject public environment variables and version info
             const publicEnvVars = getPublicEnvVars(env)
             const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`
             
-            // Inject env vars before </head> or <body>
+            // Add version meta tags with deployment tracking info
+            const versionMeta = `
+              <meta name="overskill-app-id" content="${env.APP_ID}">
+              <meta name="overskill-app-name" content="${env.APP_NAME}">
+              <meta name="overskill-environment" content="${env.ENVIRONMENT}">
+              <meta name="overskill-deployed-at" content="${env.DEPLOYED_AT || new Date().toISOString()}">
+              <meta name="overskill-build-id" content="${env.BUILD_ID || 'unknown'}">
+              <meta name="overskill-version" content="${Date.now()}">
+            `
+            
+            // Inject version meta and env vars
             let modifiedHtml = htmlContent
             if (htmlContent.includes('</head>')) {
-              modifiedHtml = htmlContent.replace('</head>', envScript + '</head>')
+              modifiedHtml = htmlContent.replace('</head>', versionMeta + envScript + '</head>')
             } else if (htmlContent.includes('<body>')) {
-              modifiedHtml = htmlContent.replace('<body>', '<body>' + envScript)
+              modifiedHtml = htmlContent.replace('<body>', '<body>' + versionMeta + envScript)
             } else {
-              modifiedHtml = envScript + htmlContent
+              modifiedHtml = versionMeta + envScript + htmlContent
             }
             
             return new Response(modifiedHtml, {
@@ -342,6 +541,10 @@ class Deployment::CloudflarePreviewService
         const types = {
           'html': 'text/html',
           'js': 'application/javascript',
+          'mjs': 'application/javascript',
+          'ts': 'application/javascript',
+          'tsx': 'application/javascript',
+          'jsx': 'application/javascript',
           'css': 'text/css',
           'json': 'application/json',
           'png': 'image/png',
@@ -403,6 +606,16 @@ class Deployment::CloudflarePreviewService
     JAVASCRIPT
   end
   
+  def built_files_as_json(built_files)
+    # Convert built files hash to JSON for embedding in Worker script
+    begin
+      JSON.generate(built_files)
+    rescue JSON::GeneratorError => e
+      Rails.logger.error "JSON generation error for built files: #{e.message}"
+      "{}"
+    end
+  end
+
   def app_files_as_json
     files_hash = {}
     @app.app_files.each do |file|

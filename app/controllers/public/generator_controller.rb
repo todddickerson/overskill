@@ -44,11 +44,20 @@ class Public::GeneratorController < Public::ApplicationController
   def index
     # Simple landing page with prompt selection
     @starter_prompts = STARTER_PROMPTS
+    @user_signed_in = user_signed_in?
     
-    # Check if we have a prompt parameter (from post-auth redirect)
-    if params[:prompt].present? && user_signed_in?
-      # Auto-submit the form with the pending prompt
-      create
+    # Check if we have a pending generation from cookies
+    if cookies.encrypted[:pending_generation].present? && user_signed_in?
+      generation_data = JSON.parse(cookies.encrypted[:pending_generation])
+      prompt = generation_data["prompt"]
+      cookies.delete(:pending_generation)
+      
+      # Process the pending generation
+      if prompt.present?
+        # Call create action directly with the stored prompt
+        params[:prompt] = prompt
+        create
+      end
     end
   end
   
@@ -57,21 +66,28 @@ class Public::GeneratorController < Public::ApplicationController
     prompt = params[:prompt] || params[:custom_prompt]
     
     if prompt.blank?
-      respond_to do |format|
-        format.html { redirect_to root_path, alert: "Please provide an app description" }
-        format.json { render json: { error: "Please provide an app description" }, status: :unprocessable_entity }
-      end
+      redirect_to root_path, alert: "Please provide an app description"
       return
     end
     
     # Check if user is signed in
     unless user_signed_in?
-      # Store the prompt in session to use after authentication
-      session[:pending_app_prompt] = prompt
+      # Store the generation request in an encrypted cookie
+      cookies.encrypted[:pending_generation] = {
+        value: { prompt: prompt }.to_json,
+        expires: 20.minutes.from_now
+      }
       
+      # Respond based on request format
       respond_to do |format|
-        format.html { redirect_to new_user_session_path, alert: "Please sign in to create an app" }
-        format.json { render json: { requires_auth: true, prompt: prompt }, status: :unauthorized }
+        format.html { redirect_to new_user_session_path }
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.replace(
+            "auth_modal",
+            partial: "shared/auth_modal",
+            locals: { show: true, prompt: prompt }
+          )
+        end
       end
       return
     end
@@ -109,11 +125,8 @@ class Public::GeneratorController < Public::ApplicationController
       AppGenerationJob.perform_later(generation)
     end
     
-    # Respond appropriately
-    respond_to do |format|
-      format.html { redirect_to account_app_editor_path(app), notice: "Creating your app..." }
-      format.json { render json: { success: true, redirect_url: account_app_editor_path(app) } }
-    end
+    # Redirect to editor
+    redirect_to account_app_editor_path(app), notice: "Creating your app..."
   end
   
   private

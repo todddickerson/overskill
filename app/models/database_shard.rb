@@ -5,7 +5,7 @@ class DatabaseShard < ApplicationRecord
   APPS_PER_SHARD = 10_000
   
   # Shard states
-  enum status: {
+  enum :status, {
     provisioning: 0,
     available: 1,
     at_capacity: 2,

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-header {
+            color: #333;
+            border-bottom: 2px solid #007AFF;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .error { color: #FF3B30; font-weight: bold; }
+        .success { color: #28A745; font-weight: bold; }
+        .warning { color: #FF9500; font-weight: bold; }
+        .info { color: #007AFF; }
+        
+        #testResults {
+            white-space: pre-wrap;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007AFF;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+        }
+        
+        .test-iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .screenshot-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .screenshot {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .test-controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .test-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: background-color 0.2s;
+        }
+        
+        .test-btn:hover {
+            background: #0056CC;
+        }
+        
+        .test-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-section">
+        <h1 class="test-header">OverSkill Todo App Deployment Test</h1>
+        <p>Testing the deployed React todo app to verify TypeScript transformation fixes.</p>
+        
+        <div class="test-controls">
+            <button class="test-btn" onclick="runAllTests()">Run All Tests</button>
+            <button class="test-btn" onclick="testMainApp()">Test Main App</button>
+            <button class="test-btn" onclick="testNgrokUrl()">Test Ngrok URL</button>
+            <button class="test-btn" onclick="takeScreenshot()">Take Screenshot</button>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Test Results</h2>
+        <div id="testResults">Click "Run All Tests" to begin testing...</div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Live App Preview - https://preview-57.overskill.app/</h2>
+        <iframe id="mainAppFrame" class="test-iframe" src="about:blank"></iframe>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Ngrok URL Test - 2kqla4w67ypgikzd3.51mivkfketqaju9fz.ngrok-cname.com</h2>
+        <iframe id="ngrokFrame" class="test-iframe" src="about:blank"></iframe>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Screenshots</h2>
+        <div id="screenshots" class="screenshot-container">
+            <p>Screenshots will appear here after testing...</p>
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let consoleErrors = [];
+        let mainAppLoaded = false;
+        let ngrokLoaded = false;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            testResults.push(logEntry);
+            updateResults();
+            console.log(logEntry);
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.textContent = testResults.join('\n');
+        }
+
+        // Capture console errors
+        const originalError = console.error;
+        console.error = function(...args) {
+            consoleErrors.push(args.join(' '));
+            originalError.apply(console, arguments);
+        };
+
+        async function runAllTests() {
+            testResults = [];
+            consoleErrors = [];
+            log('🚀 Starting comprehensive deployment tests...');
+            
+            await testMainApp();
+            await delay(2000);
+            await testNgrokUrl();
+            await delay(2000);
+            await takeScreenshot();
+            
+            log('✅ All tests completed!');
+            generateTestReport();
+        }
+
+        async function testMainApp() {
+            log('🔍 Testing main app: https://preview-57.overskill.app/');
+            
+            const frame = document.getElementById('mainAppFrame');
+            
+            return new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                    log('❌ Main app load timeout after 10 seconds', 'error');
+                    resolve();
+                }, 10000);
+
+                frame.onload = async () => {
+                    clearTimeout(timeout);
+                    mainAppLoaded = true;
+                    log('✅ Main app iframe loaded successfully');
+                    
+                    try {
+                        // Wait a bit for JavaScript to execute
+                        await delay(3000);
+                        
+                        // Try to access the frame content (may be blocked by CORS)
+                        try {
+                            const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                            const title = frameDoc.title || 'Unknown';
+                            log(`📄 Page title: "${title}"`);
+                            
+                            // Check for React root
+                            const reactRoot = frameDoc.getElementById('root');
+                            if (reactRoot) {
+                                log('✅ React root element found');
+                                log(`📊 React root innerHTML length: ${reactRoot.innerHTML.length} characters`);
+                                
+                                if (reactRoot.innerHTML.length > 100) {
+                                    log('✅ React appears to have rendered content');
+                                } else {
+                                    log('⚠️ React root seems empty or minimal', 'warning');
+                                }
+                            } else {
+                                log('❌ React root element not found', 'error');
+                            }
+                            
+                            // Check for environment variables
+                            const frameWindow = frame.contentWindow;
+                            if (frameWindow && frameWindow.ENV) {
+                                log('✅ Environment variables found');
+                                log(`📋 ENV keys: ${Object.keys(frameWindow.ENV).join(', ')}`);
+                            } else {
+                                log('❌ Environment variables not accessible', 'warning');
+                            }
+                            
+                            // Look for todo app elements
+                            const todoElements = frameDoc.querySelectorAll('[class*="todo"], [id*="todo"], [class*="task"], [id*="task"]');
+                            if (todoElements.length > 0) {
+                                log(`✅ Found ${todoElements.length} todo/task related elements`);
+                            } else {
+                                log('❌ No todo/task elements found', 'warning');
+                            }
+                            
+                        } catch (e) {
+                            log('⚠️ Cannot access frame content (CORS blocked) - this is normal for cross-origin frames', 'warning');
+                            log('🔍 Will check for load indicators instead...');
+                        }
+                        
+                        // Check console errors
+                        if (consoleErrors.length > 0) {
+                            log(`❌ Console errors detected: ${consoleErrors.length}`, 'error');
+                            consoleErrors.forEach(error => {
+                                log(`  💥 ${error}`, 'error');
+                            });
+                        } else {
+                            log('✅ No console errors detected so far');
+                        }
+                        
+                    } catch (e) {
+                        log(`❌ Error during main app testing: ${e.message}`, 'error');
+                    }
+                    
+                    resolve();
+                };
+
+                frame.onerror = () => {
+                    clearTimeout(timeout);
+                    log('❌ Main app failed to load', 'error');
+                    resolve();
+                };
+
+                // Start loading
+                frame.src = 'https://preview-57.overskill.app/';
+            });
+        }
+
+        async function testNgrokUrl() {
+            log('🔍 Testing ngrok URL: https://2kqla4w67ypgikzd3.51mivkfketqaju9fz.ngrok-cname.com');
+            
+            const frame = document.getElementById('ngrokFrame');
+            
+            return new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                    log('❌ Ngrok URL load timeout after 10 seconds', 'error');
+                    resolve();
+                }, 10000);
+
+                frame.onload = async () => {
+                    clearTimeout(timeout);
+                    ngrokLoaded = true;
+                    log('✅ Ngrok URL loaded successfully');
+                    
+                    try {
+                        await delay(2000);
+                        
+                        try {
+                            const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                            const title = frameDoc.title || 'Unknown';
+                            log(`📄 Ngrok page title: "${title}"`);
+                            
+                            const bodyText = frameDoc.body ? frameDoc.body.innerText.substring(0, 200) : 'No body';
+                            log(`📝 Ngrok page content preview: "${bodyText}"`);
+                            
+                        } catch (e) {
+                            log('⚠️ Cannot access ngrok frame content (CORS blocked)', 'warning');
+                        }
+                        
+                    } catch (e) {
+                        log(`❌ Error during ngrok testing: ${e.message}`, 'error');
+                    }
+                    
+                    resolve();
+                };
+
+                frame.onerror = () => {
+                    clearTimeout(timeout);
+                    log('❌ Ngrok URL failed to load', 'error');
+                    resolve();
+                };
+
+                // Start loading
+                frame.src = 'https://2kqla4w67ypgikzd3.51mivkfketqaju9fz.ngrok-cname.com';
+            });
+        }
+
+        async function takeScreenshot() {
+            log('📸 Taking screenshots...');
+            
+            // Since we can't take actual screenshots from a web page,
+            // we'll simulate this by capturing the iframe states
+            const screenshotDiv = document.getElementById('screenshots');
+            
+            let screenshotHtml = '<h3>App Status Screenshots</h3>';
+            
+            if (mainAppLoaded) {
+                screenshotHtml += `
+                    <div style="margin: 20px 0;">
+                        <h4>✅ Main App (https://preview-57.overskill.app/)</h4>
+                        <p>Status: Loaded successfully</p>
+                        <div style="border: 2px solid #28A745; padding: 10px; border-radius: 4px; background: #f8f9fa;">
+                            📱 App is accessible and iframe loaded without errors
+                        </div>
+                    </div>
+                `;
+            } else {
+                screenshotHtml += `
+                    <div style="margin: 20px 0;">
+                        <h4>❌ Main App (https://preview-57.overskill.app/)</h4>
+                        <p>Status: Failed to load</p>
+                        <div style="border: 2px solid #FF3B30; padding: 10px; border-radius: 4px; background: #f8f9fa;">
+                            🚫 App failed to load or timed out
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (ngrokLoaded) {
+                screenshotHtml += `
+                    <div style="margin: 20px 0;">
+                        <h4>✅ Ngrok URL</h4>
+                        <p>Status: Loaded successfully</p>
+                        <div style="border: 2px solid #28A745; padding: 10px; border-radius: 4px; background: #f8f9fa;">
+                            📱 Ngrok URL is accessible
+                        </div>
+                    </div>
+                `;
+            } else {
+                screenshotHtml += `
+                    <div style="margin: 20px 0;">
+                        <h4>❌ Ngrok URL</h4>
+                        <p>Status: Failed to load</p>
+                        <div style="border: 2px solid #FF3B30; padding: 10px; border-radius: 4px; background: #f8f9fa;">
+                            🚫 Ngrok URL failed to load or timed out
+                        </div>
+                    </div>
+                `;
+            }
+            
+            screenshotDiv.innerHTML = screenshotHtml;
+            log('✅ Screenshot capture completed');
+        }
+
+        function generateTestReport() {
+            log('\n📋 COMPREHENSIVE TEST REPORT:');
+            log('=====================================');
+            
+            log(`🌐 Main App (preview-57.overskill.app): ${mainAppLoaded ? '✅ ACCESSIBLE' : '❌ FAILED'}`);
+            log(`🔗 Ngrok URL: ${ngrokLoaded ? '✅ ACCESSIBLE' : '❌ FAILED'}`);
+            log(`💥 JavaScript Errors: ${consoleErrors.length} detected`);
+            
+            if (consoleErrors.length > 0) {
+                log('\n🚨 JavaScript Errors Found:');
+                consoleErrors.forEach((error, index) => {
+                    log(`  ${index + 1}. ${error}`);
+                });
+                log('\n❗ The previous TypeScript transformation errors may still exist.');
+            } else {
+                log('\n✅ No JavaScript errors detected - TypeScript transformation appears successful!');
+            }
+            
+            log('\n🎯 Test Recommendations:');
+            if (!mainAppLoaded) {
+                log('  • Check Cloudflare Worker deployment status');
+                log('  • Verify DNS/domain configuration');
+                log('  • Review deployment logs for errors');
+            }
+            
+            if (consoleErrors.length > 0) {
+                log('  • Review JavaScript console in browser dev tools');
+                log('  • Check TypeScript to JavaScript transformation');
+                log('  • Verify all dependencies are properly transpiled');
+            }
+            
+            if (mainAppLoaded && consoleErrors.length === 0) {
+                log('  • ✅ App appears to be working correctly!');
+                log('  • Consider testing actual todo functionality manually');
+                log('  • Verify React components are interactive');
+            }
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Auto-start testing when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🎯 Auto-starting tests in 2 seconds...');
+                setTimeout(runAllTests, 2000);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

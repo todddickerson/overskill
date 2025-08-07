@@ -1,0 +1,8 @@
+<%= turbo_stream.replace "auth_modal" do %>
+  <%= render "shared/auth_modal", 
+             show: true, 
+             error: flash[:alert] || resource.errors.full_messages.to_sentence, 
+             show_signup: true,
+             resource: resource,
+             preserve_values: true %>
+<% end %>

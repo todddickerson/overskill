@@ -151,63 +151,185 @@ module Deployment
             <!-- Babel for JSX transformation -->
             <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
             
-            <!-- Import maps for ES modules -->
-            <script type="importmap">
-            {
-              "imports": {
-                "react": "https://esm.sh/react@18",
-                "react-dom": "https://esm.sh/react-dom@18",
-                "react-dom/client": "https://esm.sh/react-dom@18/client",
-                "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
-                "zustand": "https://esm.sh/zustand@4",
-                "react-router-dom": "https://esm.sh/react-router-dom@6"
-              }
-            }
+            <!-- Supabase Client -->
+            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+            
+            <script>
+              // Make Supabase client constructor globally available
+              window.createClient = window.supabase.createClient;
+              
+              // Create mock Heroicons for compatibility
+              window.HeroIcons = {
+                PlusIcon: ({ className, ...props }) => React.createElement('svg', {
+                  className: className,
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  viewBox: '0 0 24 24',
+                  ...props
+                }, React.createElement('path', {
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                  strokeWidth: 2,
+                  d: 'M12 4v16m8-8H4'
+                })),
+                TrashIcon: ({ className, ...props }) => React.createElement('svg', {
+                  className: className,
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  viewBox: '0 0 24 24',
+                  ...props
+                }, React.createElement('path', {
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                  strokeWidth: 2,
+                  d: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                })),
+                CheckIcon: ({ className, ...props }) => React.createElement('svg', {
+                  className: className,
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  viewBox: '0 0 24 24',
+                  ...props
+                }, React.createElement('path', {
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                  strokeWidth: 2,
+                  d: 'M5 13l4 4L19 7'
+                }))
+              };
             </script>
             
             <!-- Main app entry -->
-            <script type="module">
-              // Transform and load main app
-              async function loadApp() {
+            <script>
+              // Simple module system for handling React apps
+              window.AppModules = {};
+              
+              async function loadReactApp() {
                 try {
-                  // Fetch the main app file
-                  const mainResponse = await fetch('/src/main.tsx')
-                  if (!mainResponse.ok) {
-                    // Try App.tsx as fallback
-                    const appResponse = await fetch('/src/App.tsx')
-                    if (appResponse.ok) {
-                      const appCode = await appResponse.text()
-                      const transformed = Babel.transform(appCode, {
-                        presets: ['react', 'typescript'],
-                        filename: 'App.tsx'
-                      }).code
-                      
-                      // Create module and execute
-                      const module = new Function('React', 'ReactDOM', transformed)
-                      module(window.React, window.ReactDOM)
-                    }
-                  } else {
-                    const mainCode = await mainResponse.text()
-                    const transformed = Babel.transform(mainCode, {
-                      presets: ['react', 'typescript'],
-                      filename: 'main.tsx'
-                    }).code
-                    
-                    // Execute the transformed code
-                    eval(transformed)
-                  }
+                  // Load the main components we need
+                  const [App, supabase, analytics] = await Promise.all([
+                    loadComponent('/src/App.tsx'),
+                    loadLibrary('/src/lib/supabase.ts'),
+                    loadLibrary('/src/lib/analytics.ts')
+                  ]);
+                  
+                  // Make supabase and analytics globally available
+                  window.supabase = supabase;
+                  window.analytics = analytics;
+                  
+                  // Render the app
+                  const root = ReactDOM.createRoot(document.getElementById('root'));
+                  root.render(React.createElement(App));
+                  
                 } catch (error) {
-                  console.error('Failed to load app:', error)
+                  console.error('Failed to load React app:', error);
                   document.getElementById('root').innerHTML = 
-                    '<div class="p-4 text-red-500">Failed to load app: ' + error.message + '</div>'
+                    '<div class="p-4 text-red-500 text-center">' +
+                    '<h2 class="text-lg font-bold mb-2">App Loading Error</h2>' +
+                    '<p class="mb-2">' + error.message + '</p>' +
+                    '<details class="mt-4">' +
+                    '<summary class="cursor-pointer text-sm">Show Details</summary>' +
+                    '<pre class="text-xs mt-2 p-2 bg-gray-100 text-gray-800 overflow-auto">' + 
+                    (error.stack || 'No stack trace available') + 
+                    '</pre></details></div>';
                 }
               }
               
-              // Load app when DOM is ready
+              async function loadComponent(path) {
+                const response = await fetch(path);
+                const code = await response.text();
+                
+                // Simple transformation for React components
+                const transformedCode = code
+                  // Handle React imports
+                  .replace(/import React[^;]*from ['"']react['"];?/g, 'const React = window.React;')
+                  .replace(/import \\{[^}]*\\} from ['"']react['"];?/g, 'const {useState, useEffect, useCallback, useMemo} = window.React;')
+                  
+                  // Handle ReactDOM imports  
+                  .replace(/import ReactDOM[^;]*from ['"']react-dom\\/client['"];?/g, 'const ReactDOM = window.ReactDOM;')
+                  
+                  // Handle Heroicons imports (simplified)
+                  .replace(/import \\{([^}]*)\\} from ['"']@heroicons\\/react\\/24\\/outline['"];?/g, 'const PlusIcon = window.HeroIcons.PlusIcon; const TrashIcon = window.HeroIcons.TrashIcon; const CheckIcon = window.HeroIcons.CheckIcon;')
+                  
+                  // Handle local imports (simplified - assume they're available globally)
+                  .replace(/import \\{[^}]*\\} from ['"']\\.\\/lib\\/[^'"]*['"];?/g, '// Local import - handled globally')
+                  .replace(/import [^\\s]+ from ['"']\\.\\/[^'"]*['"];?/g, '// Local import - handled globally')
+                  
+                  // Handle CSS imports
+                  .replace(/import ['"'][^'"]*\\.css['"];?/g, '// CSS import - styles already loaded')
+                  
+                  // Remove type annotations and interfaces
+                  .replace(/interface [^{]*\\{[^}]*\\}/g, '')
+                  .replace(/: [A-Z][a-zA-Z0-9<>\\[\\]|\\s]*(?=[,);=])/g, '')
+                  .replace(/as [A-Z][a-zA-Z0-9]*/g, '')
+                  
+                  // Convert export default to return statement
+                  .replace(/export default function ([A-Z]\\w*)/, 'function $1')
+                  .replace(/export default ([A-Z]\\w*)/, 'return $1')
+                  .replace(/export default/, 'return');
+                
+                // Create and execute the component function
+                const componentFunction = new Function('React', 'useState', 'useEffect', 'useCallback', 'useMemo', 'supabase', 'analytics', 
+                  transformedCode + '\\n; return typeof App !== "undefined" ? App : null;');
+                  
+                return componentFunction(
+                  window.React, 
+                  window.React.useState, 
+                  window.React.useEffect, 
+                  window.React.useCallback, 
+                  window.React.useMemo,
+                  window.supabase,
+                  window.analytics
+                );
+              }
+              
+              async function loadLibrary(path) {
+                const response = await fetch(path);
+                const code = await response.text();
+                
+                // Handle different library types
+                if (path.includes('supabase')) {
+                  // Handle Supabase library
+                  const transformedCode = code
+                    .replace(/import \\{[^}]*\\} from ['"']@supabase\\/supabase-js['"];?/g, 'const { createClient } = window.supabase;')
+        .replace(/import\\.meta\\.env\\.([A-Z_]+)/g, '(window.ENV && window.ENV.$1) || ""')
+                    .replace(/export const ([^\\s=]+)/g, 'const $1')
+                    .replace(/export \\{([^}]*)\\}/g, '// Exports: $1');
+                  
+                  // Execute and return the supabase client
+                  eval(transformedCode);
+                  return eval(code.includes('export const supabase') ? 'supabase' : 'createClient');
+                  
+                } else if (path.includes('analytics')) {
+                  // Handle analytics library  
+                  const transformedCode = code
+        .replace(/import\\.meta\\.env\\.([A-Z_]+)/g, '(window.ENV && window.ENV.$1) || ""')
+                    .replace(/export const ([^\\s=]+)/g, 'window.$1')
+                    .replace(/class (\\w+)/g, 'window.$1 = class $1')
+                    .replace(/: [A-Z][a-zA-Z0-9<>\\[\\]|\\s]*(?=[,);=])/g, '') // Remove types
+                    .replace(/interface [^{]*\\{[^}]*\\}/g, ''); // Remove interfaces
+                  
+                  eval(transformedCode);
+                  return window.analytics || {};
+                  
+                } else {
+                  // Generic library handler
+                  const transformedCode = code
+                    .replace(/export const/g, 'window.LibExport =')
+                    .replace(/export \\{[^}]*\\}/g, '// Multiple exports handled')
+                    .replace(/: [A-Z][a-zA-Z0-9<>\\[\\]|\\s]*(?=[,);=])/g, '') // Remove types
+                    .replace(/interface [^{]*\\{[^}]*\\}/g, ''); // Remove interfaces
+                  
+                  eval(transformedCode);
+                  return window.LibExport || {};
+                }
+              }
+              
+              // Start the app
               if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', loadApp)
+                document.addEventListener('DOMContentLoaded', loadReactApp);
               } else {
-                loadApp()
+                loadReactApp();
               }
             </script>
           `
@@ -219,10 +341,11 @@ module Deployment
           
           // Collect public environment variables
           const publicKeys = [
-            'VITE_APP_ID',
-            'VITE_SUPABASE_URL', 
-            'VITE_SUPABASE_ANON_KEY',
-            'VITE_ENVIRONMENT'
+            'VITE_APP_ID', 'APP_ID',
+            'VITE_SUPABASE_URL', 'SUPABASE_URL',
+            'VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY',
+            'VITE_ENVIRONMENT', 'ENVIRONMENT',
+            'APP_NAME', 'OWNER_ID'
           ]
           
           for (const key of publicKeys) {
@@ -232,27 +355,37 @@ module Deployment
           }
           
           return `
+            <!-- OverSkill Debug Helper -->
+            <script src="${ENV['BASE_URL'] || 'http://localhost:3000'}/overskill.js"></script>
+            
             <script>
-              window.__ENV__ = ${JSON.stringify(publicVars)};
+              // Set environment variables (compatible with overskill.js)
+              window.ENV = ${JSON.stringify(publicVars)};
+              window.__ENV__ = window.ENV; // Backward compatibility
+              
               // Make available as import.meta.env
               window.import = window.import || {};
               window.import.meta = window.import.meta || {};
-              window.import.meta.env = window.__ENV__;
+              window.import.meta.env = window.ENV;
             </script>
           `
         }
         
         // Simple TypeScript to JavaScript transformation
         async function transformTypeScript(code) {
-          // Remove TypeScript type annotations (basic transformation)
+          // Remove TypeScript type annotations (basic transformation)  
           // In production, we'd use SWC or esbuild WASM
-          return code
-            .replace(/: \w+(\[\])?/g, '') // Remove type annotations
-            .replace(/as \w+/g, '') // Remove type assertions
-            .replace(/interface \w+ {[^}]*}/g, '') // Remove interfaces
-            .replace(/type \w+ = [^;]+;/g, '') // Remove type aliases
-            .replace(/<(\w+)>/g, '') // Remove generics
-            .replace(/export default/g, 'window.App =') // Export as global
+          let transformedCode = code
+            .replace(/: \\w+(\\[\\])?/g, '') // Remove type annotations
+            .replace(/as \\w+/g, '') // Remove type assertions  
+            .replace(/interface \\w+ \\{[^}]*\\}/g, '') // Remove interfaces
+            .replace(/type \\w+ = [^;]+;/g, '') // Remove type aliases
+            .replace(/<\\w+>/g, '') // Remove generics
+            .replace(/export default/g, 'window.App ='); // Export as global
+          
+          // Ensure proper component return
+          transformedCode += '\\n; return typeof App !== "undefined" ? App : null;';
+          return transformedCode;
         }
         
         // API request handling with comprehensive Supabase proxy

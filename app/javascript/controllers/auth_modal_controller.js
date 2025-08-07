@@ -1,36 +1,20 @@
 import { Controller } from "@hotwired/stimulus"
-import { post } from "@rails/request.js"
 
 export default class extends Controller {
   static targets = ["modal", "loginForm", "signupForm", "loginTab", "signupTab", "errorMessage"]
   static values = { 
-    returnUrl: String,
+    show: Boolean,
     prompt: String 
   }
   
   connect() {
-    // Hide modal on initial load
-    this.element.classList.add("hidden")
-    
-    // Listen for custom event to open modal
-    this.openHandler = (event) => {
-      this.open(event)
+    // Show modal if show value is true (set by server)
+    if (this.showValue) {
+      this.show()
     }
-    document.addEventListener('auth-modal:open', this.openHandler)
   }
   
-  disconnect() {
-    // Clean up event listener
-    document.removeEventListener('auth-modal:open', this.openHandler)
-  }
-  
-  open(event) {
-    if (event.detail) {
-      // Store the prompt and any other data we need after auth
-      this.promptValue = event.detail.prompt || ""
-      this.returnUrlValue = event.detail.returnUrl || ""
-    }
-    
+  show() {
     this.element.classList.remove("hidden")
     document.body.style.overflow = "hidden" // Prevent background scrolling
   }
@@ -39,6 +23,9 @@ export default class extends Controller {
     this.element.classList.add("hidden")
     document.body.style.overflow = "" // Re-enable scrolling
     this.clearErrors()
+    
+    // Navigate back to generator page
+    window.location.href = '/'
   }
   
   switchToLogin(event) {
@@ -71,127 +58,7 @@ export default class extends Controller {
     this.clearErrors()
   }
   
-  async submitLogin(event) {
-    event.preventDefault()
-    const form = event.target
-    const formData = new FormData(form)
-    
-    // Add the stored prompt to continue after login
-    if (this.promptValue) {
-      formData.append("prompt", this.promptValue)
-    }
-    
-    try {
-      const response = await post(form.action, {
-        body: formData,
-        responseKind: "json"
-      })
-      
-      if (response.ok) {
-        const data = await response.json
-        if (data.success) {
-          // If we have a pending prompt, submit the generator form
-          if (data.pending_prompt) {
-            // Create and submit a form with the prompt
-            const form = document.createElement('form')
-            form.method = 'POST'
-            form.action = '/generator'
-            
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').content
-            const csrfInput = document.createElement('input')
-            csrfInput.type = 'hidden'
-            csrfInput.name = 'authenticity_token'
-            csrfInput.value = csrfToken
-            form.appendChild(csrfInput)
-            
-            const promptInput = document.createElement('input')
-            promptInput.type = 'hidden'
-            promptInput.name = 'prompt'
-            promptInput.value = data.pending_prompt
-            form.appendChild(promptInput)
-            
-            document.body.appendChild(form)
-            form.submit()
-          } else if (data.redirect_url) {
-            window.location.href = data.redirect_url
-          } else if (this.returnUrlValue) {
-            window.location.href = this.returnUrlValue
-          } else {
-            // Reload to continue with the generator flow
-            window.location.reload()
-          }
-        } else {
-          this.showError(data.error || "Invalid email or password")
-        }
-      } else {
-        this.showError("An error occurred. Please try again.")
-      }
-    } catch (error) {
-      console.error("Login error:", error)
-      this.showError("An error occurred. Please try again.")
-    }
-  }
-  
-  async submitSignup(event) {
-    event.preventDefault()
-    const form = event.target
-    const formData = new FormData(form)
-    
-    // Add the stored prompt to continue after signup
-    if (this.promptValue) {
-      formData.append("prompt", this.promptValue)
-    }
-    
-    try {
-      const response = await post(form.action, {
-        body: formData,
-        responseKind: "json"
-      })
-      
-      if (response.ok) {
-        const data = await response.json
-        if (data.success) {
-          // If we have a pending prompt, submit the generator form
-          if (data.pending_prompt) {
-            // Create and submit a form with the prompt
-            const form = document.createElement('form')
-            form.method = 'POST'
-            form.action = '/generator'
-            
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').content
-            const csrfInput = document.createElement('input')
-            csrfInput.type = 'hidden'
-            csrfInput.name = 'authenticity_token'
-            csrfInput.value = csrfToken
-            form.appendChild(csrfInput)
-            
-            const promptInput = document.createElement('input')
-            promptInput.type = 'hidden'
-            promptInput.name = 'prompt'
-            promptInput.value = data.pending_prompt
-            form.appendChild(promptInput)
-            
-            document.body.appendChild(form)
-            form.submit()
-          } else if (data.redirect_url) {
-            window.location.href = data.redirect_url
-          } else if (this.returnUrlValue) {
-            window.location.href = this.returnUrlValue
-          } else {
-            // Reload to continue with the generator flow
-            window.location.reload()
-          }
-        } else {
-          this.showError(data.error || "Please check the form and try again")
-        }
-      } else {
-        this.showError("An error occurred. Please try again.")
-      }
-    } catch (error) {
-      console.error("Signup error:", error)
-      this.showError("An error occurred. Please try again.")
-    }
-  }
+  // No need for custom submission handling - let Rails handle it normally
   
   showError(message) {
     if (this.hasErrorMessageTarget) {

@@ -12,11 +12,12 @@
 
     <!-- Custom Prompt Input -->
     <div class="max-w-3xl mx-auto mb-12">
-      <%= form_with url: generator_index_path, method: :post, local: false,
+      <%= form_with url: generator_index_path, 
+                    method: :post,
                     data: { 
-                      controller: "generator-form",
-                      action: "submit->generator-form#submit",
-                      generator_form_target: "form"
+                      turbo_frame: @user_signed_in ? "_top" : "auth_modal",
+                      controller: "generator",
+                      generator_user_signed_in_value: @user_signed_in.to_s
                     },
                     class: "bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6" do |f| %>
         
@@ -30,11 +31,11 @@
                      focus:ring-2 focus:ring-blue-500 focus:border-transparent
                      dark:bg-gray-700 dark:text-white resize-none",
               rows: 4,
-              id: "custom-prompt" %>
+              id: "custom-prompt",
+              data: { generator_target: "prompt" } %>
         </div>
         
-        <button type="submit" 
-                data-generator-form-target="submitButton"
+        <button type="submit"
                 class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white 
                        font-semibold py-3 px-6 rounded-lg
                        hover:from-blue-700 hover:to-indigo-700 
@@ -46,14 +47,7 @@
       <% end %>
     </div>
 
-    <!-- Debug Test Button -->
-    <div class="max-w-3xl mx-auto mb-8 text-center" style="display: none;" id="debug-auth-test">
-      <button type="button" 
-              onclick="document.dispatchEvent(new CustomEvent('auth-modal:open', { detail: { prompt: 'Test prompt' }, bubbles: true }))"
-              class="bg-red-500 text-white px-4 py-2 rounded">
-        Test Auth Modal (Debug)
-      </button>
-    </div>
+
 
     <!-- Divider -->
     <div class="max-w-3xl mx-auto mb-12">
@@ -72,35 +66,29 @@
     </div>
 
     <!-- Starter Templates Grid -->
-    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto" data-controller="generator">
       <% @starter_prompts.each do |template| %>
         <% if template[:prompt] %>
-          <%= form_with url: generator_index_path, method: :post, local: false,
-                        data: { 
-                          controller: "generator-form",
-                          action: "submit->generator-form#submit",
-                          generator_form_target: "form"
-                        } do |f| %>
-            <%= hidden_field_tag :prompt, template[:prompt] %>
-            <button type="submit"
-                    class="w-full text-left bg-white dark:bg-gray-800 rounded-xl shadow-lg 
-                           hover:shadow-xl transform transition hover:scale-[1.02] p-6
-                           border border-gray-200 dark:border-gray-700">
-              <div class="flex items-start space-x-4">
-                <div class="text-4xl">
-                  <%= template[:icon] %>
-                </div>
-                <div class="flex-1">
-                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-                    <%= template[:title] %>
-                  </h3>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">
-                    <%= template[:description] %>
-                  </p>
-                </div>
+          <button type="button"
+                  data-action="click->generator#fillPrompt"
+                  data-prompt="<%= template[:prompt] %>"
+                  class="w-full text-left bg-white dark:bg-gray-800 rounded-xl shadow-lg 
+                         hover:shadow-xl transform transition hover:scale-[1.02] p-6
+                         border border-gray-200 dark:border-gray-700">
+            <div class="flex items-start space-x-4">
+              <div class="text-4xl">
+                <%= template[:icon] %>
               </div>
-            </button>
-          <% end %>
+              <div class="flex-1">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  <%= template[:title] %>
+                </h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  <%= template[:description] %>
+                </p>
+              </div>
+            </div>
+          </button>
         <% else %>
           <!-- Custom App Card -->
           <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 
@@ -169,23 +157,7 @@
   </div>
 </div>
 
-<script>
-  // Focus custom prompt when clicking custom template
-  document.addEventListener('DOMContentLoaded', function() {
-    document.querySelector('[onclick*="custom-prompt"]')?.addEventListener('click', function() {
-      document.getElementById('custom-prompt').focus();
-    });
-    
-    // Debug: Check if auth modal is present
-    const authModal = document.querySelector('[data-controller="auth-modal"]');
-    console.log('Auth modal found:', !!authModal);
-    
-    // Debug: Test the event system
-    document.addEventListener('auth-modal:open', function(event) {
-      console.log('Auth modal open event received:', event.detail);
-    });
-  });
-</script>
+
 
 <!-- Include Auth Modal -->
 <%= render 'shared/auth_modal' %>
