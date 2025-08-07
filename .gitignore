@@ -103,3 +103,10 @@ erd.pdf
 # Personal IDE settings
 .vscode/
 .cursor/
+
+# Testing results and artifacts
+test-results/
+playwright-report/
+coverage/
+*.har
+*.log
