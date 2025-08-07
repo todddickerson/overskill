@@ -120,8 +120,20 @@ begin
     content: <<~TSX,
       import { createClient } from '@supabase/supabase-js'
       
-      const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || ''
-      const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ''
+      // Support both build-time (import.meta.env) and runtime (window.ENV) environments
+      const supabaseUrl = 
+        (import.meta as any).env?.VITE_SUPABASE_URL || 
+        (window as any).ENV?.SUPABASE_URL || 
+        ''
+      
+      const supabaseAnonKey = 
+        (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 
+        (window as any).ENV?.SUPABASE_ANON_KEY || 
+        ''
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.warn('Supabase credentials not found. Authentication features will not work.')
+      }
       
       export const supabase = createClient(supabaseUrl, supabaseAnonKey)
     TSX
