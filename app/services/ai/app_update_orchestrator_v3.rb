@@ -418,15 +418,37 @@ module Ai
       max_iterations = 25  # Increased for complex apps
       iteration = 0
       last_progress_update = Time.current
+      consecutive_failures = 0
+      max_consecutive_failures = 3
+      
+      # Success criteria for early termination
+      success_criteria = {
+        min_files_created: @is_new_app ? 3 : 1,  # New apps need at least HTML, CSS, JS
+        required_file_types: @is_new_app ? ['html', 'js'] : [],
+        max_runtime_minutes: 15
+      }
       
       while iteration < max_iterations
         iteration += 1
-        Rails.logger.info "[AppUpdateOrchestratorV3] GPT-5 iteration #{iteration}"
+        Rails.logger.info "[AppUpdateOrchestratorV3] GPT-5 iteration #{iteration}/#{max_iterations}"
+        
+        # Check runtime timeout
+        if (Time.current - @start_time) > success_criteria[:max_runtime_minutes].minutes
+          Rails.logger.warn "[AppUpdateOrchestratorV3] Runtime timeout reached (#{success_criteria[:max_runtime_minutes]} minutes)"
+          break
+        end
+        
+        # Check for consecutive failures
+        if consecutive_failures >= max_consecutive_failures
+          Rails.logger.error "[AppUpdateOrchestratorV3] Too many consecutive failures (#{consecutive_failures}), stopping generation"
+          @broadcaster.update("❌ Generation stopped due to repeated errors", 0.9)
+          break
+        end
         
         # Update progress periodically
         if Time.current - last_progress_update > 2.seconds
-          progress_pct = (iteration.to_f / max_iterations * 100).round
-          @broadcaster.update("Building your app... (#{files_created.size} files created)", progress_pct / 100.0)
+          progress_pct = [(iteration.to_f / max_iterations * 0.8), 0.95].min  # Reserve 5% for finalization
+          @broadcaster.update("Building your app... (#{files_created.size} files created)", progress_pct)
           last_progress_update = Time.current
         end
         
@@ -438,13 +460,27 @@ module Ai
         end
         
         unless response[:success]
-          Rails.logger.error "[AppUpdateOrchestratorV3] GPT-5 failed: #{response[:error]}"
-          execution_message.update!(
-            content: "❌ Implementation failed: #{response[:error]}",
-            status: "failed"
-          )
-          return { error: true, message: response[:error] }
+          consecutive_failures += 1
+          Rails.logger.error "[AppUpdateOrchestratorV3] GPT-5 failed (attempt #{consecutive_failures}/#{max_consecutive_failures}): #{response[:error]}"
+          
+          if consecutive_failures >= max_consecutive_failures
+            execution_message.update!(
+              content: "❌ Implementation failed after #{max_consecutive_failures} attempts: #{response[:error]}",
+              status: "failed"
+            )
+            return { error: true, message: "Multiple failures: #{response[:error]}" }
+          else
+            # Add error context to conversation and continue
+            messages << {
+              role: "user", 
+              content: "The previous request failed with error: #{response[:error]}. Please try a different approach or fix the issue."
+            }
+            next
+          end
         end
+        
+        # Reset consecutive failures on success
+        consecutive_failures = 0
         
         # Add assistant response to conversation
         messages << {
@@ -499,26 +535,65 @@ module Ai
           
           # Add tool results to conversation
           messages += tool_results
+          
+          # Memory management: Keep only recent messages to prevent memory bloat
+          if messages.length > 20
+            # Keep system message, last 15 messages, and current context
+            system_msg = messages.first
+            recent_messages = messages.last(15)
+            messages = [system_msg] + recent_messages
+            Rails.logger.debug "[AppUpdateOrchestratorV3] Trimmed message history to prevent memory bloat"
+          end
         else
           # No tool calls, AI is done
           break
         end
+        
+        # Check if we've met success criteria for early termination
+        if should_terminate_early?(files_created, success_criteria)
+          Rails.logger.info "[AppUpdateOrchestratorV3] Early termination: success criteria met"
+          @broadcaster.update("App generation complete! 🎉", 0.95)
+          break
+        end
       end
       
-      # If we get here, max iterations reached
-      @broadcaster.update("Implementation complete", 1.0)
+      # If we get here, max iterations reached or loop ended
+      @broadcaster.update("Validating app against standards...", 0.95)
       
-      # Save final state
+      # Validate against AI standards before completing
+      standards_result = validate_against_standards
+      
+      if standards_result[:valid]
+        @broadcaster.update("✅ App meets quality standards!", 1.0)
+        final_status = 'completed'
+      elsif standards_result[:score] >= 70  # Accept with warnings if score is decent
+        @broadcaster.update("✅ App completed with minor issues", 1.0)
+        final_status = 'completed_with_warnings'
+      else
+        @broadcaster.update("⚠️ App completed but needs improvements", 1.0)
+        final_status = 'needs_improvements'
+      end
+      
+      # Save final state with standards validation
       @app_version.update!(
         files_snapshot: app.app_files.map { |f| 
           { path: f.path, content: f.content, file_type: f.file_type }
         }.to_json,
         changed_files: @files_modified.uniq.join(", "),
         completed_at: Time.current,
-        status: 'completed'
+        status: final_status,
+        metadata: (@app_version.metadata || {}).merge({
+          standards_validation: standards_result,
+          validation_timestamp: Time.current.iso8601
+        })
       )
       
-      { success: true, result: { files: files_created } }
+      # Log standards issues for debugging
+      if standards_result[:errors].any?
+        Rails.logger.warn "[AppUpdateOrchestratorV3] Standards errors: #{standards_result[:errors].join(', ')}"
+      end
+      
+      { success: true, result: { files: files_created, standards: standards_result } }
     end
     
     def handle_create_file(args)
@@ -937,38 +1012,151 @@ module Ai
     end
     
     def validate_javascript_content(content)
-      # Basic validation for common issues
+      # Enhanced validation for common issues
       issues = []
       
-      # Check for TypeScript syntax
-      if content.match(/:\s*(string|number|boolean|any|void)\s*[;,\)\}]/) ||
-         content.match(/interface\s+\w+\s*\{/) ||
-         content.match(/<\w+>/) # Generic syntax
-        issues << "TypeScript syntax detected - should be plain JavaScript/JSX"
+      # Check for TypeScript syntax (more precise patterns)
+      # Type annotations after variable/parameter names
+      if content.match(/\w+\s*:\s*(string|number|boolean|any|void|object|Function)\s*[;,\)\}=]/)
+        issues << "TypeScript type annotations detected - should be plain JavaScript/JSX"
       end
       
-      # Check for invalid JSX
-      if content.match(/className=\{[^}]*\}/) && content.match(/className=\{\s*\}/)  
+      # Interface declarations
+      if content.match(/^[\s]*interface\s+\w+\s*\{/m)
+        issues << "TypeScript interface detected - should be plain JavaScript/JSX"
+      end
+      
+      # Generic syntax (excluding JSX) - more precise than before
+      if content.match(/<[A-Z]\w*,[\w\s,<>]*>/) || content.match(/\w+<[A-Z]\w*>/)
+        issues << "TypeScript generic syntax detected"
+      end
+      
+      # Check for invalid JSX patterns
+      if content.match(/className=\{\s*\}/)  
         issues << "Empty className binding detected"
+      end
+      
+      # Check for common React/JS errors
+      if content.match(/import\s+React\s+from\s+['"]react['"]/) && !content.match(/React\./)
+        issues << "React imported but not used - consider removing import or using React.createElement"
+      end
+      
+      # Check for missing semicolons in problematic places
+      if content.match(/^\s*const\s+\w+\s*=\s*[^;]+$/m)
+        issues << "Missing semicolons detected - add semicolons for CDN compatibility"
       end
       
       { valid: issues.empty?, errors: issues }
     end
     
     def fix_common_javascript_issues(content)
-      # Remove TypeScript type annotations
-      fixed = content.gsub(/:\s*(string|number|boolean|any|void|\w+\[\])\s*(?=[;,\)\}=])/, '')
+      # Enhanced TypeScript to JavaScript conversion
+      fixed = content.dup
       
-      # Remove interface declarations
-      fixed = fixed.gsub(/interface\s+\w+\s*\{[^}]*\}/m, '')
+      # Remove TypeScript type annotations (more precise)
+      fixed = fixed.gsub(/\w+\s*:\s*(string|number|boolean|any|void|object|Function)\s*(?=[;,\)\}=])/, '')
       
-      # Remove generic syntax
-      fixed = fixed.gsub(/<[\w\s,]+>/, '')
+      # Remove interface declarations completely
+      fixed = fixed.gsub(/^[\s]*interface\s+\w+\s*\{[^}]*\}\s*$/m, '')
+      
+      # Remove generic syntax but preserve JSX (more careful than before)
+      fixed = fixed.gsub(/([a-z]\w*)<[A-Z]\w*(?:,\s*[A-Z]\w*)*>/, '\1')
+      fixed = fixed.gsub(/<[A-Z]\w*,[\w\s,<>]*>/, '')
       
       # Fix empty className
       fixed = fixed.gsub(/className=\{\s*\}/, 'className=""')
       
+      # Add semicolons where missing
+      fixed = fixed.gsub(/^(\s*const\s+\w+\s*=\s*[^;]+)$/m, '\1;')
+      fixed = fixed.gsub(/^(\s*let\s+\w+\s*=\s*[^;]+)$/m, '\1;')
+      fixed = fixed.gsub(/^(\s*var\s+\w+\s*=\s*[^;]+)$/m, '\1;')
+      
+      # Remove unused React imports if React is not used
+      if fixed.match(/import\s+React\s+from\s+['"]react['"]/) && !fixed.match(/React\./)
+        fixed = fixed.gsub(/import\s+React\s+from\s+['"]react['"];\s*\n?/, '')
+      end
+      
       fixed
+    end
+    
+    def should_terminate_early?(files_created, success_criteria)
+      """
+      Check if we should terminate the generation loop early based on success criteria.
+      This prevents unnecessary iterations when the app is already functional.
+      """
+      return false unless files_created.any?
+      
+      # Check minimum file count
+      if files_created.length < success_criteria[:min_files_created]
+        return false
+      end
+      
+      # Check required file types are present
+      success_criteria[:required_file_types].each do |required_type|
+        unless files_created.any? { |file| file['file_type'] == required_type }
+          return false
+        end
+      end
+      
+      # For new apps, ensure we have essential files
+      if @is_new_app
+        created_paths = files_created.map { |f| f['path'].to_s.downcase }
+        
+        # Must have HTML entry point
+        unless created_paths.any? { |path| path.include?('index.html') || path.include?('.html') }
+          return false
+        end
+        
+        # Must have some JavaScript
+        unless created_paths.any? { |path| path.end_with?('.js') || path.end_with?('.jsx') }
+          return false
+        end
+      end
+      
+      # Check if we have a reasonable amount of content
+      total_content_length = @app.app_files.sum { |f| f.content&.length || 0 }
+      min_content_length = @is_new_app ? 1000 : 100  # New apps need more content
+      
+      if total_content_length < min_content_length
+        return false
+      end
+      
+      Rails.logger.info "[AppUpdateOrchestratorV3] Early termination criteria met: #{files_created.length} files, #{total_content_length} chars"
+      return true
+    end
+    
+    def validate_against_standards
+      """
+      Validate the generated app against AI_APP_STANDARDS.md requirements.
+      Returns validation results with errors, warnings, and compliance score.
+      """
+      Rails.logger.info "[AppUpdateOrchestratorV3] Validating app against AI_APP_STANDARDS"
+      
+      begin
+        validator = Ai::StandardsValidator.new(@app)
+        result = validator.validate_against_standards!
+        
+        Rails.logger.info "[AppUpdateOrchestratorV3] Standards validation complete: #{result[:score]}% score"
+        
+        # Broadcast validation results to user
+        if result[:errors].any?
+          @broadcaster.update("⚠️ Found #{result[:errors].length} standards violations", 0.97)
+        elsif result[:warnings].any?
+          @broadcaster.update("✓ App meets standards (#{result[:warnings].length} minor issues)", 0.97)
+        else
+          @broadcaster.update("✅ Perfect standards compliance!", 0.97)
+        end
+        
+        result
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Standards validation error: #{e.message}"
+        {
+          valid: false,
+          errors: ["Standards validation failed: #{e.message}"],
+          warnings: [],
+          score: 0
+        }
+      end
     end
     
     def build_completion_summary(result, duration)
