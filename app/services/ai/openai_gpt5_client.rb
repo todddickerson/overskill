@@ -42,7 +42,7 @@ module Ai
     end
     
     def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, 
-             reasoning_level: :medium, tools: nil, use_cache: true, verbosity: :medium, use_chat_api: true)
+             reasoning_level: :medium, tools: nil, use_cache: true, verbosity: :medium, use_chat_api: true, timeout: nil)
       
       # Validate API key
       raise "OpenAI API key not configured" unless @api_key
@@ -66,8 +66,8 @@ module Ai
         return @cache[cache_key]
       end
       
-      # Make API request
-      response = make_request(endpoint, request_body)
+      # Make API request with configurable timeout
+      response = make_request(endpoint, request_body, timeout: timeout)
       
       # Process response based on API type
       result = use_chat_api ? process_chat_response(response) : process_responses_response(response)
@@ -148,12 +148,12 @@ module Ai
     
     private
     
-    def build_http_client
+    def build_http_client(read_timeout: 45, open_timeout: 10)
       uri = URI(BASE_URL)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
-      http.read_timeout = 120
-      http.open_timeout = 10
+      http.read_timeout = read_timeout  # PHASE 1: Reduced from 120s to 45s default
+      http.open_timeout = open_timeout
       http
     end
     
@@ -260,16 +260,23 @@ module Ai
       formatted.join("\n\n")
     end
     
-    def make_request(endpoint, body)
+    def make_request(endpoint, body, timeout: nil)
       request = Net::HTTP::Post.new(endpoint)
       request['Authorization'] = "Bearer #{@api_key}"
       request['Content-Type'] = 'application/json'
       request.body = body.to_json
       
-      Rails.logger.info "[GPT-5] Request to #{endpoint}"
+      Rails.logger.info "[GPT-5] Request to #{endpoint}#{timeout ? " (timeout: #{timeout}s)" : ""}"
       Rails.logger.debug "[GPT-5] Request body: #{body.to_json}" if ENV['VERBOSE_AI_LOGGING']
       
-      response = @http_client.request(request)
+      # Use custom http client with different timeout if specified
+      http_client = timeout ? build_http_client(read_timeout: timeout) : @http_client
+      
+      start_time = Time.current
+      response = http_client.request(request)
+      duration = Time.current - start_time
+      
+      Rails.logger.info "[GPT-5] Response received in #{duration.round(2)}s"
       
       unless response.code == '200'
         error = JSON.parse(response.body) rescue { error: response.body }

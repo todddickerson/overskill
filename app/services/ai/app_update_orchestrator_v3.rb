@@ -1,10 +1,16 @@
 module Ai
   # GPT-5 Enhanced orchestrator - Unified handler for both CREATE and UPDATE operations
   # Streams real-time progress via app_versions and chat messages
+  # PHASE 1 ENHANCED: Optimized for efficiency and timeout prevention
   class AppUpdateOrchestratorV3
     include Rails.application.routes.url_helpers
     
     MAX_IMPROVEMENT_ITERATIONS = 3
+    # PHASE 1 OPTIMIZATION: Timeout and efficiency settings
+    MAX_CONTEXT_TOKENS = 32_000     # Smaller context to prevent timeouts
+    MAX_FILES_PER_CALL = 3          # Process files in smaller batches like Lovable
+    API_TIMEOUT_SECONDS = 45        # Shorter timeout for faster failure recovery
+    MAX_RETRIES_PER_CALL = 2        # Quick retries instead of long waits
     
     attr_reader :chat_message, :app, :user, :app_version, :broadcaster
     
@@ -50,6 +56,14 @@ module Ai
       Rails.logger.info "[AppUpdateOrchestratorV3] Operation type: #{@is_new_app ? 'CREATE' : 'UPDATE'}"
       
       begin
+        # PHASE 1: Discussion Mode Gate - Check if user wants discussion vs implementation
+        unless explicit_code_request? || @is_new_app
+          Rails.logger.info "[AppUpdateOrchestratorV3] Discussion mode detected - providing guidance without coding"
+          return handle_discussion_mode
+        end
+        
+        Rails.logger.info "[AppUpdateOrchestratorV3] Implementation mode - proceeding with code generation"
+        
         # Initialize app version for tracking
         create_app_version!
         
@@ -175,12 +189,12 @@ module Ai
         }
       ]
       
-      # Use OpenAI or fallback to OpenRouter
+      # Use OpenAI or fallback to OpenRouter with PHASE 1 optimizations
       @broadcaster.update("Calling AI for analysis...", 0.5)
       
       if @use_openai_direct
-        Rails.logger.info "[AppUpdateOrchestratorV3] Making OpenAI direct call for analysis"
-        response = stream_gpt5_response(messages)
+        Rails.logger.info "[AppUpdateOrchestratorV3] Making OpenAI direct call for analysis (timeout: #{API_TIMEOUT_SECONDS}s)"
+        response = stream_gpt5_response(messages, timeout: API_TIMEOUT_SECONDS)
       else
         Rails.logger.warn "[AppUpdateOrchestratorV3] Using OpenRouter fallback for analysis"
         response = @client.chat(messages, model: :gpt5, temperature: 1.0)
@@ -332,6 +346,41 @@ module Ai
                 replace: { type: "string", description: "Text to replace with" }
               },
               required: ["path", "find", "replace"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "line_replace",
+            description: "PREFERRED: Replace specific lines in a file (90% more efficient than update_file). Use for surgical edits with ellipsis support like Lovable's lov-line-replace.",
+            parameters: {
+              type: "object",
+              properties: {
+                path: { type: "string", description: "File path to modify" },
+                search: { type: "string", description: "Content to search for (use '...' for ellipsis to match large sections)" },
+                first_line: { type: "integer", description: "First line number to replace (1-indexed)" },
+                last_line: { type: "integer", description: "Last line number to replace (1-indexed)" },
+                replace: { type: "string", description: "New content to replace the search content with" }
+              },
+              required: ["path", "search", "first_line", "last_line", "replace"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_code",
+            description: "RECOMMENDED: Search existing code for patterns, functions, or components before creating new ones. Prevents duplicate code like Lovable's lov-search-files.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "Regex pattern to search for (e.g. 'Button', 'useState', 'function.*handleSubmit')" },
+                include_pattern: { type: "string", description: "File glob to include (e.g. 'src/', '*.jsx', 'components/')" },
+                exclude_pattern: { type: "string", description: "File glob to exclude (e.g. '*.test.js', 'node_modules/')" },
+                case_sensitive: { type: "boolean", description: "Whether to match case (default: false)" }
+              },
+              required: ["query"]
             }
           }
         },
@@ -518,6 +567,14 @@ module Ai
               result = handle_update_file(args)
               tool_results << create_tool_result(tool_call["id"], result)
               
+            when "line_replace"
+              result = handle_line_replace(args)
+              tool_results << create_tool_result(tool_call["id"], result)
+              
+            when "search_code"
+              result = handle_search_code(args)
+              tool_results << create_tool_result(tool_call["id"], result)
+              
             when "broadcast_progress"
               handle_broadcast_progress(args)
               tool_results << create_tool_result(tool_call["id"], { success: true, message: "Progress updated" })
@@ -652,6 +709,133 @@ module Ai
         Rails.logger.error "[AppUpdateOrchestratorV3] File creation failed: #{e.message}"
         { success: false, message: "Failed to create #{path}: #{e.message}" }
       end
+    end
+    
+    def handle_line_replace(args)
+      path = args["path"]
+      search_pattern = args["search"]
+      first_line = args["first_line"]
+      last_line = args["last_line"]
+      replacement = args["replace"]
+      
+      begin
+        file = app.app_files.find_by(path: path)
+        unless file
+          return { success: false, message: "File #{path} not found" }
+        end
+        
+        # Use the LineReplaceService for surgical editing
+        result = Ai::LineReplaceService.replace_lines(file, search_pattern, first_line, last_line, replacement)
+        
+        if result[:success]
+          # Track for version
+          @files_modified << path
+          
+          # Create version file record
+          if @app_version
+            @app_version.app_version_files.create!(
+              app_file: file,
+              content: result[:new_content],
+              action: 'updated'
+            )
+          end
+          
+          # Broadcast file update to UI
+          broadcast_file_update(path, 'updated')
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] Line replace successful: #{path}, lines #{first_line}-#{last_line}"
+          Rails.logger.info "[AppUpdateOrchestratorV3] Token savings: ~#{result[:stats][:token_savings]}%"
+          
+          { success: true, message: "Lines #{first_line}-#{last_line} replaced in #{path}", stats: result[:stats] }
+        else
+          Rails.logger.error "[AppUpdateOrchestratorV3] Line replace failed: #{result[:error]}"
+          result
+        end
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Line replace error: #{e.message}"
+        { success: false, message: "Failed to replace lines in #{path}: #{e.message}" }
+      end
+    end
+    
+    def handle_search_code(args)
+      query = args["query"]
+      include_pattern = args["include_pattern"]
+      exclude_pattern = args["exclude_pattern"] 
+      case_sensitive = args["case_sensitive"] || false
+      
+      begin
+        Rails.logger.info "[AppUpdateOrchestratorV3] Searching code for: '#{query}'"
+        
+        # Use the CodeSearchService for intelligent search
+        result = Ai::CodeSearchService.search(
+          app, 
+          query, 
+          include_pattern: include_pattern,
+          exclude_pattern: exclude_pattern,
+          case_sensitive: case_sensitive
+        )
+        
+        if result[:success]
+          matches_count = result[:matches].size
+          unique_files = result[:analysis][:unique_files]
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] Code search found #{matches_count} matches in #{unique_files} files"
+          
+          # Format results for AI consumption
+          formatted_result = format_search_results_for_ai(result)
+          
+          { 
+            success: true, 
+            message: "Found #{matches_count} matches in #{unique_files} files",
+            matches: result[:matches],
+            analysis: result[:analysis],
+            recommendations: result[:analysis][:recommendations],
+            ai_summary: formatted_result
+          }
+        else
+          Rails.logger.error "[AppUpdateOrchestratorV3] Code search failed: #{result[:error]}"
+          result
+        end
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Search code error: #{e.message}"
+        { success: false, message: "Search failed: #{e.message}" }
+      end
+    end
+    
+    def format_search_results_for_ai(result)
+      return "No matches found for your search." if result[:matches].empty?
+      
+      summary = []
+      
+      # Overall summary
+      matches_count = result[:matches].size
+      files_count = result[:analysis][:unique_files]
+      summary << "Found #{matches_count} matches across #{files_count} files."
+      
+      # Most relevant files
+      if result[:analysis][:most_frequent_file]
+        most_frequent = result[:analysis][:most_frequent_file]
+        summary << "Most relevant file: #{most_frequent[:file_path]} (#{most_frequent[:match_count]} matches)"
+      end
+      
+      # Component suggestions
+      if result[:analysis][:component_suggestions]&.any?
+        suggestions = result[:analysis][:component_suggestions].first(3)
+        summary << "Existing components you could reuse:"
+        suggestions.each do |suggestion|
+          summary << "  - #{suggestion[:name]} in #{suggestion[:file_path]}"
+        end
+      end
+      
+      # Recommendations
+      if result[:analysis][:recommendations]&.any?
+        summary << "Recommendations:"
+        result[:analysis][:recommendations].each do |rec|
+          summary << "  - #{rec[:message]}"
+        end
+      end
+      
+      summary.join("\n")
     end
     
     def handle_update_file(args)
@@ -1334,14 +1518,14 @@ module Ai
     end
     
     # Streaming support for OpenAI direct API
-    def stream_gpt5_response(messages)
+    def stream_gpt5_response(messages, timeout: nil)
       # ALWAYS use GPT-5 - Check OpenAI direct vs OpenRouter
       if @use_openai_direct
-        Rails.logger.info "[AppUpdateOrchestratorV3] 🔥 Making OpenAI DIRECT call with GPT-5"
+        Rails.logger.info "[AppUpdateOrchestratorV3] 🔥 Making OpenAI DIRECT call with GPT-5#{timeout ? " (timeout: #{timeout}s)" : ""}"
         
         begin
-          # Use the OpenAI client directly with GPT-5
-          response = @client.chat(messages, model: 'gpt-5', temperature: 1.0)
+          # Use the OpenAI client directly with GPT-5 and custom timeout
+          response = @client.chat(messages, model: 'gpt-5', temperature: 1.0, timeout: timeout)
           
           Rails.logger.info "[AppUpdateOrchestratorV3] OpenAI response success: #{response[:success]}"
           
@@ -1351,6 +1535,9 @@ module Ai
             Rails.logger.error "[AppUpdateOrchestratorV3] OpenAI API returned error: #{response[:error]}"
             { success: false, error: "OpenAI API error: #{response[:error]}" }
           end
+        rescue Net::ReadTimeout => e
+          Rails.logger.error "[AppUpdateOrchestratorV3] PHASE 1 OPTIMIZATION: OpenAI timeout after #{timeout || 45}s - #{e.message}"
+          { success: false, error: "Request timeout - trying shorter context" }
         rescue => e
           Rails.logger.error "[AppUpdateOrchestratorV3] OpenAI call exception: #{e.message}"
           Rails.logger.error e.backtrace.join("\n")
@@ -1394,6 +1581,132 @@ module Ai
         Rails.logger.error "[AppUpdateOrchestratorV3] Tool calling failed: #{e.message}"
         { success: false, error: e.message }
       end
+    end
+    
+    # PHASE 1 ENHANCEMENT: Discussion Mode Detection and Handling
+    
+    def explicit_code_request?
+      content = @chat_message.content.downcase
+      
+      # Lovable's action words that indicate implementation intent
+      action_words = %w[
+        implement create build code add make generate
+        fix update modify change edit write
+        add build create install setup deploy
+      ]
+      
+      # Check for explicit action words
+      action_pattern = /\b(#{action_words.join('|')})\b/i
+      has_action_words = content.match?(action_pattern)
+      
+      # Check for question patterns that suggest discussion
+      question_patterns = [
+        /\bhow (do|can|should) i\b/i,
+        /\bwhat (is|are|should|would)\b/i,
+        /\bwhy (is|are|should|would)\b/i,
+        /\bwhich (is|are|should|would)\b/i,
+        /\bcan you (help|explain|tell)\b/i,
+        /\bwould you (recommend|suggest)\b/i
+      ]
+      
+      has_questions = question_patterns.any? { |pattern| content.match?(pattern) }
+      
+      # Discussion indicators
+      discussion_words = %w[discuss plan think consider explore options approach strategy]
+      has_discussion_words = discussion_words.any? { |word| content.include?(word) }
+      
+      Rails.logger.info "[AppUpdateOrchestratorV3] Intent analysis: action_words=#{has_action_words}, questions=#{has_questions}, discussion=#{has_discussion_words}"
+      
+      # Implementation if explicit action words and not primarily questions/discussion
+      has_action_words && !(has_questions && has_discussion_words)
+    end
+    
+    def handle_discussion_mode
+      Rails.logger.info "[AppUpdateOrchestratorV3] Entering discussion mode - providing guidance without coding"
+      
+      begin
+        # Get current app context for informed discussion
+        current_files = get_cached_or_load_files || []
+        standards_content = load_ai_standards
+        
+        discussion_prompt = build_discussion_prompt(current_files, standards_content)
+        
+        messages = [
+          {
+            role: "system", 
+            content: "You are a helpful AI assistant providing guidance on app development. You discuss, plan, and advise WITHOUT writing code unless explicitly asked to implement something. Be conversational and helpful."
+          },
+          {
+            role: "user",
+            content: discussion_prompt
+          }
+        ]
+        
+        # Use OpenAI for discussion
+        if @use_openai_direct
+          response = @client.chat(messages, model: 'gpt-5', temperature: 0.7)
+        else
+          response = @client.chat(messages, model: :gpt5, temperature: 0.7)
+        end
+        
+        if response[:success]
+          # Create assistant response message
+          assistant_message = @app.app_chat_messages.create!(
+            role: "assistant",
+            content: response[:content],
+            status: "completed",
+            user: @user
+          )
+          
+          # Broadcast the response
+          broadcast_assistant_message(assistant_message)
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] Discussion mode completed successfully"
+          { success: true, message: "Discussion completed", discussion: true }
+        else
+          handle_failure("Discussion failed: #{response[:error] || 'Unknown error'}")
+        end
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Discussion mode error: #{e.message}"
+        handle_failure("Discussion error: #{e.message}")
+      end
+    end
+    
+    def build_discussion_prompt(current_files, standards_content)
+      file_context = if current_files.any?
+        file_list = current_files.map { |f| "#{f[:path]} (#{f[:file_type]})" }.join(", ")
+        "Current app structure: #{file_list}\n\n"
+      else
+        "This appears to be a new app project.\n\n"
+      end
+      
+      <<~PROMPT
+        #{file_context}User message: "#{@chat_message.content}"
+        
+        App context: #{@app.name} - #{@app.description || 'No description'}
+        
+        Please provide helpful guidance, suggestions, or explanations related to their question. 
+        You can:
+        - Explain concepts and best practices
+        - Suggest approaches and architectures  
+        - Discuss trade-offs between different solutions
+        - Ask clarifying questions to better understand their needs
+        - Recommend when they should proceed with implementation
+        
+        If they want to proceed with coding, suggest they use specific action words like "implement", "create", "build", etc.
+        
+        Keep your response conversational and helpful. Do NOT write any code unless they explicitly ask you to implement something.
+      PROMPT
+    end
+    
+    def broadcast_assistant_message(message)
+      # Broadcast new message to chat interface
+      Turbo::StreamsChannel.broadcast_append_to(
+        "app_#{@app.id}_chat",
+        target: "chat-messages",
+        partial: "account/app_editors/chat_message",
+        locals: { message: message, app: @app }
+      )
     end
   end
 end
