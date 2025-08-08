@@ -406,8 +406,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
     t.string "environment"
     t.boolean "bookmarked", default: false, null: false
     t.string "display_name"
+    t.string "status", default: "pending"
+    t.datetime "started_at"
+    t.datetime "completed_at"
+    t.jsonb "metadata", default: {}
+    t.text "error_message"
     t.index ["app_id"], name: "index_app_versions_on_app_id"
     t.index ["bookmarked"], name: "index_app_versions_on_bookmarked"
+    t.index ["metadata"], name: "index_app_versions_on_metadata", using: :gin
+    t.index ["status"], name: "index_app_versions_on_status"
     t.index ["team_id"], name: "index_app_versions_on_team_id"
     t.index ["user_id"], name: "index_app_versions_on_user_id"
   end

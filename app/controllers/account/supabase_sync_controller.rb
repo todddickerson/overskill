@@ -43,7 +43,7 @@ class Account::SupabaseSyncController < Account::ApplicationController
     @user = User.find(params[:id])
     
     # Queue sync job for this specific user
-    job = SupabaseAuthSyncJob.perform_later(@user, :create)
+    job = SupabaseAuthSyncJob.perform_later(@user, 'create')
     
     respond_to do |format|
       format.html do

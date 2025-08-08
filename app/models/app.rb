@@ -150,19 +150,43 @@ class App < ApplicationRecord
       app_chat_messages.last
     end
     
-    prompt = "Generate a simple app with a home page and a about page" if prompt.blank?
+    # Default prompt if none provided
+    if prompt.blank? && message.content.blank?
+      default_prompt = "Generate a simple app with a home page and about page"
+      update!(prompt: default_prompt)
+      message.update!(content: default_prompt) if message.persisted?
+    end
 
-    generation = app_generations.create!(
-      team: team,
-      prompt: prompt,
-      status: "pending",
-      started_at: Time.current
-    )
-    AppGenerationJob.perform_later(generation)
-
+    # Use V3 orchestrator as primary handler
+    if use_v3_orchestrator?
+      Rails.logger.info "[App] Using V3 orchestrator (GPT-5 optimized) for app ##{id}"
+      ProcessAppUpdateJobV3.perform_later(message)
+    else
+      # Fallback to legacy generation for compatibility
+      Rails.logger.info "[App] Using legacy generation system for app ##{id}"
+      generation = app_generations.create!(
+        team: team,
+        prompt: prompt || message.content,
+        status: "pending",
+        started_at: Time.current
+      )
+      AppGenerationJob.perform_later(generation)
+    end
     
     # Update status
     update!(status: "generating") unless generating?
+  end
+  
+  # Check if V3 orchestrator should be used
+  def use_v3_orchestrator?
+    # Check app-specific setting first
+    return app_settings.find_by(key: 'use_v3_orchestrator')&.value == 'true' if app_settings.exists?(key: 'use_v3_orchestrator')
+    
+    # Check team feature flag
+    # return team.feature_enabled?('v3_orchestrator') if team.respond_to?(:feature_enabled?)
+    
+    # Default to environment variable
+    ENV['USE_V3_ORCHESTRATOR'] == 'true'
   end
   
 
@@ -181,9 +205,11 @@ class App < ApplicationRecord
     # 1. Prompt is present
     # 2. Status is not already generating/generated/failed
     # 3. No existing chat messages (new app)
+    # 4. V3 orchestrator is enabled (better experience)
     prompt.present? && 
     status.in?(['draft', 'pending', nil]) && 
-    app_chat_messages.empty?
+    app_chat_messages.empty? &&
+    use_v3_orchestrator?  # Only auto-generate with V3 for best experience
   end
   
   def initiate_ai_generation

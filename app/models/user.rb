@@ -60,11 +60,11 @@ class User < ApplicationRecord
   private
   
   def create_supabase_auth_user
-    SupabaseAuthSyncJob.perform_later(self, :create)
+    SupabaseAuthSyncJob.perform_later(self, 'create')
   end
   
   def sync_to_supabase_profile
-    SupabaseAuthSyncJob.perform_later(self, :update)
+    SupabaseAuthSyncJob.perform_later(self, 'update')
   end
   
   # 🚅 add methods above.

@@ -4,18 +4,29 @@ class SupabaseAuthSyncJob < ApplicationJob
   
   retry_on StandardError, wait: 5, attempts: 3
   
-  def perform(user, action)
+  def perform(user, action = nil)
+    # Normalize action to a simple string to be resilient to
+    # ActiveJob serialization differences (symbol/hash/string)
+    normalized_action = case action
+                        when Hash
+                          action[:value] || action['value'] || action[:action] || action['action']
+                        else
+                          action
+                        end
+
+    action_str = normalized_action.to_s
+
     service = SupabaseService.instance
     
-    case action.to_sym
-    when :create
+    case action_str
+    when 'create'
       create_supabase_user(user, service)
-    when :update
+    when 'update'
       update_supabase_user(user, service)
-    when :delete
+    when 'delete'
       delete_supabase_user(user, service)
     else
-      raise ArgumentError, "Unknown action: #{action}"
+      raise ArgumentError, "Unknown action: #{action.inspect}"
     end
   end
   

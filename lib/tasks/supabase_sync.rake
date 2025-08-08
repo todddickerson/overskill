@@ -57,7 +57,7 @@ namespace :supabase do
     
     if user
       puts "Syncing user: #{user.email}"
-      job = SupabaseAuthSyncJob.perform_later(user, :create)
+      job = SupabaseAuthSyncJob.perform_later(user, 'create')
       puts "Sync job queued with ID: #{job.job_id}"
     else
       puts "User not found: #{args[:email]}"
