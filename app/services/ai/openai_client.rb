@@ -15,27 +15,28 @@ module Ai
     end
 
     def generate_image(prompt, size: "1024x1024", quality: "standard", style: "natural")
+      # Use latest OpenAI image model via Images API. Only send supported fields.
       body = {
-        model: "dall-e-3",
+        model: "gpt-image-1",
         prompt: prompt,
         n: 1,
-        size: size,
-        quality: quality, # "standard" or "hd"
-        style: style # "natural" or "vivid"
+        size: size
       }
 
-      Rails.logger.info "[AI] Generating image with DALL-E 3" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      Rails.logger.info "[AI] Generating image with gpt-image-1" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
       response = self.class.post("/images/generations", @options.merge(body: body.to_json))
 
       if response.success?
         result = response.parsed_response
         image_url = result.dig("data", 0, "url")
+        image_b64 = result.dig("data", 0, "b64_json")
         revised_prompt = result.dig("data", 0, "revised_prompt")
 
         {
           success: true,
           image_url: image_url,
+          image_b64: image_b64,
           revised_prompt: revised_prompt
         }
       else

@@ -9,8 +9,9 @@ module Ai
       openai: {
         base_url: 'https://api.openai.com/v1',
         models: {
-          'dall-e-3': { max_size: 1024, quality: 'standard', style: 'vivid' },
-          'dall-e-2': { max_size: 1024 }
+          'gpt-image-1': { max_size: 1024 },
+          'dall-e-3': { max_size: 1024, deprecated: true },
+          'dall-e-2': { max_size: 1024, deprecated: true }
         }
       },
       stability: {
@@ -298,7 +299,7 @@ module Ai
       
       case @provider
       when :openai
-        max_dimension <= 1024 ? 'dall-e-3' : 'dall-e-2'
+        'gpt-image-1'
       when :stability
         'stable-diffusion-xl-1024-v1-0'
       when :replicate
@@ -311,7 +312,7 @@ module Ai
     def generate_with_openai(prompt, model, dimensions)
       return { success: false, error: "OpenAI API key not configured" } unless @api_key
       
-      # OpenAI DALL-E API call
+      # OpenAI Images API with latest model
       response = HTTParty.post(
         "#{@base_url}/images/generations",
         headers: {
@@ -319,11 +320,10 @@ module Ai
           'Content-Type' => 'application/json'
         },
         body: {
-          model: model,
+          model: 'gpt-image-1',
           prompt: prompt,
           n: 1,
           size: "#{dimensions[:width]}x#{dimensions[:height]}",
-          quality: 'standard',
           response_format: 'b64_json'
         }.to_json
       )
@@ -334,7 +334,7 @@ module Ai
           {
             success: true,
             image_data: image_data,
-            metadata: { model: model, provider: 'openai' }
+            metadata: { model: 'gpt-image-1', provider: 'openai', width: dimensions[:width], height: dimensions[:height] }
           }
         else
           { success: false, error: "No image data in response" }
