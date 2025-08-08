@@ -128,6 +128,11 @@ result = preview_service.deploy_instant_preview!
 
 ## AI Considerations
 
+- **GPT-5**: Released August 7, 2025 - Primary model for all AI operations
+  - Models: gpt-5, gpt-5-mini, gpt-5-nano
+  - Direct OpenAI API integration with function calling
+  - Pricing: $1.25/$10 per 1M input/output tokens (gpt-5)
+  - Features: reasoning_effort, verbosity controls, built-in tools
 - **Kimi-K2**: May timeout with function calling, use StructuredAppGenerator instead
 - **Fallback**: Claude Sonnet for reliable function calling
 - **Workaround**: StructuredAppGenerator avoids function calls entirely

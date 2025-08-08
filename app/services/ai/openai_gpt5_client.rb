@@ -9,11 +9,11 @@ module Ai
     include Singleton
     
     BASE_URL = 'https://api.openai.com/v1'
-    DEFAULT_MODEL = 'gpt-5'  # GPT-5 is available!
+    DEFAULT_MODEL = 'gpt-5'  # GPT-5 released August 7, 2025!
     GPT5_VARIANTS = {
-      main: 'gpt-5',
-      mini: 'gpt-5-mini',
-      nano: 'gpt-5-nano'
+      main: 'gpt-5',        # Full GPT-5 model
+      mini: 'gpt-5-mini',   # Smaller, faster variant
+      nano: 'gpt-5-nano'    # Smallest variant
     }.freeze
     
     # Reasoning effort levels (GPT-5 exclusive feature)
@@ -167,9 +167,12 @@ module Ai
         stream: stream
       }
       
-      # Add GPT-5 specific parameters for Chat Completions
-      body[:reasoning_effort] = reasoning_level.to_s if model.include?('gpt-5')
-      body[:verbosity] = verbosity.to_s if model.include?('gpt-5')
+      # Add GPT-5 specific parameters if they exist
+      # Note: reasoning_effort and verbosity are GPT-5 specific features
+      if model.include?('gpt-5')
+        body[:reasoning_effort] = reasoning_level.to_s
+        body[:verbosity] = verbosity.to_s
+      end
       
       # Add max tokens if specified
       body[:max_tokens] = max_tokens if max_tokens

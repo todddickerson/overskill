@@ -47,18 +47,15 @@ module Ai
       # Initialize Anthropic client for prompt caching
       @anthropic_client = AnthropicClient.new if ENV["ANTHROPIC_API_KEY"]
       
-      # Initialize GPT-5 client for OpenAI models (skip if dummy/invalid key)
-      # Only use direct OpenAI if we have a valid non-project key
+      # Initialize GPT-5 client for OpenAI models
+      # GPT-5 released August 7, 2025 - use direct OpenAI API
       openai_key = ENV["OPENAI_API_KEY"]
       if openai_key && openai_key != "dummy-key" && openai_key != "your-openai-key-here"
-        # Skip project keys (sk-proj-*) as they don't work with GPT-5 API
-        # Real GPT-5 keys should start with sk- but not sk-proj-
-        if openai_key.start_with?("sk-") && !openai_key.start_with?("sk-proj-")
-          @gpt5_client = OpenaiGpt5Client.instance
-          Rails.logger.info "[OpenRouter] Initialized with direct OpenAI GPT-5 client"
-        else
-          Rails.logger.info "[OpenRouter] Skipping direct OpenAI (invalid/project key), will use OpenRouter"
-        end
+        # Use direct OpenAI API for GPT-5 models
+        @gpt5_client = OpenaiGpt5Client.instance
+        Rails.logger.info "[OpenRouter] Initialized with direct OpenAI GPT-5 client"
+      else
+        Rails.logger.info "[OpenRouter] No valid OpenAI key, will use OpenRouter fallback"
       end
     end
 

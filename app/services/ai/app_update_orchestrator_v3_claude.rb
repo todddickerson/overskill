@@ -175,18 +175,26 @@ module Ai
         "executing"
       )
       
+      # Get existing files for planning context
+      existing_file_paths = @app.app_files.pluck(:path)
+      
       # Simplified planning for efficiency
       planning_prompt = <<~PROMPT
         Based on analysis: #{analysis.to_json}
         User request: "#{chat_message.content}"
         
-        Create a simple execution plan:
+        Existing files in app: #{existing_file_paths.join(', ')}
+        
+        Create a simple execution plan. IMPORTANT: If files already exist, they should go in files_to_update, not files_to_create.
+        
         {
           "summary": "Brief plan summary",
           "files_to_create": [
-            {"path": "src/App.jsx", "description": "Main component"}
+            {"path": "path/to/new/file.jsx", "description": "Description of new file"}
           ],
-          "files_to_update": [],
+          "files_to_update": [
+            {"path": "path/to/existing/file.jsx", "description": "What changes to make"}
+          ],
           "files_to_delete": [],
           "total_operations": 3
         }
@@ -209,8 +217,18 @@ module Ai
       if response[:success]
         plan = parse_json_response(response[:content])
         
+        Rails.logger.info "[V3Claude] Plan created: #{plan.inspect}"
+        
+        # Calculate actual operations from the plan
+        total_ops = (plan&.dig('files_to_create')&.length || 0) + 
+                   (plan&.dig('files_to_update')&.length || 0) + 
+                   (plan&.dig('files_to_delete')&.length || 0)
+        
+        # Update total_operations if not set correctly
+        plan['total_operations'] = total_ops if plan && total_ops > 0
+        
         planning_message.update!(
-          content: "✅ Plan ready: #{plan&.dig('total_operations') || 0} operations",
+          content: "✅ Plan ready: #{total_ops} operations",
           status: "completed"
         )
         broadcast_message_update(planning_message)
@@ -310,6 +328,11 @@ module Ai
         }
       ]
       
+      # Load existing file contents for context
+      existing_files = @app.app_files.map do |file|
+        "#{file.path}:\n```\n#{file.content[0..500]}#{file.content.length > 500 ? '...' : ''}\n```"
+      end.join("\n\n")
+      
       # Simplified execution prompt for efficiency
       execution_prompt = <<~PROMPT
         Execute this plan using the available tools:
@@ -317,10 +340,18 @@ module Ai
         
         User request: "#{chat_message.content}"
         
-        Current files: #{@app.app_files.pluck(:path).join(', ')}
+        IMPORTANT: You have existing files that need to be updated. Use read_file first to get the full content, then use update_file or write_file as needed.
         
-        Use the tools to create/update files as needed. Call broadcast_progress to update the user.
-        Focus on creating a working #{app.framework} app.
+        Existing files in the app:
+        #{existing_files}
+        
+        Instructions:
+        1. For existing files, use read_file to get full content first
+        2. Then use update_file to modify specific parts OR write_file to completely replace
+        3. For new files, use write_file directly
+        4. Call broadcast_progress periodically to update the user
+        
+        Focus on fulfilling the user's request: "#{chat_message.content}"
       PROMPT
       
       messages = [
