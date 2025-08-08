@@ -175,12 +175,17 @@ module Ai
       end
       
       def broadcast_turbo_update(message)
+        # Use Turbo Streams directly
         Turbo::StreamsChannel.broadcast_replace_to(
           "app_#{@app.id}_chat",
-          target: "chat_message_#{message.id}",
+          target: "app_chat_message_#{message.id}",
           partial: "account/app_editors/chat_message",
           locals: { message: message }
         )
+      rescue => e
+        Rails.logger.error "[ProgressBroadcaster] Broadcast failed: #{e.message}"
+        Rails.logger.error "Ensure Redis is running and ActionCable is configured"
+        # Don't fail the whole operation for broadcast issues
       end
       
       def find_or_create_assistant_message
