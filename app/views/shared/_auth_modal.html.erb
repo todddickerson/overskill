@@ -104,7 +104,7 @@
                                   autofocus: true,
                                   value: (local_assigns[:email] || cookies.encrypted[:pre_auth_email]).to_s,
                                   autocomplete: "email",
-                                  class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" %>
+                                  class: "form-control" %>
               </div>
             </div>
 
@@ -117,7 +117,7 @@
                                      id: "login_password", 
                                      required: true,
                                      autocomplete: "current-password",
-                                     class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" %>
+                                     class: "form-control" %>
               </div>
             </div>
 
@@ -194,7 +194,7 @@
                                   autofocus: true,
                                   value: (local_assigns[:email] || cookies.encrypted[:pre_auth_email]).to_s,
                                   autocomplete: "email",
-                                  class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" %>
+                                  class: "form-control" %>
               </div>
             </div>
 
@@ -207,7 +207,7 @@
                                      id: "signup_password",
                                      required: true,
                                      autocomplete: "new-password",
-                                     class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" %>
+                                     class: "form-control" %>
               </div>
               <p class="mt-1 text-sm text-gray-500">
                 At least 6 characters
@@ -223,7 +223,7 @@
                                      id: "signup_password_confirmation",
                                      required: true,
                                      autocomplete: "new-password",
-                                     class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" %>
+                                     class: "form-control" %>
               </div>
             </div>
 

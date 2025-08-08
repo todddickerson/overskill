@@ -1,6 +1,7 @@
 const { execSync } = require("child_process");
 
-const postcssImportConfigFile = execSync(`bundle exec bin/theme postcss-import-config ${process.env.THEME}`).toString().trim()
+const theme = process.env.THEME || 'light'
+const postcssImportConfigFile = execSync(`bundle exec bin/theme postcss-import-config ${theme}`).toString().trim()
 const postcssImportConfig = require(postcssImportConfigFile)
 
 module.exports = {

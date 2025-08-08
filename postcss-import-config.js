@@ -1,7 +1,8 @@
 const { execSync } = require("child_process");
 
-const themeStylesheetsDir = execSync(`bundle exec bin/theme stylesheets-dir ${process.env.THEME} 2> /dev/null`).toString().trim()
-const themeStylesheet = execSync(`bundle exec bin/theme tailwind-stylesheet ${process.env.THEME} 2> /dev/null`).toString().trim()
+const theme = process.env.THEME || 'light'
+const themeStylesheetsDir = execSync(`bundle exec bin/theme stylesheets-dir ${theme} 2> /dev/null`).toString().trim()
+const themeStylesheet = execSync(`bundle exec bin/theme tailwind-stylesheet ${theme} 2> /dev/null`).toString().trim()
 
 module.exports = {
   resolve: (id, basedir, importOptions) => {

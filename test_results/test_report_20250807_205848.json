@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-08-07 20:58:48 UTC",
+  "total_tests": 4,
+  "successful_tests": 0,
+  "success_rate": 0.0,
+  "avg_generation_time": 0.25,
+  "total_files_generated": 0,
+  "total_chars_generated": 0,
+  "gpt5_usage": 4,
+  "results": [
+    {
+      "timestamp": "2025-08-07 20:58:35 UTC",
+      "name": "Counter App",
+      "prompt": "Create a React counter with + and - buttons. Use useState. Single index.html file only.",
+      "complexity": "simple",
+      "expected_patterns": [
+        "React",
+        "useState",
+        "counter",
+        "button"
+      ],
+      "success": false,
+      "files_generated": 0,
+      "patterns_found": [],
+      "generation_time": 0.260094,
+      "ai_model_used": "GPT-5",
+      "gpt5_used": true,
+      "total_chars": 0,
+      "errors": []
+    },
+    {
+      "timestamp": "2025-08-07 20:58:38 UTC",
+      "name": "Todo List App",
+      "prompt": "Create a React todo list. Add/remove todos, mark complete. Single index.html file.",
+      "complexity": "medium",
+      "expected_patterns": [
+        "React",
+        "useState",
+        "todo",
+        "input",
+        "map"
+      ],
+      "success": false,
+      "files_generated": 0,
+      "patterns_found": [],
+      "generation_time": 0.233886,
+      "ai_model_used": "GPT-5",
+      "gpt5_used": true,
+      "total_chars": 0,
+      "errors": []
+    },
+    {
+      "timestamp": "2025-08-07 20:58:41 UTC",
+      "name": "Calculator App",
+      "prompt": "Create a React calculator with +,-,*,/ operations. Single index.html file.",
+      "complexity": "medium",
+      "expected_patterns": [
+        "React",
+        "useState",
+        "calculator",
+        "eval"
+      ],
+      "success": false,
+      "files_generated": 0,
+      "patterns_found": [],
+      "generation_time": 0.259373,
+      "ai_model_used": "GPT-5",
+      "gpt5_used": true,
+      "total_chars": 0,
+      "errors": []
+    },
+    {
+      "timestamp": "2025-08-07 20:58:44 UTC",
+      "name": "Weather App",
+      "prompt": "Create a simple weather display app. Mock data is fine. React single file.",
+      "complexity": "complex",
+      "expected_patterns": [
+        "React",
+        "useState",
+        "weather"
+      ],
+      "success": false,
+      "files_generated": 0,
+      "patterns_found": [],
+      "generation_time": 0.227863,
+      "ai_model_used": "GPT-5",
+      "gpt5_used": true,
+      "total_chars": 0,
+      "errors": []
+    }
+  ]
+}

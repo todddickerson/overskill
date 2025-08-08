@@ -23,7 +23,7 @@ default: &default
 
 development:
   <<: *default
-  database: overskill_development
+  url: <%= ENV.fetch('DATABASE_URL') { 'postgresql://localhost/overskill_development' } %>
   # On MacOS some users are reporting crashes when first trying to access
   # the database. This workaround was suggested in this issue on `ruby-pg`:
   # https://github.com/ged/ruby-pg/issues/538

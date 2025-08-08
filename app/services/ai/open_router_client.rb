@@ -47,8 +47,19 @@ module Ai
       # Initialize Anthropic client for prompt caching
       @anthropic_client = AnthropicClient.new if ENV["ANTHROPIC_API_KEY"]
       
-      # Initialize GPT-5 client for OpenAI models
-      @gpt5_client = OpenaiGpt5Client.instance if ENV["OPENAI_API_KEY"]
+      # Initialize GPT-5 client for OpenAI models (skip if dummy/invalid key)
+      # Only use direct OpenAI if we have a valid non-project key
+      openai_key = ENV["OPENAI_API_KEY"]
+      if openai_key && openai_key != "dummy-key" && openai_key != "your-openai-key-here"
+        # Skip project keys (sk-proj-*) as they don't work with GPT-5 API
+        # Real GPT-5 keys should start with sk- but not sk-proj-
+        if openai_key.start_with?("sk-") && !openai_key.start_with?("sk-proj-")
+          @gpt5_client = OpenaiGpt5Client.instance
+          Rails.logger.info "[OpenRouter] Initialized with direct OpenAI GPT-5 client"
+        else
+          Rails.logger.info "[OpenRouter] Skipping direct OpenAI (invalid/project key), will use OpenRouter"
+        end
+      end
     end
 
     def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, use_anthropic: true)
@@ -176,12 +187,15 @@ module Ai
         max_tokens = calculate_optimal_max_tokens(messages, model_id)
       end
       
+      # Disable streaming for GPT-5 models (requires org verification)
+      use_streaming = !model_id.include?("gpt-5")
+      
       body = {
         model: model_id,
         messages: messages,
         temperature: temperature,
         max_tokens: max_tokens,
-        stream: true  # Enable streaming
+        stream: use_streaming  # Stream only for non-GPT-5 models
       }
       
       Rails.logger.info "[AI] Starting streaming chat with model: #{model_id}"
