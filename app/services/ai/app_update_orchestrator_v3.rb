@@ -164,9 +164,26 @@ module Ai
       # Update progress
       @broadcaster.update("Analyzing app requirements...", 0.3)
       
-      # Get current app state
-      current_files = get_cached_or_load_files || []
+      # PHASE 2: Use SmartContextService for efficient context loading
+      @broadcaster.update("Loading relevant context...", 0.4)
+      context_result = Ai::SmartContextService.load_relevant_context(
+        @app, 
+        @chat_message.content, 
+        operation_type: @is_new_app ? :create : :update
+      )
+      
+      current_files = context_result[:files] || []
       env_vars = get_cached_or_load_env_vars || []
+      
+      # Log context optimization stats
+      if context_result[:stats]
+        Rails.logger.info "[AppUpdateOrchestratorV3] Context stats: #{context_result[:stats][:loaded_files]}/#{context_result[:stats][:total_files]} files, ~#{context_result[:stats][:estimated_tokens]} tokens"
+        
+        # Update progress with context info
+        if context_result[:stats][:optimization_used]
+          @broadcaster.update("Smart context loaded (#{context_result[:stats][:loaded_files]} most relevant files)", 0.5)
+        end
+      end
       
       # Load AI app standards
       standards_content = load_ai_standards
@@ -175,7 +192,7 @@ module Ai
       analysis_prompt = if @is_new_app
         build_new_app_analysis_prompt(standards_content)
       else
-        build_update_analysis_prompt(current_files, standards_content)
+        build_update_analysis_prompt(current_files, standards_content, context_result[:summary])
       end
       
       messages = [
@@ -387,6 +404,51 @@ module Ai
         {
           type: "function",
           function: {
+            name: "read_console_logs",
+            description: "Read browser console logs from the deployed app for debugging. Use FIRST when debugging issues like Lovable's approach.",
+            parameters: {
+              type: "object",
+              properties: {
+                search: { type: "string", description: "Search term to filter logs (e.g. 'error', 'React', 'undefined')" },
+                limit: { type: "integer", description: "Maximum number of logs to return (default: 50)" }
+              },
+              required: []
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "read_network_requests", 
+            description: "Read network requests from the deployed app for debugging API and resource loading issues.",
+            parameters: {
+              type: "object",
+              properties: {
+                search: { type: "string", description: "Search term to filter requests (e.g. 'error', '404', 'api')" },
+                limit: { type: "integer", description: "Maximum number of requests to return (default: 50)" }
+              },
+              required: []
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "manage_dependencies",
+            description: "RECOMMENDED for Pro Mode: Analyze code and automatically manage npm dependencies. Updates package.json with needed packages.",
+            parameters: {
+              type: "object",
+              properties: {
+                mode: { type: "string", enum: ["instant", "pro"], description: "App mode: 'instant' (CDN) or 'pro' (npm packages)" },
+                force_analyze: { type: "boolean", description: "Force re-analysis even if package.json exists" }
+              },
+              required: ["mode"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
             name: "broadcast_progress",
             description: "Send progress update to user",
             parameters: {
@@ -431,10 +493,23 @@ module Ai
         }
       ]
       
-      # Load current app state and standards
+      # PHASE 2: Load current app state using SmartContextService for efficiency
+      context_result = Ai::SmartContextService.load_relevant_context(
+        @app, 
+        @chat_message.content, 
+        operation_type: @is_new_app ? :create : :update
+      )
+      
+      # Build file contents hash from context
       file_contents = {}
-      app.app_files.each { |file| file_contents[file.path] = file.content }
+      context_result[:files].each { |file| file_contents[file[:path]] = file[:content] }
       standards_content = load_ai_standards
+      
+      # Log context efficiency
+      if context_result[:stats] && context_result[:stats][:optimization_used]
+        Rails.logger.info "[AppUpdateOrchestratorV3] Using optimized context: #{context_result[:stats][:loaded_files]}/#{context_result[:stats][:total_files]} files"
+        @broadcaster.update("Using smart context (#{context_result[:stats][:loaded_files]} relevant files)", 0.2)
+      end
       
       # Comprehensive execution prompt with standards
       execution_prompt = <<~PROMPT
@@ -573,6 +648,18 @@ module Ai
               
             when "search_code"
               result = handle_search_code(args)
+              tool_results << create_tool_result(tool_call["id"], result)
+              
+            when "read_console_logs"
+              result = handle_read_console_logs(args)
+              tool_results << create_tool_result(tool_call["id"], result)
+              
+            when "read_network_requests"
+              result = handle_read_network_requests(args)
+              tool_results << create_tool_result(tool_call["id"], result)
+              
+            when "manage_dependencies"
+              result = handle_manage_dependencies(args)
               tool_results << create_tool_result(tool_call["id"], result)
               
             when "broadcast_progress"
@@ -833,6 +920,278 @@ module Ai
         result[:analysis][:recommendations].each do |rec|
           summary << "  - #{rec[:message]}"
         end
+      end
+      
+      summary.join("\n")
+    end
+    
+    def handle_read_console_logs(args)
+      search_term = args["search"]
+      limit = args["limit"] || 50
+      
+      begin
+        Rails.logger.info "[AppUpdateOrchestratorV3] Reading console logs#{search_term ? " for '#{search_term}'" : ""}"
+        
+        # Use the DebuggingService to read console logs
+        result = Ai::DebuggingService.read_console_logs(app, search_term: search_term, limit: limit)
+        
+        if result[:success]
+          logs_count = result[:logs].size
+          errors_count = result[:analysis][:errors]
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] Found #{logs_count} console logs (#{errors_count} errors)"
+          
+          # Format results for AI analysis
+          formatted_logs = format_logs_for_ai_analysis(result)
+          
+          { 
+            success: true, 
+            message: "Found #{logs_count} console logs (#{errors_count} errors)",
+            logs: result[:logs],
+            analysis: result[:analysis],
+            recommendations: result[:analysis][:recommendations],
+            ai_summary: formatted_logs
+          }
+        else
+          Rails.logger.error "[AppUpdateOrchestratorV3] Console logs reading failed: #{result[:error]}"
+          result
+        end
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Read console logs error: #{e.message}"
+        { success: false, message: "Failed to read console logs: #{e.message}" }
+      end
+    end
+    
+    def handle_read_network_requests(args)
+      search_term = args["search"]
+      limit = args["limit"] || 50
+      
+      begin
+        Rails.logger.info "[AppUpdateOrchestratorV3] Reading network requests#{search_term ? " for '#{search_term}'" : ""}"
+        
+        # Use the DebuggingService to read network requests
+        result = Ai::DebuggingService.read_network_requests(app, search_term: search_term, limit: limit)
+        
+        if result[:success]
+          requests_count = result[:requests].size
+          failed_count = result[:analysis][:failed_requests]
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] Found #{requests_count} network requests (#{failed_count} failed)"
+          
+          # Format results for AI analysis
+          formatted_requests = format_requests_for_ai_analysis(result)
+          
+          { 
+            success: true, 
+            message: "Found #{requests_count} network requests (#{failed_count} failed)",
+            requests: result[:requests],
+            analysis: result[:analysis],
+            recommendations: result[:analysis][:recommendations],
+            ai_summary: formatted_requests
+          }
+        else
+          Rails.logger.error "[AppUpdateOrchestratorV3] Network requests reading failed: #{result[:error]}"
+          result
+        end
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Read network requests error: #{e.message}"
+        { success: false, message: "Failed to read network requests: #{e.message}" }
+      end
+    end
+    
+    def format_logs_for_ai_analysis(result)
+      return "No console logs found." if result[:logs].empty?
+      
+      summary = []
+      
+      # Overall summary
+      logs_count = result[:logs].size
+      errors_count = result[:analysis][:errors]
+      warnings_count = result[:analysis][:warnings]
+      
+      summary << "Console Logs Summary: #{logs_count} total (#{errors_count} errors, #{warnings_count} warnings)"
+      
+      # Recent errors (most important)
+      error_logs = result[:logs].select { |log| log[:level] == 'error' }.first(3)
+      if error_logs.any?
+        summary << "\nRecent Errors:"
+        error_logs.each do |log|
+          timestamp = log[:timestamp].strftime('%H:%M:%S')
+          location = log[:source] ? "#{log[:source]}:#{log[:line_number]}" : "unknown"
+          summary << "  [#{timestamp}] #{log[:message]} (at #{location})"
+        end
+      end
+      
+      # Common issues
+      if result[:analysis][:common_issues].any?
+        summary << "\nCommon Issues Detected:"
+        result[:analysis][:common_issues].each do |issue|
+          summary << "  - #{issue[:description]} (#{issue[:count]} occurrences)"
+        end
+      end
+      
+      # Recommendations
+      if result[:analysis][:recommendations].any?
+        summary << "\nRecommendations:"
+        result[:analysis][:recommendations].each do |rec|
+          summary << "  - #{rec}"
+        end
+      end
+      
+      summary.join("\n")
+    end
+    
+    def format_requests_for_ai_analysis(result)
+      return "No network requests found." if result[:requests].empty?
+      
+      summary = []
+      
+      # Overall summary
+      requests_count = result[:requests].size
+      failed_count = result[:analysis][:failed_requests]
+      slow_count = result[:analysis][:slow_requests]
+      
+      summary << "Network Requests Summary: #{requests_count} total (#{failed_count} failed, #{slow_count} slow)"
+      
+      # Status code breakdown
+      if result[:analysis][:status_codes].any?
+        summary << "\nStatus Codes:"
+        result[:analysis][:status_codes].each do |status, count|
+          status_emoji = status >= 400 ? "❌" : "✅"
+          summary << "  #{status_emoji} #{status}: #{count} requests"
+        end
+      end
+      
+      # Failed requests (most important)
+      failed_requests = result[:requests].select { |req| req[:status] >= 400 }.first(3)
+      if failed_requests.any?
+        summary << "\nRecent Failed Requests:"
+        failed_requests.each do |req|
+          timestamp = req[:timestamp].strftime('%H:%M:%S')
+          summary << "  ❌ [#{timestamp}] #{req[:method]} #{req[:url]} - #{req[:status]} #{req[:error] ? "(#{req[:error]})" : ""}"
+        end
+      end
+      
+      # Common issues
+      if result[:analysis][:common_issues].any?
+        summary << "\nCommon Issues Detected:"
+        result[:analysis][:common_issues].each do |issue|
+          summary << "  - #{issue[:description]} (#{issue[:count]} occurrences)"
+        end
+      end
+      
+      # Recommendations
+      if result[:analysis][:recommendations].any?
+        summary << "\nRecommendations:"
+        result[:analysis][:recommendations].each do |rec|
+          summary << "  - #{rec}"
+        end
+      end
+      
+      summary.join("\n")
+    end
+    
+    def handle_manage_dependencies(args)
+      mode = args["mode"]&.to_sym || :instant
+      force_analyze = args["force_analyze"] || false
+      
+      begin
+        Rails.logger.info "[AppUpdateOrchestratorV3] Managing dependencies for #{mode} mode"
+        
+        # Use the DependencyManagementService
+        result = Ai::DependencyManagementService.analyze_and_manage_dependencies(app, mode: mode)
+        
+        if result[:success]
+          dependencies_count = result[:dependencies]&.size || 0
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] Dependency management successful: #{dependencies_count} dependencies managed"
+          
+          # Track for version if package.json was updated
+          if result[:package_json_updated]
+            @files_modified << 'package.json'
+          end
+          
+          # Format results for AI analysis
+          formatted_result = format_dependencies_for_ai_analysis(result)
+          
+          { 
+            success: true, 
+            message: result[:message],
+            mode: result[:mode],
+            dependencies: result[:dependencies],
+            package_json_updated: result[:package_json_updated],
+            install_commands: result[:install_commands],
+            recommendations: result[:recommendations],
+            ai_summary: formatted_result
+          }
+        else
+          Rails.logger.error "[AppUpdateOrchestratorV3] Dependency management failed: #{result[:error]}"
+          result
+        end
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Manage dependencies error: #{e.message}"
+        { success: false, message: "Failed to manage dependencies: #{e.message}" }
+      end
+    end
+    
+    def format_dependencies_for_ai_analysis(result)
+      return "No dependency management needed for Instant Mode." if result[:mode] == :instant
+      
+      summary = []
+      dependencies_count = result[:dependencies]&.size || 0
+      
+      # Overall summary
+      summary << "Dependency Management Summary: #{dependencies_count} dependencies managed for Pro Mode"
+      
+      # Dependencies breakdown
+      if result[:dependencies]&.any?
+        summary << "\nManaged Dependencies:"
+        result[:dependencies].each do |dep|
+          confidence_indicator = case dep[:confidence]
+                                when 'high' then '✅'
+                                when 'medium' then '⚠️'  
+                                when 'low' then '❓'
+                                else '•'
+                                end
+          
+          summary << "  #{confidence_indicator} #{dep[:package]}@#{dep[:version]} (#{dep[:dependency_type]})"
+          
+          if dep[:detected_in_files]&.any?
+            files_list = dep[:detected_in_files].first(3).join(', ')
+            files_suffix = dep[:detected_in_files].size > 3 ? " + #{dep[:detected_in_files].size - 3} more" : ""
+            summary << "      Found in: #{files_list}#{files_suffix}"
+          end
+        end
+      end
+      
+      # Install commands
+      if result[:install_commands]&.any?
+        summary << "\nInstall Commands:"
+        result[:install_commands].each do |cmd|
+          summary << "  $ #{cmd[:command]}"
+          summary << "    #{cmd[:description]}" if cmd[:description]
+        end
+      end
+      
+      # Recommendations
+      if result[:recommendations]&.any?
+        summary << "\nRecommendations:"
+        result[:recommendations].each do |rec|
+          type_indicator = case rec[:type]
+                          when 'warning' then '⚠️'
+                          when 'suggestion' then '💡'
+                          else '•'
+                          end
+          summary << "  #{type_indicator} #{rec[:message]}"
+          summary << "      Action: #{rec[:action]}" if rec[:action]
+        end
+      end
+      
+      # Package.json status
+      if result[:package_json_updated]
+        summary << "\n✅ package.json has been updated with all dependencies"
+      else
+        summary << "\nℹ️  No package.json changes needed"
       end
       
       summary.join("\n")
@@ -1176,17 +1535,19 @@ module Ai
       PROMPT
     end
     
-    def build_update_analysis_prompt(files, standards)
+    def build_update_analysis_prompt(files, standards, context_summary = nil)
       <<~PROMPT
         Analyze requirements for APP UPDATE: "#{chat_message.content}"
         
         Current App:
         - Name: #{app.name}
         - Type: #{app.app_type}
-        - Files: #{files.size} existing files
+        - Files: #{files.size} relevant files (smartly selected)
         
         Current Structure:
         #{files.map { |f| "- #{f[:path]} (#{f[:file_type]})" }.join("\n")}
+        
+        #{context_summary ? "Context Summary:\n#{context_summary}\n" : ""}
         
         Key Standards:
         #{standards[0..2000]}
@@ -1625,11 +1986,17 @@ module Ai
       Rails.logger.info "[AppUpdateOrchestratorV3] Entering discussion mode - providing guidance without coding"
       
       begin
-        # Get current app context for informed discussion
-        current_files = get_cached_or_load_files || []
+        # PHASE 2: Get current app context using SmartContextService for informed discussion
+        context_result = Ai::SmartContextService.load_relevant_context(
+          @app, 
+          @chat_message.content, 
+          operation_type: :discussion
+        )
+        
+        current_files = context_result[:files] || []
         standards_content = load_ai_standards
         
-        discussion_prompt = build_discussion_prompt(current_files, standards_content)
+        discussion_prompt = build_discussion_prompt(current_files, standards_content, context_result[:summary])
         
         messages = [
           {
@@ -1672,7 +2039,7 @@ module Ai
       end
     end
     
-    def build_discussion_prompt(current_files, standards_content)
+    def build_discussion_prompt(current_files, standards_content, context_summary = nil)
       file_context = if current_files.any?
         file_list = current_files.map { |f| "#{f[:path]} (#{f[:file_type]})" }.join(", ")
         "Current app structure: #{file_list}\n\n"
@@ -1680,8 +2047,10 @@ module Ai
         "This appears to be a new app project.\n\n"
       end
       
+      context_info = context_summary ? "#{context_summary}\n\n" : ""
+      
       <<~PROMPT
-        #{file_context}User message: "#{@chat_message.content}"
+        #{file_context}#{context_info}User message: "#{@chat_message.content}"
         
         App context: #{@app.name} - #{@app.description || 'No description'}
         
