@@ -163,13 +163,17 @@ module Ai
       body = {
         model: model,
         messages: messages,
-        temperature: temperature,
         stream: stream
       }
+
+      # OpenAI GPT-5 only supports default temperature (1.0). Omit the parameter entirely.
+      unless gpt5_model?(model)
+        body[:temperature] = temperature unless temperature.nil?
+      end
       
       # Add GPT-5 specific parameters if they exist
       # Note: reasoning_effort and verbosity are GPT-5 specific features
-      if model.include?('gpt-5')
+      if gpt5_model?(model)
         body[:reasoning_effort] = reasoning_level.to_s
         body[:verbosity] = verbosity.to_s
       end
@@ -218,8 +222,12 @@ module Ai
         verbosity: verbosity.to_s
       }
       
-      # Add temperature if not default
-      body[:temperature] = temperature if temperature != 0.7
+      # Temperature handling
+      # GPT-5 only supports default temperature; omit the parameter entirely for GPT-5.
+      unless gpt5_model?(model)
+        # For non-GPT-5 models, include only if it differs from the default 0.7
+        body[:temperature] = temperature if !temperature.nil? && temperature != 0.7
+      end
       
       # Add max tokens if specified
       body[:max_output_tokens] = max_tokens if max_tokens
@@ -443,6 +451,13 @@ module Ai
     def generate_cache_key(request_body)
       # Generate cache key from request
       Digest::SHA256.hexdigest(request_body.to_json)
+    end
+
+    # Determine whether the provided model refers to GPT-5 (any variant)
+    def gpt5_model?(model)
+      model_str = model.to_s.downcase
+      # Match "gpt-5", "gpt5", and variants like "gpt-5-mini"
+      model_str.include?("gpt-5") || model_str.include?("gpt5")
     end
   end
 end

@@ -11,7 +11,10 @@ try {
   themeConfig = require(themeConfigFile)
 } catch (error) {
   // Fallback config for when running outside Rails context (e.g., IDE extensions)
-  console.warn('Using minimal fallback Tailwind config. Set THEME env variable for full config.')
+  // Only show warning if not in common IDE/development scenarios
+  if (!process.env.TAILWIND_MODE && process.argv.join(' ').includes('tailwind')) {
+    console.warn('Using minimal fallback Tailwind config. Set THEME env variable for full config.')
+  }
   themeConfig = {
     content: [
       './config/initializers/theme.rb',

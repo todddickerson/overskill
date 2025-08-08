@@ -93,11 +93,12 @@ class Public::GeneratorController < Public::ApplicationController
     end
     
     # Create app with our single optimized stack
+    # The App model will automatically initiate AI generation via after_create callback
     app = current_team.apps.create!(
       creator: current_membership,
       name: generate_app_name(prompt),
       slug: generate_unique_slug,
-      prompt: enhance_prompt(prompt),
+      prompt: prompt,
       app_type: "saas",  # Single type
       framework: "react", # Single framework
       status: "draft",
@@ -105,25 +106,11 @@ class Public::GeneratorController < Public::ApplicationController
       visibility: "private"
     )
     
-    # Create initial message
-    message = app.app_chat_messages.create!(
-      role: "user",
-      content: enhance_prompt(prompt),
-      user: current_user
-    )
-    
-    # Queue generation
-    if ENV['USE_UNIFIED_AI'] == 'true'
-      UnifiedAiProcessingJob.perform_later(message)
-    else
-      # Create generation record
-      generation = app.app_generations.create!(
-        team: current_team,
-        started_at: Time.current,
-        status: "pending"
-      )
-      AppGenerationJob.perform_later(generation)
-    end
+    # App model's after_create callback will handle:
+    # 1. Creating initial chat message
+    # 2. Determining which AI system to use (V3, Unified, or Legacy)
+    # 3. Queuing the appropriate job
+    # 4. Setting status to "generating"
     
     # Redirect to editor
     redirect_to account_app_editor_path(app), notice: "Creating your app..."
@@ -168,25 +155,5 @@ class Public::GeneratorController < Public::ApplicationController
   
   def generate_unique_slug
     "app-#{SecureRandom.hex(6)}"
-  end
-  
-  def enhance_prompt(prompt)
-    # Add our tech stack requirements to every prompt
-    <<~ENHANCED
-      #{prompt}
-      
-      Build this as a modern SaaS application with:
-      - React with TypeScript for the frontend
-      - Cloudflare Workers for serverless backend
-      - Supabase for database with row-level security
-      - Supabase Auth with social logins (Google, GitHub)
-      - Stripe Connect for payments
-      - Real-time updates where applicable
-      - Mobile-responsive design
-      - Dark mode support
-      - Accessibility features
-      
-      Make it production-ready with proper error handling, loading states, and security.
-    ENHANCED
   end
 end

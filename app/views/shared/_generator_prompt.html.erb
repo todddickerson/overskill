@@ -1,0 +1,110 @@
+<%
+# Shared generator prompt component
+# Can be used in dashboard, home page, or anywhere else
+# Options:
+#   compact: true/false - Use compact styling for dashboard
+#   show_templates: true/false - Show template suggestions below
+%>
+
+<% compact = local_assigns[:compact] || false %>
+<% show_templates = local_assigns[:show_templates] || false %>
+<% user_signed_in = local_assigns[:user_signed_in] || false %>
+
+<% if compact %>
+  <!-- Compact version for dashboard -->
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-gradient-to-r from-yellow-50 via-yellow-100 to-yellow-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded-xl shadow-sm border border-yellow-200 dark:border-yellow-900/50 overflow-hidden">
+      <%= form_with url: generator_index_path, 
+                    method: :post,
+                    data: { 
+                      turbo_frame: user_signed_in ? "_top" : "auth_modal",
+                      controller: "generator",
+                      generator_user_signed_in_value: user_signed_in.to_s
+                    },
+                    class: "p-4" do |f| %>
+        
+        <div class="flex items-center space-x-4">
+          <!-- Icon -->
+          <div class="flex-shrink-0">
+            <div class="w-11 h-11 rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-sm">
+              <i class="fas fa-magic text-white text-lg"></i>
+            </div>
+          </div>
+          
+          <!-- Input and Button -->
+          <div class="flex-1 flex items-center space-x-3">
+            <%= text_field_tag :custom_prompt, nil,
+                placeholder: "Create a team collaboration platform with chat rooms, file sharing, task management, and video calls",
+                class: "flex-1 h-11 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-white dark:bg-gray-900 px-4 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent",
+                id: "generator-prompt-compact",
+                data: { 
+                  generator_target: "prompt",
+                  action: "keydown.enter->generator#submit"
+                } %>
+            
+            <button type="submit"
+                    class="h-11 px-6 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg shadow-sm hover:from-yellow-600 hover:to-yellow-700 transition-all hover:shadow-md whitespace-nowrap flex items-center">
+              Generate
+              <i class="fas fa-arrow-right ml-2 text-sm"></i>
+            </button>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% else %>
+  <!-- Full version -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <%= form_with url: generator_index_path, 
+                  method: :post,
+                  data: { 
+                    turbo_frame: user_signed_in ? "_top" : "auth_modal",
+                    controller: "generator",
+                    generator_user_signed_in_value: user_signed_in.to_s
+                  },
+                  class: "space-y-4" do |f| %>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          What would you like to build today?
+        </label>
+        
+        <%= text_area_tag :custom_prompt, nil,
+            placeholder: "I want to build an app that helps users track their fitness goals, with features like workout logging, progress charts, meal planning, and social challenges with friends...",
+            class: "w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none",
+            rows: 4,
+            id: "generator-prompt-full",
+            data: { 
+              generator_target: "prompt"
+            } %>
+      </div>
+      
+      <button type="submit"
+              class="w-full px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg shadow-sm hover:from-yellow-600 hover:to-yellow-700 transition-all hover:-translate-y-0.5 hover:shadow-lg text-center">
+        <i class="fas fa-magic mr-2"></i>
+        Generate My App
+      </button>
+    <% end %>
+    
+    <% if show_templates %>
+      <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Quick start ideas:</p>
+        <div class="flex flex-wrap gap-2">
+          <% [
+            "Task management app",
+            "Recipe organizer",
+            "Budget tracker",
+            "Study flashcards",
+            "Team collaboration tool"
+          ].each do |idea| %>
+            <button type="button"
+                    onclick="document.getElementById('generator-prompt-full').value = 'Build a <%= idea %> with user authentication and a modern interface'"
+                    class="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+              <%= idea %>
+            </button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>

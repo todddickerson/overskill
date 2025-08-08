@@ -99,37 +99,10 @@ class Account::AppEditorsController < Account::ApplicationController
   
   # Queue the appropriate AI processing job
   def queue_ai_processing(message)
-    # Use unified coordinator for all AI operations
-    if use_unified_ai?
-      Rails.logger.info "[AI] Queueing unified AI processing for message ##{message.id}"
-      UnifiedAiProcessingJob.perform_later(message)
-    else
-      # Legacy path - to be deprecated
-      queue_legacy_processing(message)
-    end
-  end
-  
-  # Legacy processing - to be removed after migration
-  def queue_legacy_processing(message)
-    Rails.logger.info "[AI] Using legacy processing for message ##{message.id}"
-    
-    if ENV['USE_AI_ORCHESTRATOR'] == 'true'
-      ProcessAppUpdateJobV2.perform_later(message)
-    else
-      # Create placeholder for old system
-      @app.app_chat_messages.create!(
-        role: "assistant",
-        content: "Analyzing your request...",
-        status: "planning"
-      )
-      ProcessAppUpdateJob.perform_later(message)
-    end
-  end
-  
-  # Check if we should use the new unified AI system
-  # Default to true since we're in alpha/dev mode
-  def use_unified_ai?
-    true
+    # Use the App model's unified method which handles all the logic
+    # for determining which AI system to use (V3, Unified, or Legacy)
+    Rails.logger.info "[AI] Delegating to App model for message ##{message.id}"
+    @app.initiate_generation!
   end
   
   # Render the chat form reset (successful message creation)

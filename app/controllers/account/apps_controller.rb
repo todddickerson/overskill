@@ -32,17 +32,9 @@ class Account::AppsController < Account::ApplicationController
   def create
     respond_to do |format|
       if @app.save
-        # Trigger AI generation if this is a new app
-        if @app.prompt.present?
-          generation = @app.app_generations.create!(
-            team: @app.team,
-            prompt: @app.prompt,
-            status: "pending",
-            started_at: Time.current
-          )
-          AppGenerationJob.perform_later(generation)
-        end
-
+        # App model's after_create callback automatically handles AI generation
+        # if prompt is present. No need to manually create generation records.
+        
         # Redirect to editor for new apps
         format.html { redirect_to account_app_editor_path(@app), notice: I18n.t("apps.notifications.created") }
         format.json { render :show, status: :created, location: [:account, @app] }

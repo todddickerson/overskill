@@ -1,0 +1,14 @@
+<%
+# This partial wraps account pages with the modern layout
+# It accepts content_for blocks for :title, :description, and :body
+%>
+
+<% partial = Shared::PartialResolver.new(self) %>
+
+<%= render 'account/shared/modern_layout', current_team: current_team do %>
+  <% if partial.body? %>
+    <%= partial.body %>
+  <% else %>
+    <%= yield %>
+  <% end %>
+<% end %>

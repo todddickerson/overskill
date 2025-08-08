@@ -2,7 +2,7 @@
 class SupabaseAuthSyncJob < ApplicationJob
   queue_as :default
   
-  retry_on StandardError, wait: :exponentially_longer, attempts: 3
+  retry_on StandardError, wait: 5, attempts: 3
   
   def perform(user, action)
     service = SupabaseService.instance

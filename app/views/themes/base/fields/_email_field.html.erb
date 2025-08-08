@@ -1,0 +1,9 @@
+<% # Ejected from `bullet_train-themes-1.26.0/app/views/themes/base/fields/_email_field.html.erb`. %>
+
+<%
+form ||= current_fields_form
+options ||= {}
+other_options ||= {}
+%>
+
+<%= render 'shared/fields/field', form: form, method: method, helper: :email_field, options: options, other_options: other_options %>

@@ -12,33 +12,10 @@
 
     <!-- Custom Prompt Input -->
     <div class="max-w-3xl mx-auto mb-12">
-      <%= form_with url: generator_index_path, 
-                    method: :post,
-                    data: { 
-                      turbo_frame: @user_signed_in ? "_top" : "auth_modal",
-                      controller: "generator",
-                      generator_user_signed_in_value: @user_signed_in.to_s
-                    },
-                    class: "bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6" do |f| %>
-        
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Describe your app idea
-          </label>
-          <%= text_area_tag :custom_prompt, nil,
-              placeholder: "I want to build an app that...",
-              class: "textarea-control resize-none",
-              rows: 5,
-              id: "custom-prompt",
-              data: { generator_target: "prompt" } %>
-        </div>
-        
-        <button type="submit"
-                class="w-full btn-primary py-3"
-                id="generate-btn">
-          🚀 Generate My App
-        </button>
-      <% end %>
+      <%= render 'shared/generator_prompt',
+                 compact: false,
+                 user_signed_in: @user_signed_in,
+                 show_templates: false %>
     </div>
 
 

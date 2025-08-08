@@ -47,6 +47,7 @@ class App < ApplicationRecord
 
   before_validation :generate_slug
   after_create :create_default_env_vars
+  after_create :initiate_ai_generation, if: :should_auto_generate?
   # 🚅 add callbacks above.
 
   # Delegate to team's database config for hybrid architecture
@@ -131,6 +132,40 @@ class App < ApplicationRecord
     end
   end
 
+  # Unified AI generation entry point
+  def initiate_generation!(initial_prompt = nil)
+    Rails.logger.info "[App] Initiating AI generation for app ##{id}"
+    
+    # Update prompt if provided
+    update!(prompt: initial_prompt) if initial_prompt.present?
+    
+    # Create initial user message if needed
+    message = if app_chat_messages.empty? && prompt.present?
+      app_chat_messages.create!(
+        role: "user",
+        content: prompt,  # Raw prompt - let AI service enhance as needed
+        user: creator.user
+      )
+    else
+      app_chat_messages.last
+    end
+    
+    prompt = "Generate a simple app with a home page and a about page" if prompt.blank?
+
+    generation = app_generations.create!(
+      team: team,
+      prompt: prompt,
+      status: "pending",
+      started_at: Time.current
+    )
+    AppGenerationJob.perform_later(generation)
+
+    
+    # Update status
+    update!(status: "generating") unless generating?
+  end
+  
+
   private
 
   def generate_slug
@@ -140,6 +175,22 @@ class App < ApplicationRecord
   def create_default_env_vars
     AppEnvVar.create_defaults_for_app(self)
   end
+  
+  def should_auto_generate?
+    # Auto-generate if:
+    # 1. Prompt is present
+    # 2. Status is not already generating/generated/failed
+    # 3. No existing chat messages (new app)
+    prompt.present? && 
+    status.in?(['draft', 'pending', nil]) && 
+    app_chat_messages.empty?
+  end
+  
+  def initiate_ai_generation
+    Rails.logger.info "[App] Auto-initiating generation for new app ##{id}"
+    initiate_generation!
+  end
+  
 
   # 🚅 add methods above.
 end

@@ -58,4 +58,18 @@ export default class extends Controller {
       textarea.dispatchEvent(new Event('input', { bubbles: true }))
     }
   }
+  
+  handleEnter(event) {
+    // Submit form on Enter (but allow Shift+Enter for new lines)
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      this.element.requestSubmit()
+    }
+  }
+  
+  submit(event) {
+    // Direct submit action for compact form
+    event.preventDefault()
+    this.element.requestSubmit()
+  }
 }

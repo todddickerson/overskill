@@ -1,0 +1,38 @@
+<%
+# Modern box component for consistent card styling
+# Usage:
+# <%= render 'account/shared/box' do |box| %>
+#   <% box.title "My Title" %>
+#   <% box.description "My description" %>
+#   <% box.body do %>
+#     Content here
+#   <% end %>
+# <% end %>
+%>
+
+<% partial = Shared::PartialResolver.new(self) %>
+
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+  <% if partial.title? || partial.description? %>
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <% if partial.title? %>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+          <%= partial.title %>
+        </h2>
+      <% end %>
+      <% if partial.description? %>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <%= partial.description %>
+        </p>
+      <% end %>
+    </div>
+  <% end %>
+  
+  <div class="p-6">
+    <% if partial.body? %>
+      <%= partial.body %>
+    <% else %>
+      <%= yield %>
+    <% end %>
+  </div>
+</div>

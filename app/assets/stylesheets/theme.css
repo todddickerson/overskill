@@ -128,6 +128,25 @@
 .form-control {
   @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base leading-6 shadow-sm placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent;
 }
+
+/* Bullet Train form field height fix */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="search"],
+input[type="time"],
+input[type="week"],
+select,
+textarea {
+  min-height: 2.75rem; /* 44px - better touch target */
+  padding: 0.625rem 0.75rem; /* py-2.5 px-3 equivalent */
+}
 .dark .form-control {
   @apply bg-gray-800 border-gray-600 text-white placeholder-gray-400;
 }

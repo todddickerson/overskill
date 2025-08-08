@@ -1,0 +1,98 @@
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+  <!-- Top Navigation Bar -->
+  <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
+    <div class="px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <!-- Left side -->
+        <div class="flex">
+          <!-- Mobile menu button -->
+          <button type="button" class="lg:hidden px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-action="click->sidebar#toggle">
+            <i class="fas fa-bars text-xl"></i>
+          </button>
+          
+          <!-- Logo -->
+          <div class="flex-shrink-0 flex items-center">
+            <a href="<%= account_teams_path %>" class="flex items-center">
+              <img class="h-8 w-auto" src="<%= image_path("logo/logo.png") %>" alt="Overskill">
+              <span class="ml-3 text-xl font-semibold text-gray-900 dark:text-white hidden sm:block">Overskill</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Right side -->
+        <div class="flex items-center space-x-4">
+          <!-- Search -->
+          <div class="hidden md:block">
+            <div class="relative">
+              <input type="text" 
+                     placeholder="Search..." 
+                     class="w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-search text-gray-400"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications -->
+          <button class="relative p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <i class="far fa-bell text-xl"></i>
+            <span class="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500"></span>
+          </button>
+
+          <!-- User menu -->
+          <div class="relative" data-controller="dropdown">
+            <button type="button" 
+                    class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                    data-action="click->dropdown#toggle">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-white font-semibold">
+                <%= current_user.first_name[0].upcase %>
+              </div>
+              <span class="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <%= current_user.name %>
+              </span>
+              <i class="fas fa-chevron-down text-xs text-gray-500"></i>
+            </button>
+            
+            <div class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 border border-gray-200 dark:border-gray-700" data-dropdown-target="menu">
+              <%= link_to edit_account_user_path(current_user), class: "block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" do %>
+                <i class="fas fa-user-circle mr-2"></i> Profile
+              <% end %>
+              <%= link_to account_teams_path, class: "block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" do %>
+                <i class="fas fa-users mr-2"></i> Teams
+              <% end %>
+              <hr class="my-1 border-gray-200 dark:border-gray-700">
+              <%= button_to main_app.destroy_user_session_path, method: :delete, form: { data: { turbo: false } }, class: "w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" do %>
+                <i class="fas fa-sign-out-alt mr-2"></i> Sign out
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="flex h-[calc(100vh-4rem)]">
+    <!-- Sidebar -->
+    <%= render 'account/shared/modern_sidebar', current_team: current_team %>
+    
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="p-6 lg:p-8">
+        <% if content_for?(:title) %>
+          <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+              <%= yield :title %>
+            </h1>
+            <% if content_for?(:description) %>
+              <p class="mt-2 text-gray-600 dark:text-gray-400">
+                <%= yield :description %>
+              </p>
+            <% end %>
+          </div>
+        <% end %>
+        
+        <%= yield %>
+      </div>
+    </main>
+  </div>
+</div>

@@ -23,12 +23,35 @@ class User < ApplicationRecord
 
   # Supabase sync callbacks
   after_create :create_supabase_auth_user
+  after_create :create_default_team
   after_update :sync_to_supabase_profile, if: :should_sync_to_supabase?
   
   # 🚅 add callbacks above.
 
   # 🚅 add delegations above.
 
+  # Override to auto-generate team name and user details
+  def create_default_team
+    # Extract username from email or use a default
+    username = email.split('@').first
+    
+    # Auto-fill user details if not provided
+    if first_name.blank? || last_name.blank?
+      name_parts = username.split(/[._-]/)
+      self.first_name = name_parts.first&.capitalize if first_name.blank?
+      self.last_name = name_parts.last&.capitalize if last_name.blank? && name_parts.length > 1
+      self.last_name ||= 'User' # Fallback if no last name can be extracted
+      save(validate: false) # Save without validation to avoid issues
+    end
+    
+    team_name = "#{first_name}'s Workspace"
+    
+    # This creates a `Membership`, because `User` `has_many :teams, through: :memberships`
+    default_team = teams.create!(name: team_name, time_zone: time_zone || 'UTC')
+    memberships.find_by(team: default_team).update(user_email: email, role_ids: [Role.admin.id])
+    update(current_team: default_team)
+  end
+  
   # Supabase sync methods
   def should_sync_to_supabase?
     saved_change_to_email? || saved_change_to_first_name? || saved_change_to_last_name?

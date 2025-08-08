@@ -61,7 +61,7 @@ module Ai
 
     def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, use_anthropic: true)
       # Use GPT-5 direct API for OpenAI models if available
-      if @gpt5_client && (model == :gpt5 || model.to_s.include?("gpt"))
+      if @gpt5_client && gpt5_model?(model)
         Rails.logger.info "[AI] Using OpenAI GPT-5 direct API" if ENV["VERBOSE_AI_LOGGING"] == "true"
         
         # Determine reasoning level based on context
@@ -69,11 +69,11 @@ module Ai
         
         begin
           # GPT-5 only supports default temperature (1.0)
-          gpt5_temperature = model.to_s.include?('gpt-5') ? 1.0 : temperature
+          gpt5_temperature = 1.0
           
           return @gpt5_client.chat(
             messages,
-            model: model == :gpt5 ? 'gpt-5' : model,
+            model: normalize_gpt5_model(model),
             temperature: gpt5_temperature,
             max_tokens: max_tokens,
             reasoning_level: reasoning_level,
@@ -124,10 +124,12 @@ module Ai
       body = {
         model: model_id,
         messages: messages,
-        temperature: temperature,
         max_tokens: max_tokens,
         stream: false
       }
+
+      # Only include temperature for non-GPT-5 requests (OpenRouter path)
+      body[:temperature] = temperature unless gpt5_model?(model_id)
 
       Rails.logger.info "[AI] Calling OpenRouter with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
@@ -241,7 +243,7 @@ module Ai
     
     def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_anthropic: true)
       # Use GPT-5 direct API for OpenAI models if available
-      if @gpt5_client && (model == :gpt5 || model.to_s.include?("gpt"))
+      if @gpt5_client && gpt5_model?(model)
         Rails.logger.info "[AI] Using OpenAI GPT-5 direct API with tools" if ENV["VERBOSE_AI_LOGGING"] == "true"
         
         # Determine reasoning level based on context
@@ -249,12 +251,12 @@ module Ai
         
         begin
           # GPT-5 only supports default temperature (1.0)
-          gpt5_temperature = model.to_s.include?('gpt-5') ? 1.0 : temperature
+          gpt5_temperature = 1.0
           
           return @gpt5_client.chat_with_tools(
             messages,
             tools,
-            model: model == :gpt5 ? 'gpt-5' : model,
+            model: normalize_gpt5_model(model),
             reasoning_level: reasoning_level,
             temperature: gpt5_temperature
           )
@@ -302,10 +304,12 @@ module Ai
         messages: messages,
         tools: tools,
         tool_choice: "auto", # Let the model decide when to use tools
-        temperature: temperature,
         max_tokens: max_tokens,
         stream: false
       }
+
+      # Only include temperature for non-GPT-5 requests (OpenRouter path)
+      body[:temperature] = temperature unless gpt5_model?(model_id)
 
       Rails.logger.info "[AI] Calling OpenRouter with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
@@ -602,6 +606,19 @@ module Ai
     end
 
     private
+    
+    # Normalize model to OpenAI GPT-5 model id
+    def normalize_gpt5_model(model)
+      str = model.to_s
+      return 'gpt-5' if str == 'gpt5' || str.include?('gpt-5')
+      model
+    end
+
+    # Detect GPT-5 across symbols and strings (including OpenRouter ids)
+    def gpt5_model?(model)
+      str = (model.is_a?(Symbol) ? model.to_s : model.to_s).downcase
+      str == 'gpt5' || str.include?('gpt-5') || str.include?('openai/gpt-5')
+    end
     
     # Convert OpenAI format tools to Anthropic format
     def convert_openai_tools_to_anthropic(openai_tools)
