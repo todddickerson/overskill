@@ -17,12 +17,21 @@ module Ai
       
       # Use OpenAI directly for GPT-5 - ALWAYS prefer OpenAI over OpenRouter
       openai_key = ENV['OPENAI_API_KEY']
+      Rails.logger.info "[AppUpdateOrchestratorV3] Checking OpenAI key: length=#{openai_key&.length}, present=#{openai_key.present?}"
+      
       if openai_key.present? && openai_key.length > 20 && !openai_key.include?('dummy')
-        @client = OpenaiGpt5Client.instance
-        @use_openai_direct = true
-        Rails.logger.info "[AppUpdateOrchestratorV3] Using OpenAI direct API with GPT-5"
+        begin
+          @client = OpenaiGpt5Client.instance
+          @use_openai_direct = true
+          Rails.logger.info "[AppUpdateOrchestratorV3] ✅ Using OpenAI direct API with GPT-5"
+        rescue => e
+          Rails.logger.error "[AppUpdateOrchestratorV3] ❌ OpenAI client initialization failed: #{e.message}"
+          Rails.logger.warn "[AppUpdateOrchestratorV3] Falling back to OpenRouter due to OpenAI client error"
+          @client = OpenRouterClient.new
+          @use_openai_direct = false
+        end
       else
-        Rails.logger.warn "[AppUpdateOrchestratorV3] WARNING: OpenAI key invalid or missing, falling back to OpenRouter"
+        Rails.logger.warn "[AppUpdateOrchestratorV3] ⚠️  WARNING: OpenAI key invalid (length: #{openai_key&.length}), falling back to OpenRouter"
         Rails.logger.warn "[AppUpdateOrchestratorV3] Set OPENAI_API_KEY in .env.development.local for better performance"
         @client = OpenRouterClient.new
         @use_openai_direct = false
@@ -170,8 +179,10 @@ module Ai
       @broadcaster.update("Calling AI for analysis...", 0.5)
       
       if @use_openai_direct
+        Rails.logger.info "[AppUpdateOrchestratorV3] Making OpenAI direct call for analysis"
         response = stream_gpt5_response(messages)
       else
+        Rails.logger.warn "[AppUpdateOrchestratorV3] Using OpenRouter fallback for analysis"
         response = @client.chat(messages, model: :gpt5, temperature: 1.0)
       end
       
@@ -1324,32 +1335,40 @@ module Ai
     
     # Streaming support for OpenAI direct API
     def stream_gpt5_response(messages)
-      # ALWAYS use GPT-5
-      unless @use_openai_direct
-        # OpenRouter uses :gpt5 symbol which maps to "openai/gpt-5"
-        return @client.chat(messages, model: :gpt5, temperature: 1.0)
-      end
-      
-      Rails.logger.info "[AppUpdateOrchestratorV3] Using OpenAI direct with model: gpt-5"
-      
-      begin
-        # Use the OpenAI client directly with GPT-5
-        response = @client.chat(messages, model: 'gpt-5', temperature: 1.0)
+      # ALWAYS use GPT-5 - Check OpenAI direct vs OpenRouter
+      if @use_openai_direct
+        Rails.logger.info "[AppUpdateOrchestratorV3] 🔥 Making OpenAI DIRECT call with GPT-5"
         
-        if response[:success]
-          { success: true, content: response[:content] }
-        else
-          { success: false, error: response[:error] }
+        begin
+          # Use the OpenAI client directly with GPT-5
+          response = @client.chat(messages, model: 'gpt-5', temperature: 1.0)
+          
+          Rails.logger.info "[AppUpdateOrchestratorV3] OpenAI response success: #{response[:success]}"
+          
+          if response[:success]
+            { success: true, content: response[:content] }
+          else
+            Rails.logger.error "[AppUpdateOrchestratorV3] OpenAI API returned error: #{response[:error]}"
+            { success: false, error: "OpenAI API error: #{response[:error]}" }
+          end
+        rescue => e
+          Rails.logger.error "[AppUpdateOrchestratorV3] OpenAI call exception: #{e.message}"
+          Rails.logger.error e.backtrace.join("\n")
+          { success: false, error: "OpenAI client error: #{e.message}" }
         end
-      rescue => e
-        Rails.logger.error "[AppUpdateOrchestratorV3] OpenAI call failed: #{e.message}"
-        { success: false, error: e.message }
+      else
+        Rails.logger.warn "[AppUpdateOrchestratorV3] ⚠️  Using OpenRouter fallback (OpenAI not configured)"
+        # OpenRouter uses :gpt5 symbol which maps to "openai/gpt-5"
+        @client.chat(messages, model: :gpt5, temperature: 1.0)
       end
     end
     
     def stream_gpt5_with_tools(messages, tools)
       # ALWAYS use GPT-5 for tool calling
-      unless @use_openai_direct
+      if @use_openai_direct
+        Rails.logger.info "[AppUpdateOrchestratorV3] 🛠️  Making OpenAI DIRECT call with tools (#{tools&.length} tools)"
+      else
+        Rails.logger.warn "[AppUpdateOrchestratorV3] ⚠️  Using OpenRouter fallback for tool calling"
         # OpenRouter uses :gpt5 symbol which maps to "openai/gpt-5"
         return @client.chat_with_tools(messages, tools, model: :gpt5, temperature: 1.0)
       end

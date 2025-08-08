@@ -249,6 +249,39 @@ export default class extends Controller {
     }
   }
   
+  // Handle submit button clicks (mobile button specifically)
+  handleSubmitClick(event) {
+    console.log('Submit button clicked, processing:', this.processingValue)
+    
+    // Don't submit if already processing
+    if (this.processingValue) {
+      console.log('Already processing, ignoring button click')
+      event.preventDefault()
+      return
+    }
+    
+    // Check if any textarea has content
+    const hasContent = this.textareaTargets.some(textarea => textarea.value.trim())
+    
+    if (!hasContent) {
+      console.log('No content to submit, ignoring button click')
+      event.preventDefault()
+      return
+    }
+    
+    // Trigger form submission
+    console.log('Button validation passed, triggering form submission...')
+    const form = this.element
+    if (form && form.tagName === 'FORM') {
+      // Use requestSubmit for proper form validation and Turbo handling
+      if (form.requestSubmit) {
+        form.requestSubmit(event.currentTarget)
+      } else {
+        // Fallback for older browsers
+        form.submit()
+      }
+    }
+  }
 
   // Handle form submission
   submit(event) {

@@ -48,6 +48,7 @@ class App < ApplicationRecord
   before_validation :generate_slug
   after_create :create_default_env_vars
   after_create :initiate_ai_generation, if: :should_auto_generate?
+  after_create :generate_app_logo
   # 🚅 add callbacks above.
 
   # Delegate to team's database config for hybrid architecture
@@ -83,6 +84,10 @@ class App < ApplicationRecord
     subdomain = "app-#{id}" if subdomain.blank?
     
     "https://#{subdomain}.overskill.app"
+  end
+
+  def generate_app_logo
+    GenerateAppLogoJob.perform_later(id)
   end
 
   def visitor_count

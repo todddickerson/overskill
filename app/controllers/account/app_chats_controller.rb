@@ -11,8 +11,14 @@ class Account::AppChatsController < Account::ApplicationController
     @message.role = "user"
 
     if @message.save
-      # Process the request with AI
-      ProcessAppUpdateJob.perform_later(@message)
+      # Process the request with AI - use V3 orchestrator if enabled
+      if @app.use_v3_orchestrator?
+        Rails.logger.info "[AppChats] Using V3 orchestrator for message ##{@message.id}"
+        ProcessAppUpdateJobV3.perform_later(@message)
+      else
+        Rails.logger.info "[AppChats] Using legacy orchestrator for message ##{@message.id}"
+        ProcessAppUpdateJob.perform_later(@message)
+      end
 
       respond_to do |format|
         format.turbo_stream do
