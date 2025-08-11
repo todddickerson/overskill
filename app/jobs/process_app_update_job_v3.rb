@@ -22,8 +22,15 @@ class ProcessAppUpdateJobV3 < ApplicationJob
   def perform(message)
     Rails.logger.info "[ProcessAppUpdateJobV3] Starting V3 orchestrator for message ##{message.id}"
     
-    # Use the V3 orchestrator (GPT-5 optimized with tool calling)
-    orchestrator = Ai::AppUpdateOrchestratorV3.new(message)
+    # Use optimized V3 if enabled, otherwise use standard V3
+    orchestrator = if ENV['USE_V3_OPTIMIZED'] == 'true'
+      Rails.logger.info "[ProcessAppUpdateJobV3] Using OPTIMIZED V3 orchestrator"
+      Ai::AppUpdateOrchestratorV3Optimized.new(message)
+    else
+      Rails.logger.info "[ProcessAppUpdateJobV3] Using standard V3 orchestrator"
+      Ai::AppUpdateOrchestratorV3.new(message)
+    end
+    
     orchestrator.execute!
     
     Rails.logger.info "[ProcessAppUpdateJobV3] Successfully processed message ##{message.id}"
