@@ -43,25 +43,53 @@ module Ai
     end
     
     def execute_generation!
-      # V4 Generation Pipeline
-      Rails.logger.info "[V4] Starting generation pipeline for app ##{@app.id}"
+      # V4 Enhanced Generation Pipeline
+      Rails.logger.info "[V4] Starting enhanced generation pipeline for app ##{@app.id}"
       
       # Phase 1: Generate shared foundation (Day 2 ✅ IMPLEMENTED)
       generate_shared_foundation
       
-      # Phase 2: AI app-specific features (Week 1 implementation) 
-      # generate_app_features
+      # Phase 1.5: 🚀 NEW - Generate AI context with available components
+      component_context = generate_component_context
+      Rails.logger.info "[V4] Generated component context (#{component_context.length} chars)"
       
-      # Phase 3: Smart edits via existing services (Week 1 integration)
+      # Phase 2: AI app-specific features with component awareness (Day 2.5 implementation)
+      # generate_app_features_with_components(component_context)
+      
+      # Phase 3: Smart component selection and integration (Day 2.5 implementation)
+      # integrate_requested_components
+      
+      # Phase 4: Smart edits via existing services (Week 1 integration)
       # apply_smart_edits
       
-      # Phase 4: Build and deploy (Day 3-5 implementation)
+      # Phase 5: Build and deploy (Day 3-5 implementation)
       # build_and_deploy
       
       # Update app status
       @app.update!(status: 'generated')
       
-      Rails.logger.info "[V4] Generation pipeline completed for app ##{@app.id}"
+      Rails.logger.info "[V4] Enhanced generation pipeline completed for app ##{@app.id}"
+    end
+    
+    def generate_component_context
+      Rails.logger.info "[V4] Generating enhanced component context for AI"
+      
+      # Use the enhanced optional component service
+      optional_service = if defined?(Ai::EnhancedOptionalComponentService)
+        Ai::EnhancedOptionalComponentService.new(@app)
+      else
+        # Fallback to basic service
+        Ai::OptionalComponentService.new(@app)
+      end
+      
+      context = optional_service.respond_to?(:generate_ai_context_with_supabase) ? 
+        optional_service.generate_ai_context_with_supabase : 
+        optional_service.generate_ai_context
+        
+      # Store context for potential use in chat messages
+      Rails.cache.write("app_#{@app.id}_component_context", context, expires_in: 1.hour)
+      
+      context
     end
     
     def generate_shared_foundation
