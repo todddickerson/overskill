@@ -21,7 +21,7 @@ module Ai
       auth: ['login.tsx', 'signup.tsx', 'protected-route.tsx', 'forgot-password.tsx'],
       database: ['supabase-client.ts', 'app-scoped-db.ts', 'rls-helpers.ts'],
       routing: ['app-router.tsx', 'route-config.ts', 'navigation.tsx'],
-      core: ['package.json', 'vite.config.ts', 'index.html', 'tsconfig.json', 'tailwind.config.js']
+      core: ['package.json', 'vite.config.ts', 'index.html', 'tsconfig.json', 'tailwind.config.js', 'lib-utils.ts']
     }.freeze
     
     def create_file_from_template(category, filename)
@@ -71,7 +71,11 @@ module Ai
       when :routing
         "src/components/routing/#{filename}"
       when :core
-        filename # Root level files
+        if filename == 'lib-utils.ts'
+          "src/lib/utils.ts"  # shadcn/ui standard location
+        else
+          filename # Root level files
+        end
       else
         "src/#{filename}"
       end
