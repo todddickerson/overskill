@@ -23,18 +23,25 @@
 - [x] Updated CLAUDE.md with V4 deployment architecture
 - [x] Identified critical Cloudflare constraints (1MB worker limit)
 
-#### 🔴 **IMMEDIATE (Day 1-2): Critical Decisions**
-- [ ] **Choose build environment**: Lambda vs ECS vs Docker for Node.js builds
+#### ✅ **COMPLETED (Day 1): Critical Foundation**
+- [x] **AppBuilderV4 orchestrator**: Core service with intelligent error recovery
+- [x] **ProcessAppUpdateJobV4**: Background job integration  
+- [x] **App model migration**: Updated to use V4 instead of V3
+- [x] **Error Recovery**: Contextual chat-based error fixing (not blind retries)
+- [x] **Billing Integration**: Bug fix messages marked `billing_ignore: true`
+
+#### 🔴 **IMMEDIATE (Day 2): Next Critical Decisions**
+- [ ] **Template storage method**: Git repo vs database vs filesystem (/app/templates/shared/)
+- [ ] **Build environment**: Lambda vs ECS vs Docker for Node.js builds  
 - [ ] **Define RLS policy creation**: When/how database isolation policies are applied
-- [ ] **Template storage method**: Git repo vs database vs filesystem
 - [ ] **Monitoring stack selection**: Real-time worker size and performance tracking
 
-#### 🟡 **HIGH (Day 3-5): Core Services**
-- [ ] **Create Ai::AppBuilderV4**: New orchestrator replacing V3
+#### 🟡 **HIGH (Day 2-5): Core Services**
+- [x] **Create Ai::AppBuilderV4**: ✅ COMPLETED with intelligent error recovery
   - Simple architecture for ALL apps (Supabase-first)
-  - Integration with LineReplaceService and SmartSearchService
-  - Claude 4 conversation loop implementation
-  - Discussion mode vs code generation logic
+  - Integration with LineReplaceService and SmartSearchService (Week 1)
+  - Claude 4 conversation loop implementation (Week 1)  
+  - Contextual error recovery via chat messages
 
 - [ ] **Build Ai::SharedTemplateService**: Core foundation files
   - Auth pages (Login, SignUp, ForgotPassword, etc.)

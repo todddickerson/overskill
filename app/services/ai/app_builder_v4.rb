@@ -15,7 +15,7 @@ module Ai
     private
     
     def execute_with_retry
-      # Retry logic with 2x maximum
+      # Intelligent error recovery via chat conversation
       attempt = 0
       
       begin
@@ -29,9 +29,11 @@ module Ai
         Rails.logger.error "[V4] Backtrace: #{e.backtrace&.first(5)&.join("\n")}"
         
         if attempt <= MAX_RETRIES
-          sleep_time = 2 ** attempt # Exponential backoff: 2s, 4s
-          Rails.logger.info "[V4] Retrying in #{sleep_time} seconds..."
-          sleep(sleep_time)
+          # Instead of blind retry, ask AI to fix the error via chat
+          create_error_recovery_message(e, attempt)
+          
+          # Brief pause to allow message processing, then retry
+          sleep(2)
           retry
         else
           mark_as_failed(e)
@@ -77,6 +79,60 @@ module Ai
       version_parts.join('.')
     end
     
+    
+    def create_error_recovery_message(error, attempt)
+      # Create a system message on behalf of user asking AI to fix the error
+      error_context = build_error_context(error, attempt)
+      
+      recovery_message = @app.app_chat_messages.create!(
+        role: "user",
+        content: error_context,
+        user: @message.user,
+        # Mark as bug fix for billing purposes (tokens should be ignored)
+        metadata: {
+          type: "error_recovery",
+          attempt: attempt,
+          original_error: error.class.name,
+          billing_ignore: true
+        }.to_json
+      )
+      
+      Rails.logger.info "[V4] Created error recovery message ##{recovery_message.id} for attempt #{attempt}"
+      
+      # Update the current message reference to the recovery message
+      @message = recovery_message
+    end
+    
+    def build_error_context(error, attempt)
+      context = []
+      context << "I encountered an error during app generation (attempt #{attempt}/#{MAX_RETRIES + 1}):"
+      context << ""
+      context << "**Error:** #{error.message}"
+      context << ""
+      
+      # Add relevant context based on error type
+      case error
+      when Ai::GenerationError, OpenAI::RequestError
+        context << "This appears to be an AI generation issue. Please:"
+        context << "1. Review the current app structure and identify the problem"
+        context << "2. Fix any syntax errors or missing dependencies"
+        context << "3. Continue with the generation process"
+      when Net::TimeoutError, Timeout::Error
+        context << "This was a timeout error. Please:"
+        context << "1. Continue with the generation using smaller, focused changes"
+        context << "2. Break down complex operations into simpler steps"
+      when StandardError
+        context << "This was a system error. Please:"
+        context << "1. Analyze the error and current app state"
+        context << "2. Make necessary corrections to continue generation"
+        context << "3. Proceed with building the app"
+      end
+      
+      context << ""
+      context << "Please fix this issue and continue with the app generation."
+      
+      context.join("\n")
+    end
     
     def mark_as_failed(error)
       @app.update!(

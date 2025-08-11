@@ -251,43 +251,66 @@ export const createRLSPolicy = (tableName: string, appId: string) => {
 };
 ```
 
-##### Day 4: Error Recovery Enhancement
-**Service Updates:**
+##### Day 4: Error Recovery Enhancement ✅ IMPLEMENTED (Day 1)
+**Intelligent Error Recovery via Chat Conversation:**
 ```ruby
-# Update /app/services/ai/app_builder_v4.rb
+# ✅ COMPLETED: /app/services/ai/app_builder_v4.rb
 class AppBuilderV4
   def execute_with_retry
+    # Intelligent error recovery via chat conversation
     attempt = 0
     
     begin
       attempt += 1
-      Rails.logger.info "[V4] Generation attempt #{attempt}/#{MAX_RETRIES + 1}"
-      
       execute_generation!
       
-    rescue Ai::GenerationError, OpenAI::RequestError => e
-      handle_generation_error(e, attempt)
-    rescue Net::TimeoutError => e
-      handle_timeout_error(e, attempt)  
+    rescue StandardError => e
+      if attempt <= MAX_RETRIES
+        # Instead of blind retry, ask AI to fix the error via chat
+        create_error_recovery_message(e, attempt)
+        sleep(2)
+        retry
+      else
+        mark_as_failed(e)
+        raise e
+      end
     end
   end
   
   private
   
-  def handle_generation_error(error, attempt)
-    Rails.logger.error "[V4] Generation failed (attempt #{attempt}): #{error.message}"
+  def create_error_recovery_message(error, attempt)
+    # Create contextual bug fix message in chat conversation
+    error_context = build_error_context(error, attempt)
     
-    if attempt <= MAX_RETRIES
-      sleep_time = 2 ** attempt # Exponential backoff
-      sleep(sleep_time)
-      retry
-    else
-      mark_as_failed(error)
-      raise error
-    end
+    recovery_message = @app.app_chat_messages.create!(
+      role: "user",
+      content: error_context,
+      user: @message.user,
+      # Mark as bug fix for billing purposes (tokens ignored)
+      metadata: {
+        type: "error_recovery",
+        attempt: attempt,
+        billing_ignore: true
+      }.to_json
+    )
+    
+    @message = recovery_message # Continue with recovery message
+  end
+  
+  def build_error_context(error, attempt)
+    # Builds contextual error message for AI to understand and fix
+    # Includes error details, attempt info, and specific guidance
+    # Based on error type (GenerationError, TimeoutError, etc.)
   end
 end
 ```
+
+**🎯 Key Benefits:**
+- **Contextual Recovery**: AI sees full error context and can fix intelligently  
+- **No Token Waste**: Bug fix messages marked `billing_ignore: true`
+- **Conversation Continuity**: Uses normal chat flow, no special retry logic
+- **Error-Type Specific Guidance**: Tailored instructions based on error class
 
 ##### Day 5: Comprehensive Testing & CI Integration
 **V4 Unified Test Suite** (Rails CI Integration):
