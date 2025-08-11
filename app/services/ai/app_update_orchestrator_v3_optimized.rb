@@ -918,14 +918,14 @@ module Ai
       Rails.logger.info "[V3-Optimized] Queueing post-generation jobs for app ##{@app.id}"
       
       # Queue app naming job (runs first to name the app properly)
-      AppNamingJob.perform_later(@app.id)
+      ::AppNamingJob.perform_later(@app.id)
       
       # Queue logo generation job (uses the proper name)
-      GenerateAppLogoJob.perform_later(@app.id)
+      ::GenerateAppLogoJob.perform_later(@app.id)
       
       # Queue deployment job if enabled
       if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
-        AppDeploymentJob.perform_later(@app)
+        ::AppDeploymentJob.perform_later(@app)
       end
     end
     
