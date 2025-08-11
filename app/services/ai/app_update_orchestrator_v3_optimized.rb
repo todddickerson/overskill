@@ -494,8 +494,8 @@ module Ai
     def execute_in_batches(plan)
       Rails.logger.info "[V3-Optimized] Executing in batches"
       
-      # Define tools for file operations
-      tools = create_tool_definitions
+      # Define tools for file operations (without broadcast_progress to avoid confusion)
+      tools = create_tool_definitions(false)
       
       # Process each step
       steps = plan["steps"] || [{ "description" => "Build app", "files" => [] }]
@@ -518,28 +518,90 @@ module Ai
         
         User wants: "#{@chat_message.content}"
         
-        MANDATORY: You MUST use the create_file tool to create ALL necessary files for a complete application.
+        YOU MUST CREATE MULTIPLE SEPARATE FILES - NOT A SINGLE FILE!
         
-        For a todo app with authentication, you MUST create:
-        1. index.html - with React Router, Supabase CDN links
-        2. src/App.jsx - Main app with React Router setup
-        3. src/lib/supabase.js - Supabase client configuration
-        4. src/lib/router.jsx - Router configuration
-        5. src/pages/Home.jsx - Landing page
-        6. src/pages/auth/Login.jsx - Login page with email and social auth
-        7. src/pages/auth/SignUp.jsx - Registration page
-        8. src/pages/auth/AuthCallback.jsx - OAuth callback handler
-        9. src/pages/Dashboard.jsx - Main todo dashboard
-        10. src/components/auth/Auth.jsx - Auth component
-        11. src/components/auth/SocialButtons.jsx - Social login buttons
-        12. src/components/auth/ProtectedRoute.jsx - Route guard
-        13. src/components/layout/Header.jsx - App header
-        14. src/components/layout/Layout.jsx - Layout wrapper
-        15. Any additional components needed for the features
+        MANDATORY FILE LIST - CREATE EACH AS A SEPARATE FILE:
         
-        Use the create_file tool for EACH file. Do not skip any files.
-        Include complete, working code in each file - no placeholders or TODOs.
-        Remember to use window.ENV for configuration access.
+        FILE 1: Call create_file with path="index.html"
+        - HTML document with CDN links for React, Router, Supabase, Tailwind
+        - Script tag to load src/App.jsx
+        - DO NOT inline JavaScript here
+        
+        FILE 2: Call create_file with path="src/App.jsx"  
+        - Main React component with Router setup
+        - Import statements (even though using CDN)
+        - Authentication state management
+        - Route definitions
+        
+        FILE 3: Call create_file with path="src/lib/supabase.js"
+        - Supabase client initialization
+        - Uses window.ENV for configuration
+        - Export the client
+        
+        FILE 4: Call create_file with path="src/pages/auth/Login.jsx"
+        - Login page component
+        - Email and OAuth options
+        
+        FILE 5: Call create_file with path="src/pages/auth/SignUp.jsx"
+        - Registration page component
+        
+        FILE 6: Call create_file with path="src/pages/Dashboard.jsx"
+        - Main dashboard for the app
+        
+        CREATE AT LEAST 6-10 SEPARATE FILES!
+        DO NOT CREATE A SINGLE MONOLITHIC FILE!
+        
+        Each file MUST be created with a separate create_file tool call.
+        
+        EXAMPLE OF CORRECT TOOL USAGE:
+        
+        To create index.html, call create_file with:
+        {
+          "path": "index.html",
+          "content": "<!DOCTYPE html>\\n<html>\\n..."
+        }
+        
+        To create src/App.jsx, call create_file with:
+        {
+          "path": "src/App.jsx",
+          "content": "const App = () => {\\n  ..."
+        }
+        
+        REQUIRED FILES TO CREATE (use create_file for EACH):
+        
+        1. index.html - Complete HTML with all CDN scripts:
+           - React, ReactDOM, React Router DOM
+           - Babel standalone for JSX transformation
+           - Supabase client library
+           - Tailwind CSS
+           - Proper script to mount React app
+        
+        2. src/App.jsx - Main application with:
+           - React Router setup with all routes
+           - Authentication state management
+           - Supabase client initialization
+           - Route protection logic
+        
+        3. src/lib/supabase.js - Supabase configuration:
+           - Initialize client with window.ENV values
+           - Export configured client
+        
+        4. src/pages/Home.jsx - Landing page
+        5. src/pages/auth/Login.jsx - Login with email + OAuth
+        6. src/pages/auth/SignUp.jsx - Registration page
+        7. src/pages/Dashboard.jsx - Main app dashboard
+        8. src/components/auth/ProtectedRoute.jsx - Route guard
+        9. src/components/layout/Header.jsx - Navigation header
+        10. Additional components as needed for the app
+        
+        IMPORTANT REMINDERS:
+        - Use create_file tool for EVERY file - do not output code in text
+        - Each file must have COMPLETE, WORKING code - no placeholders
+        - Use window.ENV for all configuration values
+        - Include proper error handling and loading states
+        - Follow the OverSkill platform patterns
+        
+        Start creating files NOW using the create_file tool function.
       PROMPT
       
       messages = [
@@ -584,19 +646,27 @@ module Ai
         model: @model,
         messages: messages,
         tools: tools,
-        tool_choice: "auto",
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 8000  # Increased for comprehensive app generation
+        tool_choice: "auto",  # Let AI choose but prompt strongly encourages tool use
+        stream: true
       }
       
-      # Add caching if supported
-      if ENABLE_PROMPT_CACHING && @model.include?('gpt-5')
-        request_body[:cache] = {
-          enabled: true,
-          ttl: 300
-        }
+      # GPT-5 specific adjustments
+      if @model.include?('gpt-5')
+        request_body[:max_completion_tokens] = 16000
+        # GPT-5 only supports default temperature of 1
+      else
+        request_body[:max_tokens] = 16000
+        request_body[:temperature] = 0.7
       end
+      
+      # GPT-5 doesn't support the cache parameter
+      # Keeping this commented for future when it might be supported
+      # if ENABLE_PROMPT_CACHING && @model.include?('gpt-5')
+      #   request_body[:cache] = {
+      #     enabled: true,
+      #     ttl: 300
+      #   }
+      # end
       
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
@@ -612,7 +682,29 @@ module Ai
       accumulated_tool_calls = []
       current_tool_call = nil
       
+      Rails.logger.info "[V3-Optimized] Starting streaming request to OpenAI"
+      
       http.request(request) do |response|
+        Rails.logger.info "[V3-Optimized] Response status: #{response.code}"
+        
+        # Handle error responses
+        if response.code != '200'
+          error_body = response.read_body
+          Rails.logger.error "[V3-Optimized] API Error Response: #{error_body}"
+          
+          # Try to parse error message
+          begin
+            error_data = JSON.parse(error_body)
+            Rails.logger.error "[V3-Optimized] Error details: #{error_data['error']['message']}" if error_data['error']
+          rescue
+            Rails.logger.error "[V3-Optimized] Raw error: #{error_body}"
+          end
+          
+          # Fall back to non-streaming or simpler approach
+          Rails.logger.info "[V3-Optimized] Falling back to non-streaming due to error"
+          return execute_with_openai_tools(messages, tools)
+        end
+        
         response.read_body do |chunk|
           # Process SSE chunks and extract tool calls
           chunk.split("\n").each do |line|
@@ -623,6 +715,13 @@ module Ai
             
             begin
               data = JSON.parse(json_str)
+              
+              # Log first chunk to see structure
+              if accumulated_content.empty? && accumulated_tool_calls.empty?
+                Rails.logger.info "[V3-Optimized] First chunk structure: #{data.keys}"
+                Rails.logger.info "[V3-Optimized] Choice keys: #{data['choices']&.first&.keys}"
+              end
+              
               choice = data['choices']&.first
               next unless choice
               
@@ -637,12 +736,14 @@ module Ai
               
               # Handle tool calls
               if delta['tool_calls']
+                Rails.logger.info "[V3-Optimized] Tool call delta detected: #{delta['tool_calls'].inspect}"
                 delta['tool_calls'].each do |tool_call_delta|
                   index = tool_call_delta['index']
                   
                   # Initialize or update tool call at index
                   if tool_call_delta['id']
                     # New tool call
+                    Rails.logger.info "[V3-Optimized] New tool call: #{tool_call_delta['function']['name']}"
                     current_tool_call = {
                       'id' => tool_call_delta['id'],
                       'type' => tool_call_delta['type'] || 'function',
@@ -699,10 +800,17 @@ module Ai
         model: @model,
         messages: messages,
         tools: tools,
-        tool_choice: "auto",
-        temperature: 0.7,
-        max_tokens: 8000  # Increased for comprehensive generation
+        tool_choice: "auto"  # Let AI choose but prompt strongly encourages tool use
       }
+      
+      # GPT-5 specific adjustments
+      if @model.include?('gpt-5')
+        request_body[:max_completion_tokens] = 16000
+        # GPT-5 only supports default temperature of 1
+      else
+        request_body[:max_tokens] = 16000
+        request_body[:temperature] = 0.7
+      end
       
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
@@ -750,18 +858,18 @@ module Ai
       end
     end
     
-    def create_tool_definitions
-      [
+    def create_tool_definitions(include_broadcast = false)
+      tools = [
         {
           type: "function",
           function: {
             name: "create_file",
-            description: "Create a new file with content",
+            description: "Create a new file with complete content. Use this to create ALL files for the application.",
             parameters: {
               type: "object",
               properties: {
-                path: { type: "string", description: "File path (e.g., src/App.jsx)" },
-                content: { type: "string", description: "Complete file content" }
+                path: { type: "string", description: "File path (e.g., index.html, src/App.jsx, src/lib/supabase.js)" },
+                content: { type: "string", description: "Complete file content with all code" }
               },
               required: ["path", "content"]
             }
@@ -771,22 +879,27 @@ module Ai
           type: "function", 
           function: {
             name: "update_file",
-            description: "Update an existing file",
+            description: "Update an existing file with new content",
             parameters: {
               type: "object",
               properties: {
-                path: { type: "string" },
-                content: { type: "string", description: "New complete content" }
+                path: { type: "string", description: "Path to existing file" },
+                content: { type: "string", description: "New complete content for the file" }
               },
               required: ["path", "content"]
             }
           }
-        },
-        {
+        }
+      ]
+      
+      # Only include broadcast_progress if explicitly requested
+      # This tool seems to confuse GPT-5 during file generation
+      if include_broadcast
+        tools << {
           type: "function",
           function: {
             name: "broadcast_progress",
-            description: "Send progress update to user",
+            description: "Send progress update to user (DO NOT USE for file creation)",
             parameters: {
               type: "object",
               properties: {
@@ -796,7 +909,9 @@ module Ai
             }
           }
         }
-      ]
+      end
+      
+      tools
     end
     
     def process_tool_calls(tool_calls)
@@ -1182,15 +1297,91 @@ module Ai
     end
     
     def create_files_from_response(content)
-      # Parse content for file blocks and create them
-      # This is a fallback when tools aren't available
+      # Enhanced fallback parser for when AI returns structured content without tool calls
+      Rails.logger.info "[V3-Optimized] Parsing content for file structures"
       
-      if content.include?('```')
-        # Extract code blocks
-        content.scan(/```(?:jsx?|html|css)?\n(.*?)```/m).each do |match|
-          # Try to determine filename from context
-          create_or_update_file('src/App.jsx', match[0])
+      files_created = 0
+      
+      # Try to parse as JSON first (AI might return structured JSON)
+      begin
+        if content.include?('{') && content.include?('files')
+          # Extract JSON from content
+          json_match = content.match(/\{[^{}]*"files"[^{}]*\}/m)
+          if json_match
+            data = JSON.parse(json_match[0])
+            if data['files'].is_a?(Array)
+              data['files'].each do |file|
+                create_or_update_file(file['path'], file['content'])
+                files_created += 1
+              end
+            end
+          end
         end
+      rescue JSON::ParserError
+        # Not JSON, continue with other parsing methods
+      end
+      
+      # Parse file markers like "// File: src/App.jsx" or "<!-- File: index.html -->"
+      if content.include?('File:') || content.include?('file:')
+        sections = content.split(/(?:^|\n)(?:\/\/|#|<!--)\s*[Ff]ile:\s*/)
+        sections.each do |section|
+          next if section.strip.empty?
+          
+          # Extract filename and content
+          lines = section.split("\n")
+          filename = lines.first.strip.gsub(/-->.*/, '').strip
+          next unless filename.match?(/\.(jsx?|html|css|json)$/)
+          
+          # Get content (skip the filename line)
+          file_content = lines[1..-1].join("\n")
+          
+          # Clean up content (remove trailing comment closers, etc)
+          file_content = file_content.gsub(/^```.*?\n/, '').gsub(/\n```\s*$/, '')
+          
+          if file_content.strip.length > 10  # Ensure meaningful content
+            create_or_update_file(filename, file_content)
+            files_created += 1
+            Rails.logger.info "[V3-Optimized] Created #{filename} from parsed content"
+          end
+        end
+      end
+      
+      # Parse code blocks with filenames in the fence
+      if content.include?('```')
+        # Pattern: ```jsx:src/App.jsx or ```html:index.html
+        content.scan(/```([a-z]+):([^\n]+)\n(.*?)```/m).each do |lang, filepath, code|
+          filepath = filepath.strip
+          if filepath.match?(/\.(jsx?|html|css|json)$/)
+            create_or_update_file(filepath, code)
+            files_created += 1
+            Rails.logger.info "[V3-Optimized] Created #{filepath} from code block"
+          end
+        end
+        
+        # Also try standard code blocks if no files created yet
+        if files_created == 0
+          # Extract HTML block for index.html
+          html_match = content.match(/```html\n(.*?)```/m)
+          if html_match
+            create_or_update_file('index.html', html_match[1])
+            files_created += 1
+          end
+          
+          # Extract JSX/JS blocks for App.jsx
+          jsx_match = content.match(/```(?:jsx?|javascript)\n(.*?)```/m)
+          if jsx_match
+            create_or_update_file('src/App.jsx', jsx_match[1])
+            files_created += 1
+          end
+        end
+      end
+      
+      Rails.logger.info "[V3-Optimized] Fallback parser created #{files_created} files"
+      
+      # If still no files created, log the content for debugging
+      if files_created == 0
+        Rails.logger.warn "[V3-Optimized] No files could be parsed from content"
+        Rails.logger.debug "[V3-Optimized] Content preview: #{content[0..500]}"
       end
     end
   end
