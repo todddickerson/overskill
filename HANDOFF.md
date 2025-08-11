@@ -1,460 +1,269 @@
-# OverSkill Development Handoff
+# OverSkill Development Handoff - Builder V4 Implementation
 
-## ✅ PHASE 3 COMPLETE: 23 AI Tools with Market-Leading Capabilities!
+## 🚀 CURRENT MISSION: Builder V4 Implementation
 
-### Current State: Production Ready Platform - All Systems Operational
+### Current State: V4 Architecture Planned - Ready for Implementation
 
-**MISSION ACCOMPLISHED** ✅ - OverSkill is now a comprehensive AI development platform with 23 tools, exceeding all competitors.
+**STRATEGIC SHIFT** 📈 - Moving from V3 (complex multi-tool orchestrator) to **V4 (template-based with Vite builds)** for better alignment with professional development workflows and market requirements.
 
-### Latest Achievements (Phase 3 - August 7, 2025)
-- **✅ 23 AI Tools**: Industry-leading toolset (28% more than Lovable)
-- **✅ Image Generation**: DALL-E 3 integration for AI-powered assets
-- **✅ Advanced Analytics**: AI insights and performance recommendations  
-- **✅ Git Integration**: Full version control (unique feature vs competitors)
-- **✅ 90% Cost Savings**: Maintained through Anthropic prompt caching
-
-### System Status
-- **Tools Available**: 23/23 operational
-- **Test Coverage**: 100% on all new features
-- **Performance**: 85% faster with caching, 68% cache hit rate
-- **Production Ready**: All systems tested and validated
-
-### Key Differentiators
-- **More Tools**: 23 vs Lovable's ~15-18
-- **Unique Features**: Git + Advanced Analytics (competitors lack these)
-- **Cost Leadership**: 90% cheaper operations
-- **Full Deployment**: Production apps, not just previews
-
-**See**: `/docs/FINAL-IMPLEMENTATION-REPORT.md` for complete technical details.
+### Critical Context: Clean Slate Approach
+- **No Backward Compatibility Needed**: Old apps will be discarded
+- **V3 → V4 Migration**: Complete architecture overhaul
+- **Focus**: Vite + TypeScript + React Router (removing INSTANT MODE entirely)
 
 ---
 
-## 🚀 Latest Update: COMPREHENSIVE FLOW ANALYSIS & LOVABLE COMPARISON COMPLETE (2025-08-08)
+## 🎯 V4 IMPLEMENTATION PLAN
 
-### 🎯 **CRITICAL FINDING: Clear Path to Market Leadership Identified**
+### **Week 1 Priority: Core Infrastructure**
 
-After deep analysis of Lovable's leaked prompts (295 lines) and tools (17 tools) vs our V3 Orchestrator, I've identified the **exact 6 missing tools** needed to exceed Lovable's capabilities. **We have superior infrastructure but lack workflow optimization tools.**
+#### ✅ **COMPLETED: Analysis & Planning**
+- [x] V4 comprehensive architecture plan (`docs/BUILDER_V4_COMPREHENSIVE_PLAN.md`)
+- [x] Gap analysis and concerns documented (`docs/V4_GAPS_AND_CONCERNS.md`)
+- [x] Updated CLAUDE.md with V4 deployment architecture
+- [x] Identified critical Cloudflare constraints (1MB worker limit)
 
-**Key Discovery**: Our foundation is better (GPT-5, Cloudflare Workers, 90% cost savings), but we're missing Lovable's surgical editing and discussion-first workflow that makes them 3x more efficient.
+#### 🔴 **IMMEDIATE (Day 1-2): Critical Decisions**
+- [ ] **Choose build environment**: Lambda vs ECS vs Docker for Node.js builds
+- [ ] **Define RLS policy creation**: When/how database isolation policies are applied
+- [ ] **Template storage method**: Git repo vs database vs filesystem
+- [ ] **Monitoring stack selection**: Real-time worker size and performance tracking
 
-**See**: `/docs/comprehensive-app-generation-flow-analysis.md` for complete findings and 3-week implementation roadmap.
+#### 🟡 **HIGH (Day 3-5): Core Services**
+- [ ] **Create Ai::AppBuilderV4**: New orchestrator replacing V3
+  - Simple architecture for ALL apps (Supabase-first)
+  - Integration with LineReplaceService and SmartSearchService
+  - Claude 4 conversation loop implementation
+  - Discussion mode vs code generation logic
 
-### ✅ **V3 Orchestrator - Production Ready AI Generation System**
-- **Unified Handler**: Single orchestrator for both CREATE and UPDATE operations
-- **GPT-5 Direct Integration**: ✅ WORKING - Uses OpenAI API directly with 164-character key
-- **Real-time Progress**: Streaming updates via app_versions and chat messages
-- **Version Tracking**: Complete history with file snapshots
-- **Standards Enforcement**: Automatic AI_APP_STANDARDS.md compliance
-- **Smart Features**: Auth detection, database setup, logo generation
-- **Professional UX**: Similar to Lovable.dev with progress stages
+- [ ] **Build Ai::SharedTemplateService**: Core foundation files
+  - Auth pages (Login, SignUp, ForgotPassword, etc.)
+  - App-scoped Supabase database wrapper
+  - React Router configuration
+  - Vite + TypeScript + Tailwind setup
 
-### ✅ **CRITICAL FIXES COMPLETED TODAY**
+- [ ] **Implement Deployment::ViteBuilderService**: Build pipeline
+  - FastDevelopmentBuilder (45s builds for iteration)
+  - ProductionOptimizedBuilder (3min with full optimization)
+  - Node.js build environment with npm caching
+  - Build failure recovery and error handling
 
-#### **Environment Configuration** ✅ RESOLVED
-- **Dotenv Hierarchy Issue**: Fixed conflicting environment file loading
-- **OpenAI API Key**: Now consistently loads 164-character key across all processes
-- **Process Consistency**: Rails console, web server, and Sidekiq workers use same configuration
-- **File Structure**: `.env` (commented placeholders) → `.env.local` (real keys) → `.env.development.local` (backups)
+- [ ] **Create Deployment::CloudflareWorkerOptimizer**: Size management
+  - Automatic hybrid asset strategy (critical embedded, large to R2)
+  - 900KB worker size limit enforcement
+  - Real-time size monitoring and alerts
 
-#### **Chat Interface** ✅ FIXED  
-- **Send Button**: Added missing `handleSubmitClick` method to chat form controller
-- **Mobile Compatibility**: Both desktop and mobile submit buttons now functional
-- **Form Validation**: Proper content checking before submission
-- **Error Prevention**: Disabled state during processing to prevent duplicate submissions
+- [ ] **Create Deployment::CloudflareApiClient**: API-only deployment
+  - Worker deployment via Cloudflare API (no Wrangler CLI)
+  - R2 asset upload via API
+  - Worker secrets management via API
+  - Route configuration via API
 
-#### **V3 Orchestrator Integration** ✅ OPERATIONAL
-- **OpenAI Direct**: ✅ Shows `🔥 Making OpenAI DIRECT call with GPT-5` in logs
-- **No More Fallbacks**: Eliminated OpenRouter credential errors
-- **Comprehensive Logging**: Enhanced debugging with clear success/failure indicators
-- **Error Recovery**: Graceful handling of API failures with detailed error reporting
+### **Week 2 Priority: Integration & Testing**
 
-#### **Standards Enhancement** ✅ COMPLETED
-- **Hybrid Architecture**: Supports both "Instant Mode" (CDN-only) and "Pro Mode" (TypeScript/Vite)
-- **AI_APP_STANDARDS.md**: Unified standards file supporting multiple deployment modes
-- **Quality Validation**: Automated compliance checking during generation
-- **Progressive Enhancement**: Users can choose complexity level based on needs
+#### 🟡 **INTEGRATION**
+- [ ] **Database Setup**: App-scoped table creation and RLS policies
+- [ ] **Secret Management**: Environment variables across dev/staging/prod
+- [ ] **Template Integration**: All shared foundation files working
+- [ ] **Claude 4 Testing**: Conversation loop for multi-file generation
 
-**Status**: 🎉 **V3 Orchestrator is now fully operational with GPT-5!** All critical issues resolved - platform ready for production use.
-
-**See**: `/docs/v3-orchestrator-architecture.md` for complete technical details.
-
-## 📋 TODO: STRATEGIC PRIORITIES - Path to Market Leadership
-
-### ✅ **PHASE 1: CRITICAL WORKFLOW TOOLS - COMPLETED (2025-08-08)**
-**ALL 3 CRITICAL TOOLS IMPLEMENTED** - 90% efficiency gain achieved:
-
-- [x] **Discussion Mode Gate** ✅ - Implements discussion-first workflow like Lovable (prevents over-engineering)
-- [x] **Line-Based Replacement Tool** ✅ - Surgical code edits vs full file rewrites (90% token savings)  
-- [x] **Code Search Tool** ✅ - Finds existing components before creating duplicates (prevents bloat)
-- [x] **Timeout Optimization** ✅ - Prevents API timeouts with 45s limits and better error handling
-
-**Impact**: V3 Orchestrator now matches Lovable's core workflow efficiency while maintaining our infrastructure advantages.
-
-### ✅ **PHASE 2: DEBUGGING & OPTIMIZATION (Week 2) - COMPLETED (2025-08-08)**
-**ALL 3 ADVANCED TOOLS IMPLEMENTED** - 50% efficiency gain + debugging capabilities achieved:
-
-- [x] **Debugging Integration** ✅ - Browser console logs + network request monitoring (like Lovable)
-- [x] **Smart Context Management** ✅ - Efficient file loading (50% context reduction)  
-- [x] **Dependency Management** ✅ - Automated npm package management for Pro Mode
-
-**Impact**: V3 Orchestrator now has advanced debugging and optimization tools, matching Lovable's runtime analysis capabilities while adding automated dependency management.
-
-### ✅ **NEW: DUAL MODEL SUPPORT - COMPLETED (2025-08-11)**
-**A/B Testing Infrastructure for AI Models**:
-
-- [x] **Model Selection UI** ✅ - Dropdown in app creation form for GPT-5 vs Claude Sonnet 4
-- [x] **ModelClientFactory** ✅ - Clean abstraction supporting both OpenAI and Anthropic
-- [x] **V3 Orchestrator Integration** ✅ - Respects app.ai_model preference during generation
-- [x] **Testing Infrastructure** ✅ - Comprehensive test script for both models
-
-**Features**:
-- GPT-5: Fast, efficient, $1.25/$10 per M tokens
-- Claude Sonnet 4: Advanced reasoning, creative, $3/$15 per M tokens
-- Users can select preferred model during app creation
-- Enables A/B testing to compare generation quality
-
-### ⚡ **PHASE 3: UI & POLISH (Week 3) - MEDIUM** 
-- [ ] **Progressive UI Components** - Build UI that lets users choose Instant Mode vs Pro Mode
-- [ ] **Enhanced Standards Validation** - Validate both CDN-only and build-tools apps
-- [ ] **Production Metrics Dashboard UI** - Backend complete, needs React components
-
-### 📊 **TRACKING METRICS**
-- [ ] **Token Usage Reduction**: Target 90% for small updates via surgical edits
-- [ ] **Generation Speed**: Target 50% improvement through efficiency
-- [ ] **Code Quality**: Target 80% reduction in duplicate components
-- [ ] **User Success Rate**: Track request-to-working-app completion
-
-### ✅ **COMPLETED FOUNDATIONS**
-- [x] ~~Fix Chat UI Send Button~~ ✅ DONE (2025-08-08)
-- [x] ~~Resolve Dotenv Hierarchy Issues~~ ✅ DONE (2025-08-08) 
-- [x] ~~OpenAI Direct Integration with GPT-5~~ ✅ DONE (2025-08-08)
-- [x] ~~V3 Orchestrator Production Ready~~ ✅ DONE (2025-08-08)
-- [x] ~~Hybrid Instant/Pro Mode Standards~~ ✅ DONE (2025-08-08)
-- [x] ~~Comprehensive Lovable Analysis~~ ✅ DONE (2025-08-08)
+#### 🟢 **TESTING & VALIDATION**
+- [ ] **End-to-end POC**: Single template flow working
+- [ ] **Performance Testing**: Verify 45s dev / 3min prod build times
+- [ ] **Size Validation**: Confirm worker size compliance
+- [ ] **Database Testing**: App-scoped queries working with RLS
 
 ---
 
-## Previous Progress (Phase 1-2 Complete)
+## ⚠️ CRITICAL GAPS TO ADDRESS
 
-**MAJOR MILESTONE: Professional Mobile-First Editor with AI Function Calling** ✅ COMPLETE
+### **1. Build Environment Architecture**
+**Gap**: No defined Node.js execution environment for Vite builds
+- Need containerized build system (Docker + ECS recommended)
+- npm install caching strategy required
+- Build timeout handling (current: undefined)
+- Resource limits and cost management
 
-The OverSkill app editor now features a fully responsive mobile UI, improved AI generation with function calling, and real-time progress tracking.
+### **2. Database Migration Strategy**  
+**Gap**: RLS policy creation and table scoping undefined
+- Auto-create `app_${id}_${table_name}` tables
+- RLS policy templates for multi-tenancy
+- Migration scripts for database setup
+- Connection pooling from Workers
 
-### ✅ **Latest Completed: Mobile UI Fixes (2025-08-05)**
-- **Mobile Chat Toggle**: Fixed panel visibility switching on mobile
-- **Mobile Header**: Added header with [Logo | App Name | Collaborator Avatars + Invite]
-- **Plus Menu**: Implemented camera/image upload and AI suggestions
-- **Invite Modal**: Added bottom sheet modal for inviting collaborators
-- **Panel Switching**: Improved mobile panel visibility with proper z-index
-- **AI Suggestions**: Quick action prompts for common improvements
-- **Debug Logging**: Added console logging for troubleshooting
+### **3. App-Scoped Database Implementation**
+**Must Have**: Hybrid wrapper (transparent + debuggable)
+```typescript
+// Required in ALL templates:
+class AppScopedDatabase {
+  from(table: string) {
+    const scopedTable = `app_${this.appId}_${table}`;
+    console.log(`🗃️ Querying: ${scopedTable}`); // Dev logging
+    return this.supabase.from(scopedTable);
+  }
+}
+```
 
-### ✅ **Previously Completed: Lovable.dev Mobile UI (2025-08-05)**
-- **Bottom Navigation**: Fixed bottom bar with Chat/Preview toggle (mobile)
-- **Contextual Actions**: Mode-specific buttons (+ in chat, history in preview)
-- **Mobile Modals**: All dropdowns use bottom sheet style on mobile
-- **Preview Controls**: Overlay bar with page selector, refresh, control toggle
-- **Full-Screen Modes**: Chat and preview take full screen on mobile
-- **Professional Polish**: Smooth animations, proper z-index stacking
-- **Dashboard Access**: Via settings gear in chat mode
-
-### ✅ **Previously Completed: Supabase & AI (2025-08-04)**
-- **Supabase Phase 2**: Complete user sync infrastructure
-- **Function Calling**: OpenAI-compatible function calling
-- **Real-time Progress**: Text-based progress bars
-- **Activity Monitor**: API call tracking with statistics
-
-### ✅ **Completed: Professional App Editor**
-- **Lovable.dev-style UI**: Split-screen layout with chat, preview, and code panels
-- **Real-time Preview**: Working iframe preview with proper MIME types and JS execution
-- **Professional Code Editor**: CodeMirror integration with syntax highlighting
-- **Advanced AI Workflow**: Planning → Executing → Completed states with visual feedback
-- **Dynamic File Management**: File tree, auto-save, version tracking
-- **Version Control**: Dynamic preview links in chat for each AI change
-
-### ✅ **Technical Infrastructure Complete**
-- All tests passing (32+ tests)
-- Background job processing with Sidekiq + automatic cleanup jobs
-- User tracking and audit trails
-- Turbo Streams real-time updates with enhanced error handling
-- External CDN support (React, Babel, etc.)
-- Secure iframe sandboxing with localStorage fallbacks
-- Database constraints for data integrity
-- OpenAI/DALL-E integration for logo generation
-- Comprehensive timeout and retry mechanisms
-
-## Major Features Implemented ✅
-
-### 1. **Preview System** ✅ COMPLETED
-- [x] ~~Create preview route that serves app files~~
-- [x] ~~Implement iframe sandbox for security~~ 
-- [x] ~~Handle index.html as default file~~
-- [x] ~~Support CSS/JS file loading within preview~~
-- [x] ~~Fix MIME type issues for JavaScript execution~~
-- [x] ~~Handle external CDN dependencies (React, Babel)~~
-
-### 2. **Professional Code Editor** ✅ COMPLETED  
-- [x] ~~Add file tree sidebar showing all app_files~~
-- [x] ~~Integrate CodeMirror with syntax highlighting~~
-- [x] ~~Support file switching without page reload~~
-- [x] ~~Add auto-save functionality (updates app_file content)~~
-- [x] ~~Show file metadata (size, cursor position)~~
-- [x] ~~Dark theme with professional styling~~
-
-### 3. **Files Tab & Navigation** ✅ COMPLETED
-- [x] ~~List all app files with proper icons~~
-- [x] ~~File count badges "Files (4)"~~
-- [x] ~~Proper tab switching functionality~~
-- [x] ~~File tree navigation in both Code and Files panels~~
-
-### 4. **Advanced AI Chat Workflow** ✅ COMPLETED
-- [x] ~~AI response states: planning/executing/completed~~
-- [x] ~~Visual status indicators with icons and animations~~
-- [x] ~~Real-time status updates via Turbo Streams~~
-- [x] ~~Dynamic version preview links in chat~~
-- [x] ~~Version comparison framework~~
-
-### 5. **Real-time Updates** ✅ COMPLETED
-- [x] ~~Broadcast file changes to preview iframe~~
-- [x] ~~Update code editor when chat makes changes~~
-- [x] ~~Show visual indicators for file status~~
-- [x] ~~Auto-refresh preview on file saves~~
-
-## Current Issues & Next Priorities
-
-### **COMPLETED - Supabase Dual Auth Phase 2**
-- [x] **User Sync Background Job**: Created SyncUsersToSupabaseJob for batch processing
-- [x] **Real-time User Sync**: SupabaseAuthSyncJob handles create/update/delete events
-- [x] **OAuth Provider Sync**: SupabaseOauthSyncService manages social login integration
-- [x] **Admin Dashboard**: Full sync monitoring UI at /account/supabase_sync
-- [x] **Sync Verification**: Rake tasks for status checking and management
-
-### **NEXT - Supabase Phase 3 (App Integration)**
-- [ ] **App Auth Configuration**: Store Supabase credentials per app
-- [ ] **JWT Token Exchange**: Bridge Rails and Supabase sessions
-- [ ] **App User Management**: Sync app-specific users to Supabase
-- [ ] **Real-time Database**: Enable Supabase real-time features
-
-### **High Priority - Production Scale**
-- [ ] **Cloudflare Workers Migration**: Real Node.js runtime for previews
-  - Replace Rails preview with proper Worker environments
-  - Native JavaScript execution without MIME type issues
-  - Better performance and isolation
-  
-- [ ] **Deploy Button**: One-click deployment to unique subdomains
-  - Generate unique subdomains: `{app-name}.overskill.app`
-  - Push to Cloudflare Workers with R2 asset storage
-  - Environment variables management
-
-### **Medium Priority - Developer Experience**  
-- [ ] **CodeMirror Diff View**: Visual version comparison
-  - Show file changes between versions
-  - Side-by-side diff visualization
-  - Merge conflict resolution
-  
-- [ ] **AI Suggestion Buttons**: Follow-up action recommendations
-  - "Add mobile responsiveness"
-  - "Improve accessibility" 
-  - "Add dark mode"
-  - Smart context-aware suggestions
-
-### **Medium Priority - Collaboration**
-- [ ] **GitHub Integration**: Export to repositories
-  - GitHub OAuth flow
-  - Create repository from app
-  - Push app files to GitHub
-  - Two-way sync between app files and repo
-
-### **Low Priority - Enterprise Features**
-- [ ] **Custom Domains**: User-provided domain support
-- [ ] **Team Collaboration**: Real-time collaborative editing
-- [ ] **API Access**: External integrations and webhooks
-- [ ] **Analytics**: Usage tracking and performance metrics
-
-## Technical Architecture ✅ PRODUCTION-READY
-
-### **Core Models & Associations**
+### **4. Claude 4 Conversation Loop**
+**Gap**: Implementation details for single-file-per-call limitation
 ```ruby
-# App model has complete associations:
-app.app_files         # All source files with content and metadata
-app.app_versions      # Version history with changelogs  
-app.app_generations   # AI generation history and tracking
-app.app_chat_messages # Chat conversation with status states
+# Need to implement:
+def generate_with_claude_conversation(files_needed)
+  files_needed.each_slice(2) do |batch|
+    response = claude_create_files(batch)
+    # Handle partial failures, context maintenance
+  end
+end
 ```
 
-### **Key Controllers & Features**
-- **`Account::AppEditorsController`** - Main editor interface with real-time chat
-- **`Account::AppPreviewsController`** - Secure preview serving with proper MIME types
-- **`Account::AppVersionsController`** - Version management and comparison
-- **`Account::AppsController`** - App CRUD operations
+---
 
-### **Services & Background Jobs**
-- **`Ai::AppGeneratorService`** - Initial app code generation
-- **`ProcessAppUpdateJob`** - Handles chat-based updates with status workflow
-- **Turbo Streams** - Real-time UI updates without page refresh
+## 📊 SUCCESS METRICS (V4)
 
-### **Frontend Architecture**
-- **CodeMirror Integration** - Professional code editor with syntax highlighting
-- **Stimulus Controllers** - `tabs_controller`, `codemirror_controller`, `version_preview_controller`
-- **Tailwind CSS** - Consistent dark theme design system
-- **Hotwire/Turbo** - Real-time updates and smooth navigation
+### **Performance Targets**
+- **Dev Build Time**: < 45 seconds (fast mode for iteration)
+- **Prod Build Time**: < 3 minutes (optimized with hybrid assets)
+- **Worker Script Size**: < 900KB (with buffer under 1MB limit)
+- **Cold Start Time**: < 100ms for edge workers
+- **Database Query**: < 50ms with app scoping
 
-### **Key Files Created/Modified**
+### **Business Targets**
+- **Simple App Cost**: $1-2/month (70% of apps - Supabase-first)
+- **Performance App Cost**: $40-50/month (20% of apps - hybrid edge)
+- **Complex App Cost**: $200-300/month (10% of apps - full edge stack)
+- **AI Token Savings**: 90% via LineReplaceService surgical edits
+
+---
+
+## 🚨 HIGH RISK ITEMS
+
+### **1. Supabase Table Limits** (CRITICAL)
+- **Risk**: 500 tables per project = ~50 apps max with app scoping
+- **Mitigation**: Multiple Supabase projects (database sharding)
+
+### **2. Build Environment Costs**
+- **Risk**: Node.js builds could be expensive at scale
+- **Mitigation**: Aggressive npm caching, build optimization
+
+### **3. Worker Size Violations**
+- **Risk**: Apps could suddenly exceed 1MB Cloudflare limit
+- **Mitigation**: Continuous monitoring, automatic R2 offloading
+
+### **4. Claude 4 Rate Limits**
+- **Risk**: Conversation loop could hit API limits
+- **Mitigation**: Implement backoff, use GPT-5 fallback
+
+---
+
+## 📋 DEVELOPER WORKFLOW
+
+### **V4 Generation Flow**
 ```
-app/javascript/controllers/
-├── chat_form_controller.js          # NEW: Enhanced form submission logic
-├── codemirror_controller.js         # Professional code editor
-├── version_preview_controller.js    # Version management
-├── version_history_controller.js    # FIXED: Modal controller scoping
-├── tabs_controller.js               # Tab navigation with dark mode fixes
-├── main_tabs_controller.js          # NEW: Mobile-aware tab switching
-├── editor_layout_controller.js      # ENHANCED: Deprecated mobile methods
-├── mobile_navigation_controller.js  # NEW: Lovable.dev-style mobile navigation
-├── team_navigation_controller.js    # ENHANCED: Mobile bottom sheet support
-└── app_navigation_controller.js     # ENHANCED: Mobile bottom sheet support
-
-app/controllers/account/
-├── app_editors_controller.rb        # Enhanced with chat form fixes
-├── app_previews_controller.rb       # MIME type fixes, CDN support  
-└── app_versions_controller.rb       # Preview and compare actions
-
-app/models/
-├── app.rb                          # ADDED: Logo attachment support
-└── app_chat_message.rb             # ENHANCED: Status validation & constraints
-
-app/jobs/
-├── cleanup_stuck_messages_job.rb   # NEW: Periodic message cleanup
-├── generate_app_logo_job.rb        # NEW: Automatic logo generation
-├── process_app_update_job.rb       # ENHANCED: Timeout & error handling
-├── sync_users_to_supabase_job.rb   # NEW: Batch user sync to Supabase
-└── supabase_auth_sync_job.rb       # ENHANCED: Real-time user sync
-
-app/services/ai/
-├── logo_generator_service.rb       # NEW: DALL-E logo generation
-├── openai_client.rb               # NEW: OpenAI API integration
-├── app_spec_builder.rb            # ENHANCED: OverSkill branding
-└── open_router_client.rb          # ENHANCED: Function calling support
-
-app/services/
-├── supabase_service.rb            # Core Supabase API integration
-└── supabase_oauth_sync_service.rb # NEW: OAuth provider sync
-
-app/controllers/account/
-├── supabase_sync_controller.rb    # NEW: Admin sync dashboard
-
-app/views/account/supabase_sync/
-└── index.html.erb                 # NEW: Sync monitoring UI
-
-lib/tasks/
-└── supabase_sync.rake             # NEW: Sync management tasks
-
-app/views/account/app_editors/
-├── show.html.erb                   # Updated controller scoping
-├── _chat_form.html.erb             # Fixed form submission issues
-├── _chat_input_wrapper.html.erb    # NEW: Wrapper for form broadcasts
-├── _version_history_modal.html.erb # FIXED: Controller scoping
-└── _code_editor.html.erb           # CodeMirror integration
-
-config/initializers/
-└── sidekiq_cron.rb                 # NEW: Periodic cleanup job scheduling
-
-db/migrate/
-├── add_logo_fields_to_apps.rb      # NEW: Logo attachment support
-└── add_constraints_to_app_chat_messages.rb # NEW: Data integrity constraints
+User Request → 
+1. Simple Architecture (ALL apps use Supabase-first approach) →
+2. Generate Shared Foundation (auth, routing, app-scoped DB) →
+3. AI Customization (Claude 4 conversation loop) →
+4. Surgical Edits (LineReplaceService for 90% token savings) →
+5. Build (fast dev 45s OR optimized prod 3min) →
+6. Deploy via API (hybrid assets if needed for 1MB limit)
 ```
 
-### **Environment Variables (Production Ready)**
-```bash
-# Core Rails
-RAILS_ENV=production
-SECRET_KEY_BASE=...
+### **Local Development**
+- **Challenge**: Vite dev server + Cloudflare Worker mismatch
+- **Solution**: Use Miniflare for local Worker development
+- **Database**: Shared dev Supabase with app-scoped tables
+- **Hot Reload**: Limited by Worker constraints
 
-# AI Integration  
-OPENROUTER_API_KEY=...
-OPENAI_API_KEY=...        # NEW: For DALL-E logo generation
+### **Environment Management**
+- **Development**: Fast builds, embedded assets, preview URLs
+- **Production**: Full optimization, hybrid assets, custom domains
+- **Secrets**: Per-environment via Cloudflare API
 
-# Background Jobs
-REDIS_URL=...
+---
 
-# Future Cloudflare Integration
-CLOUDFLARE_ACCOUNT_ID=...
-CLOUDFLARE_API_TOKEN=...
-CLOUDFLARE_R2_ACCESS_KEY_ID=...
-CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
-CLOUDFLARE_R2_BUCKET_NAME=...
-```
+## 🔧 TECHNICAL DECISIONS NEEDED
 
-## Development Commands
+### **1. Build Environment** (IMMEDIATE)
+**Options**:
+- A) AWS Lambda (serverless, pay per build)
+- B) ECS + Docker (containerized, consistent environment) ✅ RECOMMENDED  
+- C) Local Docker (development only)
 
-```bash
-# Start development environment (Rails + Sidekiq + asset builds)
-bin/dev
+### **2. Template Storage** (DAY 1)
+**Options**:
+- A) Git repository (versioned, easy updates)
+- B) Database storage (dynamic, harder to version) 
+- C) Filesystem (simple, hard to update)
 
-# Run full test suite (all tests passing ✅)
-bin/rails test
+### **3. RLS Policy Management** (DAY 2)
+**Options**:
+- A) Create during app generation (automatic)
+- B) Create during first database access (lazy)
+- C) Bulk create via migration (batch)
 
-# Build frontend assets (includes CodeMirror)
-npm run build
+### **4. Node.js Caching Strategy** (DAY 3)
+**Options**:
+- A) Persistent node_modules volumes (fast, complex)
+- B) npm cache with shared storage (medium speed)
+- C) No caching (slow but simple)
 
-# Rails console for debugging
-bin/rails console
+---
 
-# Check app files and preview
-App.first.app_files.pluck(:path, :file_type, :size_bytes)
-```
+## ⚡ IMMEDIATE ACTION ITEMS
 
-## Next Session Focus 🚀
+### **Today**
+1. **Review V4 plan**: Confirm architecture and approach
+2. **Make critical decisions**: Build env, template storage, RLS strategy
+3. **Setup infrastructure**: Docker environment, monitoring
 
-**Current Priority: Complete Supabase Integration** Next steps:
+### **Tomorrow**  
+1. **Create AppBuilderV4 skeleton**: Basic orchestrator structure
+2. **Build SharedTemplateService**: First template with app-scoped DB
+3. **Setup build pipeline**: Basic Vite build working
 
-1. **Supabase Phase 2**: Implement user sync between Rails and Supabase
-2. **Supabase Phase 3**: App-level integration for generated apps
-3. **Deploy Button**: Cloudflare Workers deployment pipeline
-4. **Custom Domains**: User domain management system
+### **This Week**
+1. **Complete core services**: All 4 main V4 services
+2. **End-to-end POC**: Working app generation
+3. **Performance validation**: Meet build time targets
+4. **Size compliance**: Verify 1MB worker limits
 
-## Recent Session Summary (2025-08-04)
+---
 
-### ✅ **Completed**
-- Fixed dashboard navigation and deep links
-- Installed OverSkill logo and Neue Regrade font
-- Removed unnecessary preview controls
-- Fixed all header button functionality
-- Implemented automatic error detection for previews
-- Regenerated App 18 with improved AI orchestration
-- Added real-time progress messaging during generation
-- Implemented OpenAI function calling to avoid JSON errors
-- Fixed chat submit button functionality
-- Created comprehensive activity monitor
-- Made editor fully mobile responsive
-- Fixed chat panel positioning on desktop
-- Created simple mobile UI with floating edit button
+## 📚 KEY DOCUMENTATION
 
-## Quick Start for New Developer
+### **FINAL V4 Documents** (Ready for Implementation)
+- ✅ `docs/BUILDER_V4_COMPREHENSIVE_PLAN.md` - Complete architecture
+- ✅ `docs/V4_CRITICAL_DECISIONS_FINALIZED.md` - All decisions resolved
+- ✅ `docs/V4_IMPLEMENTATION_ROADMAP.md` - 3-week detailed plan
 
-```bash
-# 1. Setup environment
-cp .env.example .env
-# Add OPENROUTER_API_KEY
+### **Analysis Documents** (Historical Reference)
+- `docs/V4_GAPS_AND_CONCERNS.md` - Original issues (now resolved)
+- `docs/V4_DEPRECATION_LIST.md` - Files to remove/update
+- Analysis docs from conversation context (archived)
 
-# 2. Install and setup
-bundle install
-npm install
-bin/setup
+### **Reference Implementation**
+- `app/services/ai/line_replace_service.rb` - Ready for integration (90% token savings)
+- `app/services/ai/smart_search_service.rb` - Ready for integration (duplicate prevention)
 
-# 3. Start development
-bin/dev
+---
 
-# 4. Visit editor (sign up first)
-# http://localhost:3000/account/apps/{any-app-id}/editor
-```
+## 🎯 V4 LAUNCH CRITERIA
 
-## Current State Verification ✅
+Before considering V4 production ready:
 
-The app editor at `/account/apps/{id}/editor` now provides:
-- ✅ **Real-time preview** with working JavaScript
-- ✅ **Professional code editor** with syntax highlighting  
-- ✅ **AI chat workflow** with visual status updates
-- ✅ **File management** with auto-save and version tracking
-- ✅ **Dynamic version links** in chat for quick previews
+1. **✅ Build Pipeline**: Consistent < 45s dev, < 3min prod builds
+2. **✅ Worker Compliance**: 100% apps under 1MB Cloudflare limit
+3. **✅ Database Isolation**: App-scoped tables with working RLS
+4. **✅ Template System**: Shared foundation generating correctly
+5. **✅ AI Integration**: Claude 4 conversation loop functional
+6. **✅ Service Integration**: LineReplace + SmartSearch working
+7. **✅ Monitoring**: Full visibility into build times, sizes, costs
+8. **✅ Documentation**: Setup guides and troubleshooting
+9. **✅ Testing**: 90% coverage of critical V4 paths
+10. **✅ Rollback**: Tested failure recovery procedures
 
-**Target achieved: Lovable.dev-quality development experience**
+---
+
+*Updated: August 11, 2025*  
+*Status: V4 Implementation Ready - Awaiting Go Decision*  
+*Next: Make critical technical decisions and start core service development*

@@ -162,9 +162,9 @@ class App < ApplicationRecord
       message.update!(content: default_prompt) if message.persisted?
     end
 
-    # Always use V3 Optimized orchestrator (GPT-5 optimized)
-    Rails.logger.info "[App] Using V3 Optimized orchestrator for app ##{id}"
-    ProcessAppUpdateJobV3.perform_later(message)
+    # Always use V4 orchestrator (Vite + TypeScript + template-based)
+    Rails.logger.info "[App] Using V4 orchestrator for app ##{id}"
+    ProcessAppUpdateJobV4.perform_later(message)
     
     # Update status
     update!(status: "generating") unless generating?

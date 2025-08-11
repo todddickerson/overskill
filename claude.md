@@ -19,36 +19,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OverSkill is an AI-powered app marketplace platform built with Ruby on Rails (BulletTrain framework). It enables non-technical users to create, deploy, and monetize applications using natural language.
 
-## Deployment Architecture (UPDATED)
+## Deployment Architecture (V4 - VITE BUILD SYSTEM) ✅ FINALIZED
 
 ### Infrastructure Philosophy
-- **Lean Stack**: Cloudflare Workers + R2 + KV + Supabase only
-- **No Build Tools**: Direct deployment via Cloudflare API
-- **No Wrangler CLI**: Use Cloudflare API for all operations
-- **Fast Preview**: < 3 seconds using CDN React + on-the-fly transformation
-- **Module Workers**: Modern format for better secret handling
+- **Professional Stack**: Vite + TypeScript + React Router + Cloudflare Workers
+- **Cloudflare Worker Builds**: Build system runs via Cloudflare API (no CLI)
+- **Simple Architecture**: ALL apps use Supabase-first approach ($1-2/month)
+- **App-Scoped Database**: `app_${APP_ID}_${table}` naming with RLS isolation
+- **Dual Build Modes**: Fast dev builds (45s) and optimized prod builds (3min)
+- **API-Only Deployment**: Pure HTTP API approach, no Wrangler CLI
 
-### Deployment Services
+### Core Services (V4)
 
-#### 1. **FastPreviewService** (Primary - < 3s deploy)
-- Instant preview without build step
-- Uses CDN React (unpkg/esm.sh)
-- On-the-fly TypeScript transformation
-- Module worker format with proper env handling
-- Path: `app/services/deployment/fast_preview_service.rb`
+#### 1. **Ai::AppBuilderV4** (Primary orchestrator) ✅ DECIDED
+- Template-based generation with shared foundation files
+- **Simple architecture ONLY** (no app type detection needed)
+- Integration with LineReplaceService and SmartSearchService
+- AI retry system (2x maximum) then human intervention
+- Token usage tracking per app_version for future billing
+- Path: `app/services/ai/app_builder_v4.rb`
 
-#### 2. **CloudflarePreviewService** (Base service)
-- Handles worker upload and route configuration
-- Environment variable management via API
-- Supports preview/staging/production environments
-- Path: `app/services/deployment/cloudflare_preview_service.rb`
+#### 2. **Ai::SharedTemplateService** (Template system) ✅ DECIDED
+- Core foundation files ALL apps need (auth, routing, database)
+- **Git repository storage** at `/app/templates/shared/`
+- TypeScript + React Router + Tailwind + shadcn/ui
+- App-scoped Supabase client with debugging wrapper
+- Path: `app/services/ai/shared_template_service.rb`
 
-#### 3. **CloudflareSecretService** (Lean infrastructure)
-- Manages secrets via Cloudflare API only
-- R2 bucket integration for assets
-- KV namespace for sessions
-- No external dependencies
-- Path: `app/services/deployment/cloudflare_secret_service.rb`
+#### 3. **Deployment::ViteBuilderService** (Build pipeline) ✅ DECIDED
+- **Cloudflare Worker builds** via API (no Docker/ECS needed)
+- **Development Mode**: Fast builds (45s) for rapid iteration
+- **Production Mode**: Full optimization with hybrid assets (3min)
+- Worker runtime executes Node.js + Vite builds
+- Path: `app/services/deployment/vite_builder_service.rb`
+
+#### 4. **Deployment::CloudflareApiClient** (API-only deployment) ✅ DECIDED
+- **Pure API approach** - no Wrangler CLI dependency
+- Worker deployment, R2 uploads, secret management via API
+- AppEnvVar integration with automatic Cloudflare sync
+- Route configuration and domain management
+- Path: `app/services/deployment/cloudflare_api_client.rb`
+
+### Database Architecture ✅ DECIDED
+
+#### File Storage Strategy
+Uses **existing database tables** (analyzed and perfect for V4):
+
+```ruby
+# Current structure works perfectly for V4:
+class AppFile < ApplicationRecord
+  belongs_to :app, :team
+  validates :path, :content, presence: true    # 'src/App.tsx' + content
+end
+
+class AppVersion < ApplicationRecord
+  has_many :app_version_files  # Tracks all changes
+  # AI-generated display names via OpenRouter Gemini Flash
+end
+
+class AppVersionFile < ApplicationRecord  
+  belongs_to :app_version, :app_file
+  enum :action, { created: 'create', updated: 'update', deleted: 'delete' }
+end
+
+class AppEnvVar < ApplicationRecord
+  belongs_to :app
+  # System defaults: SUPABASE_URL, APP_ID, OWNER_ID, ENVIRONMENT
+  after_commit :sync_to_cloudflare  # Automatic Worker sync
+end
+```
+
+#### App-Scoped Database
+```typescript
+// Template: /app/templates/shared/database/app-scoped-db.ts
+class AppScopedDatabase {
+  from(table: string) {
+    const scopedTable = `app_${this.appId}_${table}`;
+    console.log(`🗃️ [${this.appId}] Querying: ${scopedTable}`);
+    return this.supabase.from(scopedTable);
+  }
+}
+```
 
 ### Environment Variable Strategy
 
@@ -103,27 +154,58 @@ if (path.startsWith('/api/db/')) {
 }
 ```
 
-### Fast Preview Implementation
+### App-Scoped Database Architecture
 
-1. **No Build Step**: Direct file serving with transformation
-2. **CDN Dependencies**: React, Babel via unpkg
-3. **Import Maps**: ES module resolution
-4. **TypeScript Transform**: Basic on-the-fly conversion
-5. **Instant Deploy**: < 3 seconds from save to preview
+```typescript
+// ALL apps include this wrapper (transparent + debuggable)
+class AppScopedDatabase {
+  private appId: string;
+  
+  from(table: string) {
+    const scopedTable = `app_${this.appId}_${table}`;
+    // Development logging: "🗃️ Querying table: app_123_todos"
+    return this.supabase.from(scopedTable);
+  }
+  
+  getTableName(table: string): string {
+    return `app_${this.appId}_${table}`;
+  }
+}
 
-### Deployment Flow
+// Usage in generated code:
+const todos = await db.from('todos').select('*');
+// Actually queries: app_123_todos
+```
+
+### Consistent Simple Architecture (All Apps)
+
+- **ALL Apps**: Supabase-first, minimal edge complexity ($1-2/month per app)
+- **Authentication**: Supabase Auth with built-in OAuth support
+- **Database**: App-scoped tables with automatic RLS isolation
+- **Static Assets**: R2 for CDN performance only
+- **No Complex Services**: No KV storage, Cache API, or edge analytics
+
+### V4 Deployment Flow
 
 ```ruby
-# 1. Generate app with AI
-generator = Ai::StructuredAppGenerator.new(app)
-generator.generate!(prompt)
+# 1. Generate app with AI (simple architecture for all)
+builder = Ai::AppBuilderV4.new(chat_message)
 
-# 2. Deploy instant preview (< 3s)
-preview_service = Deployment::FastPreviewService.new(app)
-result = preview_service.deploy_instant_preview!
+# 2. Generate shared foundation + app-specific features  
+builder.generate_shared_foundation  # Auth, routing, app-scoped DB
+builder.generate_app_features       # Supabase-first approach
 
-# 3. App available at:
-# https://preview-{app-id}.overskill.app
+# 3. Build with appropriate optimization
+case user_intent
+when /deploy|production/
+  result = ProductionOptimizedBuilder.new(app).build!  # 3min optimized
+else
+  result = FastDevelopmentBuilder.new(app).build!     # 45s fast
+end
+
+# 4. App available at:
+# Development: https://preview-{app-id}.overskill.app
+# Production: https://app-{app-id}.overskill.app
 ```
 
 ## AI Considerations
@@ -157,35 +239,49 @@ result = preview_service.deploy_instant_preview!
 - **Claude 3 Opus**: Model ID `claude-3-opus-20240229` - Previous premium model
 - **Kimi-K2**: May timeout with function calling, use StructuredAppGenerator instead
 
-## AI App Generation System (Enhanced)
+## AI App Generation System (V4 - TEMPLATE-BASED)
 
 ### Key Components
-- **AI_APP_STANDARDS.md**: Comprehensive standards automatically included in every AI generation request
-- **AppUpdateOrchestratorV2**: Enhanced orchestrator with tool calling for incremental file updates
-- **Real-time Progress**: Shows files being created/edited in real-time during generation
-- **30-minute timeout**: Extended from 10 minutes to handle complex app generation
-- **Function/Tool Calling**: Uses OpenRouter's tool calling API for structured operations
+- **AI_APP_STANDARDS.md**: PRO MODE ONLY - Vite + TypeScript + React Router (INSTANT MODE removed)
+- **Ai::AppBuilderV4**: Template-based orchestrator with Claude 4 conversation loop
+- **Ai::SharedTemplateService**: Core foundation files (auth, routing, database wrapper)
+- **Integration Services**: LineReplaceService (90% token savings) + SmartSearchService
+- **Claude 4 Primary**: Extended thinking with conversation loop for multi-file generation
 
-### How It Works
-1. **Analysis Phase**: AI analyzes app structure and user request
-2. **Planning Phase**: Creates detailed execution plan with tool definitions
-3. **Execution Phase**: Uses tool calling to incrementally update files with progress broadcasts
-4. **Validation Phase**: Confirms all changes and updates preview
+### V4 Generation Flow
+1. **Simple Architecture**: All apps use consistent Supabase-first approach
+2. **Shared Foundation**: Generate core files all apps need (templates)
+3. **AI Customization**: Claude 4 generates app-specific features via conversation
+4. **Surgical Edits**: Use LineReplaceService for minimal changes
+5. **Build & Deploy**: Fast dev (45s) or optimized prod (3min) via API only
 
-### Tool Functions Available
-- `read_file`: Read complete file content
-- `write_file`: Create or overwrite files
-- `update_file`: Find/replace within files
-- `delete_file`: Remove files
-- `broadcast_progress`: Send real-time updates to user
-
-### Testing AI Generation
+### Claude 4 Conversation Loop
 ```ruby
-# Test the new orchestrator directly
+# Claude only creates 1-2 files per API call
+def generate_with_claude_conversation(files_needed)
+  files_created = []
+  
+  files_needed.each_slice(2) do |batch|
+    response = claude_create_files(batch)
+    files_created.concat(response[:files])
+    broadcast_progress(files_created)
+  end
+end
+```
+
+### V4 Tool Integration
+- **LineReplaceService**: Surgical edits with ellipsis support (90% token savings)
+- **SmartSearchService**: Find existing components to prevent duplicates
+- **App-Scoped Database**: Automatic `app_${id}_${table}` naming
+- **Cloudflare Optimization**: Hybrid asset strategy for 1MB worker limit
+
+### Testing V4 Generation
+```ruby
+# Test V4 orchestrator
 rails console
-message = AppChatMessage.last  # Get a test message
-orchestrator = Ai::AppUpdateOrchestratorV2.new(message)
-orchestrator.execute!
+message = AppChatMessage.create!(content: "Build a todo app", user: user)
+builder = Ai::AppBuilderV4.new(message)
+builder.execute!
 ```
 
 ## DevUX and Testing Tools
