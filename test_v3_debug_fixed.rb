@@ -1,4 +1,4 @@
-#\!/usr/bin/env ruby
+#!/usr/bin/env ruby
 # Debug V3 orchestrator to find why no files are created
 
 ENV['USE_V3_ORCHESTRATOR'] = 'true'
@@ -13,10 +13,10 @@ puts "V3 Orchestrator Debug Test"
 puts "="*80
 
 team = Team.first
-abort("No team found\!") unless team
+abort("No team found!") unless team
 
 # Create simple test app
-app = App.create\!(
+app = App.create!(
   team: team,
   name: "Debug Test #{Time.now.to_i}",
   slug: "debug-test-#{Time.now.to_i}",
@@ -29,7 +29,7 @@ app = App.create\!(
 
 puts "\n✅ Created app ##{app.id}"
 
-message = app.app_chat_messages.create\!(
+message = app.app_chat_messages.create!(
   role: 'user',
   content: app.prompt,
   user: team.memberships.first.user
@@ -48,13 +48,13 @@ puts "  Model: #{orchestrator.instance_variable_get(:@model)}"
 puts "  Is new app: #{orchestrator.instance_variable_get(:@is_new_app)}"
 puts "  Use streaming: #{orchestrator.instance_variable_get(:@use_streaming)}"
 
-# Run execute\! and capture all output
+# Run execute! and capture all output
 puts "\n📊 Executing orchestrator..."
 puts "-"*40
 
 begin
   # Execute
-  orchestrator.execute\!
+  orchestrator.execute!
   puts "\n✅ Orchestrator completed"
   
 rescue => e
@@ -78,7 +78,7 @@ if app.app_files.any?
     puts "  - #{file.path}"
   end
 else
-  puts "\n⚠️  No files were created\!"
+  puts "\n⚠️  No files were created!"
   
   # Check last message
   last_msg = app.app_chat_messages.order(:created_at).last

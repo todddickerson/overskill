@@ -9,7 +9,7 @@ module Ai
     # PHASE 1 OPTIMIZATION: Timeout and efficiency settings
     MAX_CONTEXT_TOKENS = 32_000     # Smaller context to prevent timeouts
     MAX_FILES_PER_CALL = 3          # Process files in smaller batches like Lovable
-    API_TIMEOUT_SECONDS = 45        # Shorter timeout for faster failure recovery
+    API_TIMEOUT_SECONDS = 300       # Max timeout (5 minutes) for testing
     MAX_RETRIES_PER_CALL = 2        # Quick retries instead of long waits
     
     attr_reader :chat_message, :app, :user, :app_version, :broadcaster
@@ -209,6 +209,8 @@ module Ai
       
       if @use_openai_direct
         Rails.logger.info "[AppUpdateOrchestratorV3] Making OpenAI direct call for analysis (timeout: #{API_TIMEOUT_SECONDS}s)"
+        Rails.logger.info "[AppUpdateOrchestratorV3] Message size: #{messages.to_json.length} bytes"
+        Rails.logger.info "[AppUpdateOrchestratorV3] Standards length: #{standards_content.length} bytes"
         response = stream_gpt5_response(messages, timeout: API_TIMEOUT_SECONDS)
       else
         Rails.logger.warn "[AppUpdateOrchestratorV3] Using OpenRouter fallback for analysis"
@@ -1581,11 +1583,18 @@ module Ai
     end
     
     def load_ai_standards
-      # Load and cache AI standards
+      # Load and cache AI standards - full version
       @ai_standards ||= begin
         standards_path = Rails.root.join('AI_APP_STANDARDS.md')
         if File.exist?(standards_path)
-          File.read(standards_path)
+          content = File.read(standards_path)
+          # Truncate if too large (> 8000 chars) to prevent timeouts
+          if content.length > 8000
+            Rails.logger.warn "[AppUpdateOrchestratorV3] AI_APP_STANDARDS.md truncated from #{content.length} to 8000 chars"
+            content[0..7999] + "\n\n[Truncated for context limit]"
+          else
+            content
+          end
         else
           Rails.logger.warn "[AppUpdateOrchestratorV3] AI_APP_STANDARDS.md not found"
           "Follow best practices for React apps with Tailwind CSS."

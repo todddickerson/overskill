@@ -1,9 +1,20 @@
 #!/usr/bin/env ruby
 # Test actual app generation with streaming
 
+# Set environment variables BEFORE loading Rails
+ENV['USE_V3_ORCHESTRATOR'] = 'true'
+ENV['USE_STREAMING'] = 'true'
+ENV['VERBOSE_AI_LOGGING'] = 'true'
+
 require_relative 'config/environment'
 
 puts "Testing app generation with streaming..."
+puts "\nEnvironment Configuration:"
+puts "  USE_V3_ORCHESTRATOR: #{ENV['USE_V3_ORCHESTRATOR']}"
+puts "  USE_STREAMING: #{ENV['USE_STREAMING']}"
+puts "  VERBOSE_AI_LOGGING: #{ENV['VERBOSE_AI_LOGGING']}"
+puts "  OpenAI API Key: #{ENV['OPENAI_API_KEY'].present? ? '✅ Present' : '❌ Missing'}"
+puts ""
 
 team = Team.first
 abort("No team found!") unless team
@@ -39,7 +50,18 @@ app.update!(status: 'generating')
 # Check if V3 orchestrator is being used
 if app.use_v3_orchestrator?
   puts "Using V3 orchestrator with streaming support"
-  ProcessAppUpdateJobV3.perform_later(message)
+  
+  # Run synchronously to catch errors immediately
+  begin
+    puts "\nRunning generation synchronously to catch errors..."
+    ProcessAppUpdateJobV3.new.perform(message)
+    puts "✅ Generation completed successfully!"
+  rescue => e
+    puts "❌ Generation failed with error:"
+    puts "  #{e.message}"
+    puts "\nBacktrace:"
+    puts e.backtrace.first(10).join("\n")
+  end
 else
   puts "Using legacy generation (no streaming)"
   generation = app.app_generations.create!(
@@ -48,26 +70,11 @@ else
     status: "pending",
     started_at: Time.current
   )
-  AppGenerationJob.perform_later(generation)
+  AppGenerationJob.perform_now(generation)
 end
 
-puts "\n✅ Generation job queued!"
-puts "\nMonitoring progress for 10 seconds..."
-
-10.times do |i|
-  sleep 1
-  app.reload
-  print "."
-  
-  if app.status != 'generating'
-    puts "\n\nApp status changed to: #{app.status}"
-    break
-  end
-  
-  if app.app_files.any?
-    puts "\n\nFiles being created! Current count: #{app.app_files.count}"
-  end
-end
+# Reload to get latest status
+app.reload
 
 puts "\n\nFinal Status:"
 puts "-" * 40

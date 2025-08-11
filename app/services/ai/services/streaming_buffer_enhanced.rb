@@ -88,8 +88,15 @@ module Ai
         
         return unless data
         
-        # Process based on type
-        process_stream_chunk(data)
+        # Process based on current state
+        case @state
+        when BUFFER_STATES[:idle]
+          process_idle_chunk(data)
+        when BUFFER_STATES[:buffering_content]
+          process_content_chunk(data)
+        when BUFFER_STATES[:buffering_tool_call]
+          process_tool_call_chunk(data)
+        end
         
         # Yield parsed content if block given and we have complete content
         if block_given? && has_complete_content?
@@ -97,6 +104,8 @@ module Ai
         end
       rescue => e
         Rails.logger.error "[StreamingBuffer] Error in process_chunk: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n") if ENV['DEBUG']
+        # Continue processing - don't fail on single chunk errors
       end
       
       private
@@ -134,29 +143,6 @@ module Ai
         result
       end
       
-      def process_stream_chunk(chunk)
-        @tokens_received += 1
-        
-        # Update progress less frequently to avoid UI spam
-        if Time.current - @last_update_time > 0.5  # Update every 500ms
-          update_progress_display
-          @last_update_time = Time.current
-        end
-        
-        # Process based on current state
-        case @state
-        when BUFFER_STATES[:idle]
-          process_idle_chunk(chunk)
-        when BUFFER_STATES[:buffering_content]
-          process_content_chunk(chunk)
-        when BUFFER_STATES[:buffering_tool_call]
-          process_tool_call_chunk(chunk)
-        end
-      rescue => e
-        Rails.logger.error "[StreamingBuffer] Error processing chunk: #{e.message}"
-        Rails.logger.error e.backtrace.join("\n")
-        # Continue processing - don't fail on single chunk errors
-      end
       
       def flush_buffers
         # Flush any remaining content
