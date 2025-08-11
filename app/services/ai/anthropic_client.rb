@@ -3,6 +3,7 @@ require 'net/http'
 module Ai
   class AnthropicClient
     include HTTParty
+    include Singleton
     base_uri "https://api.anthropic.com"
 
     MODELS = {

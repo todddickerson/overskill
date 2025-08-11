@@ -21,27 +21,21 @@ module Ai
       @iteration_count = 0
       @improvements_made = []
       
-      # Use OpenAI directly for GPT-5 - ALWAYS prefer OpenAI over OpenRouter
-      openai_key = ENV['OPENAI_API_KEY']
-      Rails.logger.info "[AppUpdateOrchestratorV3] Checking OpenAI key: length=#{openai_key&.length}, present=#{openai_key.present?}"
+      # Get model preference from app (defaults to gpt-5 if not set)
+      @model_preference = @app.ai_model || 'gpt-5'
+      Rails.logger.info "[AppUpdateOrchestratorV3] Model preference: #{@model_preference}"
       
-      if openai_key.present? && openai_key.length > 20 && !openai_key.include?('dummy')
-        begin
-          @client = OpenaiGpt5Client.instance
-          @use_openai_direct = true
-          Rails.logger.info "[AppUpdateOrchestratorV3] ✅ Using OpenAI direct API with GPT-5"
-        rescue => e
-          Rails.logger.error "[AppUpdateOrchestratorV3] ❌ OpenAI client initialization failed: #{e.message}"
-          Rails.logger.warn "[AppUpdateOrchestratorV3] Falling back to OpenRouter due to OpenAI client error"
-          @client = OpenRouterClient.new
-          @use_openai_direct = false
-        end
-      else
-        Rails.logger.warn "[AppUpdateOrchestratorV3] ⚠️  WARNING: OpenAI key invalid (length: #{openai_key&.length}), falling back to OpenRouter"
-        Rails.logger.warn "[AppUpdateOrchestratorV3] Set OPENAI_API_KEY in .env.development.local for better performance"
-        @client = OpenRouterClient.new
-        @use_openai_direct = false
-      end
+      # Use ModelClientFactory for clean model selection
+      client_info = Ai::ModelClientFactory.create_client(@model_preference)
+      @client = client_info[:client]
+      @model = client_info[:model]
+      @provider = client_info[:provider]
+      @supports_streaming = client_info[:supports_streaming]
+      
+      Rails.logger.info "[AppUpdateOrchestratorV3] ✅ Using #{@provider} with model #{@model}"
+      
+      # Backwards compatibility flags
+      @use_openai_direct = @provider == 'openai_direct'
       
       @is_new_app = determine_if_new_app
       @app_version = nil
@@ -1880,13 +1874,13 @@ module Ai
     
     # Streaming support for OpenAI direct API
     def stream_gpt5_response(messages, timeout: nil)
-      # ALWAYS use GPT-5 - Check OpenAI direct vs OpenRouter
-      if @use_openai_direct
-        Rails.logger.info "[AppUpdateOrchestratorV3] 🔥 Making OpenAI DIRECT call with GPT-5#{timeout ? " (timeout: #{timeout}s)" : ""}"
+      # Use appropriate model based on preference
+      if @provider.include?('direct')
+        Rails.logger.info "[AppUpdateOrchestratorV3] 🔥 Making #{@provider} call with #{@model}#{timeout ? " (timeout: #{timeout}s)" : ""}"
         
         begin
-          # Use the OpenAI client directly with GPT-5 and custom timeout
-          response = @client.chat(messages, model: 'gpt-5', temperature: 1.0, timeout: timeout)
+          # Use the client with appropriate model and settings
+          response = @client.chat(messages, model: @model, temperature: get_temperature_for_model, timeout: timeout)
           
           Rails.logger.info "[AppUpdateOrchestratorV3] OpenAI response success: #{response[:success]}"
           
@@ -1905,31 +1899,23 @@ module Ai
           { success: false, error: "OpenAI client error: #{e.message}" }
         end
       else
-        Rails.logger.warn "[AppUpdateOrchestratorV3] ⚠️  Using OpenRouter fallback (OpenAI not configured)"
-        # OpenRouter uses :gpt5 symbol which maps to "openai/gpt-5"
-        @client.chat(messages, model: :gpt5, temperature: 1.0)
+        Rails.logger.info "[AppUpdateOrchestratorV3] Using #{@provider} with model #{@model}"
+        # OpenRouter uses symbols for models
+        @client.chat(messages, model: @model, temperature: get_temperature_for_model)
       end
     end
     
     def stream_gpt5_with_tools(messages, tools)
-      # ALWAYS use GPT-5 for tool calling
-      if @use_openai_direct
-        Rails.logger.info "[AppUpdateOrchestratorV3] 🛠️  Making OpenAI DIRECT call with tools (#{tools&.length} tools)"
-      else
-        Rails.logger.warn "[AppUpdateOrchestratorV3] ⚠️  Using OpenRouter fallback for tool calling"
-        # OpenRouter uses :gpt5 symbol which maps to "openai/gpt-5"
-        return @client.chat_with_tools(messages, tools, model: :gpt5, temperature: 1.0)
-      end
-      
-      Rails.logger.info "[AppUpdateOrchestratorV3] Using OpenAI direct with tools, model: gpt-5"
+      # Use appropriate model for tool calling
+      Rails.logger.info "[AppUpdateOrchestratorV3] 🛠️  Making #{@provider} call with tools (#{tools&.length} tools) using #{@model}"
       
       begin
-        # OpenAI direct API with tool calling - GPT-5
-        response = @client.chat_with_tools(
-          messages, 
+        # Use ModelClientFactory for unified tool calling
+        response = Ai::ModelClientFactory.stream_with_tools(
+          @model_preference,
+          messages,
           tools,
-          model: 'gpt-5',
-          temperature: 1.0  # GPT-5 uses default temperature
+          temperature: get_temperature_for_model
         )
         
         # Handle tool calls
@@ -2076,6 +2062,18 @@ module Ai
         partial: "account/app_editors/chat_message",
         locals: { message: message, app: @app }
       )
+    end
+    
+    def get_temperature_for_model
+      # Get appropriate temperature for the selected model
+      case @model_preference
+      when 'gpt-5'
+        1.0  # GPT-5 only supports default temperature
+      when 'claude-sonnet-4'
+        0.7  # Claude works well with 0.7
+      else
+        0.7  # Default for other models
+      end
     end
   end
 end

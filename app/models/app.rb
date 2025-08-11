@@ -194,6 +194,23 @@ class App < ApplicationRecord
     ENV['USE_V3_ORCHESTRATOR'] == 'true'
   end
   
+  # AI Model selection for A/B testing
+  AI_MODELS = {
+    'gpt-5' => 'GPT-5 (Fast & Efficient)',
+    'claude-sonnet-4' => 'Claude Sonnet 4 (Advanced Reasoning)'
+  }.freeze
+  
+  def ai_model_name
+    AI_MODELS[ai_model] || AI_MODELS['gpt-5']
+  end
+  
+  def using_claude?
+    ai_model == 'claude-sonnet-4'
+  end
+  
+  def using_gpt5?
+    ai_model == 'gpt-5' || ai_model.nil?
+  end
 
   private
 
@@ -222,6 +239,5 @@ class App < ApplicationRecord
     initiate_generation!
   end
   
-
   # 🚅 add methods above.
 end
