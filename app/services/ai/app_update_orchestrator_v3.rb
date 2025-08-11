@@ -40,7 +40,11 @@ module Ai
       @is_new_app = determine_if_new_app
       @app_version = nil
       @broadcaster = Services::ProgressBroadcaster.new(@app, @chat_message)
-      @streaming_buffer = nil
+      
+      # Initialize streaming buffer for real-time updates
+      @streaming_buffer = Services::StreamingBufferEnhanced.new(@app, @chat_message, @broadcaster)
+      @use_streaming = ENV['USE_STREAMING'] != 'false' && @supports_streaming
+      
       @files_modified = []
       @start_time = Time.current
     end
@@ -581,7 +585,11 @@ module Ai
           last_progress_update = Time.current
         end
         
-        if @use_openai_direct
+        # Choose execution method based on streaming preference
+        response = if @use_streaming && @streaming_buffer
+          Rails.logger.info "[AppUpdateOrchestratorV3] Using streaming execution with buffer"
+          execute_with_streaming(messages, tools)
+        elsif @use_openai_direct
           # Use OpenAI direct API with streaming tool calls
           response = stream_gpt5_with_tools(messages, tools)
         else
@@ -1431,6 +1439,94 @@ module Ai
       
       broadcast_message_update(error_msg)
       broadcast_app_update
+    end
+    
+    # Execute with streaming for real-time updates
+    def execute_with_streaming(messages, tools)
+      Rails.logger.info "[AppUpdateOrchestratorV3] Starting streaming execution with buffer"
+      
+      # Initialize streaming state
+      @streaming_buffer.start_generation
+      
+      # Track chunks for complete response
+      full_response = { content: "", tool_calls: [] }
+      
+      begin
+        # Use streaming API based on provider
+        if @provider == 'openai_direct'
+          stream_openai_response(messages, tools, full_response)
+        elsif @provider == 'anthropic_direct'
+          stream_anthropic_response(messages, tools, full_response)
+        else
+          # Fallback to non-streaming for other providers
+          Rails.logger.info "[AppUpdateOrchestratorV3] Provider #{@provider} doesn't support streaming, using regular API"
+          return @client.chat(messages, model: @model, tools: tools, temperature: 0.7)
+        end
+        
+        # Return the complete buffered response
+        {
+          success: true,
+          content: full_response[:content],
+          tool_calls: full_response[:tool_calls]
+        }
+      rescue => e
+        Rails.logger.error "[AppUpdateOrchestratorV3] Streaming error: #{e.message}"
+        { success: false, error: e.message }
+      end
+    end
+    
+    # Stream OpenAI response with buffering
+    def stream_openai_response(messages, tools, full_response)
+      # OpenAI streaming implementation
+      require 'net/http'
+      require 'uri'
+      
+      uri = URI('https://api.openai.com/v1/chat/completions')
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.read_timeout = 120
+      
+      request = Net::HTTP::Post.new(uri)
+      request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
+      request['Content-Type'] = 'application/json'
+      request['Accept'] = 'text/event-stream'
+      
+      body = {
+        model: @model,
+        messages: messages,
+        tools: tools,
+        stream: true,
+        temperature: 0.7
+      }
+      
+      request.body = body.to_json
+      
+      http.request(request) do |response|
+        response.read_body do |chunk|
+          @streaming_buffer.process_chunk(chunk) do |parsed_content|
+            # Buffer processes and sends updates when complete
+            full_response[:content] += parsed_content[:content] if parsed_content[:content]
+            full_response[:tool_calls] += parsed_content[:tool_calls] if parsed_content[:tool_calls]
+          end
+        end
+      end
+    end
+    
+    # Stream Anthropic response with buffering
+    def stream_anthropic_response(messages, tools, full_response)
+      # Anthropic streaming would be implemented similarly
+      # For now, fallback to regular API
+      Rails.logger.info "[AppUpdateOrchestratorV3] Anthropic streaming not yet implemented, using regular API"
+      
+      response = @client.chat_with_tools(
+        messages,
+        tools,
+        model: @model,
+        temperature: 0.7
+      )
+      
+      full_response[:content] = response[:content]
+      full_response[:tool_calls] = response[:tool_calls]
     end
     
     def parse_json_response(content)
