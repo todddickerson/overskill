@@ -31,8 +31,8 @@ module Ai
       setup_ai_client
       
       @is_new_app = @app.app_files.empty? && @app.app_versions.empty?
-      @broadcaster = Services::ProgressBroadcaster.new(@app, @chat_message)
-      @streaming_buffer = Services::StreamingBufferEnhanced.new(@app, @chat_message, @broadcaster)
+      @broadcaster = Ai::Services::ProgressBroadcaster.new(@app, @chat_message)
+      @streaming_buffer = Ai::Services::StreamingBufferEnhanced.new(@app, @chat_message, @broadcaster)
       @use_streaming = ENV['USE_STREAMING'] != 'false' && @supports_streaming
       
       @files_modified = []
