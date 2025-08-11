@@ -62,7 +62,7 @@ class AppGenerationJob < ApplicationJob
       
       # Queue deployment job if enabled
       if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
-        AppDeploymentJob.perform_later(app)
+        DeployAppJob.perform_later(app)
       end
     else
       Rails.logger.error "[AppGenerationJob] Failed to generate app ##{app.id}: #{result[:error]}"

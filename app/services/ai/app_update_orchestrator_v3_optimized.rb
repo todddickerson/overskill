@@ -925,7 +925,7 @@ module Ai
       
       # Queue deployment job if enabled
       if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
-        ::AppDeploymentJob.perform_later(@app)
+        ::DeployAppJob.perform_later(@app)
       end
     end
     
