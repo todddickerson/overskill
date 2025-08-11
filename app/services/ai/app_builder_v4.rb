@@ -43,15 +43,11 @@ module Ai
     end
     
     def execute_generation!
-      # 1. Generate shared foundation
-      # 2. AI app-specific features  
-      # 3. Smart edits via existing services
-      # 4. Build and deploy
+      # V4 Generation Pipeline
+      Rails.logger.info "[V4] Starting generation pipeline for app ##{@app.id}"
       
-      Rails.logger.info "[V4] Starting generation for app ##{@app.id}"
-      
-      # Phase 1: Generate shared foundation (Day 2 implementation)
-      # generate_shared_foundation
+      # Phase 1: Generate shared foundation (Day 2 ✅ IMPLEMENTED)
+      generate_shared_foundation
       
       # Phase 2: AI app-specific features (Week 1 implementation) 
       # generate_app_features
@@ -62,7 +58,37 @@ module Ai
       # Phase 4: Build and deploy (Day 3-5 implementation)
       # build_and_deploy
       
-      Rails.logger.info "[V4] Generation completed for app ##{@app.id}"
+      # Update app status
+      @app.update!(status: 'generated')
+      
+      Rails.logger.info "[V4] Generation pipeline completed for app ##{@app.id}"
+    end
+    
+    def generate_shared_foundation
+      Rails.logger.info "[V4] Generating shared foundation files for app ##{@app.id}"
+      
+      # Use SharedTemplateService to create all foundation files
+      template_service = Ai::SharedTemplateService.new(@app)
+      template_service.generate_core_files
+      
+      # Track files created in this version
+      track_template_files_created
+      
+      Rails.logger.info "[V4] Shared foundation generation completed"
+    end
+    
+    def track_template_files_created
+      # Get files created since this version started
+      files_created = @app.app_files.where('created_at >= ?', @app_version.created_at)
+      
+      files_created.each do |app_file|
+        @app_version.app_version_files.create!(
+          app_file: app_file,
+          action: 'created'
+        )
+      end
+      
+      Rails.logger.info "[V4] Tracked #{files_created.count} template files in version"
     end
     
     def create_new_version
