@@ -686,10 +686,40 @@ class Deployment::CloudflarePreviewService
   end
   
   def upload_worker(worker_name, script)
+    # For ES modules, we need to use multipart form data with metadata
+    boundary = "----WorkerBoundary#{SecureRandom.hex(8)}"
+    
+    # Build multipart body for ES module worker
+    body = []
+    
+    # Part 1: Metadata specifying this is an ES module
+    body << "--#{boundary}"
+    body << 'Content-Disposition: form-data; name="metadata"'
+    body << 'Content-Type: application/json'
+    body << ''
+    body << JSON.generate({
+      main_module: "worker.js",
+      compatibility_date: "2024-01-01"
+    })
+    
+    # Part 2: The worker script
+    body << "--#{boundary}"
+    body << 'Content-Disposition: form-data; name="worker.js"; filename="worker.js"'
+    body << 'Content-Type: application/javascript+module'
+    body << ''
+    body << script
+    
+    # End boundary
+    body << "--#{boundary}--"
+    
+    multipart_body = body.join("\r\n")
+    
     response = self.class.put(
       "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
-      headers: { 'Content-Type' => 'application/javascript' },
-      body: script
+      headers: { 
+        'Content-Type' => "multipart/form-data; boundary=#{boundary}"
+      },
+      body: multipart_body
     )
     
     Rails.logger.debug "[CloudflarePreview] Upload response: #{response.code} - #{response.body[0..200]}..."

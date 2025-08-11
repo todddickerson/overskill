@@ -243,8 +243,7 @@ module Ai
         Ai::SmartContextService.load_relevant_context(
           @app,
           @chat_message.content,
-          operation_type: :update,
-          max_files: 10
+          operation_type: :update
         )
       end
       
