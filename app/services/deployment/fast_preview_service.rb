@@ -58,17 +58,18 @@ module Deployment
     
     def generate_fast_preview_worker
       <<~JAVASCRIPT
-        // Fast Preview Worker - ES Module format for Cloudflare Workers
+        // Fast Preview Worker - Service Worker format for compatibility
+        // This format works with both old and new Cloudflare Workers runtime
         
-        export default {
-          async fetch(request, env, ctx) {
-            return handleRequest(request, env, ctx)
-          }
-        }
+        addEventListener('fetch', event => {
+          event.respondWith(handleRequest(event.request, event))
+        })
         
-        async function handleRequest(request, env, ctx) {
+        async function handleRequest(request, event) {
           const url = new URL(request.url)
           let pathname = url.pathname
+          // Access environment variables through event context
+          const env = event.env || {}
           
           // API routes
           if (pathname.startsWith('/api/')) {

@@ -658,7 +658,8 @@ module Ai
       Rails.logger.info "[V3-Optimized] Deploying app"
       
       begin
-        service = Deployment::FastPreviewService.new(@app)
+        # Use simplified service for now to avoid worker errors
+        service = Deployment::FastPreviewServiceSimple.new(@app)
         result = service.deploy_instant_preview!
         
         if result[:success]
@@ -690,8 +691,8 @@ module Ai
       # Also broadcast a Turbo Stream to refresh the preview iframe if it exists
       Turbo::StreamsChannel.broadcast_replace_later_to(
         "app_#{@app.id}_preview",
-        target: "preview_iframe",
-        partial: "account/app_editors/preview_iframe",
+        target: "preview_frame",
+        partial: "account/app_editors/preview_frame",
         locals: { app: @app }
       )
     rescue => e
