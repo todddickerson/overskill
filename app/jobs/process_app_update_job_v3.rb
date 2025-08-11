@@ -20,10 +20,18 @@ class ProcessAppUpdateJobV3 < ApplicationJob
   end
   
   def perform(message)
-    Rails.logger.info "[ProcessAppUpdateJobV3] Starting V3 Optimized orchestrator for message ##{message.id}"
+    Rails.logger.info "[ProcessAppUpdateJobV3] Starting V3 orchestrator for message ##{message.id}"
     
-    # Always use the optimized V3 orchestrator - it's the best and tested version
-    orchestrator = Ai::AppUpdateOrchestratorV3Optimized.new(message)
+    # Use the unified orchestrator that supports both Claude and GPT-5
+    # It will automatically select the best model based on app settings
+    orchestrator = if defined?(Ai::AppUpdateOrchestratorV3Unified)
+      Rails.logger.info "[ProcessAppUpdateJobV3] Using V3 Unified orchestrator"
+      Ai::AppUpdateOrchestratorV3Unified.new(message)
+    else
+      Rails.logger.info "[ProcessAppUpdateJobV3] Falling back to V3 Optimized orchestrator"
+      Ai::AppUpdateOrchestratorV3Optimized.new(message)
+    end
+    
     orchestrator.execute!
     
     Rails.logger.info "[ProcessAppUpdateJobV3] Successfully processed message ##{message.id}"

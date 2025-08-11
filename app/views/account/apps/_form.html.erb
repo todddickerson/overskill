@@ -40,15 +40,17 @@
         <%= render 'shared/fields/options', method: :framework, options: {include_blank: false} %>
         
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">AI Model (Beta Testing)</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
           <%= form.select :ai_model, 
               options_for_select([
-                ['GPT-5 (Fast & Efficient)', 'gpt-5', { 'data-description' => 'OpenAI GPT-5 - Fast generation, cost-effective, reliable' }],
-                ['Claude Sonnet 4 (Advanced Reasoning)', 'claude-sonnet-4', { 'data-description' => 'Anthropic Claude 3.5 Sonnet - Advanced reasoning, creative solutions' }]
-              ], app.ai_model || 'gpt-5'),
+                ['Claude Sonnet 4 (Recommended)', 'claude-sonnet-4', { 'data-description' => 'Best for coding - 72.7% on SWE-bench, superior reasoning' }],
+                ['Claude Opus 4.1 (Premium)', 'claude-opus-4.1', { 'data-description' => 'Most capable - Complex tasks, long-running generation' }],
+                ['GPT-5 (Unified AI)', 'gpt-5', { 'data-description' => 'PhD-level intelligence with reasoning, released Aug 7, 2025' }],
+                ['GPT-5 Mini (Fast)', 'gpt-5-mini', { 'data-description' => 'Smaller GPT-5 for faster generation' }]
+              ], app.ai_model || 'claude-sonnet-4'),
               {},
               class: 'form-control' %>
-          <p class="text-xs text-gray-500 mt-1">Choose the AI model for generating your app. We're testing both to see which creates better apps!</p>
+          <p class="text-xs text-gray-500 mt-1">Claude 4 models excel at comprehensive app structure. GPT-5 provides PhD-level reasoning with unified capabilities.</p>
         </div>
         
         <%= render 'shared/fields/number_field', method: :base_price, options: {value: 0} %>
