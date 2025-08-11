@@ -21,7 +21,7 @@ module Ai
     end
     
     def self.load_relevant_context(app, user_request, operation_type: :update)
-      service = new(app, user_request, operation_type)
+      service = new(app, user_request, operation_type: operation_type)
       service.load_context
     end
     
