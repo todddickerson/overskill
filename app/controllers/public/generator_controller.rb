@@ -112,8 +112,17 @@ class Public::GeneratorController < Public::ApplicationController
     # 3. Queuing the appropriate job
     # 4. Setting status to "generating"
     
-    # Redirect to editor
-    redirect_to account_app_editor_path(app), notice: "Creating your app..."
+    # Redirect to editor immediately so user can watch generation progress
+    respond_to do |format|
+      format.html { redirect_to account_app_editor_path(app), notice: "Creating your app..." }
+      format.turbo_stream do
+        # Redirect via JavaScript for turbo_stream requests
+        render turbo_stream: turbo_stream.append(
+          "body", 
+          html: "<script>window.location.href = '#{account_app_editor_path(app)}';</script>"
+        )
+      end
+    end
   end
   
   private

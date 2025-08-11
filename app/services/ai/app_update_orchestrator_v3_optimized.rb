@@ -133,6 +133,7 @@ module Ai
         
         TECHNOLOGY STACK:
         • React 18 via CDN (unpkg/esm.sh) - No build tools needed
+        • React Router DOM via CDN for client-side routing
         • Tailwind CSS via CDN for styling
         • Babel Standalone for JSX transpilation
         • Supabase for backend (when needed)
@@ -154,34 +155,157 @@ module Ai
         
         7. **STATE MANAGEMENT** - Use React hooks properly (useState, useEffect, useCallback, useMemo). Handle async operations correctly.
         
-        FILE STRUCTURE:
+        8. **MULTI-PAGE STRUCTURE** - Use React Router for proper page navigation with professional URL structure.
+        
+        FILE STRUCTURE (REQUIRED FOR APPS WITH USER DATA):
         ```
-        index.html          - Entry point with CDN scripts
+        index.html              - Entry point with CDN scripts
         src/
-          App.jsx          - Main application component
-          components/      - Feature components (organized by feature)
-            TodoList.jsx
-            TodoItem.jsx
-            FilterBar.jsx
-          hooks/           - Custom React hooks
-            useLocalStorage.js
-            useDebounce.js
-          utils/           - Helper functions
-            formatters.js
-            validators.js
-        styles.css         - Custom styles beyond Tailwind
+          pages/               - Page components (React Router)
+            Home.jsx          - Public landing page
+            auth/             - Authentication pages
+              Login.jsx       - Login page
+              SignUp.jsx      - Registration page
+              AuthCallback.jsx - OAuth callback handler
+            Dashboard.jsx     - Protected dashboard
+          components/         - Reusable components
+            auth/
+              Auth.jsx        - Main auth component
+              SocialButtons.jsx - OAuth login buttons
+              ProtectedRoute.jsx - Route guard
+            layout/
+              Header.jsx      - App header with auth state
+              Layout.jsx      - Main layout wrapper
+          lib/
+            supabase.js       - Supabase client configuration
+            router.jsx        - Router configuration
+          hooks/              - Custom React hooks
+          utils/              - Helper functions
+        styles.css            - Custom styles beyond Tailwind
+        ```
+        
+        CRITICAL APP CONFIGURATION:
+        
+        Your app will receive configuration via window.ENV object:
+        ```javascript
+        // Available environment variables
+        const config = {
+          APP_ID: window.ENV?.APP_ID,              // Unique app identifier
+          SUPABASE_URL: window.ENV?.SUPABASE_URL,   // Supabase project URL
+          SUPABASE_ANON_KEY: window.ENV?.SUPABASE_ANON_KEY, // Supabase anon key
+          API_WORKER_URL: window.ENV?.API_WORKER_URL, // Cloudflare Worker for API proxy
+          AUTH_SETTINGS: window.ENV?.AUTH_SETTINGS   // App auth configuration
+        };
+        ```
+        
+        AUTHENTICATION REQUIREMENTS:
+        
+        Apps receive AUTH_SETTINGS object with visibility configuration:
+        ```javascript
+        // window.ENV.AUTH_SETTINGS contains:
+        {
+          visibility: "private_login_required" | "public_login_required" | "public_no_login",
+          allowed_providers: ["email", "google", "github"],
+          require_email_verification: boolean,
+          allow_signups: boolean,
+          allow_anonymous: boolean
+        }
+        ```
+        
+        MANDATORY AUTH IMPLEMENTATION:
+        
+        For visibility "private_login_required" or "public_login_required":
+        
+        1. **ALWAYS create comprehensive auth system**:
+           - src/pages/auth/Login.jsx - Professional login page
+           - src/pages/auth/SignUp.jsx - Registration page  
+           - src/pages/auth/AuthCallback.jsx - OAuth callback handler
+           - src/components/auth/SocialButtons.jsx - Social auth buttons
+           - src/components/auth/ProtectedRoute.jsx - Route guard
+        
+        2. **ALWAYS use React Router for navigation**:
+           - Multi-page structure with proper routing
+           - Protected routes for authenticated content
+           - Professional URL structure (/login, /dashboard, etc.)
+        
+        3. **ALWAYS respect AUTH_SETTINGS configuration**:
+           - Show/hide signup based on allow_signups
+           - Include only allowed_providers in social buttons
+           - Implement email verification if required
+        
+        4. **ALWAYS include social authentication**:
+           - Google OAuth via window.ENV.API_WORKER_URL/auth/google
+           - GitHub OAuth via window.ENV.API_WORKER_URL/auth/github
+           - Professional social login buttons with proper styling
+        
+        SUPABASE INTEGRATION REQUIREMENTS:
+        
+        For apps with user data, ALWAYS implement proper Supabase integration:
+        
+        1. **Use app-specific table names**:
+        ```javascript
+        // ✅ CORRECT - includes app ID prefix
+        const tableName = `app_${window.ENV.APP_ID}_items`
+        await supabase.from(tableName).select('*')
+        
+        // ❌ WRONG - missing app ID prefix  
+        await supabase.from('items').select('*')
+        ```
+        
+        2. **Include user context in all operations**:
+        ```javascript
+        // ✅ CORRECT - filtered by user
+        await supabase
+          .from(`app_${window.ENV.APP_ID}_items`)
+          .select('*')
+          .eq('user_id', user.id)
+        
+        // ✅ CORRECT - include user_id when creating
+        await supabase
+          .from(`app_${window.ENV.APP_ID}_items`)
+          .insert([{ title, user_id: user.id }])
+        ```
+        
+        3. **Create Supabase client properly**:
+        ```javascript
+        // src/lib/supabase.js
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+        
+        export const supabase = createClient(
+          window.ENV.SUPABASE_URL,
+          window.ENV.SUPABASE_ANON_KEY
+        )
+        ```
+        
+        API INTEGRATION REQUIREMENTS:
+        
+        For external API calls, ALWAYS use the secure proxy pattern:
+        
+        ```javascript
+        // ✅ CORRECT - via secure Cloudflare Worker proxy
+        const response = await fetch(`${window.ENV.API_WORKER_URL}/stripe/payment_intents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: 5000, currency: 'usd' })
+        })
+        
+        // ❌ WRONG - direct API calls expose secrets
+        const response = await fetch('https://api.stripe.com/v1/payment_intents', {
+          headers: { 'Authorization': 'Bearer sk_test_...' } // NEVER do this
+        })
         ```
         
         IMPLEMENTATION REQUIREMENTS:
         
         For ALL Apps:
-        • Start with complete index.html including all CDN links
-        • Create fully functional App.jsx with proper state management
+        • Start with complete index.html including all CDN links (React, React Router, Supabase)
+        • Create fully functional App.jsx with React Router setup
         • Add feature-specific components as needed
-        • Include proper data persistence (localStorage or Supabase)
+        • Include proper data persistence (localStorage fallback + Supabase)
         • Add keyboard shortcuts and accessibility features
         • Implement smooth animations and transitions
         • Include comprehensive error handling
+        • Respect AUTH_SETTINGS for proper access control
         
         For Apps with User Data (todos, notes, budgets):
         • Implement full CRUD operations (Create, Read, Update, Delete)
@@ -189,6 +313,25 @@ module Ai
         • Include sorting and categorization
         • Add data export capabilities
         • Implement undo/redo if applicable
+        • ALWAYS use app-scoped table names with proper user filtering
+        
+        REQUIRED CDN RESOURCES:
+        Include in index.html:
+        ```html
+        <!-- React + Router -->
+        <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+        <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+        <script src="https://unpkg.com/react-router-dom@6.8.1/dist/umd/react-router-dom.development.js"></script>
+        
+        <!-- Babel for JSX -->
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        
+        <!-- Supabase -->
+        <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+        
+        <!-- Tailwind CSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        ```
         
         UI/UX Requirements:
         • Use a cohesive color scheme with CSS variables
@@ -197,6 +340,7 @@ module Ai
         • Include loading skeletons for async operations
         • Show success/error toasts for user feedback
         • Empty states with helpful messages and CTAs
+        • Professional form inputs with proper text-slate-900 for visibility
         
         Code Quality:
         • Clean, readable code with consistent formatting
@@ -205,13 +349,16 @@ module Ai
         • Efficient re-renders (useCallback, useMemo where needed)
         • No console.logs in production code
         • Comments only for complex logic
+        • Environment variable access via window.ENV
+        • Proper error boundaries and fallbacks
         
         WHEN USING TOOL FUNCTIONS:
-        • create_file: Create COMPLETE files with all necessary code
+        • create_file: Create COMPLETE files with all necessary code and proper integrations
         • update_file: Preserve existing functionality while adding features
         • broadcast_progress: Send clear updates about what you're building
         
         CRITICAL: Build applications that users would happily pay for. Every detail matters.
+        Implement the complete OverSkill platform integration with Supabase, OAuth, and Cloudflare Workers.
       SYSTEM
       
       # Add operation-specific guidance
@@ -749,12 +896,37 @@ module Ai
         files_snapshot: @files_modified.to_json
       )
       
+      # Update app status for new apps
+      if @is_new_app
+        @app.update!(status: 'generated')
+      end
+      
       # Create success message
       @app.app_chat_messages.create!(
         role: 'assistant',
         content: "Successfully #{@is_new_app ? 'created' : 'updated'} your app with #{@files_modified.count} files.",
         status: 'completed'
       )
+      
+      # Queue post-generation jobs for new apps
+      if @is_new_app
+        queue_post_generation_jobs
+      end
+    end
+    
+    def queue_post_generation_jobs
+      Rails.logger.info "[V3-Optimized] Queueing post-generation jobs for app ##{@app.id}"
+      
+      # Queue app naming job (runs first to name the app properly)
+      AppNamingJob.perform_later(@app.id)
+      
+      # Queue logo generation job (uses the proper name)
+      GenerateAppLogoJob.perform_later(@app.id)
+      
+      # Queue deployment job if enabled
+      if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
+        AppDeploymentJob.perform_later(@app)
+      end
     end
     
     def handle_failure(error_message)

@@ -54,6 +54,9 @@ class AppGenerationJob < ApplicationJob
       # Broadcast success via Turbo
       broadcast_status(app, "generated", "Your app has been generated successfully!")
 
+      # Queue app naming job (runs before logo generation)
+      AppNamingJob.perform_later(app.id)
+      
       # Queue logo generation job
       GenerateAppLogoJob.perform_later(app.id)
       

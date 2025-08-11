@@ -19,10 +19,12 @@ class Account::AppChatsController < Account::ApplicationController
         format.turbo_stream do
           render turbo_stream: [
             turbo_stream.append("chat_messages", partial: "account/app_chats/message", locals: {message: @message}),
-            turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: {app: @app, message: @app.app_chat_messages.build})
+            turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: {app: @app, message: @app.app_chat_messages.build}),
+            # Redirect to editor immediately so user can watch generation progress
+            turbo_stream.append("body", html: "<script>window.location.href = '/account/apps/#{@app.to_param}/editor';</script>")
           ]
         end
-        format.html { redirect_to account_app_chat_path(@app) }
+        format.html { redirect_to account_app_editor_path(@app) }
       end
     else
       respond_to do |format|
