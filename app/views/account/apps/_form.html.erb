@@ -43,14 +43,14 @@
           <label class="block text-sm font-medium text-gray-700 mb-2">AI Model</label>
           <%= form.select :ai_model, 
               options_for_select([
-                ['Claude Sonnet 4 (Recommended)', 'claude-sonnet-4', { 'data-description' => 'Best for coding - 72.7% on SWE-bench, superior reasoning' }],
-                ['Claude Opus 4.1 (Premium)', 'claude-opus-4.1', { 'data-description' => 'Most capable - Complex tasks, long-running generation' }],
-                ['GPT-5 (Unified AI)', 'gpt-5', { 'data-description' => 'PhD-level intelligence with reasoning, released Aug 7, 2025' }],
-                ['GPT-5 Mini (Fast)', 'gpt-5-mini', { 'data-description' => 'Smaller GPT-5 for faster generation' }]
-              ], app.ai_model || 'claude-sonnet-4'),
+                ['Claude Sonnet 4 (Recommended)', 'claude-sonnet-4-20250514', { 'data-description' => 'Best for coding - 72.7% SWE-bench, superior reasoning' }],
+                ['Claude Opus 4.1 (Premium)', 'claude-opus-4-1-20250805', { 'data-description' => 'Most capable - Complex tasks, agent workflows, extended thinking' }],
+                ['GPT-5 (Fast)', 'gpt-5', { 'data-description' => 'OpenAI GPT-5 - Fast generation, PhD-level reasoning' }],
+                ['GPT-5 Mini', 'gpt-5-mini', { 'data-description' => 'Smaller GPT-5 for quick generation' }]
+              ], app.ai_model || 'claude-sonnet-4-20250514'),
               {},
               class: 'form-control' %>
-          <p class="text-xs text-gray-500 mt-1">Claude 4 models excel at comprehensive app structure. GPT-5 provides PhD-level reasoning with unified capabilities.</p>
+          <p class="text-xs text-gray-500 mt-1">Claude 4 models are the latest and best. Sonnet 4 excels at coding, Opus 4.1 for complex tasks.</p>
         </div>
         
         <%= render 'shared/fields/number_field', method: :base_price, options: {value: 0} %>

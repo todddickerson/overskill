@@ -12,8 +12,8 @@ module Ai
     
     # Model configurations - Updated August 2025
     MODEL_CONFIGS = {
-      # Claude 4 Series (Released May 2025)
-      'claude-opus-4.1' => {
+      # Claude 4 Series (Latest Models)
+      'claude-opus-4-1-20250805' => {  # Claude Opus 4.1 - Released Aug 5, 2025
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -23,9 +23,9 @@ module Ai
         tool_format: 'anthropic',
         context_window: 200_000,
         use_for: 'complex_generation',
-        description: 'Most capable model for complex, long-running tasks'
+        description: 'Claude Opus 4.1 - Most capable, complex tasks, agent workflows'
       },
-      'claude-sonnet-4' => {
+      'claude-sonnet-4-20250514' => {  # Claude Sonnet 4 - Released May 22, 2025
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -34,7 +34,29 @@ module Ai
         temperature_range: [0, 1],
         tool_format: 'anthropic',
         context_window: 200_000,
-        description: 'Superior coding and reasoning, state-of-the-art performance'
+        description: 'Claude Sonnet 4 - Best for coding, 72.7% SWE-bench'
+      },
+      # Claude 3.5 Series (Current Available)
+      'claude-3-5-sonnet-20241022' => {  # Latest available Sonnet
+        provider: 'anthropic',
+        supports_streaming: true,
+        supports_caching: true,
+        max_tokens: 8192,
+        temperature_range: [0, 1],
+        tool_format: 'anthropic',
+        context_window: 200_000,
+        description: 'Claude 3.5 Sonnet - Currently available, excellent for apps'
+      },
+      'claude-3-opus-20240229' => {  # Claude 3 Opus
+        provider: 'anthropic',
+        supports_streaming: true,
+        supports_caching: true,
+        max_tokens: 4096,
+        temperature_range: [0, 1],
+        tool_format: 'anthropic',
+        context_window: 200_000,
+        use_for: 'complex_generation_fallback',
+        description: 'Claude 3 Opus - Previous generation premium model'
       },
       # GPT-5 Series (Released August 7, 2025)
       'gpt-5' => {
@@ -65,8 +87,8 @@ module Ai
         tool_format: 'openai',
         description: 'Smallest GPT-5 for simple tasks'
       },
-      # Legacy models for fallback
-      'claude-3-5-sonnet-20241022' => {
+      # Legacy/fallback models
+      'claude-3-5-sonnet-20240620' => {
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -74,8 +96,8 @@ module Ai
         temperature_range: [0, 1],
         tool_format: 'anthropic',
         fallback: true,
-        description: 'Previous generation Claude'
-      },
+        description: 'Previous Sonnet version'
+      }
       'gpt-4-turbo-preview' => {
         provider: 'openai',
         supports_streaming: true,
@@ -163,34 +185,35 @@ module Ai
     private
     
     def select_optimal_model
-      # Start with user preference
-      preferred = @app.ai_model || ENV['DEFAULT_AI_MODEL'] || 'claude-sonnet-4'
+      # Start with user preference - default to Claude 4 models
+      preferred = @app.ai_model || ENV['DEFAULT_AI_MODEL'] || 'claude-sonnet-4-20250514'
       
-      # Map any old model names to new ones
-      model_mapping = {
-        'claude-3-5-sonnet-20241022' => 'claude-sonnet-4',
-        'claude-3-opus-20240229' => 'claude-opus-4.1',
-        'gpt-4-turbo' => 'gpt-5',
-        'gpt-4-turbo-preview' => 'gpt-5'
-      }
+      # Check if it's an alias and map to actual model name
+      if MODEL_CONFIGS[preferred].is_a?(String)
+        # It's an alias, resolve to actual model
+        actual_model = MODEL_CONFIGS[preferred]
+        Rails.logger.info "[V3-Unified] Mapping #{preferred} to actual model: #{actual_model}"
+        mapped_model = actual_model
+      else
+        mapped_model = preferred
+      end
       
-      mapped_model = model_mapping[preferred] || preferred
-      
-      # For new app generation, potentially use Opus 4.1 for better results
+      # For new app generation, use Opus 4.1 for complex tasks
       if @is_new_app && @chat_message.content.length > 500
-        # Complex prompt - consider Opus 4.1
-        if mapped_model.include?('claude') && !mapped_model.include?('opus')
-          @model = 'claude-opus-4.1'
-          Rails.logger.info "[V3-Unified] Using Claude Opus 4.1 for complex new app generation"
-        else
-          @model = mapped_model
-        end
+        # Complex prompt - use Opus 4.1
+        @model = 'claude-opus-4-1-20250805'
+        Rails.logger.info "[V3-Unified] Using Claude Opus 4.1 for complex new app generation"
       else
         @model = mapped_model
       end
       
-      # Get configuration
-      @model_config = MODEL_CONFIGS[@model] || MODEL_CONFIGS['claude-sonnet-4']
+      # Get configuration (handle aliases)
+      @model_config = MODEL_CONFIGS[@model]
+      if @model_config.is_a?(String)
+        # It was an alias, get the actual config
+        @model_config = MODEL_CONFIGS[@model_config]
+      end
+      @model_config ||= MODEL_CONFIGS['claude-sonnet-4-20250514']  # Default to Claude Sonnet 4
       @provider = @model_config[:provider]
       @supports_streaming = @model_config[:supports_streaming]
       @supports_caching = @model_config[:supports_caching]
@@ -227,6 +250,22 @@ module Ai
       # We'll use direct HTTP for OpenAI to have full control
       @use_native_client = false
       @api_key = ENV['OPENAI_API_KEY']
+    end
+    
+    def try_model_available?(model_id)
+      # Check if a model is available
+      # Claude 4 models ARE available and should be used
+      available_models = [
+        'claude-opus-4-1-20250805',     # Claude Opus 4.1 - BEST
+        'claude-sonnet-4-20250514',      # Claude Sonnet 4 - RECOMMENDED
+        'gpt-5', 
+        'gpt-5-mini'
+      ]
+      
+      # Return true for Claude 4 models - they're the latest and best
+      return true if model_id.include?('claude-opus-4-1') || model_id.include?('claude-sonnet-4')
+      
+      available_models.include?(model_id)
     end
     
     def is_app_new?

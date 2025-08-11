@@ -128,14 +128,34 @@ result = preview_service.deploy_instant_preview!
 
 ## AI Considerations
 
-- **GPT-5**: Released August 7, 2025 - Primary model for all AI operations
+### Claude 4 Series (Latest - Recommended)
+- **Claude Opus 4.1**: Released August 5, 2025 - Most capable model
+  - API Model ID: `claude-opus-4-1-20250805`
+  - Best for: Complex, long-running tasks, agent workflows
+  - Performance: 72.5% on SWE-bench, 43.2% on Terminal-bench
+  - Pricing: $15/$75 per million tokens (input/output)
+  - Features: Extended thinking, tool use, 200k context window
+  - API Docs: https://docs.anthropic.com/en/docs/about-claude/models
+
+- **Claude Sonnet 4**: Released May 22, 2025 - Best for coding
+  - API Model ID: `claude-sonnet-4-20250514`
+  - Performance: 72.7% on SWE-bench (state-of-the-art)
+  - Pricing: $3/$15 per million tokens (input/output)
+  - Features: Superior coding and reasoning, follows instructions precisely
+  - Currently using: `claude-3-5-sonnet-20241022` (latest available)
+
+### GPT-5 Series
+- **GPT-5**: Released August 7, 2025 - Unified AI with reasoning
   - Models: gpt-5, gpt-5-mini, gpt-5-nano
   - Direct OpenAI API integration with function calling
   - Pricing: $1.25/$10 per 1M input/output tokens (gpt-5)
-  - Features: reasoning_effort, verbosity controls, built-in tools
+  - Features: PhD-level intelligence, unified reasoning, no temperature control
+  - Note: Only supports default temperature, use max_completion_tokens instead of max_tokens
+
+### Legacy Models
+- **Claude 3.5 Sonnet**: Model ID `claude-3-5-sonnet-20241022` - Current fallback
+- **Claude 3 Opus**: Model ID `claude-3-opus-20240229` - Previous premium model
 - **Kimi-K2**: May timeout with function calling, use StructuredAppGenerator instead
-- **Fallback**: Claude Sonnet for reliable function calling
-- **Workaround**: StructuredAppGenerator avoids function calls entirely
 
 ## AI App Generation System (Enhanced)
 
