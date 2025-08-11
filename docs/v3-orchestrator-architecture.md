@@ -109,10 +109,8 @@ def initiate_generation!(prompt = nil)
   end
 end
 
-def use_v3_orchestrator?
-  # Check app setting → team flag → ENV variable
-  ENV['USE_V3_ORCHESTRATOR'] == 'true'
-end
+# V3 Optimized is now always used - no configuration needed!
+# This method has been removed as V3 Optimized is the default and only orchestrator
 ```
 
 ## Progress Broadcasting
@@ -183,16 +181,13 @@ broadcast_app_update
 
 ## Configuration
 
-### Enable V3 Orchestrator
-```bash
-# Environment variable (global)
-USE_V3_ORCHESTRATOR=true
+### V3 Optimized (Always Enabled)
 
-# Or per-app setting
-app.app_settings.create!(key: 'use_v3_orchestrator', value: 'true')
+No configuration needed! V3 Optimized is now the default and only orchestrator.
 
-# Or team feature flag (if implemented)
-team.enable_feature!('v3_orchestrator')
+```ruby
+# All apps automatically use V3 Optimized
+app.initiate_generation!("Any prompt")  # Uses V3 Optimized
 ```
 
 ### Testing

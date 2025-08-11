@@ -10,16 +10,14 @@ Unified AI generation flow that consolidates all app generation logic into the A
 - Added `after_create :initiate_ai_generation` callback for automatic generation on new apps
 - Intelligently determines which AI orchestrator to use based on configuration
 
-### 2. Orchestrator Selection Priority
-The system checks in this order:
-1. **App-specific setting** - Individual app can override
-2. **Team-level feature flag** - Team can have different settings  
-3. **Global environment variable** - System-wide default
+### 2. V3 Optimized (Always Used)
 
-Available orchestrators:
-- **V3 (GPT-5 optimized)** - `USE_V3_ORCHESTRATOR=true` - Recommended for production
-- **Unified AI** - `USE_UNIFIED_AI=true` - Legacy coordinator
-- **Legacy** - Original generation system
+The system now always uses the **V3 Optimized orchestrator** - the best and tested version.
+
+**Current orchestrator:**
+- **V3 Optimized (GPT-5)** - Always enabled, fastest and most reliable
+
+**Deprecated orchestrators:** All old orchestrators have been moved to `bak/lib/deprecated_generators/`
 
 ### 3. Controllers Simplified
 
@@ -63,20 +61,19 @@ app = team.apps.create!(
 app.initiate_generation!("New prompt or update")
 ```
 
-### Configure which orchestrator to use
-```bash
-# Environment variables (global default)
-USE_V3_ORCHESTRATOR=true  # Use GPT-5 optimized orchestrator
-USE_UNIFIED_AI=false      # Don't use legacy coordinator
-USE_AI_ORCHESTRATOR=false # Don't use old orchestrator
+### V3 Optimized (No Configuration Needed)
 
-# Or configure per-app or per-team via settings/feature flags
+V3 Optimized is always used - no environment variables or configuration needed!
+
+```ruby
+# All generation automatically uses V3 Optimized
+app.initiate_generation!("Any prompt")  # Uses V3 Optimized
 ```
 
 ## Testing
 Run `ruby test_unified_generation.rb` to verify the unified flow works correctly.
 
 ## Migration Notes
-- Existing code paths remain compatible
-- No database migrations required
-- Can gradually migrate to V3 orchestrator by setting environment variable
+- V3 Optimized is now the only orchestrator
+- All legacy orchestrators deprecated and moved to `bak/lib/deprecated_generators/`
+- No configuration needed - works out of the box

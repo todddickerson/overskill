@@ -33,11 +33,10 @@ OPENROUTER_API_KEY=sk-or-...your-openrouter-key...
 - Organization verification required for some features
 - Higher latency
 
-### 2. Enable V3 Orchestrator
+### 2. V3 Optimized (Always Enabled)
 
-```bash
-USE_V3_ORCHESTRATOR=true
-```
+V3 Optimized orchestrator is now the default and only orchestrator - no configuration needed!
+All apps automatically use the best and tested V3 Optimized version.
 
 ### 3. Database Setup
 
@@ -130,7 +129,6 @@ bin/rails restart
 ## Production Checklist
 
 - [ ] Set `OPENAI_API_KEY` in production environment
-- [ ] Set `USE_V3_ORCHESTRATOR=true`
 - [ ] Run database migrations
 - [ ] Ensure Redis is configured for ActionCable
 - [ ] Test with a simple app generation
