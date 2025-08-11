@@ -26,11 +26,14 @@ module Ai
       @user = chat_message.user
       @iteration_count = 0
       
+      # IMPORTANT: Check if new app BEFORE any versions are created
+      # An app is "new" if it has no real content files (ignore minimal placeholders)
+      @is_new_app = is_app_new?
+      
       # Model selection
       @model_preference = @app.ai_model || 'gpt-5'
       setup_ai_client
       
-      @is_new_app = @app.app_files.empty? && @app.app_versions.empty?
       @broadcaster = Ai::Services::ProgressBroadcaster.new(@app, @chat_message)
       @streaming_buffer = Ai::Services::StreamingBufferEnhanced.new(@app, @chat_message, @broadcaster)
       @use_streaming = ENV['USE_STREAMING'] != 'false' && @supports_streaming
@@ -41,6 +44,24 @@ module Ai
       # OPTIMIZATION: Load standards once and create cached system prompt
       load_standards_once
       @system_prompt = create_optimized_system_prompt
+    end
+    
+    def is_app_new?
+      # An app is "new" if it has no files or only has minimal placeholder files
+      return true if @app.app_files.empty?
+      
+      # Check if only minimal files exist (created by ensure_minimum_files)
+      files = @app.app_files.pluck(:path)
+      minimal_files = ['index.html', 'src/App.jsx']
+      
+      # If we only have the minimal files and they're small, treat as new
+      if files.sort == minimal_files.sort
+        total_size = @app.app_files.sum { |f| f.content.length }
+        # If total content is less than 2KB, these are just placeholders
+        return total_size < 2000
+      end
+      
+      false
     end
     
     def execute!
@@ -861,8 +882,16 @@ module Ai
       # Quick review
       @broadcaster.update("Reviewing generated code...", 0.9)
       
-      # Ensure we have minimum required files
-      ensure_minimum_files
+      # Only ensure minimum files if we're in UPDATE mode and no files were created
+      # For NEW apps, we should have created comprehensive files via tool calls
+      if !@is_new_app && @files_modified.empty?
+        Rails.logger.warn "[V3-Optimized] No files modified in update mode, ensuring minimum files"
+        ensure_minimum_files
+      elsif @is_new_app && @files_modified.empty?
+        Rails.logger.error "[V3-Optimized] ERROR: New app generation created no files! AI tool calls failed."
+        # Still create minimal files so app isn't broken, but log the error
+        ensure_minimum_files
+      end
       
       # Update app status
       @app.update!(status: 'generated')
