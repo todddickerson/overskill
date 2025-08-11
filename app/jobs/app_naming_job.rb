@@ -1,5 +1,5 @@
 class AppNamingJob < ApplicationJob
-  queue_as :ai_naming
+  queue_as :ai_processing
   
   # Retry up to 2 times for naming failures
   retry_on StandardError, wait: :polynomially_longer, attempts: 2

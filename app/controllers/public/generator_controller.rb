@@ -64,6 +64,7 @@ class Public::GeneratorController < Public::ApplicationController
   def create
     # Handle app generation request
     prompt = params[:prompt] || params[:custom_prompt]
+    ai_model = params[:ai_model] || 'claude-sonnet-4-20250514'  # Default to Claude Sonnet 4
     
     if prompt.blank?
       redirect_to root_path, alert: "Please provide an app description"
@@ -74,7 +75,7 @@ class Public::GeneratorController < Public::ApplicationController
     unless user_signed_in?
       # Store the generation request in an encrypted cookie
       cookies.encrypted[:pending_generation] = {
-        value: { prompt: prompt }.to_json,
+        value: { prompt: prompt, ai_model: ai_model }.to_json,
         expires: 20.minutes.from_now
       }
       
@@ -103,7 +104,8 @@ class Public::GeneratorController < Public::ApplicationController
       framework: "react", # Single framework
       status: "draft",
       base_price: 0,
-      visibility: "private"
+      visibility: "private",
+      ai_model: ai_model  # Use selected AI model
     )
     
     # App model's after_create callback will handle:

@@ -6,6 +6,7 @@ production:
 :queues:
   - critical
   - ai_generation
+  - ai_naming
   - ai_processing
   - deployment
   - preview_updates

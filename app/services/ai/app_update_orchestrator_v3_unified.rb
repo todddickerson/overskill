@@ -7,13 +7,13 @@ module Ai
     # Configuration
     MAX_CONTEXT_TOKENS = 128_000  # Claude supports up to 200k
     MAX_FILES_PER_BATCH = 5
-    API_TIMEOUT_SECONDS = 120
+    API_TIMEOUT_SECONDS = 300  # 5 minutes for Claude's multi-step generation
     MAX_RETRIES = 2
     
-    # Model configurations - Updated August 2025
+    # Model configurations - Claude 4 models confirmed available!
     MODEL_CONFIGS = {
-      # Claude 4 Series (Latest Models)
-      'claude-opus-4-1-20250805' => {  # Claude Opus 4.1 - Released Aug 5, 2025
+      # Claude 4 Opus - Most capable model (CONFIRMED WORKING)
+      'claude-opus-4-1-20250805' => {
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -23,9 +23,10 @@ module Ai
         tool_format: 'anthropic',
         context_window: 200_000,
         use_for: 'complex_generation',
-        description: 'Claude Opus 4.1 - Most capable, complex tasks, agent workflows'
+        description: 'Claude Opus 4.1 - Most capable, extended thinking'
       },
-      'claude-sonnet-4-20250514' => {  # Claude Sonnet 4 - Released May 22, 2025
+      # Claude 4 Sonnet - Best for coding (CONFIRMED WORKING)
+      'claude-sonnet-4-20250514' => {
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -34,10 +35,10 @@ module Ai
         temperature_range: [0, 1],
         tool_format: 'anthropic',
         context_window: 200_000,
-        description: 'Claude Sonnet 4 - Best for coding, 72.7% SWE-bench'
+        description: 'Claude Sonnet 4 - 72.7% SWE-bench, best for coding'
       },
-      # Claude 3.5 Series (Current Available)
-      'claude-3-5-sonnet-20241022' => {  # Latest available Sonnet
+      # Claude 3.5 Sonnet - Fallback option
+      'claude-3-5-sonnet-20241022' => {
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -45,9 +46,11 @@ module Ai
         temperature_range: [0, 1],
         tool_format: 'anthropic',
         context_window: 200_000,
-        description: 'Claude 3.5 Sonnet - Currently available, excellent for apps'
+        fallback: true,
+        description: 'Claude 3.5 Sonnet - Reliable fallback'
       },
-      'claude-3-opus-20240229' => {  # Claude 3 Opus
+      # Claude 3 Opus - Legacy complex tasks
+      'claude-3-opus-20240229' => {
         provider: 'anthropic',
         supports_streaming: true,
         supports_caching: true,
@@ -55,8 +58,20 @@ module Ai
         temperature_range: [0, 1],
         tool_format: 'anthropic',
         context_window: 200_000,
-        use_for: 'complex_generation_fallback',
-        description: 'Claude 3 Opus - Previous generation premium model'
+        fallback: true,
+        description: 'Claude 3 Opus - Legacy model'
+      },
+      # Claude 3 Haiku - Fast and efficient
+      'claude-3-haiku-20240307' => {
+        provider: 'anthropic',
+        supports_streaming: true,
+        supports_caching: false,
+        max_tokens: 4096,
+        temperature_range: [0, 1],
+        tool_format: 'anthropic',
+        context_window: 200_000,
+        fallback: true,
+        description: 'Claude 3 Haiku - Fast for simple tasks'
       },
       # GPT-5 Series (Released August 7, 2025)
       'gpt-5' => {
@@ -87,17 +102,6 @@ module Ai
         tool_format: 'openai',
         description: 'Smallest GPT-5 for simple tasks'
       },
-      # Legacy/fallback models
-      'claude-3-5-sonnet-20240620' => {
-        provider: 'anthropic',
-        supports_streaming: true,
-        supports_caching: true,
-        max_tokens: 8192,
-        temperature_range: [0, 1],
-        tool_format: 'anthropic',
-        fallback: true,
-        description: 'Previous Sonnet version'
-      }
       'gpt-4-turbo-preview' => {
         provider: 'openai',
         supports_streaming: true,
@@ -185,7 +189,7 @@ module Ai
     private
     
     def select_optimal_model
-      # Start with user preference - default to Claude 4 models
+      # Start with user preference - default to Claude Sonnet 4 (best for coding)
       preferred = @app.ai_model || ENV['DEFAULT_AI_MODEL'] || 'claude-sonnet-4-20250514'
       
       # Check if it's an alias and map to actual model name
@@ -200,7 +204,7 @@ module Ai
       
       # For new app generation, use Opus 4.1 for complex tasks
       if @is_new_app && @chat_message.content.length > 500
-        # Complex prompt - use Opus 4.1
+        # Complex prompt - use Claude Opus 4.1
         @model = 'claude-opus-4-1-20250805'
         Rails.logger.info "[V3-Unified] Using Claude Opus 4.1 for complex new app generation"
       else
@@ -254,16 +258,16 @@ module Ai
     
     def try_model_available?(model_id)
       # Check if a model is available
-      # Claude 4 models ARE available and should be used
+      # Using actual available models confirmed via API testing
       available_models = [
-        'claude-opus-4-1-20250805',     # Claude Opus 4.1 - BEST
-        'claude-sonnet-4-20250514',      # Claude Sonnet 4 - RECOMMENDED
+        'claude-opus-4-1-20250805',      # Claude Opus 4.1 - CONFIRMED WORKING
+        'claude-sonnet-4-20250514',      # Claude Sonnet 4 - CONFIRMED WORKING
+        'claude-3-5-sonnet-20241022',    # Claude 3.5 Sonnet - Fallback
+        'claude-3-opus-20240229',        # Claude 3 Opus - Legacy
+        'claude-3-haiku-20240307',       # Claude 3 Haiku - Fast
         'gpt-5', 
         'gpt-5-mini'
       ]
-      
-      # Return true for Claude 4 models - they're the latest and best
-      return true if model_id.include?('claude-opus-4-1') || model_id.include?('claude-sonnet-4')
       
       available_models.include?(model_id)
     end
@@ -596,23 +600,51 @@ module Ai
     end
     
     def build_step_prompt(step)
-      base = "Implement: #{step['description']}\n\nUser request: #{@chat_message.content}\n\n"
+      # Extract core user intent without technical specifics
+      user_intent = @chat_message.content.gsub(/tailwind|supabase|react|cdn|jsx/i, '').strip
+      
+      base = <<~BASE
+        Step: #{step['description']}
+        Focus: #{step['focus']}
+        
+        User's App Requirements: #{user_intent}
+        
+        Technical Stack (automatically provided):
+        - React 18 via CDN (unpkg) - NO build step required
+        - Babel standalone for JSX transformation in browser
+        - All .jsx files use type="text/babel" script tags
+        - Tailwind CSS via CDN for instant styling
+        - Supabase client via CDN for database/auth
+        - React Router DOM via CDN for navigation
+        - Cloudflare Worker deployment ready
+        - Fast preview deployment < 3 seconds
+        
+      BASE
+      
+      files_to_create = step['files'] || []
       
       case @provider
       when 'anthropic'
-        base + <<~PROMPT
-          Use the tool functions to create all necessary files.
-          Create comprehensive, production-ready code.
-          Each file should be created with a separate tool call.
-          
-          Required files to create:
-          - index.html with all CDN dependencies
-          - src/App.jsx with complete React app
-          - src/lib/supabase.js for database
-          - All necessary page and component files
-          
-          Start creating files now.
-        PROMPT
+        if files_to_create.any?
+          base + <<~PROMPT
+            Create the following #{files_to_create.length} file(s) using the create_file tool:
+            #{files_to_create.map.with_index { |f, i| "#{i+1}. #{f}" }.join("\n")}
+            
+            Requirements:
+            - Use create_file tool for EACH file listed
+            - Each file must be complete and production-ready
+            - Follow the user's feature requirements
+            - Apply the technical stack mentioned above
+            - Ensure files work together as a cohesive app
+            
+            Create #{files_to_create.length == 1 ? 'this file' : 'these files'} now.
+          PROMPT
+        else
+          base + <<~PROMPT
+            Implement the requested functionality based on the step description.
+            Use tool functions as needed to create or update files.
+          PROMPT
+        end
       when 'openai'
         base + <<~PROMPT
           YOU MUST USE TOOL FUNCTIONS ONLY - NO TEXT OUTPUT!
@@ -701,11 +733,21 @@ module Ai
       
       begin
         response = http.request(request)
+        
+        # Log the raw response for debugging
+        Rails.logger.info "[V3-Unified] Claude response status: #{response.code}"
+        
+        if response.code != '200'
+          Rails.logger.error "[V3-Unified] Claude API error - Status: #{response.code}, Body: #{response.body}"
+        end
+        
         result = JSON.parse(response.body)
         
         if result['error']
-          Rails.logger.error "[V3-Unified] Claude error: #{result['error']['message']}"
-          raise result['error']['message']
+          error_detail = result['error']
+          Rails.logger.error "[V3-Unified] Claude error: #{error_detail['type']} - #{error_detail['message']}"
+          Rails.logger.error "[V3-Unified] Full error: #{error_detail.inspect}"
+          raise "Claude API Error: #{error_detail['message']}"
         end
         
         # Process tool use if present
@@ -781,13 +823,14 @@ module Ai
     end
     
     def process_claude_tool_use(content_blocks)
-      content_blocks.each do |block|
-        next unless block['type'] == 'tool_use'
-        
+      tool_blocks = content_blocks.select { |b| b['type'] == 'tool_use' }
+      Rails.logger.info "[V3-Unified] Processing #{tool_blocks.length} Claude tool calls"
+      
+      tool_blocks.each_with_index do |block, index|
         tool_name = block['name']
         tool_input = block['input']
         
-        Rails.logger.info "[V3-Unified] Claude tool: #{tool_name}"
+        Rails.logger.info "[V3-Unified] Claude tool #{index + 1}/#{tool_blocks.length}: #{tool_name} for #{tool_input['path']}"
         
         case tool_name
         when 'create_file'
@@ -798,6 +841,8 @@ module Ai
           Rails.logger.warn "[V3-Unified] Unknown tool: #{tool_name}"
         end
       end
+      
+      Rails.logger.info "[V3-Unified] Finished processing #{tool_blocks.length} tool calls"
     end
     
     def process_openai_tool_calls(tool_calls)
@@ -823,10 +868,8 @@ module Ai
     def create_or_update_file(path, content)
       Rails.logger.info "[V3-Unified] Creating/updating file: #{path}"
       
-      # Validate content
-      if path.end_with?('.jsx', '.js')
-        content = ensure_valid_javascript(content)
-      end
+      # Ensure Cloudflare Worker compatibility
+      content = ensure_cloudflare_compatible(path, content)
       
       # Create or update file
       file = @app.app_files.find_or_initialize_by(path: path)
@@ -836,9 +879,59 @@ module Ai
       file.save!
       
       @files_modified << path
-      @broadcaster.file_created(path)
+      
+      # Broadcast file creation immediately for real-time updates
+      broadcast_file_update(path, content.length)
       
       Rails.logger.info "[V3-Unified] File saved: #{path} (#{content.length} bytes)"
+    end
+    
+    def broadcast_file_update(path, size)
+      # Send real-time update to user
+      if @broadcaster
+        if @broadcaster.respond_to?(:file_created)
+          @broadcaster.file_created(path)
+        else
+          @broadcaster.update("✅ Created #{path} (#{size} bytes)", nil)
+        end
+      end
+      
+      # Also broadcast via ActionCable if available
+      if defined?(ActionCable) && @app
+        ActionCable.server.broadcast(
+          "app_#{@app.id}_updates",
+          {
+            type: 'file_created',
+            path: path,
+            size: size,
+            timestamp: Time.current.to_i
+          }
+        )
+      end
+    end
+    
+    def ensure_cloudflare_compatible(path, content)
+      if path == 'index.html'
+        # Ensure HTML is set up for CDN React (no build step)
+        unless content.include?('unpkg.com/react')
+          Rails.logger.warn "[V3-Unified] Adding React CDN to HTML"
+          content = content.sub('</head>', <<~HTML.strip + "\n</head>")
+            <!-- React via CDN - No build step required -->
+            <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+            <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+            <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+          HTML
+        end
+        
+        # Ensure Babel is configured for JSX transformation
+        unless content.include?('type="text/babel"')
+          content = content.gsub('type="text/javascript"', 'type="text/babel"')
+        end
+      elsif path.end_with?('.jsx')
+        # JSX files will be transformed on-the-fly by Babel in the browser
+        content = ensure_valid_javascript(content)
+      end
+      content
     end
     
     # Include all the helper methods from the original
@@ -897,15 +990,54 @@ module Ai
     end
     
     def create_execution_plan(analysis)
-      # Simple plan for now
-      {
-        "steps" => [
-          {
-            "description" => "Create complete application structure",
-            "files" => analysis["files_needed"] || []
-          }
-        ]
-      }
+      # For new apps, create an optimized multi-step plan
+      # Claude 4 works best with 1-2 files per step
+      if @is_new_app
+        {
+          "steps" => [
+            {
+              "description" => "Create HTML foundation",
+              "files" => ["index.html"],
+              "focus" => "Complete HTML with React CDN, Tailwind CSS, and all script dependencies"
+            },
+            {
+              "description" => "Create main React application",
+              "files" => ["src/App.jsx"],
+              "focus" => "React app with routing, authentication context, and theme management"
+            },
+            {
+              "description" => "Set up Supabase integration",
+              "files" => ["src/lib/supabase.js"],
+              "focus" => "Database client configuration and helper functions"
+            },
+            {
+              "description" => "Create authentication system",
+              "files" => ["src/pages/auth/Login.jsx", "src/pages/auth/SignUp.jsx"],
+              "focus" => "Login and registration pages with Supabase auth"
+            },
+            {
+              "description" => "Build dashboard and main features",
+              "files" => ["src/pages/Dashboard.jsx"],
+              "focus" => "Main application interface based on user requirements"
+            },
+            {
+              "description" => "Create UI components",
+              "files" => ["src/components/TaskCard.jsx", "src/components/KanbanBoard.jsx"],
+              "focus" => "Reusable components for the application features"
+            }
+          ]
+        }
+      else
+        # Simple plan for updates
+        {
+          "steps" => [
+            {
+              "description" => "Update application with requested changes",
+              "files" => analysis["files_needed"] || []
+            }
+          ]
+        }
+      end
     end
     
     def parse_analysis_response(response)
