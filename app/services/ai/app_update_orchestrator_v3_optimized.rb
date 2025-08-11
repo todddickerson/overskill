@@ -394,7 +394,7 @@ module Ai
         )
       end
       
-      # Minimal analysis prompt
+      # Comprehensive analysis prompt
       analysis_prompt = <<~PROMPT
         Analyze this request: "#{@chat_message.content}"
         
@@ -402,12 +402,19 @@ module Ai
         Type: #{@is_new_app ? 'NEW' : 'UPDATE'}
         Current files: #{context[:files].map { |f| f[:path] }.join(', ')}
         
-        Return JSON with:
+        IMPORTANT: For NEW apps, you must plan to create a COMPLETE application with:
+        - Full authentication system (login, signup, OAuth)
+        - React Router for multi-page navigation
+        - Supabase integration for data persistence
+        - Professional UI with Tailwind CSS
+        - All necessary components and pages
+        
+        Return JSON with ALL files needed:
         {
-          "approach": "Technical approach",
-          "files_needed": ["file1.jsx", "file2.jsx"],
-          "complexity": "simple|moderate|complex",
-          "needs_auth": true/false
+          "approach": "Technical approach description",
+          "files_needed": ["index.html", "src/App.jsx", "src/lib/supabase.js", "src/lib/router.jsx", "src/pages/Home.jsx", "src/pages/auth/Login.jsx", "src/pages/auth/SignUp.jsx", "src/pages/Dashboard.jsx", "src/components/auth/Auth.jsx", "etc..."],
+          "complexity": "complex",
+          "needs_auth": true
         }
       PROMPT
       
@@ -484,22 +491,43 @@ module Ai
     end
     
     def execute_step_with_tools(step, tools)
-      # Create focused prompt for this step
+      # Create focused prompt for this step with explicit tool usage instructions
       prompt = <<~PROMPT
         Implement: #{step['description']}
         
         User wants: "#{@chat_message.content}"
-        Files to work on: #{step['files'].join(', ')}
         
-        Create complete, production-ready code.
-        Use the tools to create/update files.
-        Include sample data and polish.
+        MANDATORY: You MUST use the create_file tool to create ALL necessary files for a complete application.
+        
+        For a todo app with authentication, you MUST create:
+        1. index.html - with React Router, Supabase CDN links
+        2. src/App.jsx - Main app with React Router setup
+        3. src/lib/supabase.js - Supabase client configuration
+        4. src/lib/router.jsx - Router configuration
+        5. src/pages/Home.jsx - Landing page
+        6. src/pages/auth/Login.jsx - Login page with email and social auth
+        7. src/pages/auth/SignUp.jsx - Registration page
+        8. src/pages/auth/AuthCallback.jsx - OAuth callback handler
+        9. src/pages/Dashboard.jsx - Main todo dashboard
+        10. src/components/auth/Auth.jsx - Auth component
+        11. src/components/auth/SocialButtons.jsx - Social login buttons
+        12. src/components/auth/ProtectedRoute.jsx - Route guard
+        13. src/components/layout/Header.jsx - App header
+        14. src/components/layout/Layout.jsx - Layout wrapper
+        15. Any additional components needed for the features
+        
+        Use the create_file tool for EACH file. Do not skip any files.
+        Include complete, working code in each file - no placeholders or TODOs.
+        Remember to use window.ENV for configuration access.
       PROMPT
       
       messages = [
         { role: "system", content: @system_prompt },
         { role: "user", content: prompt }
       ]
+      
+      # Log for debugging
+      Rails.logger.info "[V3-Optimized] Executing step with #{tools.length} tools available"
       
       # Execute with streaming if available
       if @use_streaming && @streaming_buffer
@@ -538,7 +566,7 @@ module Ai
         tool_choice: "auto",
         stream: true,
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 8000  # Increased for comprehensive app generation
       }
       
       # Add caching if supported
@@ -558,10 +586,84 @@ module Ai
       request['Content-Type'] = 'application/json'
       request.body = request_body.to_json
       
+      # Variables to accumulate streaming response
+      accumulated_content = ""
+      accumulated_tool_calls = []
+      current_tool_call = nil
+      
       http.request(request) do |response|
         response.read_body do |chunk|
-          @streaming_buffer.process_chunk(chunk)
+          # Process SSE chunks and extract tool calls
+          chunk.split("\n").each do |line|
+            next unless line.start_with?("data: ")
+            
+            json_str = line[6..-1]  # Remove "data: " prefix
+            next if json_str == "[DONE]"
+            
+            begin
+              data = JSON.parse(json_str)
+              choice = data['choices']&.first
+              next unless choice
+              
+              delta = choice['delta']
+              next unless delta
+              
+              # Handle content
+              if delta['content']
+                accumulated_content += delta['content']
+                @streaming_buffer.process_chunk(delta['content']) if @streaming_buffer
+              end
+              
+              # Handle tool calls
+              if delta['tool_calls']
+                delta['tool_calls'].each do |tool_call_delta|
+                  index = tool_call_delta['index']
+                  
+                  # Initialize or update tool call at index
+                  if tool_call_delta['id']
+                    # New tool call
+                    current_tool_call = {
+                      'id' => tool_call_delta['id'],
+                      'type' => tool_call_delta['type'] || 'function',
+                      'function' => {
+                        'name' => tool_call_delta['function']['name'],
+                        'arguments' => ""
+                      }
+                    }
+                    accumulated_tool_calls[index] = current_tool_call
+                  elsif accumulated_tool_calls[index]
+                    # Accumulate arguments for existing tool call
+                    if tool_call_delta['function'] && tool_call_delta['function']['arguments']
+                      accumulated_tool_calls[index]['function']['arguments'] += tool_call_delta['function']['arguments']
+                    end
+                  end
+                end
+              end
+              
+              # Handle finish reason
+              if choice['finish_reason'] == 'tool_calls' && accumulated_tool_calls.any?
+                # Execute all accumulated tool calls
+                Rails.logger.info "[V3-Optimized] Executing #{accumulated_tool_calls.length} tool calls"
+                process_tool_calls(accumulated_tool_calls)
+                accumulated_tool_calls = []
+              end
+            rescue JSON::ParserError => e
+              Rails.logger.debug "[V3-Optimized] Skipping invalid JSON chunk: #{e.message}"
+            end
+          end
         end
+      end
+      
+      # Process any remaining tool calls
+      if accumulated_tool_calls.any?
+        Rails.logger.info "[V3-Optimized] Executing final #{accumulated_tool_calls.length} tool calls"
+        process_tool_calls(accumulated_tool_calls)
+      end
+      
+      # Return accumulated content if no tool calls were made
+      if accumulated_content.present? && @files_modified.empty?
+        Rails.logger.warn "[V3-Optimized] No tool calls made, creating files from content"
+        create_files_from_response(accumulated_content)
       end
     end
     
@@ -577,7 +679,8 @@ module Ai
         messages: messages,
         tools: tools,
         tool_choice: "auto",
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 8000  # Increased for comprehensive generation
       }
       
       http = Net::HTTP.new(uri.host, uri.port)
@@ -589,12 +692,28 @@ module Ai
       request['Content-Type'] = 'application/json'
       request.body = request_body.to_json
       
+      Rails.logger.info "[V3-Optimized] Sending non-streaming request with #{tools.length} tools"
+      
       response = http.request(request)
       result = JSON.parse(response.body)
       
+      if result['error']
+        Rails.logger.error "[V3-Optimized] OpenAI API error: #{result['error']['message']}"
+        return
+      end
+      
       # Process tool calls
       if result['choices'] && result['choices'][0]['message']['tool_calls']
-        process_tool_calls(result['choices'][0]['message']['tool_calls'])
+        tool_calls = result['choices'][0]['message']['tool_calls']
+        Rails.logger.info "[V3-Optimized] Received #{tool_calls.length} tool calls from API"
+        process_tool_calls(tool_calls)
+      elsif result['choices'] && result['choices'][0]['message']['content']
+        # AI returned content without tool calls - parse it for file creation
+        content = result['choices'][0]['message']['content']
+        Rails.logger.warn "[V3-Optimized] No tool calls received, attempting to parse content for files"
+        create_files_from_response(content)
+      else
+        Rails.logger.error "[V3-Optimized] Unexpected response structure: #{result.keys}"
       end
     end
     
@@ -660,17 +779,38 @@ module Ai
     end
     
     def process_tool_calls(tool_calls)
-      tool_calls.each do |call|
+      Rails.logger.info "[V3-Optimized] Processing #{tool_calls.length} tool calls"
+      
+      tool_calls.each_with_index do |call, index|
         function_name = call['function']['name']
-        arguments = JSON.parse(call['function']['arguments'])
+        arguments_str = call['function']['arguments']
         
-        case function_name
-        when 'create_file', 'update_file'
-          create_or_update_file(arguments['path'], arguments['content'])
-        when 'broadcast_progress'
-          @broadcaster.update(arguments['message'])
+        begin
+          arguments = JSON.parse(arguments_str)
+          Rails.logger.info "[V3-Optimized] Tool call #{index + 1}: #{function_name} - #{arguments['path'] || arguments['message'] || 'no path'}"
+          
+          case function_name
+          when 'create_file'
+            create_or_update_file(arguments['path'], arguments['content'])
+            @broadcaster.file_created(arguments['path']) if @broadcaster
+          when 'update_file'
+            create_or_update_file(arguments['path'], arguments['content'])
+            @broadcaster.update("Updated #{arguments['path']}", nil) if @broadcaster
+          when 'broadcast_progress'
+            @broadcaster.update(arguments['message']) if @broadcaster
+          else
+            Rails.logger.warn "[V3-Optimized] Unknown tool function: #{function_name}"
+          end
+        rescue JSON::ParserError => e
+          Rails.logger.error "[V3-Optimized] Failed to parse tool arguments: #{e.message}"
+          Rails.logger.error "[V3-Optimized] Arguments string: #{arguments_str}"
+        rescue => e
+          Rails.logger.error "[V3-Optimized] Error processing tool call: #{e.message}"
+          Rails.logger.error e.backtrace.first(3).join("\n")
         end
       end
+      
+      Rails.logger.info "[V3-Optimized] Completed processing tool calls. Files modified: #{@files_modified.count}"
     end
     
     def create_or_update_file(path, content)
