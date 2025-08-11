@@ -1903,12 +1903,57 @@ module Ai
       # Queue logo generation
       GenerateAppLogoJob.perform_later(@app.id)
       
-      # Queue deployment if enabled
-      if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
+      # Always deploy preview for new apps (not just when AUTO_DEPLOY is true)
+      if @is_new_app
+        @broadcaster.update("Deploying preview...", 0.8)
+        deploy_preview_now
+      elsif ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
+        # For updates, respect the env var
         AppDeploymentJob.perform_later(@app)
       end
       
       @broadcaster.update("App setup complete", 1.0)
+    end
+    
+    def deploy_preview_now
+      Rails.logger.info "[V3] Deploying preview for app #{@app.id}"
+      
+      begin
+        service = Deployment::FastPreviewService.new(@app)
+        result = service.deploy_instant_preview!
+        
+        if result[:success]
+          @broadcaster.update("Preview deployed to #{result[:preview_url]}", 0.95)
+          
+          # Broadcast preview ready to update UI
+          ActionCable.server.broadcast(
+            "app_#{@app.id}_chat",
+            {
+              action: "preview_ready", 
+              preview_url: result[:preview_url],
+              message: "Preview is ready!"
+            }
+          )
+          
+          # Turbo Stream update for preview iframe
+          begin
+            Turbo::StreamsChannel.broadcast_replace_later_to(
+              "app_#{@app.id}_preview",
+              target: "preview_iframe",
+              partial: "account/app_editors/preview_iframe",
+              locals: { app: @app.reload }
+            )
+          rescue => e
+            Rails.logger.warn "[V3] Could not broadcast Turbo Stream: #{e.message}"
+          end
+        else
+          Rails.logger.error "[V3] Preview deployment failed: #{result[:error]}"
+          @broadcaster.update("Preview deployment failed", 0.95)
+        end
+      rescue => e
+        Rails.logger.error "[V3] Preview deployment error: #{e.message}"
+        @broadcaster.update("Deployment error occurred", 0.95)
+      end
     end
     
     def app_needs_authentication?

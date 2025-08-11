@@ -664,10 +664,39 @@ module Ai
         
         if result[:success]
           @broadcaster.update("Deployed to #{result[:preview_url]}", 1.0)
+          
+          # Broadcast preview URL update to refresh the UI
+          broadcast_preview_ready(result[:preview_url])
+        else
+          Rails.logger.error "[V3-Optimized] Deployment failed: #{result[:error]}"
+          @broadcaster.update("Deployment failed: #{result[:error]}", 0.95)
         end
       rescue => e
         Rails.logger.error "[V3-Optimized] Deployment failed: #{e.message}"
+        @broadcaster.update("Deployment error: #{e.message}", 0.95)
       end
+    end
+    
+    def broadcast_preview_ready(preview_url)
+      # Broadcast that preview is ready to trigger UI refresh
+      ActionCable.server.broadcast(
+        "app_#{@app.id}_chat",
+        {
+          action: "preview_ready",
+          preview_url: preview_url,
+          message: "Preview deployed successfully!"
+        }
+      )
+      
+      # Also broadcast a Turbo Stream to refresh the preview iframe if it exists
+      Turbo::StreamsChannel.broadcast_replace_later_to(
+        "app_#{@app.id}_preview",
+        target: "preview_iframe",
+        partial: "account/app_editors/preview_iframe",
+        locals: { app: @app }
+      )
+    rescue => e
+      Rails.logger.error "[V3-Optimized] Failed to broadcast preview update: #{e.message}"
     end
     
     def create_app_version!

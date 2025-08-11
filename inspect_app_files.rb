@@ -1,6 +1,4 @@
-#\!/usr/bin/env ruby
-# Check app files content
-
+#!/usr/bin/env ruby
 require_relative 'config/environment'
 
 app_id = ARGV[0] || 148
@@ -10,9 +8,8 @@ puts "App ##{app.id}: #{app.name}"
 puts "="*60
 
 app.app_files.each do |file|
-  puts "\n📄 #{file.path} (#{file.content.length} bytes)"
+  puts "\nFile: #{file.path} (#{file.content.length} bytes)"
   puts "-"*40
   puts file.content
   puts "-"*40
 end
-EOF < /dev/null
