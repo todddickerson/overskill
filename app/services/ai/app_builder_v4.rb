@@ -733,7 +733,8 @@ module Ai
       files_created.each do |app_file|
         @app_version.app_version_files.create!(
           app_file: app_file,
-          action: 'created'
+          action: 'created',
+          content: app_file.content  # Include content for validation
         )
       end
       
