@@ -90,4 +90,7 @@ end
 
 class ActiveSupport::TestCase
   include FactoryBot::Syntax::Methods
+  
+  # WebMock configuration
+  WebMock.disable_net_connect!(allow_localhost: true)
 end

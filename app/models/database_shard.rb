@@ -27,13 +27,14 @@ class DatabaseShard < ApplicationRecord
   has_many :apps, dependent: :restrict_with_error
   
   # Scopes
+  scope :available, -> { where(status: 'available') }
   scope :with_capacity, -> { available.where("app_count < ?", APPS_PER_SHARD) }
   scope :ordered_by_usage, -> { order(app_count: :asc) }
   
   class << self
     # Get the best shard for a new app (least loaded with capacity)
     def current_shard
-      with_capacity.ordered_by_usage.first || create_new_shard!
+      with_capacity.ordered_by_usage.first
     end
     
     # Create a new shard when needed
