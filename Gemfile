@@ -209,6 +209,7 @@ group :development, :test do
   gem "faker" # Fake data generation
   gem "vcr" # Record HTTP interactions for tests
   gem "webmock" # Stub HTTP requests in tests
+  gem "mocha" # Method stubbing and mocking
 end
 
 group :development do

@@ -34,7 +34,15 @@ class DatabaseShard < ApplicationRecord
   class << self
     # Get the best shard for a new app (least loaded with capacity)
     def current_shard
+      # Skip during Rails initialization and testing
+      return nil if Rails.application.config.eager_load == false
+      return nil unless connection.table_exists?('database_shards')
+      return nil unless connection.active?
+      
       with_capacity.ordered_by_usage.first
+    rescue => e
+      Rails.logger.warn "[DatabaseShard] Error in current_shard: #{e.message}"
+      nil
     end
     
     # Create a new shard when needed

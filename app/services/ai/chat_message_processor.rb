@@ -168,10 +168,9 @@ module Ai
     
     def analyze_user_communication_patterns
       # Analyze how this user typically communicates
-      user_messages = @user.app_chat_messages
-                           .joins(:app)
-                           .where(role: 'user')
-                           .limit(50)
+      user_messages = AppChatMessage.joins(:app)
+                                   .where(user: @user, role: 'user')
+                                   .limit(50)
       
       {
         total_messages: user_messages.count,
