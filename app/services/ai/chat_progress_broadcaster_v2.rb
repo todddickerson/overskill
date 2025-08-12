@@ -9,13 +9,23 @@ module Ai
     def initialize(chat_message)
       @chat_message = chat_message
       @app = chat_message.app
+      @user = chat_message.user
       @channel = "ChatChannel:#{chat_message.id}"
       @start_time = Time.current
+      @current_assistant_message = nil
     end
     
     # Main broadcast methods that use Turbo Streams and CableReady
     
     def broadcast_phase(phase_number, phase_name, total_phases = 6)
+      # Create or update assistant message with phase info
+      if phase_number == 1 && !@current_assistant_message
+        content = "🚀 Starting app generation!\n\n**Phase #{phase_number}/#{total_phases}: #{phase_name}**\n"
+        create_assistant_message(content)
+      else
+        append_to_message("\n\n**Phase #{phase_number}/#{total_phases}: #{phase_name}**\n")
+      end
+      
       # Use Turbo Streams for updates - use app channel that frontend subscribes to
       Turbo::StreamsChannel.broadcast_update_to(
         "app_#{@app.id}_chat",
@@ -45,6 +55,13 @@ module Ai
     
     def broadcast_file_operation(operation, file_path, content_preview = nil, status = "pending")
       file_id = "file_#{Digest::MD5.hexdigest(file_path)}"
+      
+      # Append file operation to assistant message
+      if operation == :created
+        append_to_message("✅ Created `#{file_path}`\n")
+      elsif operation == :updated
+        append_to_message("📝 Updated `#{file_path}`\n")
+      end
       
       case operation
       when :creating
@@ -122,6 +139,11 @@ module Ai
     end
     
     def broadcast_build_output(output_line, stream_type = :stdout)
+      # Append key build output to assistant message
+      if output_line.match?(/Building|Installing|Deployed|✓|✅/)
+        append_to_message("#{output_line}\n")
+      end
+      
       # Stream build output in real-time
       Turbo::StreamsChannel.broadcast_append_to(
         "app_#{@app.id}_chat",
@@ -141,6 +163,14 @@ module Ai
     end
     
     def broadcast_error(error_message, recovery_suggestions = [], technical_details = nil)
+      # Append error to assistant message
+      error_text = "\n\n⚠️ **Error**: #{error_message}\n"
+      if recovery_suggestions.any?
+        error_text += "\n**Suggestions:**\n"
+        recovery_suggestions.each { |s| error_text += "• #{s}\n" }
+      end
+      append_to_message(error_text)
+      
       Turbo::StreamsChannel.broadcast_update_to(
         "app_#{@app.id}_chat",
         target: "error-panel-#{chat_message.id}",
@@ -159,6 +189,25 @@ module Ai
     
     def broadcast_completion(success: true, stats: {})
       elapsed_time = Time.current - @start_time
+      
+      # Create completion message
+      if success
+        completion_message = "\n\n✨ **App generation complete!**\n"
+        if stats[:app_url]
+          completion_message += "\n🔗 Preview URL: #{stats[:app_url]}\n"
+        end
+        if stats[:files_generated]
+          completion_message += "📁 Files generated: #{stats[:files_generated]}\n"
+        end
+        completion_message += "⏱️ Total time: #{elapsed_time.round(1)} seconds\n"
+      else
+        completion_message = "\n\n❌ **Generation failed**\n"
+        if stats[:error]
+          completion_message += "Error: #{stats[:error]}\n"
+        end
+      end
+      
+      append_to_message(completion_message)
       
       Turbo::StreamsChannel.broadcast_update_to(
         "app_#{@app.id}_chat",
@@ -199,6 +248,46 @@ module Ai
     end
     
     private
+    
+    # Message management methods
+    def create_assistant_message(content)
+      @current_assistant_message = AppChatMessage.create!(
+        app: @app,
+        user: @user,
+        role: 'assistant',
+        content: content,
+        metadata: {
+          generation_session: true,
+          created_at: Time.current.iso8601
+        }.to_json
+      )
+      
+      # Broadcast the new message to the UI
+      broadcast_message_to_ui(@current_assistant_message)
+      @current_assistant_message
+    end
+    
+    def append_to_message(additional_content)
+      return unless @current_assistant_message
+      
+      @current_assistant_message.update!(
+        content: @current_assistant_message.content + additional_content,
+        updated_at: Time.current
+      )
+      
+      # Broadcast the updated message
+      broadcast_message_to_ui(@current_assistant_message)
+    end
+    
+    def broadcast_message_to_ui(message)
+      # Broadcast via Turbo Streams to update the chat UI
+      Turbo::StreamsChannel.broadcast_append_to(
+        "app_#{@app.id}_chat",
+        target: "chat_messages",
+        partial: "account/app_chat_messages/message",
+        locals: { message: message }
+      )
+    end
     
     # Render methods that use Rails partials
     
