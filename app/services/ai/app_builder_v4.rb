@@ -1,4 +1,6 @@
 module Ai
+  class GenerationError < StandardError; end
+  
   class AppBuilderV4
     MAX_RETRIES = 2
     
@@ -786,12 +788,12 @@ module Ai
       
       # Add relevant context based on error type
       case error
-      when Ai::GenerationError, OpenAI::RequestError
+      when Ai::GenerationError
         context << "This appears to be an AI generation issue. Please:"
         context << "1. Review the current app structure and identify the problem"
         context << "2. Fix any syntax errors or missing dependencies"
         context << "3. Continue with the generation process"
-      when Net::TimeoutError, Timeout::Error
+      when Timeout::Error
         context << "This was a timeout error. Please:"
         context << "1. Continue with the generation using smaller, focused changes"
         context << "2. Break down complex operations into simpler steps"
@@ -810,6 +812,9 @@ module Ai
     
     def create_app_file(path, content)
       # Create or update an app file
+      # Ensure content is not nil or empty
+      content = content.presence || "// Placeholder content for #{path}"
+      
       existing_file = @app.app_files.find_by(path: path)
       
       if existing_file

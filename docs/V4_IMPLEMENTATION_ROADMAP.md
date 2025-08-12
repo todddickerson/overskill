@@ -185,8 +185,10 @@ end
 - [x] V4 orchestrator replaces V3 successfully ✅
 - [x] Shared templates generate foundation files ✅
 - [x] Vite builds execute via Cloudflare Workers ✅
-- [ ] LineReplaceService and SmartSearchService integrated ❌ NOT DONE
-- [ ] End-to-end generation works (basic test app) ⚠️ PARTIAL
+- [x] LineReplaceService and SmartSearchService integrated ✅ COMPLETE (Aug 12)
+- [x] Claude API integrated with token tracking ✅ COMPLETE (Aug 12)
+- [x] Supabase UI components integrated ✅ COMPLETE (Aug 12)
+- [ ] End-to-end generation works (basic test app) ⚠️ READY TO TEST
 
 ---
 

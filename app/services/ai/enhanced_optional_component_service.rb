@@ -264,6 +264,12 @@ module Ai
         template_content = ::File.read(template_path)
         processed_content = process_component_template(template_content)
         
+        # Ensure content is not blank
+        if processed_content.blank?
+          Rails.logger.warn "[EnhancedOptionalComponentService] Blank content for #{component_info[:path]}, using placeholder"
+          processed_content = "// Placeholder for #{component_info[:path]}"
+        end
+        
         @app.app_files.create!(
           path: component_info[:path],
           content: processed_content,

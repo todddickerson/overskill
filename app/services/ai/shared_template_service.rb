@@ -39,6 +39,10 @@ module Ai
       create_file('tsconfig.json', tsconfig_template)
       files << 'tsconfig.json'
       
+      # tsconfig.node.json
+      create_file('tsconfig.node.json', tsconfig_node_template)
+      files << 'tsconfig.node.json'
+      
       # tailwind.config.js
       create_file('tailwind.config.js', tailwind_config_template)
       files << 'tailwind.config.js'
@@ -148,6 +152,12 @@ module Ai
       # Process template variables
       processed_content = process_template_variables(content)
       
+      # Ensure content is not blank
+      if processed_content.blank?
+        Rails.logger.error "[SharedTemplateService] Blank content for file: #{path}"
+        processed_content = "// Placeholder for #{path}"
+      end
+      
       # Create or update the file
       existing_file = @app.app_files.find_by(path: path)
       
@@ -244,6 +254,21 @@ module Ai
           },
         })
       TS
+    end
+    
+    def tsconfig_node_template
+      <<~JSON
+        {
+          "compilerOptions": {
+            "composite": true,
+            "skipLibCheck": true,
+            "module": "ESNext",
+            "moduleResolution": "bundler",
+            "allowSyntheticDefaultImports": true
+          },
+          "include": ["vite.config.ts"]
+        }
+      JSON
     end
     
     def tsconfig_template
