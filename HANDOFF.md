@@ -25,12 +25,31 @@
 - ✅ **Build Performance**: 819ms builds, 336KB optimized Worker bundles
 - ✅ **Zero Errors**: No console errors, all assets loading successfully
 
+### ⚠️ CRITICAL: Cloudflare API Credentials Required
+
+**Deployment is currently failing due to missing Cloudflare credentials in `.env.development`:**
+```bash
+# Required environment variables for deployment:
+CLOUDFLARE_ACCOUNT_ID=your_account_id_here
+CLOUDFLARE_API_TOKEN=your_api_token_here  
+CLOUDFLARE_ZONE_ID=your_zone_id_here
+
+# These are MISSING and deployment will fail without them!
+```
+
+**To fix deployment:**
+1. Get Cloudflare API credentials from your dashboard
+2. Add the above variables to `.env.development`
+3. Restart Rails server and Sidekiq workers
+4. Deployment will then work correctly
+
 ### 🔄 Swapping from V4 to V4 Enhanced
 
 **To enable V4 Enhanced (recommended):**
 1. Set in `.env.local`: `APP_GENERATION_VERSION=v4_enhanced`
-2. Restart Rails server and Sidekiq workers
-3. All new app generations will use V4 Enhanced
+2. Ensure Cloudflare credentials are set (see above)
+3. Restart Rails server and Sidekiq workers
+4. All new app generations will use V4 Enhanced
 
 **Key Improvements in V4 Enhanced:**
 - ✅ Real-time visual progress feedback during generation
