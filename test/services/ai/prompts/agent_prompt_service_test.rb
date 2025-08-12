@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class AI::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
+class Ai::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
   def setup
-    @service = AI::Prompts::AgentPromptService.new
+    @service = Ai::Prompts::AgentPromptService.new
   end
 
   test "initializes with default variables" do
@@ -14,7 +14,7 @@ class AI::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
   end
 
   test "allows custom variables to override defaults" do
-    custom_service = AI::Prompts::AgentPromptService.new(
+    custom_service = Ai::Prompts::AgentPromptService.new(
       platform_name: "CustomPlatform",
       tool_prefix: "custom-"
     )
@@ -69,13 +69,13 @@ class AI::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
   test "validates configuration" do
     assert @service.valid_config?
     
-    invalid_service = AI::Prompts::AgentPromptService.new(platform_name: "")
+    invalid_service = Ai::Prompts::AgentPromptService.new(platform_name: "")
     refute invalid_service.valid_config?
   end
 
   test "creates platform-specific configurations" do
-    overskill_service = AI::Prompts::AgentPromptService.for_platform(:overskill)
-    lovable_service = AI::Prompts::AgentPromptService.for_platform(:lovable)
+    overskill_service = Ai::Prompts::AgentPromptService.for_platform(:overskill)
+    lovable_service = Ai::Prompts::AgentPromptService.for_platform(:lovable)
     
     assert_equal "OverSkill", overskill_service.variables[:platform_name]
     assert_equal "os-", overskill_service.variables[:tool_prefix]
@@ -86,7 +86,7 @@ class AI::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
   end
 
   test "lists available platforms" do
-    platforms = AI::Prompts::AgentPromptService.available_platforms
+    platforms = Ai::Prompts::AgentPromptService.available_platforms
     
     assert_includes platforms, :overskill
     assert_includes platforms, :lovable
@@ -113,7 +113,7 @@ class AI::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
   test "handles current date as lambda" do
     # Freeze time for consistent testing
     travel_to Time.zone.parse("2025-01-15") do
-      service = AI::Prompts::AgentPromptService.new
+      service = Ai::Prompts::AgentPromptService.new
       prompt = service.generate_prompt
       
       assert_includes prompt, "2025-01-15"
@@ -121,7 +121,7 @@ class AI::Prompts::AgentPromptServiceTest < ActiveSupport::TestCase
   end
 
   test "custom variables with lambdas work correctly" do
-    custom_service = AI::Prompts::AgentPromptService.new(
+    custom_service = Ai::Prompts::AgentPromptService.new(
       current_date: -> { "CUSTOM-DATE" },
       platform_name: -> { "DYNAMIC-PLATFORM" }
     )

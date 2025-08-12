@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 # Example of integrating the Agent Prompt System with existing AI services
-module AI
+module Ai
   module Prompts
     class IntegrationExample
       # Example: Using with AI App Generation
       class EnhancedAppBuilder
         def initialize(platform: :overskill, custom_variables: {})
-          @prompt_service = AI::Prompts::AgentPromptService.for_platform(
+          @prompt_service = Ai::Prompts::AgentPromptService.for_platform(
             platform, 
             custom_variables
           )
@@ -41,7 +41,7 @@ module AI
             current_date: Date.current.strftime("%Y-%m-%d")
           }
 
-          AI::Prompts::AgentPromptService.new(custom_variables)
+          Ai::Prompts::AgentPromptService.new(custom_variables)
         end
 
         def self.for_app_generation(app)
@@ -54,7 +54,7 @@ module AI
             context_section_name: "app_context"
           }
 
-          AI::Prompts::AgentPromptService.new(custom_variables)
+          Ai::Prompts::AgentPromptService.new(custom_variables)
         end
       end
 
@@ -71,7 +71,7 @@ module AI
             app = team.apps.first || team.apps.build(name: "Demo App")
             prompt_service = TeamSpecificPromptService.for_app_generation(app)
           else
-            prompt_service = AI::Prompts::AgentPromptService.for_platform(:overskill)
+            prompt_service = Ai::Prompts::AgentPromptService.for_platform(:overskill)
           end
 
           config = prompt_service.generate_config
@@ -93,7 +93,7 @@ module AI
         def show
           platform = params[:platform]&.to_sym || :overskill
           
-          unless AI::Prompts::AgentPromptService.available_platforms.include?(platform)
+          unless Ai::Prompts::AgentPromptService.available_platforms.include?(platform)
             return render json: { error: "Invalid platform" }, status: :bad_request
           end
 
@@ -106,7 +106,7 @@ module AI
             custom_vars[:platform_name] = "#{current_user.current_team.name} AI"
           end
 
-          prompt_service = AI::Prompts::AgentPromptService.for_platform(platform, custom_vars)
+          prompt_service = Ai::Prompts::AgentPromptService.for_platform(platform, custom_vars)
           
           if prompt_service.valid_config?
             config = prompt_service.generate_config
@@ -127,7 +127,7 @@ module AI
 
         def export
           platform = params[:platform]&.to_sym || :overskill
-          prompt_service = AI::Prompts::AgentPromptService.for_platform(platform)
+          prompt_service = Ai::Prompts::AgentPromptService.for_platform(platform)
           
           export_path = prompt_service.export_to_files
           
@@ -142,9 +142,9 @@ module AI
         def self.test_all_platforms
           results = {}
           
-          AI::Prompts::AgentPromptService.available_platforms.each do |platform|
+          Ai::Prompts::AgentPromptService.available_platforms.each do |platform|
             begin
-              service = AI::Prompts::AgentPromptService.for_platform(platform)
+              service = Ai::Prompts::AgentPromptService.for_platform(platform)
               config = service.generate_config
               
               results[platform] = {
@@ -172,7 +172,7 @@ module AI
             current_date: "2025-01-01"
           }
 
-          service = AI::Prompts::AgentPromptService.new(test_vars)
+          service = Ai::Prompts::AgentPromptService.new(test_vars)
           prompt = service.generate_prompt
           tools = service.generate_tools
 

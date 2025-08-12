@@ -2,7 +2,7 @@
 
 require 'json'
 
-module AI
+module Ai
   module Prompts
     class AgentTools
       # Default variable values

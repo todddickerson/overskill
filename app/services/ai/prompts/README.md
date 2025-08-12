@@ -16,7 +16,7 @@ The system consists of three main components:
 
 ```ruby
 # Use default OverSkill configuration
-service = AI::Prompts::AgentPromptService.new
+service = Ai::Prompts::AgentPromptService.new
 config = service.generate_config
 
 # Access individual parts
@@ -29,7 +29,7 @@ tool_names = service.tool_names
 
 ```ruby
 # Override specific variables
-service = AI::Prompts::AgentPromptService.new(
+service = Ai::Prompts::AgentPromptService.new(
   platform_name: "MyPlatform",
   tool_prefix: "mp-",
   backend_integration: "Firebase"
@@ -43,12 +43,12 @@ prompt = service.generate_prompt
 
 ```ruby
 # Use predefined platform configurations
-overskill_service = AI::Prompts::AgentPromptService.for_platform(:overskill)
-lovable_service = AI::Prompts::AgentPromptService.for_platform(:lovable)
-generic_service = AI::Prompts::AgentPromptService.for_platform(:generic)
+overskill_service = Ai::Prompts::AgentPromptService.for_platform(:overskill)
+lovable_service = Ai::Prompts::AgentPromptService.for_platform(:lovable)
+generic_service = Ai::Prompts::AgentPromptService.for_platform(:generic)
 
 # With custom overrides
-custom_service = AI::Prompts::AgentPromptService.for_platform(
+custom_service = Ai::Prompts::AgentPromptService.for_platform(
   :overskill, 
   current_date: "2025-12-31"
 )
@@ -63,14 +63,14 @@ custom_service = AI::Prompts::AgentPromptService.for_platform(
 | `tool_prefix` | "os-" | Prefix for all tool names |
 | `technology_stack` | "React, Vite, Tailwind CSS, and TypeScript" | Supported technologies |
 | `backend_integration` | "Supabase" | Backend service name |
-| `context_section_name` | "additional_data" | Name of context section |
+| `context_section_name` | "useful-context" | Name of context section |
 
 ## Advanced Usage
 
 ### Dynamic Variables with Lambdas
 
 ```ruby
-service = AI::Prompts::AgentPromptService.new(
+service = Ai::Prompts::AgentPromptService.new(
   current_date: -> { Date.current.strftime("%B %d, %Y") },
   platform_name: -> { Rails.application.class.module_parent_name }
 )
@@ -79,7 +79,7 @@ service = AI::Prompts::AgentPromptService.new(
 ### Validation
 
 ```ruby
-service = AI::Prompts::AgentPromptService.new(platform_name: "")
+service = Ai::Prompts::AgentPromptService.new(platform_name: "")
 if service.valid_config?
   config = service.generate_config
 else
@@ -90,7 +90,7 @@ end
 ### Export for Debugging
 
 ```ruby
-service = AI::Prompts::AgentPromptService.new
+service = Ai::Prompts::AgentPromptService.new
 export_path = service.export_to_files
 # Creates files at tmp/agent_config/prompt.txt, tools.json, metadata.json
 ```
@@ -102,7 +102,7 @@ export_path = service.export_to_files
 ```ruby
 class AI::ChatService
   def initialize(platform: :overskill)
-    @prompt_service = AI::Prompts::AgentPromptService.for_platform(platform)
+    @prompt_service = Ai::Prompts::AgentPromptService.for_platform(platform)
   end
 
   def chat_with_agent(user_message)
@@ -128,7 +128,7 @@ class GenerateAppJob < ApplicationJob
   def perform(app_id, platform: :overskill)
     app = App.find(app_id)
     
-    prompt_service = AI::Prompts::AgentPromptService.for_platform(
+    prompt_service = Ai::Prompts::AgentPromptService.for_platform(
       platform,
       current_date: Date.current.strftime("%Y-%m-%d"),
       platform_name: app.team.platform_name || "OverSkill"
@@ -156,7 +156,7 @@ else
 end
 
 # Usage
-service = AI::Prompts::AgentPromptService.new(AI_PROMPT_CONFIG)
+service = Ai::Prompts::AgentPromptService.new(AI_PROMPT_CONFIG)
 ```
 
 ## File Structure

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module AI
+module Ai
   module Prompts
     class AgentPrompt
       # Default variable values
@@ -10,7 +10,7 @@ module AI
         tool_prefix: "os-",
         technology_stack: "React, Vite, Tailwind CSS, and TypeScript",
         backend_integration: "Supabase",
-        context_section_name: "additional_data"
+        context_section_name: "useful-context"
       }.freeze
 
       attr_reader :variables

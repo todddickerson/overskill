@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module AI
+module Ai
   module Prompts
     class AgentPromptService
       include ActiveModel::Validations
@@ -85,7 +85,7 @@ module AI
           tool_prefix: "os-",
           technology_stack: "React, Vite, Tailwind CSS, and TypeScript",
           backend_integration: "Supabase",
-          context_section_name: "additional_data"
+          context_section_name: "useful-context"
         }
       end
 
@@ -118,8 +118,8 @@ module AI
             platform_name: "OverSkill",
             tool_prefix: "os-",
             technology_stack: "React, Vite, Tailwind CSS, and TypeScript",
-            backend_integration: "Supabase",
-            context_section_name: "additional_data"
+            backend_integration: "Supabase Shared",
+            context_section_name: "useful-context"
           },
           lovable: {
             platform_name: "Lovable",

@@ -3,7 +3,7 @@
 # Example usage of the Agent Prompt System
 # Run this in Rails console: load Rails.root.join('app/services/ai/prompts/example_usage.rb')
 
-module AI
+module Ai
   module Prompts
     class ExampleUsage
       def self.run_examples
@@ -34,7 +34,7 @@ module AI
         puts "1. Basic Usage"
         puts "-" * 40
 
-        service = AI::Prompts::AgentPromptService.new
+        service = Ai::Prompts::AgentPromptService.new
         config = service.generate_config
 
         puts "Generated config with:"
@@ -49,7 +49,7 @@ module AI
         puts "2. Custom Variables"
         puts "-" * 40
 
-        service = AI::Prompts::AgentPromptService.new(
+        service = Ai::Prompts::AgentPromptService.new(
           platform_name: "MyCustomPlatform",
           tool_prefix: "custom-",
           backend_integration: "Firebase",
@@ -67,11 +67,11 @@ module AI
         puts "3. Platform Configurations"
         puts "-" * 40
 
-        platforms = AI::Prompts::AgentPromptService.available_platforms
+        platforms = Ai::Prompts::AgentPromptService.available_platforms
         puts "Available platforms: #{platforms.join(', ')}"
 
         platforms.each do |platform|
-          service = AI::Prompts::AgentPromptService.for_platform(platform)
+          service = Ai::Prompts::AgentPromptService.for_platform(platform)
           puts "  #{platform}: #{service.variables[:platform_name]} (#{service.variables[:tool_prefix]})"
         end
         puts
@@ -81,7 +81,7 @@ module AI
         puts "4. Tools Configuration"
         puts "-" * 40
 
-        service = AI::Prompts::AgentPromptService.new
+        service = Ai::Prompts::AgentPromptService.new
         tools = service.generate_tools
 
         puts "Total tools: #{tools.size}"
@@ -102,7 +102,7 @@ module AI
         puts "5. Export Functionality"
         puts "-" * 40
 
-        service = AI::Prompts::AgentPromptService.new(
+        service = Ai::Prompts::AgentPromptService.new(
           platform_name: "ExportTest",
           current_date: Date.current.strftime("%Y-%m-%d")
         )
@@ -127,4 +127,4 @@ module AI
 end
 
 # Uncomment to run examples automatically
-# AI::Prompts::ExampleUsage.run_examples
+# Ai::Prompts::ExampleUsage.run_examples
