@@ -265,7 +265,7 @@ module Deployment
     end
     
     def wrap_for_worker_deployment(built_code)
-      # Wrap the built code in a Cloudflare Worker template
+      # Wrap the built code in a Cloudflare Worker template using Service Worker format
       # This makes it ready for deployment to Workers with secrets injection
       
       <<~JAVASCRIPT
@@ -273,54 +273,25 @@ module Deployment
         // Built at: #{Time.current.iso8601}
         // Build mode: #{@build_mode || 'development'}
         
-        // User's built React app bundle
-        #{built_code}
-        
-        // Cloudflare Worker fetch handler
-        export default {
-          async fetch(request, env, ctx) {
-            // Environment variables injected at runtime:
-            // env.SUPABASE_SECRET_KEY - Platform secret (hidden from user)
-            // env.SUPABASE_URL - Platform configuration
-            // env.APP_ID - Unique app identifier
-            // env.OWNER_ID - Team identifier
-            // env.CUSTOM_VARS - User's custom variables
-            
-            const url = new URL(request.url);
-            
-            // Initialize app configuration with secrets
-            const appConfig = {
-              supabaseUrl: env.SUPABASE_URL,
-              supabaseKey: env.SUPABASE_SECRET_KEY,
-              appId: env.APP_ID,
-              ownerId: env.OWNER_ID,
-              customVars: JSON.parse(env.CUSTOM_VARS || '{}'),
-              environment: env.ENVIRONMENT || 'preview'
-            };
-            
-            // Handle API routes
-            if (url.pathname.startsWith('/api/')) {
-              return handleApiRequest(request, appConfig, env);
-            }
-            
-            // Serve the React app
-            return serveReactApp(request, appConfig);
-          }
-        };
+        // User's built React app bundle (embedded to avoid CORS issues)
+        const REACT_APP_BUNDLE = `#{built_code.gsub('`', '\\\`')}`;
         
         // Serve the React application
-        async function serveReactApp(request, config) {
-          const html = `#{@built_html || generate_default_html}`;
+        async function serveReactApp(request, appConfig) {
+          const html = `#{(@built_html || generate_default_html).gsub('`', '\\\`')}`;
           
-          // Inject runtime configuration
+          // Inject runtime configuration and embedded React bundle
           const configScript = `
             <script>
               window.APP_CONFIG = {
-                supabaseUrl: "${config.supabaseUrl}",
-                appId: "${config.appId}",
-                environment: "${config.environment}",
-                customVars: ${JSON.stringify(config.customVars)}
+                supabaseUrl: "${appConfig.supabaseUrl}",
+                appId: "${appConfig.appId}",
+                environment: "${appConfig.environment}",
+                customVars: ${JSON.stringify(appConfig.customVars)}
               };
+            </script>
+            <script type="module">
+              ${REACT_APP_BUNDLE}
             </script>
           `;
           
@@ -335,15 +306,52 @@ module Deployment
         }
         
         // Handle API requests with Supabase admin access
-        async function handleApiRequest(request, config, env) {
+        async function handleApiRequest(request, appConfig, env) {
           // This function would handle API routes with server-side Supabase access
           // using the secret service key
           return new Response(JSON.stringify({ 
             message: 'API endpoint',
-            appId: config.appId 
+            appId: appConfig.appId 
           }), {
             headers: { 'Content-Type': 'application/json' }
           });
+        }
+        
+        // Cloudflare Worker fetch handler (Service Worker format)
+        addEventListener('fetch', event => {
+          event.respondWith(handleRequest(event.request));
+        });
+        
+        async function handleRequest(request) {
+          // Environment variables injected at runtime (available globally)
+          const env = {
+            SUPABASE_SECRET_KEY: SUPABASE_SECRET_KEY,
+            SUPABASE_URL: SUPABASE_URL,
+            APP_ID: APP_ID,
+            OWNER_ID: OWNER_ID,
+            CUSTOM_VARS: CUSTOM_VARS,
+            ENVIRONMENT: ENVIRONMENT || 'preview'
+          };
+          
+          const url = new URL(request.url);
+          
+          // Initialize app configuration with secrets
+          const appConfig = {
+            supabaseUrl: env.SUPABASE_URL,
+            supabaseKey: env.SUPABASE_SECRET_KEY,
+            appId: env.APP_ID,
+            ownerId: env.OWNER_ID,
+            customVars: JSON.parse(env.CUSTOM_VARS || '{}'),
+            environment: env.ENVIRONMENT
+          };
+          
+          // Handle API routes
+          if (url.pathname.startsWith('/api/')) {
+            return handleApiRequest(request, appConfig, env);
+          }
+          
+          // Serve the React app
+          return serveReactApp(request, appConfig);
         }
       JAVASCRIPT
     end

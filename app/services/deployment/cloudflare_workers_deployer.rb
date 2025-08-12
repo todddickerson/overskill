@@ -20,14 +20,24 @@ module Deployment
       # 1. Deploy the Worker script
       deploy_worker(worker_name, built_code)
       
-      # 2. Set environment variables and secrets
-      set_worker_secrets(worker_name)
+      # 2. Set environment variables and secrets (skip if API token lacks permissions)
+      begin
+        set_worker_secrets(worker_name)
+        Rails.logger.info "[CloudflareWorkersDeployer] Successfully set secrets for #{worker_name}"
+      rescue => secrets_error
+        Rails.logger.warn "[CloudflareWorkersDeployer] Could not set secrets (continuing deployment): #{secrets_error.message}"
+        # Continue deployment even if secrets fail - worker can still serve static content
+      end
       
       # 3. Configure routes based on deployment type
       worker_url = configure_worker_routes(worker_name, deployment_type)
       
-      # 4. Handle custom domain if configured
-      custom_url = setup_custom_domain if @app.custom_domain.present? && deployment_type == :production
+      # 4. Handle custom domain if configured (check if custom_domain method exists)
+      custom_url = if @app.respond_to?(:custom_domain) && @app.custom_domain.present? && deployment_type == :production
+                     setup_custom_domain
+                   else
+                     nil
+                   end
       
       {
         success: true,

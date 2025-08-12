@@ -1,3 +1,6 @@
+# Job to generate meaningful app names based on user prompts
+# Uses AI to analyze the app's prompt and generate a descriptive, brandable name
+# Integrates with AppNamerService for the actual AI generation
 class GenerateAppNameJob < ApplicationJob
   queue_as :default
 
@@ -19,6 +22,10 @@ class GenerateAppNameJob < ApplicationJob
     else
       Rails.logger.error "[AppName] Failed to generate name for app #{app.id}: #{result[:error]}"
     end
+  rescue ActiveRecord::RecordNotFound => e
+    # Re-raise RecordNotFound as it indicates a real system error
+    Rails.logger.error "[AppName] App not found: #{app_id}"
+    raise e
   rescue => e
     Rails.logger.error "[AppName] Exception in GenerateAppNameJob: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
