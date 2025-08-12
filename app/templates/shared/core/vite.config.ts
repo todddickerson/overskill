@@ -13,19 +13,24 @@ export default defineConfig({
     // Optimize for size (Cloudflare 1MB limit)
     minify: 'esbuild',
     
-    // Generate source maps for debugging
-    sourcemap: true,
+    // Generate source maps for debugging (disable for production)
+    sourcemap: process.env.NODE_ENV !== 'production',
     
-    // Split chunks for better caching
+    // Configure for pure embedded approach - single bundle
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          supabase: ['@supabase/supabase-js']
-        }
+        // Create single bundle instead of chunks for embedded deployment
+        manualChunks: undefined,
+        
+        // Ensure consistent file naming for easier processing
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
-    }
+    },
+    
+    // Adjust chunk size warning limits for embedded approach
+    chunkSizeWarningLimit: 1000 // 1MB limit for Cloudflare Workers
   },
   
   // Development server configuration

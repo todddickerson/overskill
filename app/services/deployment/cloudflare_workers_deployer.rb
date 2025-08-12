@@ -157,6 +157,7 @@ module Deployment
       # Platform secrets (hidden from users)
       secrets['SUPABASE_URL'] = ENV['SUPABASE_URL']
       secrets['SUPABASE_SECRET_KEY'] = ENV['SUPABASE_SERVICE_KEY']
+      secrets['SUPABASE_ANON_KEY'] = ENV['SUPABASE_ANON_KEY'] # Public key for client-side auth
       
       # System defaults
       secrets['APP_ID'] = @app.id.to_s

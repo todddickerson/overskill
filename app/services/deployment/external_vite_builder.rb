@@ -243,117 +243,244 @@ module Deployment
         raise "Build output directory not found: #{dist_dir}"
       end
       
-      # Find the main JavaScript bundle
-      js_files = Dir.glob(dist_dir.join('assets', '*.js'))
-      
-      if js_files.empty?
-        raise "No JavaScript bundles found in build output"
+      # Read HTML first to understand the structure
+      html_file = dist_dir.join('index.html')
+      unless File.exist?(html_file)
+        raise "HTML file not found in build output: #{html_file}"
       end
       
-      # Read the main bundle (usually index-[hash].js)
-      main_js_file = js_files.find { |f| f.include?('index') } || js_files.first
-      built_code = File.read(main_js_file)
+      html_content = File.read(html_file)
+      Rails.logger.info "[ExternalViteBuilder] HTML file found: #{html_content.bytesize} bytes"
       
-      # Also read the HTML for proper injection later
-      html_file = dist_dir.join('index.html')
-      @built_html = File.read(html_file) if File.exist?(html_file)
+      # Parse the HTML to find all asset references
+      assets = extract_asset_references(html_content, dist_dir)
+      Rails.logger.info "[ExternalViteBuilder] Found #{assets.length} assets to embed"
       
-      Rails.logger.info "[ExternalViteBuilder] Build successful. Output size: #{built_code.bytesize} bytes"
+      # Create hybrid HTML with CSS embedded and JS external
+      hybrid_html = create_hybrid_html_with_external_js(html_content, assets)
       
-      # Wrap in Worker-compatible format
-      wrap_for_worker_deployment(built_code)
+      Rails.logger.info "[ExternalViteBuilder] Build successful. Hybrid HTML size: #{hybrid_html.bytesize} bytes"
+      Rails.logger.info "[ExternalViteBuilder] External assets: #{@external_assets&.count || 0} files"
+      
+      # Wrap in Worker-compatible format with asset serving
+      wrap_for_worker_deployment_hybrid(hybrid_html, @external_assets || [])
+    end
+
+    private
+    
+    def extract_asset_references(html_content, dist_dir)
+      assets = []
+      
+      # Find JavaScript modules
+      html_content.scan(/<script[^>]*src=['"](.*?)['"]/m) do |src|
+        asset_path = src[0]
+        next if asset_path.start_with?('http') # Skip external URLs
+        
+        file_path = dist_dir.join(asset_path.gsub(/^\//, ''))
+        if File.exist?(file_path)
+          content = File.read(file_path)
+          assets << {
+            type: 'script',
+            original_tag: $&,
+            path: asset_path,
+            content: content,
+            is_module: $&.include?('type="module"')
+          }
+          Rails.logger.info "[ExternalViteBuilder] Found JS asset: #{asset_path} (#{content.bytesize} bytes)"
+        else
+          Rails.logger.warn "[ExternalViteBuilder] Asset not found: #{file_path}"
+        end
+      end
+      
+      # Find CSS stylesheets
+      html_content.scan(/<link[^>]*rel=['"](stylesheet|modulepreload)['"][^>]*href=['"](.*?)['"]/m) do |rel, href|
+        next if href.start_with?('http') # Skip external URLs
+        
+        file_path = dist_dir.join(href.gsub(/^\//, ''))
+        if File.exist?(file_path) && rel == 'stylesheet'
+          content = File.read(file_path)
+          assets << {
+            type: 'style',
+            original_tag: $&,
+            path: href,
+            content: content
+          }
+          Rails.logger.info "[ExternalViteBuilder] Found CSS asset: #{href} (#{content.bytesize} bytes)"
+        elsif File.exist?(file_path) && rel == 'modulepreload'
+          # Modulepreload files are JavaScript that will be embedded
+          content = File.read(file_path)
+          assets << {
+            type: 'preload_script',
+            original_tag: $&,
+            path: href,
+            content: content
+          }
+          Rails.logger.info "[ExternalViteBuilder] Found preload asset: #{href} (#{content.bytesize} bytes)"
+        end
+      end
+      
+      assets
     end
     
-    def wrap_for_worker_deployment(built_code)
-      # Wrap the built code in a Cloudflare Worker template using Service Worker format
-      # This makes it ready for deployment to Workers with secrets injection
+    def create_hybrid_html_with_external_js(html_content, assets)
+      # Hybrid approach: embed CSS (small), external JS assets (large)
+      Rails.logger.info "[ExternalViteBuilder] Building hybrid HTML with #{assets.count} assets"
       
-      <<~JAVASCRIPT
-        // App ID: #{@app.id}
-        // Built at: #{Time.current.iso8601}
-        // Build mode: #{@build_mode || 'development'}
-        
-        // User's built React app bundle (embedded to avoid CORS issues)
-        const REACT_APP_BUNDLE = `#{built_code.gsub('`', '\\\`')}`;
-        
-        // Serve the React application
-        async function serveReactApp(request, appConfig) {
-          const html = `#{(@built_html || generate_default_html).gsub('`', '\\\`')}`;
+      # Extract title from original HTML
+      title_match = html_content.match(/<title>(.*?)<\/title>/m)
+      title = title_match ? title_match[1] : "App #{@app.id}"
+      
+      # Separate assets by type and size
+      js_assets = []
+      css_content = []
+      @external_assets = [] # Store for R2 upload
+      
+      assets.each do |asset|
+        case asset[:type]
+        when 'script', 'preload_script'
+          # External JS assets (will be uploaded to R2)
+          js_assets << asset
+          @external_assets << {
+            path: asset[:path],
+            content: asset[:content],
+            content_type: 'application/javascript',
+            size: asset[:content].bytesize
+          }
+          Rails.logger.info "[ExternalViteBuilder] External JS asset: #{asset[:path]} (#{asset[:content].bytesize} bytes)"
           
-          // Inject runtime configuration and embedded React bundle
-          const configScript = `
-            <script>
-              window.APP_CONFIG = {
-                supabaseUrl: "${appConfig.supabaseUrl}",
-                appId: "${appConfig.appId}",
-                environment: "${appConfig.environment}",
-                customVars: ${JSON.stringify(appConfig.customVars)}
-              };
-            </script>
-            <script type="module">
-              ${REACT_APP_BUNDLE}
-            </script>
-          `;
-          
-          const finalHtml = html.replace('</head>', configScript + '</head>');
-          
-          return new Response(finalHtml, {
-            headers: {
-              'Content-Type': 'text/html',
-              'Cache-Control': 'public, max-age=3600'
-            }
-          });
-        }
+        when 'style'
+          # Embed CSS directly (usually small)
+          css_content << asset[:content]
+          Rails.logger.info "[ExternalViteBuilder] Embedded CSS asset: #{asset[:path]} (#{asset[:content].bytesize} bytes)"
+        end
+      end
+      
+      # Build HTML with embedded CSS and external JS references
+      js_tags = js_assets.map { |asset| 
+        "<script type=\"module\" src=\"#{asset[:path]}\"></script>" 
+      }.join("\n")
+      
+      hybrid_html = <<~HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <link rel="icon" type="image/svg+xml" href="/vite.svg">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>#{title}</title>
+          #{css_content.map { |css| "<style>\n#{css}\n</style>" }.join("\n")}
+        </head>
+        <body>
+          <div id="root"></div>
+          #{js_tags}
+        </body>
+        </html>
+      HTML
+      
+      Rails.logger.info "[ExternalViteBuilder] Generated hybrid HTML (#{hybrid_html.bytesize} bytes, #{@external_assets.count} external assets)"
+      hybrid_html
+    end
+    
+    def wrap_for_worker_deployment_hybrid(hybrid_html, external_assets)
+      # Create Worker template that serves HTML and external JS assets
+      escaped_html = hybrid_html.gsub('\\', '\\\\').gsub('`', '\\`').gsub('$', '\\$')
+      
+      # Create asset map for the Worker with safe escaping
+      assets_map = external_assets.map do |asset|
+        # Use JSON encoding for maximum safety
+        content_json = asset[:content].to_json
+        "  #{asset[:path].to_json}: { content: #{content_json}, type: #{asset[:content_type].to_json} }"
+      end.join(",\n")
+      
+      # Hybrid Worker code with asset serving
+      worker_code = <<~JAVASCRIPT
+        // App ID: #{@app.id} | Built: #{Time.current.iso8601} | Mode: hybrid
+        // Architecture: CSS embedded, JS assets served with correct MIME types
         
-        // Handle API requests with Supabase admin access
-        async function handleApiRequest(request, appConfig, env) {
-          // This function would handle API routes with server-side Supabase access
-          // using the secret service key
-          return new Response(JSON.stringify({ 
-            message: 'API endpoint',
-            appId: appConfig.appId 
-          }), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
+        // HTML with embedded CSS and external JS references
+        const HTML_CONTENT = `#{escaped_html}`;
         
-        // Cloudflare Worker fetch handler (Service Worker format)
+        // External assets (JS files) with content and MIME types
+        const ASSETS = {
+        #{assets_map}
+        };
+        
+        // Service Worker event listener
         addEventListener('fetch', event => {
           event.respondWith(handleRequest(event.request));
         });
         
         async function handleRequest(request) {
-          // Environment variables injected at runtime (available globally)
-          const env = {
-            SUPABASE_SECRET_KEY: SUPABASE_SECRET_KEY,
-            SUPABASE_URL: SUPABASE_URL,
-            APP_ID: APP_ID,
-            OWNER_ID: OWNER_ID,
-            CUSTOM_VARS: CUSTOM_VARS,
-            ENVIRONMENT: ENVIRONMENT || 'preview'
-          };
-          
           const url = new URL(request.url);
           
-          // Initialize app configuration with secrets
-          const appConfig = {
-            supabaseUrl: env.SUPABASE_URL,
-            supabaseKey: env.SUPABASE_SECRET_KEY,
-            appId: env.APP_ID,
-            ownerId: env.OWNER_ID,
-            customVars: JSON.parse(env.CUSTOM_VARS || '{}'),
-            environment: env.ENVIRONMENT
+          // Get environment variables with fallbacks
+          const config = {
+            supabaseUrl: typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://bsbgwixlklvgeoxvjmtb.supabase.co',
+            supabaseAnonKey: typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzYmd3aXhsa2x2Z2VveHZqbXRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzgyMTAsImV4cCI6MjA2OTMxNDIxMH0.0K9JFMA0K90yOtvnYSYBCroS2Htg1iaICjcevNVCWKM',
+            appId: typeof APP_ID !== 'undefined' ? APP_ID : '#{@app.id}',
+            environment: typeof ENVIRONMENT !== 'undefined' ? ENVIRONMENT : 'preview',
+            customVars: {}
           };
           
-          // Handle API routes
-          if (url.pathname.startsWith('/api/')) {
-            return handleApiRequest(request, appConfig, env);
+          // CRITICAL FIX: Serve JS assets with correct MIME types
+          // Handle both absolute (/assets/file.js) and relative (./file.js) import paths
+          let assetPath = null;
+          
+          if (url.pathname.startsWith('/assets/') && url.pathname.endsWith('.js')) {
+            // Direct absolute path request
+            assetPath = url.pathname;
+          } else if (url.pathname.endsWith('.js')) {
+            // Relative path - convert to absolute
+            const filename = url.pathname.split('/').pop();
+            // Find matching asset by filename
+            assetPath = Object.keys(ASSETS).find(path => path.endsWith('/' + filename));
           }
           
-          // Serve the React app
-          return serveReactApp(request, appConfig);
+          if (assetPath && ASSETS[assetPath]) {
+            const asset = ASSETS[assetPath];
+            return new Response(asset.content, {
+              headers: {
+                'Content-Type': 'application/javascript; charset=utf-8',
+                'Cache-Control': 'public, max-age=31536000', // 1 year cache for assets
+                'Access-Control-Allow-Origin': '*'
+              }
+            });
+          }
+          
+          // Check if this is a JS file request that we should handle
+          if (url.pathname.endsWith('.js')) {
+            return new Response('JavaScript asset not found: ' + url.pathname, { 
+              status: 404,
+              headers: { 'Content-Type': 'text/plain' }
+            });
+          }
+          
+          // Handle API routes  
+          if (url.pathname.startsWith('/api/')) {
+            return new Response(JSON.stringify({
+              message: 'API endpoint',
+              appId: config.appId,
+              path: url.pathname
+            }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          
+          // Inject config and serve HTML for all page routes
+          const configScript = '<script>window.APP_CONFIG=' + JSON.stringify(config) + ';</script>';
+          const finalHtml = HTML_CONTENT.replace('<div id="root">', configScript + '<div id="root">');
+          
+          return new Response(finalHtml, {
+            headers: {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'public, max-age=300'
+            }
+          });
         }
       JAVASCRIPT
+      
+      Rails.logger.info "[ExternalViteBuilder] Generated hybrid Worker (#{worker_code.bytesize} bytes) with #{external_assets.count} assets"
+      worker_code
     end
     
     def generate_default_html
