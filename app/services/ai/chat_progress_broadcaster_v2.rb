@@ -284,7 +284,7 @@ module Ai
       Turbo::StreamsChannel.broadcast_append_to(
         "app_#{@app.id}_chat",
         target: "chat_messages",
-        partial: "account/app_chat_messages/message",
+        partial: "account/app_editors/chat_message",
         locals: { message: message }
       )
     end
