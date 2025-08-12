@@ -5,8 +5,8 @@ module Ai
       @team = app.team
     end
     
-    def generate_core_files
-      Rails.logger.info "[SharedTemplateService] Generating core files for app ##{@app.id}"
+    def generate_foundation_files
+      Rails.logger.info "[SharedTemplateService] Generating foundation files for app ##{@app.id}"
       
       files_created = []
       
@@ -18,9 +18,20 @@ module Ai
       files_created += generate_routing_files
       files_created += generate_layout_files
       
-      Rails.logger.info "[SharedTemplateService] Generated #{files_created.size} core files"
-      files_created
+      Rails.logger.info "[SharedTemplateService] Generated #{files_created.size} foundation files"
+      
+      # Return data format expected by AppBuilderV4Enhanced
+      files_created.map do |file_path|
+        app_file = @app.app_files.find_by(path: file_path)
+        {
+          path: file_path,
+          content: app_file&.content || "// File content for #{file_path}"
+        }
+      end
     end
+    
+    # Keep the old method name for backward compatibility
+    alias_method :generate_core_files, :generate_foundation_files
     
     private
     

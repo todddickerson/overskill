@@ -11,10 +11,10 @@
       <div class="flex items-center space-x-3">
         <%# User/AI avatar %>
         <div class="flex-shrink-0">
-          <% if chat_message.from_user? %>
+          <% if chat_message.role == 'user' %>
             <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
               <span class="text-white text-sm font-medium">
-                <%= chat_message.user.name.first.upcase %>
+                <%= (chat_message.user&.name || 'U').first.upcase %>
               </span>
             </div>
           <% else %>
@@ -30,7 +30,7 @@
         <%# Message metadata %>
         <div>
           <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-            <%= chat_message.from_user? ? chat_message.user.name : 'AI Assistant' %>
+            <%= chat_message.role == 'user' ? chat_message.user&.name || 'User' : 'AI Assistant' %>
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             <%= chat_message.created_at.strftime("%H:%M") %>

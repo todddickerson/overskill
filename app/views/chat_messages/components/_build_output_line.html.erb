@@ -1,0 +1,13 @@
+<%# Build output line with timestamp and stream type %>
+<div class="flex items-start space-x-2 py-0.5">
+  <span class="text-xs text-gray-500 font-mono flex-shrink-0 w-12">
+    <%= timestamp %>
+  </span>
+  <div class="flex-1 min-w-0">
+    <% if stream_type == :stderr %>
+      <span class="text-red-400 font-mono text-xs break-all"><%= line %></span>
+    <% else %>
+      <span class="text-green-400 font-mono text-xs break-all"><%= line %></span>
+    <% end %>
+  </div>
+</div>

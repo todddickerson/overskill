@@ -1,7 +1,7 @@
 <%# User-friendly error panel with recovery suggestions %>
 <div class="rounded-lg border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4"
      data-controller="error-panel"
-     data-error-panel-show-technical-value="<%= show_technical %>">
+     data-error-panel-show-technical-value="<%= defined?(show_technical) ? show_technical : false %>">
   
   <%# Error header %>
   <div class="flex items-start space-x-3">

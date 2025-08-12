@@ -39,6 +39,20 @@ class AppChatMessage < ApplicationRecord
     status == "failed"
   end
 
+  def generating?
+    status == "generating"
+  end
+
+  def has_generation_data?
+    # Check if this message has progress data or is actively being processed
+    generating? || executing? || planning? || status.present?
+  end
+
+  def app_generated?
+    # Check if this message resulted in a completed app
+    completed? && app.present? && app.status == 'ready'
+  end
+
   def status_icon
     case status
     when "planning"

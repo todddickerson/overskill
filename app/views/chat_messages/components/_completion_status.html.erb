@@ -1,0 +1,52 @@
+<%# Completion status with success/failure indication %>
+<div class="<%= success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' %> flex items-center space-x-2">
+  <% if success %>
+    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+    </svg>
+    <span class="font-medium">Generation completed successfully!</span>
+  <% else %>
+    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+    </svg>
+    <span class="font-medium">Generation failed</span>
+  <% end %>
+</div>
+
+<% if stats.present? %>
+  <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+    <% if success %>
+      <div class="space-y-1">
+        <% if stats[:files_generated] %>
+          <div>Files generated: <span class="font-mono"><%= stats[:files_generated] %></span></div>
+        <% end %>
+        <% if stats[:build_time] %>
+          <div>Build time: <span class="font-mono"><%= "%.2f" % stats[:build_time] %>s</span></div>
+        <% end %>
+        <% if stats[:app_url] %>
+          <div>
+            App URL: 
+            <a href="<%= stats[:app_url] %>" 
+               target="_blank" 
+               class="font-mono text-blue-600 dark:text-blue-400 hover:underline">
+              <%= stats[:app_url] %>
+            </a>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <% if stats[:error] %>
+        <div>Error: <span class="font-mono text-red-600 dark:text-red-400"><%= stats[:error] %></span></div>
+      <% end %>
+      <% if stats[:duration] %>
+        <div>Duration: <span class="font-mono"><%= "%.2f" % stats[:duration] %>s</span></div>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if elapsed_time %>
+  <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+    Total time: <%= "%.2f" % elapsed_time %>s
+  </div>
+<% end %>

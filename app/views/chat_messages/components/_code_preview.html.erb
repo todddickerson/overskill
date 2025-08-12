@@ -1,0 +1,14 @@
+<%# Code preview with syntax highlighting %>
+<div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3">
+  <div class="flex items-center justify-between mb-2">
+    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+      <%= file_path %>
+    </h4>
+    <span class="text-xs text-gray-500 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+      <%= language %>
+    </span>
+  </div>
+  <div class="bg-gray-900 rounded-md p-3 overflow-x-auto">
+    <pre><code class="text-sm text-gray-100 font-mono"><%= content %></code></pre>
+  </div>
+</div>
