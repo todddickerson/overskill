@@ -97,7 +97,7 @@ module Ai
         @broadcaster.broadcast_build_progress(:complete)
         @broadcaster.broadcast_step_complete("Build & Deploy", {
           build_time: build_result[:build_time],
-          size: build_result[:size]
+          size: build_result[:size] || 0
         })
         
         # Update app status and complete generation

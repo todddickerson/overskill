@@ -215,6 +215,7 @@ module Ai
     end
     
     def format_file_size(bytes)
+      return "0B" if bytes.nil? || bytes <= 0
       return "#{bytes}B" if bytes < 1024
       return "#{(bytes / 1024.0).round(1)}KB" if bytes < 1024 * 1024
       "#{(bytes / (1024.0 * 1024)).round(1)}MB"
