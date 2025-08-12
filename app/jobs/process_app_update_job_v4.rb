@@ -25,7 +25,7 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     Rails.logger.info "[ProcessAppUpdateJobV4] Starting V4 orchestrator for message ##{message.id} (app ##{message.app.id})"
     
     # Use enhanced V4 with visual feedback by default
-    use_v5 = true # Todd's human built new version based on Lovable leaked Agent prompts
+    use_v5 = true # New version based on Lovable leaked Agent prompts
     orchestrator = if use_v5
       Rails.logger.info "[ProcessAppUpdateJobV4] Using V5 builder"
       Ai::AppBuilderV5.new(message)
