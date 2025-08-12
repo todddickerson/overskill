@@ -389,8 +389,15 @@ module Deployment
       assets_map = external_assets.map do |asset|
         # Use JSON encoding for maximum safety
         content_json = asset[:content].to_json
-        "  #{asset[:path].to_json}: { content: #{content_json}, type: #{asset[:content_type].to_json} }"
+        content_type = asset[:content_type] || 'application/javascript'
+        "  #{asset[:path].to_json}: { content: #{content_json}, type: #{content_type.to_json} }"
       end.join(",\n")
+      
+      # Log assets for debugging
+      Rails.logger.info "[ExternalViteBuilder] Creating Worker with #{external_assets.count} assets"
+      external_assets.each do |asset|
+        Rails.logger.info "  Asset: #{asset[:path]} (#{asset[:content].bytesize} bytes)"
+      end
       
       # Hybrid Worker code with asset serving
       worker_code = <<~JAVASCRIPT
@@ -404,6 +411,9 @@ module Deployment
         const ASSETS = {
         #{assets_map}
         };
+        
+        // Debug: Log available assets on Worker initialization
+        console.log('[Worker Init] App #{@app.id} - Available assets:', Object.keys(ASSETS));
         
         // Service Worker event listener
         addEventListener('fetch', event => {
@@ -438,9 +448,10 @@ module Deployment
           
           if (assetPath && ASSETS[assetPath]) {
             const asset = ASSETS[assetPath];
+            console.log('[Worker] Serving JS asset:', assetPath, 'type:', asset.type);
             return new Response(asset.content, {
               headers: {
-                'Content-Type': 'application/javascript; charset=utf-8',
+                'Content-Type': asset.type || 'application/javascript; charset=utf-8',
                 'Cache-Control': 'public, max-age=31536000', // 1 year cache for assets
                 'Access-Control-Allow-Origin': '*'
               }
@@ -449,7 +460,9 @@ module Deployment
           
           // Check if this is a JS file request that we should handle
           if (url.pathname.endsWith('.js')) {
-            return new Response('JavaScript asset not found: ' + url.pathname, { 
+            console.log('[Worker] JS asset not found:', url.pathname);
+            console.log('[Worker] Available assets:', Object.keys(ASSETS));
+            return new Response('JavaScript asset not found: ' + url.pathname + '\nAvailable: ' + Object.keys(ASSETS).join(', '), { 
               status: 404,
               headers: { 'Content-Type': 'text/plain' }
             });

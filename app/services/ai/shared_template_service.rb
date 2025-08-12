@@ -443,11 +443,25 @@ module Ai
       <<~TS
         import { createClient } from '@supabase/supabase-js'
         
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+        // Use window.APP_CONFIG injected by the Worker
+        declare global {
+          interface Window {
+            APP_CONFIG?: {
+              supabaseUrl: string
+              supabaseAnonKey: string
+              appId: string
+              environment: string
+              customVars: Record<string, string>
+            }
+          }
+        }
+        
+        const supabaseUrl = window.APP_CONFIG?.supabaseUrl || ''
+        const supabaseAnonKey = window.APP_CONFIG?.supabaseAnonKey || ''
         
         if (!supabaseUrl || !supabaseAnonKey) {
-          console.warn('Supabase credentials not configured')
+          console.error('Supabase credentials not configured')
+          console.log('APP_CONFIG:', window.APP_CONFIG)
         }
         
         export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

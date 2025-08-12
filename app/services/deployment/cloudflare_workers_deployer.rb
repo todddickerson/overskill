@@ -116,6 +116,17 @@ module Deployment
       handle_api_response(response, "deploy worker #{worker_name}")
     end
     
+    def delete_worker(worker_name)
+      Rails.logger.info "[CloudflareWorkersDeployer] Deleting Worker: #{worker_name}"
+      
+      response = self.class.delete(
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
+        headers: {}
+      )
+      
+      handle_api_response(response, "delete worker #{worker_name}")
+    end
+    
     def build_worker_upload_body(script_content)
       # Build multipart body for Worker deployment
       {
