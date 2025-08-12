@@ -2,9 +2,15 @@ require 'test_helper'
 
 class Ai::AppBuilderV4CompleteTest < ActiveSupport::TestCase
   setup do
-    @user = users(:one)
-    @team = teams(:one)
-    @app = apps(:one)
+    @team = Team.create!(name: 'Test Team')
+    @user = User.create!(email: 'test@example.com', password: 'password123')
+    @membership = @team.memberships.create!(user: @user, role_ids: ['admin'])
+    @app = App.create!(
+      name: 'Test App',
+      team: @team,
+      creator: @membership,
+      prompt: 'Test prompt'
+    )
     
     # Create initial message
     @message = @app.app_chat_messages.create!(

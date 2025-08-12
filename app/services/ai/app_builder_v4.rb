@@ -106,25 +106,26 @@ module Ai
     end
 
     def build_for_deployment
-      Rails.logger.info "[V4] Building app ##{@app.id} for deployment"
+      Rails.logger.info "[V4] Building app ##{@app.id} using external Rails build system"
       
-      builder = Deployment::ViteBuilderService.new(@app)
+      # Use external Rails-based builder (MVP approach)
+      builder = Deployment::ExternalViteBuilder.new(@app)
       
-      # Determine build mode based on user intent
-      build_mode = builder.determine_build_mode(@message.content)
+      # Determine if this is preview or production based on context
+      is_production = @message.content.downcase.include?('deploy') || 
+                     @message.content.downcase.include?('production')
       
-      build_result = case build_mode
-                    when :production
-                      Rails.logger.info "[V4] Using production build (3min optimized)"
-                      builder.build_for_production!
+      build_result = if is_production
+                      Rails.logger.info "[V4] Using production optimized build"
+                      builder.build_for_production
                     else
-                      Rails.logger.info "[V4] Using development build (45s fast)"
-                      builder.build_for_development!
+                      Rails.logger.info "[V4] Using fast preview build"
+                      builder.build_for_preview
                     end
 
-      # Deploy to Cloudflare if build successful
+      # Deploy to Cloudflare Workers (not Pages) if build successful
       if build_result[:success]
-        deployment_result = deploy_to_cloudflare(build_result)
+        deployment_result = deploy_to_workers_with_secrets(build_result, is_production)
         build_result.merge!(deployment: deployment_result)
       end
       
@@ -137,38 +138,68 @@ module Ai
       { success: false, error: e.message, build_skipped: true }
     end
 
-    def deploy_to_cloudflare(build_result)
-      Rails.logger.info "[V4] Deploying to Cloudflare for app ##{@app.id}"
+    def deploy_to_workers_with_secrets(build_result, is_production = false)
+      Rails.logger.info "[V4] Deploying to Cloudflare Workers with secrets for app ##{@app.id}"
       
-      client = Deployment::CloudflareApiClient.new(@app)
-      deployment_result = client.deploy_complete_application(build_result)
+      # Use new Workers deployer with secrets management
+      deployer = Deployment::CloudflareWorkersDeployer.new(@app)
+      
+      # Deploy to preview or production subdomain
+      deployment_type = is_production ? :production : :preview
+      deployment_result = deployer.deploy_with_secrets(
+        built_code: build_result[:built_code],
+        deployment_type: deployment_type
+      )
       
       if deployment_result[:success]
-        Rails.logger.info "[V4] Cloudflare deployment successful"
-        # Update app URLs from deployment
-        update_app_urls_from_deployment(deployment_result[:deployment_urls])
+        Rails.logger.info "[V4] Workers deployment successful to #{deployment_type} environment"
+        # Update app URLs based on deployment type
+        update_app_urls_for_deployment_type(deployment_result, deployment_type)
       else
-        Rails.logger.warn "[V4] Cloudflare deployment failed: #{deployment_result[:error]}"
+        Rails.logger.warn "[V4] Workers deployment failed: #{deployment_result[:error]}"
       end
       
       deployment_result
     rescue => e
-      Rails.logger.error "[V4] Cloudflare deployment error: #{e.message}"
+      Rails.logger.error "[V4] Workers deployment error: #{e.message}"
       { success: false, error: e.message }
     end
 
-    def update_app_urls_from_deployment(deployment_urls)
+    def update_app_urls_for_deployment_type(deployment_result, deployment_type)
       updates = {}
       
-      if deployment_urls[:preview_url]
-        updates[:preview_url] = deployment_urls[:preview_url]
+      if deployment_type == :preview
+        # Preview deployments go to preview subdomain
+        updates[:preview_url] = deployment_result[:worker_url]  # preview-{app-id}.overskill.app
+      elsif deployment_type == :production
+        # Production deployments go to main subdomain
+        updates[:production_url] = deployment_result[:worker_url]  # app-{app-id}.overskill.app
+        updates[:deployed_at] = Time.current
       end
       
-      if deployment_urls[:production_url]
-        updates[:production_url] = deployment_urls[:production_url]
+      # Also track custom domain if configured
+      if deployment_result[:custom_url].present?
+        updates[:custom_domain_url] = deployment_result[:custom_url]
       end
       
       @app.update!(updates) if updates.any?
+      
+      # Ensure environment variables are synced to Worker
+      ensure_app_env_vars_synced(deployment_type)
+    end
+    
+    def ensure_app_env_vars_synced(deployment_type)
+      # Ensure system defaults and platform secrets are set up
+      if defined?(AppEnvVar)
+        begin
+          AppEnvVar.ensure_system_defaults_for_app(@app) if AppEnvVar.respond_to?(:ensure_system_defaults_for_app)
+          AppEnvVar.ensure_platform_secrets_for_app(@app) if AppEnvVar.respond_to?(:ensure_platform_secrets_for_app)
+        rescue => e
+          Rails.logger.warn "[V4] Could not sync env vars: #{e.message}"
+        end
+      end
+      
+      Rails.logger.info "[V4] Environment variables synced for #{deployment_type} deployment"
     end
 
     
@@ -489,6 +520,7 @@ module Ai
     
     def create_new_version
       @app.app_versions.create!(
+        team: @app.team,
         version_number: next_version_number,
         changelog: "V4 orchestrator generation: #{@message.content.truncate(100)}"
       )

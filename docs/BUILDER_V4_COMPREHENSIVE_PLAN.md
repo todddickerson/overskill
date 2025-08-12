@@ -4,7 +4,7 @@
 
 **Current Problem**: We've diverged from core requirements. Using CDN React + Babel (no build) when we need Vite builds. Missing structured templates, proper file organization, and key service integrations. GPT-5 implementation created complexity without addressing fundamentals.
 
-**Solution**: Builder V4 refocuses on Lovable.dev patterns with Vite builds, React Router, structured templates, and integrated services. Claude 4.1 as primary model with proper tool integration.
+**Solution**: Builder V4 adopts a hybrid architecture with Rails-based builds (MVP approach), Cloudflare Workers deployment (not Pages), structured templates, and integrated services. Focus on simplicity and reliability over complex edge computing.
 
 ---
 
@@ -56,8 +56,11 @@ src/
 All apps start with shared foundation files (auth pages, routing, Supabase setup). 
 App-specific templates come from cloning existing apps, not pre-built templates.
 
-### 4. **Cloudflare Worker Deployment**
-Proper build → deploy pipeline with secret management via API.
+### 4. **Hybrid Deployment Architecture**
+- **Build System**: Rails-based builds with temp directories (MVP approach)
+- **Deployment Target**: Cloudflare Workers (not Pages) with secrets management
+- **Subdomain Strategy**: preview-{app-id} vs app-{app-id} differentiation
+- **Custom Domains**: Cloudflare for SaaS integration for SSL
 
 ### 5. **Supabase Multi-tenancy**
 Sharding with RLS for app isolation in shared projects.
@@ -106,12 +109,12 @@ graph TD
 
 ### Core Services
 
-#### 1. **Ai::AppBuilderV4** (New Orchestrator)
+#### 1. **Ai::AppBuilderV4** (Hybrid Architecture Orchestrator)
 ```ruby
 module Ai
   class AppBuilderV4
-    # Primary orchestrator replacing V3
-    # Focus: Template-based generation with smart edits
+    # Primary orchestrator with hybrid Rails-based builds
+    # Focus: Simplicity, reliability, and proper secrets management
     
     SUPPORTED_MODELS = [
       'claude-opus-4-1-20250805',      # Primary (extended thinking)
@@ -120,19 +123,19 @@ module Ai
     ]
     
     def execute!
-      # SIMPLIFIED: All apps use same simple architecture
+      # HYBRID APPROACH: Rails builds + Cloudflare Workers deployment
       
       # Phase 1: Generate shared foundation with app-scoped DB
       generate_shared_foundation  # Auth, routing, app-scoped Supabase
       
       # Phase 2: AI generates app-specific features
-      generate_app_features        # Simple Supabase-first approach
+      generate_app_features       # Simple Supabase-first approach
       
       # Phase 3: Smart customization
-      apply_customizations         # Use LineReplace for edits
+      apply_customizations        # Use LineReplace for edits
       
-      # Phase 4: Build and deploy
-      build_and_deploy            # Fast dev mode or optimized prod
+      # Phase 4: Rails-based build and Workers deployment
+      build_and_deploy_hybrid     # Rails server builds → Workers deployment
   end
 end
 ```
@@ -218,40 +221,65 @@ module Ai
 end
 ```
 
-#### 4. **Deployment::ViteBuilderService** (Enhanced with Optimization)
+#### 4. **Deployment::ExternalViteBuilder** (Rails-Based MVP)
 ```ruby
 module Deployment
-  class ViteBuilderService
+  class ExternalViteBuilder
+    # Rails server builds with temp directories (MVP approach)
+    
     def build!(app, mode = :development)
       case mode
       when :development, :preview
-        FastDevelopmentBuilder.new(app).build!  # 45s builds
+        RailsFastBuilder.new(app).build!  # 45s builds on Rails server
       when :production
-        ProductionOptimizedBuilder.new(app).build!  # 3min optimized
+        RailsOptimizedBuilder.new(app).build!  # 3min optimized on Rails server
       end
     end
   end
   
-  class FastDevelopmentBuilder
-    # Skip optimization for rapid iteration
+  class RailsFastBuilder
+    # Rails server execution with temp directories
     def build!(app)
-      vite_result = run_vite_build_fast(app)
+      build_dir = create_temp_build_directory(app)
+      
+      # Execute on Rails server (not Workers)
+      Dir.chdir(build_dir) do
+        run_npm_install
+        vite_result = run_vite_build_fast
+      end
+      
       validate_basic_size(vite_result)  # Fail if > 1.2MB
       worker = generate_simple_worker(vite_result)
-      deploy_to_preview(worker)
+      deploy_to_preview_subdomain(worker)
+      cleanup_temp_directory(build_dir)
       # Total: 35-45 seconds
     end
   end
   
-  class ProductionOptimizedBuilder  
-    # Full optimization with hybrid assets
+  class RailsOptimizedBuilder  
+    # Rails server execution with full optimization
     def build!(app)
-      vite_result = run_vite_build_production(app)
+      build_dir = create_temp_build_directory(app)
+      
+      Dir.chdir(build_dir) do
+        run_npm_install_with_cache
+        vite_result = run_vite_build_production
+      end
+      
       distribution = CloudflareWorkerOptimizer.new.optimize(vite_result)
       upload_to_r2(distribution[:r2_assets])
       worker = generate_hybrid_worker(distribution)
-      deploy_to_production(worker)
+      deploy_to_production_subdomain(worker)
+      cleanup_temp_directory(build_dir)
       # Total: 2.5-3 minutes
+    end
+    
+    private
+    
+    def create_temp_build_directory(app)
+      temp_dir = Rails.root.join('tmp', 'builds', app.id.to_s, Time.current.to_i.to_s)
+      FileUtils.mkdir_p(temp_dir)
+      temp_dir
     end
   end
 end
@@ -302,10 +330,10 @@ module Deployment
 end
 ```
 
-#### 6. **Deployment::CloudflareApiClient** (New - No Wrangler CLI)
+#### 6. **Deployment::CloudflareWorkersDeployer** (Workers-Only Deployment)
 ```ruby
 module Deployment
-  class CloudflareApiClient
+  class CloudflareWorkersDeployer
     include HTTParty
     base_uri 'https://api.cloudflare.com/client/v4'
     
@@ -316,21 +344,31 @@ module Deployment
       self.class.headers 'Authorization' => "Bearer #{@api_token}"
     end
     
-    # Deploy Worker via API (no wrangler CLI)
-    def deploy_worker(name, script_content)
+    # Deploy to Workers (not Pages) with subdomain differentiation
+    def deploy_worker(app, script_content, mode = :preview)
+      worker_name = generate_worker_name(app, mode)
+      subdomain = generate_subdomain(app, mode)
+      
+      # Deploy Worker script
       response = self.class.put(
-        "/accounts/#{@account_id}/workers/scripts/#{name}",
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
         headers: { 'Content-Type' => 'application/javascript' },
         body: script_content
       )
       
       raise "Worker deployment failed: #{response.body}" unless response.success?
-      response
+      
+      # Configure route for subdomain
+      configure_worker_route(worker_name, subdomain)
+      
+      # Inject platform secrets (hidden from user)
+      inject_platform_secrets(worker_name, app)
+      
+      { worker_name: worker_name, url: "https://#{subdomain}" }
     end
     
-    # Upload to R2 via API (no wrangler CLI)
+    # Upload to R2 via API (for large assets)
     def upload_to_r2(bucket:, key:, content:, content_type:)
-      # Use R2 API endpoint directly
       r2_endpoint = "https://#{@account_id}.r2.cloudflarestorage.com/#{bucket}/#{key}"
       
       response = HTTParty.put(r2_endpoint, {
@@ -345,33 +383,93 @@ module Deployment
       response
     end
     
-    # Set Worker secrets via API (no wrangler CLI)
-    def set_worker_secrets(worker_name, secrets_hash)
-      secrets_hash.each do |key, value|
-        response = self.class.patch(
-          "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
-          body: { name: key, text: value, type: 'secret_text' }.to_json,
-          headers: { 'Content-Type' => 'application/json' }
-        )
-        
-        raise "Secret setting failed for #{key}" unless response.success?
+    # Secrets management with platform vs user separation
+    def inject_platform_secrets(worker_name, app)
+      # Platform secrets (hidden from users)
+      platform_secrets = {
+        'SUPABASE_SERVICE_KEY' => ENV['SUPABASE_SERVICE_KEY'],
+        'PLATFORM_API_KEY' => ENV['PLATFORM_API_KEY'],
+        'INTERNAL_WEBHOOK_SECRET' => ENV['INTERNAL_WEBHOOK_SECRET']
+      }
+      
+      # User environment variables (visible)
+      user_env_vars = app.app_env_vars.user_visible.pluck(:key, :value).to_h
+      
+      # Inject all secrets via API
+      (platform_secrets.merge(user_env_vars)).each do |key, value|
+        set_worker_secret(worker_name, key, value)
       end
     end
     
-    # Configure Worker routes via API (no wrangler CLI)
-    def configure_worker_routes(worker_name, domains)
-      domains.each do |domain|
-        response = self.class.post(
-          "/zones/#{ENV['CLOUDFLARE_ZONE_ID']}/workers/routes",
-          body: {
-            pattern: "#{domain}/*",
-            script: worker_name
-          }.to_json,
-          headers: { 'Content-Type' => 'application/json' }
-        )
-        
-        raise "Route configuration failed for #{domain}" unless response.success?
+    # Custom domains via Cloudflare for SaaS
+    def configure_custom_domain(app, custom_domain)
+      # Integrate with Cloudflare for SaaS for SSL certificates
+      response = self.class.post(
+        "/zones/#{ENV['CLOUDFLARE_ZONE_ID']}/custom_hostnames",
+        body: {
+          hostname: custom_domain,
+          ssl: {
+            method: 'http',
+            type: 'dv',
+            settings: {
+              http2: 'on',
+              min_tls_version: '1.2'
+            }
+          }
+        }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      
+      raise "Custom domain configuration failed" unless response.success?
+      
+      # Route traffic to appropriate Worker
+      worker_name = generate_worker_name(app, :production)
+      configure_worker_route(worker_name, custom_domain)
+      
+      response
+    end
+    
+    private
+    
+    def generate_worker_name(app, mode)
+      case mode
+      when :preview
+        "preview-app-#{app.id}"
+      when :production
+        "app-#{app.id}"
       end
+    end
+    
+    def generate_subdomain(app, mode)
+      case mode
+      when :preview
+        "preview-#{app.id}.overskill.app"
+      when :production
+        "app-#{app.id}.overskill.app"
+      end
+    end
+    
+    def set_worker_secret(worker_name, key, value)
+      response = self.class.patch(
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
+        body: { name: key, text: value, type: 'secret_text' }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      
+      raise "Secret setting failed for #{key}" unless response.success?
+    end
+    
+    def configure_worker_route(worker_name, domain)
+      response = self.class.post(
+        "/zones/#{ENV['CLOUDFLARE_ZONE_ID']}/workers/routes",
+        body: {
+          pattern: "#{domain}/*",
+          script: worker_name
+        }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      
+      raise "Route configuration failed for #{domain}" unless response.success?
     end
   end
 end
@@ -555,10 +653,10 @@ overskill-app-template/
 
 ## 🔧 Implementation Phases
 
-### Phase 1: Core Infrastructure (Week 1)
-1. **Create Ai::AppBuilderV4**
-   - Replace V3 orchestrator
-   - Integrate existing services
+### Phase 1: Core Infrastructure (Updated for Hybrid - Week 1)
+1. **Create Ai::AppBuilderV4** (Hybrid Architecture)
+   - Replace V3 orchestrator with Rails-based build approach
+   - Integrate existing services (LineReplace, SmartSearch)
    - Implement discussion mode
 
 2. **Build Ai::SharedTemplateService**
@@ -566,49 +664,57 @@ overskill-app-template/
    - NOT app-specific templates
    - Focus on reusable components
 
-3. **Implement Deployment::ViteBuilderService**
-   - Vite build pipeline
-   - Cloudflare Worker generation
-   - Secret management
+3. **Implement Deployment::ExternalViteBuilder** (Rails-Based)
+   - Rails server build execution with temp directories
+   - Node.js execution on Rails server (MVP approach)
+   - Build pipeline for both fast (45s) and optimized (3min) modes
 
-### Phase 2: Service Integration (Week 1)
-1. **Integrate LineReplaceService**
-   - Tool definition in V4
-   - Surgical edit workflow
-   - Token optimization
+4. **Create Deployment::CloudflareWorkersDeployer**
+   - Deploy built code to Cloudflare Workers (not Pages)
+   - Subdomain management (preview vs production)
+   - Platform secrets injection
 
-2. **Integrate SmartSearchService**
-   - Component discovery
-   - Duplicate prevention
-   - Context loading
+5. **Enhanced AppEnvVar Model**
+   - Add var_type enum (public, runtime_secret, platform_secret)
+   - Automatic Cloudflare Workers synchronization
+   - User visibility controls
 
-3. **Implement Conversation Loop**
-   - Claude 4 multi-step
-   - Progress broadcasting
-   - File batching
+### Phase 2: Secrets Management & Environment Variables (Week 2)
+1. **Enhanced Environment Variable System**
+   - Migrate AppEnvVar model with var_type enum
+   - Implement platform vs user secret separation
+   - Build user-friendly environment variable dashboard
 
-### Phase 3: App Library & Cloning (Week 2)
-1. **Build Example Apps for Cloning**
-   - Todo app (basic CRUD)
-   - Dashboard (data viz)
-   - Blog (content management)
-   - Game (state management)
-   - Tool (single purpose)
+2. **Cloudflare Workers Secrets Integration**
+   - Automatic secret synchronization
+   - Runtime injection for platform secrets
+   - User-defined secret management interface
+
+3. **Preview vs Production URL Management**
+   - Implement subdomain routing logic
+   - Build promotion workflow (preview → production)
+   - Version management for deployments
+
+### Phase 3: Custom Domains & Cloudflare for SaaS (Week 3)
+1. **Custom Domain Support**
+   - Cloudflare for SaaS integration
+   - Automatic SSL certificate provisioning
+   - Domain verification workflows
    
-2. **Implement App Cloning Service**
-   - Browse existing apps
-   - Clone as starting point
-   - Maintain app genealogy
+2. **Advanced Deployment Features**
+   - Blue-green deployments for production apps
+   - Rollback capabilities
+   - Deployment health monitoring
 
-3. **Supabase Integration**
-   - RLS policies
-   - Multi-tenancy
-   - Auth flows
+3. **Testing & Validation**
+   - End-to-end deployment testing
+   - Custom domain validation
+   - Performance monitoring
 
-4. **Testing & Validation**
-   - Shared file generation
-   - Build process
-   - Deployment
+4. **Migration & Documentation**
+   - Migration scripts from current system
+   - Updated deployment documentation
+   - Monitoring and alerting setup
 
 ---
 

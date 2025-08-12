@@ -85,46 +85,35 @@
 
 ---
 
-## ⚠️ CRITICAL GAPS TO ADDRESS
+## ✅ CRITICAL GAPS RESOLVED (HYBRID ARCHITECTURE)
 
-### **1. Build Environment Architecture**
-**Gap**: No defined Node.js execution environment for Vite builds
-- Need containerized build system (Docker + ECS recommended)
-- npm install caching strategy required
-- Build timeout handling (current: undefined)
-- Resource limits and cost management
+### **1. Build Environment Architecture** ✅ RESOLVED
+**Solution**: Rails-based build system (MVP approach)
+- Rails server execution with temp directories
+- npm install and Vite build on Rails server
+- Temp directory cleanup and resource management  
+- Simple and reliable approach without complex infrastructure
 
-### **2. Database Migration Strategy**  
-**Gap**: RLS policy creation and table scoping undefined
-- Auto-create `app_${id}_${table_name}` tables
-- RLS policy templates for multi-tenancy
-- Migration scripts for database setup
-- Connection pooling from Workers
+### **2. Secrets Management** ✅ NEW SOLUTION
+**Solution**: Enhanced AppEnvVar with var_type enum
+- Platform secrets (hidden): SUPABASE_SERVICE_KEY, PLATFORM_API_KEY
+- User secrets (visible): STRIPE_SECRET_KEY, custom API keys  
+- Public vars (client-safe): VITE_APP_ID, VITE_SUPABASE_URL
+- Automatic Cloudflare Workers synchronization
 
-### **3. App-Scoped Database Implementation**
-**Must Have**: Hybrid wrapper (transparent + debuggable)
-```typescript
-// Required in ALL templates:
-class AppScopedDatabase {
-  from(table: string) {
-    const scopedTable = `app_${this.appId}_${table}`;
-    console.log(`🗃️ Querying: ${scopedTable}`); // Dev logging
-    return this.supabase.from(scopedTable);
-  }
-}
-```
+### **3. Deployment Target** ✅ RESOLVED  
+**Solution**: Cloudflare Workers (not Pages) deployment
+- Workers deployment via API (no Wrangler CLI)
+- Subdomain routing: preview-{app-id}.overskill.app vs app-{app-id}.overskill.app
+- Custom domains via Cloudflare for SaaS with automatic SSL
+- Platform secrets injection at runtime
 
-### **4. Claude 4 Conversation Loop**
-**Gap**: Implementation details for single-file-per-call limitation
-```ruby
-# Need to implement:
-def generate_with_claude_conversation(files_needed)
-  files_needed.each_slice(2) do |batch|
-    response = claude_create_files(batch)
-    # Handle partial failures, context maintenance
-  end
-end
-```
+### **4. Custom Domain Support** ✅ NEW FEATURE
+**Solution**: Cloudflare for SaaS integration
+- Automatic SSL certificate provisioning
+- Domain verification workflows
+- Custom domains → Workers routing
+- Fallback to subdomain if SSL fails
 
 ---
 
@@ -137,18 +126,18 @@ end
 - **App Architecture**: App-scoped database + Supabase auth ✅
 - **Error Recovery**: Intelligent chat-based debugging ✅
 
-### **🎯 PERFORMANCE TARGETS (Day 3-5)**
-- **Dev Build Time**: < 45 seconds (fast mode for iteration)
-- **Prod Build Time**: < 3 minutes (optimized with hybrid assets)
+### **🎯 PERFORMANCE TARGETS (Hybrid Architecture)**
+- **Rails Fast Build Time**: < 45 seconds (Rails server execution)
+- **Rails Optimized Build Time**: < 3 minutes (full optimization)
 - **Worker Script Size**: < 900KB (with buffer under 1MB limit)
-- **Cold Start Time**: < 100ms for edge workers
-- **Database Query**: < 50ms with app scoping
+- **Secrets Sync Time**: < 5 seconds (Platform → Workers)
+- **Custom Domain SSL**: < 2 minutes (certificate provisioning)
 
-### **💰 BUSINESS TARGETS**
+### **💰 BUSINESS TARGETS (Hybrid Architecture)**
 - **Generated App Quality**: Professional UI vs basic HTML ✅
-- **Simple App Cost**: $1-2/month (70% of apps - Supabase-first)
-- **Performance App Cost**: $40-50/month (20% of apps - hybrid edge)
-- **Complex App Cost**: $200-300/month (10% of apps - full edge stack)
+- **Simple App Cost**: $1-2/month (ALL apps - Supabase-first approach)
+- **Infrastructure Simplicity**: Rails + Workers (no complex edge computing)
+- **Custom Domain Cost**: $0 additional (via Cloudflare for SaaS)
 - **AI Token Savings**: 90% via LineReplaceService surgical edits
 
 ---
@@ -282,6 +271,31 @@ Before considering V4 production ready:
 
 ---
 
-*Updated: August 11, 2025*  
-*Status: ✅ V4 IMPLEMENTATION COMPLETE - Ready for Testing*  
-*Next: End-to-end testing, performance validation, and production rollout*
+## 🔄 UPDATED HYBRID ARCHITECTURE SUMMARY
+
+### **Key Changes from Original V4 Plan**
+1. **Build System**: Workers-based builds → **Rails-based builds** (MVP approach)
+2. **Deployment Target**: Pages → **Cloudflare Workers** with secrets management
+3. **Subdomain Strategy**: Enhanced **preview vs production** differentiation  
+4. **Secrets Management**: New **var_type enum** for platform vs user separation
+5. **Custom Domains**: **Cloudflare for SaaS** integration for automatic SSL
+6. **Timeline**: Extended to **4 weeks** for comprehensive hybrid implementation
+
+### **Benefits of Hybrid Architecture**
+- **Simplicity**: Rails server builds vs complex edge computing
+- **Reliability**: Proven Rails infrastructure vs experimental Workers builds
+- **Security**: Strong platform secrets separation
+- **Scalability**: Custom domains with automatic SSL provisioning
+- **Cost Efficiency**: Consistent $1-2/month per app across all apps
+
+### **Services to Create/Update**
+- ✅ **ExternalViteBuilder**: Rails-based builds with temp directories
+- ✅ **CloudflareWorkersDeployer**: Workers deployment with secrets injection
+- ✅ **Enhanced AppEnvVar**: var_type enum and automatic synchronization
+- ✅ **Custom Domain Manager**: Cloudflare for SaaS integration
+
+---
+
+*Updated: August 12, 2025*  
+*Status: ✅ V4 HYBRID ARCHITECTURE PLANNED - Ready for Implementation*  
+*Next: Begin Week 1 implementation with Rails-based builds and Workers deployment*

@@ -1,8 +1,8 @@
 # V4 Implementation Roadmap
 
-**Project**: OverSkill Builder V4 (Vite + Cloudflare Worker Architecture)
-**Timeline**: 3 weeks
-**Status**: Ready for Implementation
+**Project**: OverSkill Builder V4 (Hybrid Rails + Cloudflare Workers Architecture)
+**Timeline**: 4 weeks
+**Status**: Updated for Hybrid Architecture
 
 ---
 
@@ -11,10 +11,11 @@
 ### **Week 1: Core Infrastructure** 
 *August 12-18, 2025*
 
-#### 🎯 Primary Goals
-- Replace V3 orchestrator with V4
+#### 🎯 Primary Goals (Updated for Hybrid)
+- Replace V3 orchestrator with V4 hybrid architecture
 - Create shared template system  
-- Build Vite pipeline via Cloudflare Workers
+- Build Rails-based Vite pipeline with temp directories (MVP approach)
+- Deploy to Cloudflare Workers (not Pages) with secrets management
 - Integrate existing services (LineReplace, SmartSearch)
 
 #### 📋 Specific Deliverables
@@ -116,11 +117,11 @@ end
 ```
 
 ##### Day 3-4: Vite Build Service ✅ COMPLETED
-**Files Created:**
+**Files to Create:**
 ```ruby
-# /app/services/deployment/vite_builder_service.rb
+# /app/services/deployment/external_vite_builder.rb (NEW - Rails-Based)
 module Deployment
-  class ViteBuilderService
+  class ExternalViteBuilder
     def initialize(app)
       @app = app
     end
@@ -128,39 +129,53 @@ module Deployment
     def build!(mode = :development)
       case mode
       when :development, :preview
-        FastDevelopmentBuilder.new(@app).build!  # 45s
+        RailsFastBuilder.new(@app).build!  # 45s on Rails server
       when :production  
-        ProductionOptimizedBuilder.new(@app).build! # 3min
+        RailsOptimizedBuilder.new(@app).build! # 3min on Rails server
       end
     end
   end
 end
 
-# /app/services/deployment/fast_development_builder.rb
-# /app/services/deployment/production_optimized_builder.rb
-# /app/services/deployment/cloudflare_worker_optimizer.rb
+# /app/services/deployment/rails_fast_builder.rb (NEW)
+# /app/services/deployment/rails_optimized_builder.rb (NEW)
+# /app/services/deployment/cloudflare_workers_deployer.rb (NEW - Workers not Pages)
 ```
 
 ##### Day 5: Cloudflare API Client ✅ COMPLETED
-**Files Created:**
+**Files to Create:**
 ```ruby
-# /app/services/deployment/cloudflare_api_client.rb
+# /app/services/deployment/cloudflare_workers_deployer.rb (UPDATED)
 module Deployment
-  class CloudflareApiClient
+  class CloudflareWorkersDeployer
     include HTTParty
     base_uri 'https://api.cloudflare.com/client/v4'
     
-    def deploy_worker(name, script_content)
-      # Deploy via API, no Wrangler CLI
+    def deploy_worker(app, script_content, mode = :preview)
+      worker_name = generate_worker_name(app, mode)
+      subdomain = generate_subdomain(app, mode)
+      
+      # Deploy to Workers (not Pages)
+      deploy_worker_script(worker_name, script_content)
+      configure_worker_route(worker_name, subdomain)
+      inject_platform_secrets(worker_name, app)
+      
+      { worker_name: worker_name, url: "https://#{subdomain}" }
     end
     
-    def upload_to_r2(bucket:, key:, content:, content_type:)
-      # R2 API direct upload
+    def configure_custom_domain(app, custom_domain)
+      # Cloudflare for SaaS integration for SSL
     end
     
-    def set_worker_secrets(worker_name, app)
-      # Sync AppEnvVar to Cloudflare
-      app.app_env_vars.each { |env_var| sync_env_var(env_var) }
+    private
+    
+    def generate_subdomain(app, mode)
+      case mode
+      when :preview
+        "preview-#{app.id}.overskill.app"
+      when :production
+        "app-#{app.id}.overskill.app"
+      end
     end
   end
 end
@@ -175,31 +190,49 @@ end
 
 ---
 
-### **Week 2: Advanced Features & Integration**
+### **Week 2: Secrets Management & Environment Variables**
 *August 19-25, 2025*
 
 #### 🎯 Primary Goals
-- Add token usage tracking
-- Implement app-scoped database wrapper
-- Build error recovery system
-- Create comprehensive testing
+- Enhanced AppEnvVar model with var_type enum
+- Platform secrets vs user secrets separation
+- Automatic Cloudflare Workers secrets synchronization
+- Preview vs production URL management
 
 #### 📋 Specific Deliverables
 
-##### Day 1: Token Tracking Migration
+##### Day 1: Enhanced AppEnvVar Model
 **Migration to Create:**
 ```ruby
-# /db/migrate/add_token_tracking_to_app_versions.rb
-class AddTokenTrackingToAppVersions < ActiveRecord::Migration[7.0]
+# /db/migrate/add_var_type_to_app_env_vars.rb
+class AddVarTypeToAppEnvVars < ActiveRecord::Migration[7.0]
   def change
-    add_column :app_versions, :ai_tokens_input, :integer, default: 0
-    add_column :app_versions, :ai_tokens_output, :integer, default: 0  
-    add_column :app_versions, :ai_cost_cents, :integer, default: 0
-    add_column :ai_model_used, :string
+    add_column :app_env_vars, :var_type, :string, default: 'public'
+    add_column :app_env_vars, :description, :text
+    add_column :app_env_vars, :is_platform_managed, :boolean, default: false
     
-    add_index :app_versions, :ai_cost_cents
-    add_index :app_versions, :ai_model_used
+    add_index :app_env_vars, :var_type
+    add_index :app_env_vars, :is_platform_managed
   end
+end
+```
+
+**Enhanced Model:**
+```ruby
+# /app/models/app_env_var.rb (UPDATED)
+class AppEnvVar < ApplicationRecord
+  belongs_to :app
+  
+  enum :var_type, {
+    public: 'public',           # Safe for client (VITE_ prefixed)
+    runtime_secret: 'runtime_secret',  # Worker-only, user-defined
+    platform_secret: 'platform_secret' # Platform-only, hidden from users
+  }
+  
+  scope :user_visible, -> { where(var_type: [:public, :runtime_secret]) }
+  scope :platform_only, -> { where(var_type: :platform_secret) }
+  
+  after_commit :sync_to_cloudflare_worker, if: :should_sync?
 end
 ```
 
@@ -645,33 +678,44 @@ end
 
 ---
 
-### **Week 3: Polish & Production Readiness**
+### **Week 3: Custom Domains & Cloudflare for SaaS**
 *August 26-September 1, 2025*
 
 #### 🎯 Primary Goals
-- Remove deprecated V3 code  
-- Update AI_APP_STANDARDS.md
-- Production deployment testing
-- Documentation and migration guides
+- Cloudflare for SaaS integration for custom domains
+- Automatic SSL certificate provisioning
+- Blue-green deployments and rollback capabilities
+- Advanced monitoring and health checks
 
 #### 📋 Specific Deliverables
 
-##### Day 1: Cleanup & Deprecation
-**Files to Remove:**
-```
-# Remove deprecated V3 orchestrators
-/app/services/ai/app_update_orchestrator.rb
-/app/services/ai/app_update_orchestrator_v2.rb
-/app/services/ai/app_update_orchestrator_v3.rb (after V4 stable)
-
-# Remove INSTANT MODE services
-/app/services/deployment/fast_preview_service.rb
-/app/services/deployment/cloudflare_preview_service.rb
-
-# Remove test files
-/test_*.rb
-/debug_*.rb  
-/check_*.rb
+##### Day 1: Custom Domain Support
+**Service to Create:**
+```ruby
+# /app/services/deployment/custom_domain_manager.rb (NEW)
+module Deployment
+  class CustomDomainManager
+    def configure_custom_domain(app, domain)
+      # 1. Create Cloudflare for SaaS hostname
+      hostname = create_cloudflare_hostname(domain)
+      
+      # 2. Generate SSL certificate
+      provision_ssl_certificate(hostname)
+      
+      # 3. Route to appropriate Worker
+      route_to_worker(app, domain)
+      
+      # 4. Update app record
+      app.update!(custom_domain: domain, ssl_status: 'provisioning')
+    end
+    
+    private
+    
+    def create_cloudflare_hostname(domain)
+      # Cloudflare for SaaS API integration
+    end
+  end
+end
 ```
 
 **Files to Update:**
@@ -685,7 +729,7 @@ end
 - Proper build → deploy pipeline
 ```
 
-##### Day 2-3: Production Testing
+##### Day 2-3: Blue-Green Deployments
 **Test Scripts to Create:**
 ```bash
 # /scripts/test_v4_deployment.sh
@@ -723,7 +767,7 @@ module Monitoring
 end
 ```
 
-##### Day 4: Documentation
+##### Day 4: Advanced Monitoring
 **Docs to Create:**
 ```markdown
 # /docs/V4_MIGRATION_GUIDE.md
@@ -736,7 +780,7 @@ end
 # V4 service API documentation
 ```
 
-##### Day 5: Production Rollout
+##### Day 5: Integration Testing
 **Rollout Plan:**
 1. Deploy V4 to staging environment
 2. Test with subset of beta users
@@ -745,53 +789,172 @@ end
 5. Deprecate V3 after validation
 
 #### ✅ Week 3 Success Criteria
-- [ ] V3 code safely deprecated
-- [ ] AI_APP_STANDARDS.md updated (INSTANT MODE removed)
-- [ ] Production testing passes all scenarios
-- [ ] Documentation complete and reviewed
-- [ ] Rollout plan executed successfully
+- [ ] Custom domain support working with SSL
+- [ ] Cloudflare for SaaS integration complete
+- [ ] Blue-green deployment system operational
+- [ ] Advanced monitoring and alerting setup
+- [ ] Performance targets met (45s dev, 3min prod)
+
+---
+
+### **Week 4: Testing & Migration**
+*September 2-8, 2025*
+
+#### 🎯 Primary Goals
+- Comprehensive testing of hybrid architecture
+- Migration from current V3/Workers-for-Platforms system
+- Production deployment and validation
+- Documentation and team training
+
+#### 📋 Specific Deliverables
+
+##### Day 1-2: Comprehensive Testing Suite
+**Rails-Based Build Testing:**
+```ruby
+# /test/services/deployment/external_vite_builder_test.rb
+class Deployment::ExternalViteBuilderTest < ActiveSupport::TestCase
+  test "creates temp build directory and executes Rails-based builds" do
+    app = apps(:one)
+    builder = Deployment::ExternalViteBuilder.new(app)
+    
+    result = builder.build!(:development)
+    
+    assert result[:success]
+    assert result[:build_time] < 45 # seconds
+    assert result[:worker_size] < 900_000 # bytes
+  end
+end
+```
+
+**Cloudflare Workers Deployment Testing:**
+```ruby
+# /test/services/deployment/cloudflare_workers_deployer_test.rb  
+class Deployment::CloudflareWorkersDeployerTest < ActiveSupport::TestCase
+  test "deploys to Workers with correct subdomain routing" do
+    app = apps(:one)
+    deployer = Deployment::CloudflareWorkersDeployer.new
+    
+    result = deployer.deploy_worker(app, "console.log('test')", :preview)
+    
+    assert_equal "preview-#{app.id}.overskill.app", result[:url].gsub('https://', '')
+    assert result[:worker_name].present?
+  end
+end
+```
+
+##### Day 3: Migration Scripts
+**V3 to V4 Migration Service:**
+```ruby
+# /app/services/migration/v3_to_v4_migrator.rb
+module Migration
+  class V3ToV4Migrator
+    def migrate_app(app)
+      # 1. Convert existing app files to V4 structure
+      convert_file_structure(app)
+      
+      # 2. Update environment variables with var_type
+      migrate_env_vars(app)
+      
+      # 3. Update deployment configuration
+      update_deployment_config(app)
+      
+      # 4. Test build and deployment
+      validate_v4_functionality(app)
+    end
+  end
+end
+```
+
+##### Day 4: Performance Validation
+**Build Time Benchmarks:**
+```bash
+# /scripts/benchmark_hybrid_builds.sh
+#!/bin/bash
+echo "Benchmarking V4 Hybrid Build Performance..."
+
+# Test Rails-based fast builds (target: <45s)
+for i in {1..5}; do
+  start_time=$(date +%s)
+  rails runner "Deployment::RailsFastBuilder.new(App.first).build!"
+  end_time=$(date +%s)
+  echo "Fast build $i: $((end_time - start_time))s"
+done
+
+# Test Rails-based optimized builds (target: <3min)
+for i in {1..3}; do
+  start_time=$(date +%s)
+  rails runner "Deployment::RailsOptimizedBuilder.new(App.first).build!"
+  end_time=$(date +%s)
+  echo "Optimized build $i: $((end_time - start_time))s"
+done
+```
+
+##### Day 5: Production Rollout
+**Gradual Migration Strategy:**
+1. **Phase 1**: Deploy V4 to staging environment
+2. **Phase 2**: Test with subset of beta users (20%)
+3. **Phase 3**: Monitor metrics and performance
+4. **Phase 4**: Gradual rollout to all users (50%, 80%, 100%)
+5. **Phase 5**: Deprecate V3 after validation
+
+#### ✅ Week 4 Success Criteria
+- [ ] All hybrid architecture tests passing
+- [ ] Migration scripts successfully convert V3 apps
+- [ ] Performance benchmarks meet targets (45s dev, 3min prod)
+- [ ] Production deployment validation complete
+- [ ] Team training and documentation finished
+- [ ] V3 system safely deprecated
 
 ---
 
 ## 🎯 Critical Success Metrics
 
-### Technical Performance
+### Technical Performance (Updated for Hybrid)
 | Metric | Target | Measurement |
 |--------|--------|-------------|
-| Dev Build Time | < 45 seconds | Average build duration |
-| Prod Build Time | < 3 minutes | Full optimization time |
+| Rails Fast Build Time | < 45 seconds | Average build duration on Rails server |
+| Rails Optimized Build Time | < 3 minutes | Full optimization time on Rails server |
 | Worker Script Size | < 900KB | Cloudflare 1MB limit compliance |
 | App Success Rate | > 95% | Working deployed apps |
-| Token Usage | 90% savings | Via LineReplace integration |
+| Secrets Sync Time | < 5 seconds | Platform to Workers synchronization |
+| Custom Domain SSL | < 2 minutes | Certificate provisioning time |
 
-### Business Impact
+### Business Impact (Updated for Hybrid)
 | Metric | Target | Measurement |
 |--------|--------|-------------|
 | Time to First App | < 60 seconds | User onboarding |
 | App Monthly Cost | $1-2 | Supabase-first architecture |
 | Development Velocity | 2x faster | vs manual development |
-| API Dependencies | 0 CLI tools | Pure HTTP API approach |
+| Infrastructure Simplicity | Rails + Workers | No complex edge computing |
+| Custom Domain Setup | < 5 minutes | End-to-end SSL configuration |
 
 ---
 
 ## 🚨 Risk Mitigation
 
-### High Risk Items
-1. **Cloudflare Worker Size Limit** (1MB)
+### High Risk Items (Updated for Hybrid)
+1. **Rails Server Build Performance** (NEW RISK)
+   - *Risk*: Rails server might be slower than dedicated build infrastructure
+   - *Mitigation*: Temp directory cleanup, npm caching, concurrent builds
+   - *Testing*: Automated performance benchmarks in CI
+
+2. **Cloudflare Worker Size Limit** (1MB)
    - *Mitigation*: Hybrid asset strategy (embed critical, R2 for large)
    - *Testing*: Automated size checking in build pipeline
 
-2. **Build Performance** (Target: 45s dev, 3min prod)
-   - *Mitigation*: Fast dev mode with optimized prod mode
-   - *Testing*: Performance benchmarks in CI
+3. **Platform Secrets Exposure** (NEW RISK)
+   - *Risk*: Platform secrets might accidentally be exposed to users
+   - *Mitigation*: Strong separation via var_type enum, automated auditing
+   - *Testing*: Security validation in deployment pipeline
 
-3. **App-Scoped Database Complexity**
-   - *Mitigation*: Wrapper service with transparent debugging
-   - *Testing*: Multi-tenant test scenarios
+4. **Custom Domain SSL Provisioning** (NEW RISK)
+   - *Risk*: SSL certificate provisioning might fail or be slow
+   - *Mitigation*: Cloudflare for SaaS integration, fallback to subdomain
+   - *Testing*: End-to-end domain validation testing
 
-4. **Migration from V3** 
-   - *Mitigation*: Parallel deployment, gradual rollout
-   - *Testing*: Staging environment validation
+5. **Migration from V3** 
+   - *Mitigation*: Comprehensive migration scripts, gradual rollout
+   - *Testing*: Staging environment validation with real V3 apps
 
 ### Low Risk Items
 - Token tracking (existing database structure)
