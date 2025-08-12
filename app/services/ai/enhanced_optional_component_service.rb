@@ -390,39 +390,136 @@ module Ai
     def get_required_dependencies
       dependencies = Set.new
       
-      # Check which categories have been added by looking at files
-      @app.app_files.pluck(:path).each do |path|
-        # Supabase auth components
-        if path.include?('components/auth/password-based-auth')
-          dependencies.add('@supabase/auth-helpers-react')
-        end
+      # Analyze all app files for dependency imports and usage
+      @app.app_files.each do |file|
+        file_content = file.content || ""
         
-        # Dropzone
-        if path.include?('components/data/dropzone')
-          dependencies.add('react-dropzone')
-        end
+        # Scan for import statements and component usage
+        analyze_file_dependencies(file_content, dependencies)
         
-        # Realtime components
-        if path.include?('components/realtime/')
-          dependencies.add('@supabase/realtime-js')
-        end
-        
-        # shadcn/ui components
-        if path.include?('components/ui/')
-          dependencies.add('@radix-ui/react-dialog')
-          dependencies.add('@radix-ui/react-slot')
-          dependencies.add('class-variance-authority')
-          dependencies.add('lucide-react')
-        end
-        
-        # Platform kit
-        if path.include?('components/platform/')
-          dependencies.add('@monaco-editor/react')
-          dependencies.add('recharts')
-        end
+        # Path-based detection for specific component categories
+        analyze_path_dependencies(file.path, dependencies)
       end
       
       dependencies.to_a
+    end
+    
+    private
+    
+    def analyze_file_dependencies(content, dependencies)
+      # Drag and drop libraries
+      if content.include?('@hello-pangea/dnd') || content.include?('DragDropContext') || content.include?('Draggable')
+        dependencies.add('@hello-pangea/dnd')
+      end
+      
+      # Icon libraries
+      if content.include?('lucide-react') || content.match?(/import.*from ['"]lucide-react['"]/)
+        dependencies.add('lucide-react')
+      end
+      
+      # shadcn/ui component dependencies
+      add_shadcn_dependencies(content, dependencies)
+      
+      # Supabase auth UI
+      if content.include?('@supabase/auth-ui-react') || content.include?('Auth from')
+        dependencies.add('@supabase/auth-ui-react')
+        dependencies.add('@supabase/auth-ui-shared')
+      end
+      
+      # React Hook Form (common in forms)
+      if content.include?('react-hook-form') || content.include?('useForm')
+        dependencies.add('react-hook-form')
+        dependencies.add('@hookform/resolvers')
+        dependencies.add('zod') # commonly used with react-hook-form
+      end
+      
+      # Toast/notification libraries
+      if content.include?('react-hot-toast') || content.include?('toast')
+        dependencies.add('react-hot-toast')
+      end
+      
+      # Date/time libraries
+      if content.include?('date-fns') || content.include?('formatDistance')
+        dependencies.add('date-fns')
+      end
+      
+      # State management
+      if content.include?('zustand')
+        dependencies.add('zustand')
+      end
+      
+      # Animation libraries
+      if content.include?('framer-motion') || content.include?('motion.')
+        dependencies.add('framer-motion')
+      end
+    end
+    
+    def add_shadcn_dependencies(content, dependencies)
+      # Core shadcn/ui dependencies always needed
+      if content.match?(/['"]@\/components\/ui\//) || content.include?('components/ui/')
+        dependencies.add('class-variance-authority') # CVA for variants
+        dependencies.add('clsx') # className utilities
+        dependencies.add('tailwind-merge') # Tailwind className merging
+      end
+      
+      # Radix UI dependencies based on component usage
+      radix_components = {
+        'Dialog' => '@radix-ui/react-dialog',
+        'Popover' => '@radix-ui/react-popover', 
+        'Tooltip' => '@radix-ui/react-tooltip',
+        'DropdownMenu' => '@radix-ui/react-dropdown-menu',
+        'Select' => '@radix-ui/react-select',
+        'Checkbox' => '@radix-ui/react-checkbox',
+        'RadioGroup' => '@radix-ui/react-radio-group',
+        'Switch' => '@radix-ui/react-switch',
+        'Slider' => '@radix-ui/react-slider',
+        'Progress' => '@radix-ui/react-progress',
+        'Tabs' => '@radix-ui/react-tabs',
+        'Accordion' => '@radix-ui/react-accordion',
+        'AlertDialog' => '@radix-ui/react-alert-dialog',
+        'Sheet' => '@radix-ui/react-dialog', # Sheets use dialog primitives
+        'Toast' => '@radix-ui/react-toast',
+        'Slot' => '@radix-ui/react-slot'
+      }
+      
+      radix_components.each do |component, package|
+        if content.include?(component) || content.include?("ui/#{component.downcase}")
+          dependencies.add(package)
+        end
+      end
+      
+      # Additional shadcn/ui specific packages
+      if content.include?('Badge') || content.include?('ui/badge')
+        dependencies.add('lucide-react') # badges often use icons
+      end
+      
+      if content.include?('useToast') || content.include?('toast(')
+        dependencies.add('@radix-ui/react-toast')
+      end
+    end
+    
+    def analyze_path_dependencies(path, dependencies)
+      # Path-based dependency detection (existing logic)
+      # Supabase auth components
+      if path.include?('components/auth/password-based-auth')
+        dependencies.add('@supabase/auth-helpers-react')
+      end
+      
+      # Dropzone
+      if path.include?('components/data/dropzone')
+        dependencies.add('react-dropzone')
+      end
+      
+      # Realtime components
+      if path.include?('components/realtime/')
+        dependencies.add('@supabase/realtime-js')
+      end
+      
+      # Platform kit
+      if path.include?('components/platform/')
+        dependencies.add('@monaco-editor/react')
+        dependencies.add('recharts')
+      end
     end
   end
 end
