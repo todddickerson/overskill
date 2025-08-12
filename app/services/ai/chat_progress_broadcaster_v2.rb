@@ -4,10 +4,11 @@ module Ai
     include ActionView::RecordIdentifier
     include ActionView::Helpers::TagHelper
     
-    attr_reader :chat_message, :channel
+    attr_reader :chat_message, :app, :channel
     
     def initialize(chat_message)
       @chat_message = chat_message
+      @app = chat_message.app
       @channel = "ChatChannel:#{chat_message.id}"
       @start_time = Time.current
     end
@@ -15,23 +16,23 @@ module Ai
     # Main broadcast methods that use Turbo Streams and CableReady
     
     def broadcast_phase(phase_number, phase_name, total_phases = 6)
-      # Use Turbo Streams for updates
+      # Use Turbo Streams for updates - use app channel that frontend subscribes to
       Turbo::StreamsChannel.broadcast_update_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "chat-progress-#{chat_message.id}",
         html: render_progress_bar(phase_number, total_phases, phase_name)
       )
       
       # Add phase to timeline
       Turbo::StreamsChannel.broadcast_append_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "chat-timeline-#{chat_message.id}",
         html: render_phase_item(phase_number, phase_name, "in_progress")
       )
       
       # Also broadcast via Action Cable for custom handling
       ActionCable.server.broadcast(
-        "chat_progress_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         {
           action: 'update_progress',
           phase: phase_number,
@@ -49,7 +50,7 @@ module Ai
       when :creating
         # Add file to tree with pending status
         Turbo::StreamsChannel.broadcast_append_to(
-          "chat_message_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           target: "file-tree-#{chat_message.id}",
           html: render_file_tree_item(file_path, "creating")
         )
@@ -57,7 +58,7 @@ module Ai
         # Show code preview if provided
         if content_preview
           Turbo::StreamsChannel.broadcast_update_to(
-            "chat_message_#{chat_message.id}",
+            "app_#{@app.id}_chat",
             target: "code-preview-#{chat_message.id}",
             html: render_code_preview(file_path, content_preview)
           )
@@ -66,14 +67,14 @@ module Ai
       when :created
         # Update file status with success
         Turbo::StreamsChannel.broadcast_update_to(
-          "chat_message_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           target: "#{file_id}-status",
           html: render_file_status("created")
         )
         
         # Broadcast custom event for animation
         ActionCable.server.broadcast(
-          "chat_progress_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           {
             action: 'add_file',
             file_id: file_id,
@@ -84,7 +85,7 @@ module Ai
       when :updated
         # Show diff preview
         Turbo::StreamsChannel.broadcast_update_to(
-          "chat_message_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           target: "diff-preview-#{chat_message.id}",
           html: render_diff_preview(file_path, content_preview)
         )
@@ -92,7 +93,7 @@ module Ai
       when :failed
         # Mark file as failed
         Turbo::StreamsChannel.broadcast_update_to(
-          "chat_message_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           target: "#{file_id}-status",
           html: render_file_status("failed", content_preview)
         )
@@ -101,7 +102,7 @@ module Ai
     
     def broadcast_dependency_check(dependencies, missing = [], resolved = [])
       Turbo::StreamsChannel.broadcast_update_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "dependency-panel-#{chat_message.id}",
         html: render_dependency_panel(dependencies, missing, resolved)
       )
@@ -109,7 +110,7 @@ module Ai
       # Add notification for missing dependencies
       if missing.any?
         Turbo::StreamsChannel.broadcast_append_to(
-          "chat_message_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           target: "chat-notifications-#{chat_message.id}",
           html: render_notification(
             "Missing dependencies detected: #{missing.join(', ')}",
@@ -123,14 +124,14 @@ module Ai
     def broadcast_build_output(output_line, stream_type = :stdout)
       # Stream build output in real-time
       Turbo::StreamsChannel.broadcast_append_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "build-output-#{chat_message.id}",
         html: render_build_output_line(output_line, stream_type)
       )
       
       # Send scroll event via Action Cable
       ActionCable.server.broadcast(
-        "chat_progress_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         {
           action: 'update_build_output',
           line: output_line,
@@ -141,14 +142,14 @@ module Ai
     
     def broadcast_error(error_message, recovery_suggestions = [], technical_details = nil)
       Turbo::StreamsChannel.broadcast_update_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "error-panel-#{chat_message.id}",
         html: render_error_panel(error_message, recovery_suggestions, technical_details)
       )
       
       # Send error event for animation
       ActionCable.server.broadcast(
-        "chat_progress_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         {
           action: 'show_error',
           message: error_message
@@ -160,7 +161,7 @@ module Ai
       elapsed_time = Time.current - @start_time
       
       Turbo::StreamsChannel.broadcast_update_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "chat-status-#{chat_message.id}",
         html: render_completion_status(success, elapsed_time, stats)
       )
@@ -168,7 +169,7 @@ module Ai
       # Send completion event
       if success
         ActionCable.server.broadcast(
-          "chat_progress_#{chat_message.id}",
+          "app_#{@app.id}_chat",
           {
             action: 'dispatch_event',
             event_name: 'generation:complete:success',
@@ -182,13 +183,13 @@ module Ai
     
     def request_user_approval(changes, callback_id)
       Turbo::StreamsChannel.broadcast_update_to(
-        "chat_message_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         target: "approval-panel-#{chat_message.id}",
         html: render_approval_panel(changes, callback_id)
       )
       
       ActionCable.server.broadcast(
-        "chat_progress_#{chat_message.id}",
+        "app_#{@app.id}_chat",
         {
           action: 'dispatch_event',
           event_name: 'approval:requested',
