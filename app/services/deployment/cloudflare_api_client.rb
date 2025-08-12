@@ -21,12 +21,15 @@ module Deployment
 
     def initialize(app)
       @app = app
-      @account_id = Rails.application.credentials.cloudflare[:account_id]
-      @zone_id = Rails.application.credentials.cloudflare[:zone_id]
-      @api_token = Rails.application.credentials.cloudflare[:api_token]
-      @bucket_name = Rails.application.credentials.cloudflare[:r2_bucket] || 'overskill-apps'
+      @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
+      @zone_id = ENV['CLOUDFLARE_ZONE_ID']
+      @api_token = ENV['CLOUDFLARE_API_TOKEN']
+      @bucket_name = ENV['CLOUDFLARE_R2_BUCKET'] || 'overskill-apps'
       
       Rails.logger.info "[CloudflareApiClient] Initializing for app ##{@app.id}"
+      
+      # Validate required credentials
+      validate_credentials!
       
       setup_http_headers
     end
@@ -89,7 +92,7 @@ module Deployment
         body: worker_script,
         headers: {
           'Content-Type' => 'application/javascript',
-          'X-Auth-Email' => Rails.application.credentials.cloudflare[:email]
+          'X-Auth-Email' => ENV['CLOUDFLARE_EMAIL']
         }
       )
 
@@ -271,8 +274,8 @@ module Deployment
       secrets = {}
       
       # System secrets (always required)
-      secrets['SUPABASE_URL'] = Rails.application.credentials.supabase[:url]
-      secrets['SUPABASE_SERVICE_KEY'] = Rails.application.credentials.supabase[:service_key]
+      secrets['SUPABASE_URL'] = ENV['SUPABASE_URL']
+      secrets['SUPABASE_SERVICE_KEY'] = ENV['SUPABASE_SERVICE_KEY']
       secrets['APP_ID'] = @app.id.to_s
       secrets['ENVIRONMENT'] = Rails.env
       
@@ -454,6 +457,25 @@ module Deployment
     rescue JSON::ParserError => e
       Rails.logger.error "[CloudflareApiClient] Invalid JSON response: #{e.message}"
       raise DeploymentError, "#{error_message}: Invalid API response"
+    end
+
+    def validate_credentials!
+      missing_credentials = []
+      
+      missing_credentials << 'CLOUDFLARE_ACCOUNT_ID' if @account_id.blank?
+      missing_credentials << 'CLOUDFLARE_ZONE_ID' if @zone_id.blank?
+      missing_credentials << 'CLOUDFLARE_API_TOKEN' if @api_token.blank?
+      missing_credentials << 'CLOUDFLARE_EMAIL' if ENV['CLOUDFLARE_EMAIL'].blank?
+      missing_credentials << 'SUPABASE_URL' if ENV['SUPABASE_URL'].blank?
+      missing_credentials << 'SUPABASE_SERVICE_KEY' if ENV['SUPABASE_SERVICE_KEY'].blank?
+      
+      if missing_credentials.any?
+        error_msg = "Missing required Cloudflare credentials: #{missing_credentials.join(', ')}"
+        Rails.logger.error "[CloudflareApiClient] #{error_msg}"
+        raise DeploymentError, error_msg
+      end
+      
+      Rails.logger.info "[CloudflareApiClient] All required credentials validated"
     end
   end
 end

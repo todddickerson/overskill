@@ -8,6 +8,7 @@ module Ai
       @app = app_chat_message.app
       @message = app_chat_message
       @app_version = create_new_version
+      @broadcaster = Ai::ChatProgressBroadcaster.new(@app, @message.user, @message)
     end
     
     def execute!
@@ -45,30 +46,78 @@ module Ai
     end
     
     def execute_generation!
-      # V4 Enhanced Generation Pipeline
+      # V4 Enhanced Generation Pipeline with Real-time Chat Feedback
       Rails.logger.info "[V4] Starting enhanced generation pipeline for app ##{@app.id}"
       
-      # Phase 1: Generate shared foundation (Day 2 ✅ IMPLEMENTED)
-      generate_shared_foundation
+      # Start chat feedback with plan overview
+      app_type = determine_app_type(@message.content)
+      @broadcaster.broadcast_start("a #{app_type} with professional components")
       
-      # Phase 1.5: 🚀 NEW - Generate AI context with available components
+      # Phase 1: Generate shared foundation (Day 2 ✅ IMPLEMENTED)
+      @broadcaster.broadcast_step_start("Project Foundation", "Setting up package.json, configs, and core files")
+      files_before = @app.app_files.count
+      generate_shared_foundation
+      files_after = @app.app_files.count
+      @broadcaster.broadcast_step_complete("Project Foundation", { 
+        files_count: files_after - files_before 
+      })
+      
+      # Phase 1.5: Generate AI context with available components
       component_context = generate_component_context
       Rails.logger.info "[V4] Generated component context (#{component_context.length} chars)"
       
       # Phase 2: AI app-specific features with component awareness
+      @broadcaster.broadcast_step_start("Core Components", "Generating #{app_type} components with AI")
+      files_before = @app.app_files.count
       generate_app_features_with_components(component_context)
+      files_after = @app.app_files.count
+      @broadcaster.broadcast_step_complete("Core Components", { 
+        files_count: files_after - files_before,
+        components: extract_component_names_created
+      })
       
       # Phase 3: Smart component selection and integration
+      @broadcaster.broadcast_step_start("UI Enhancement", "Adding professional UI components")
       integrate_requested_components
+      @broadcaster.broadcast_step_complete("UI Enhancement")
       
       # Phase 4: Smart edits via existing services
+      @broadcaster.broadcast_step_start("Code Optimization", "Applying smart edits and improvements")
       apply_smart_edits
+      @broadcaster.broadcast_step_complete("Code Optimization")
       
-      # Phase 5: Build and deploy (Day 3-4 ✅ IMPLEMENTED)
+      # Phase 5: Build and deploy
+      @broadcaster.broadcast_step_start("Build & Deploy", "Building with npm + Vite and deploying")
+      @broadcaster.broadcast_build_progress(:npm_install)
+      @broadcaster.broadcast_build_progress(:vite_build)
+      
       build_result = build_for_deployment
       
-      # Update app status
-      @app.update!(status: 'generated')
+      if build_result[:success]
+        @broadcaster.broadcast_build_progress(:complete)
+        @broadcaster.broadcast_step_complete("Build & Deploy", {
+          build_time: build_result[:build_time],
+          size: build_result[:size]
+        })
+        
+        # Update app status and complete generation
+        @app.update!(status: 'generated')
+        
+        # Final completion message with preview URL
+        @broadcaster.broadcast_completion(
+          @app.preview_url,
+          {
+            size: build_result[:size],
+            build_time: build_result[:build_time]
+          }
+        )
+      else
+        @broadcaster.broadcast_error("Build failed: #{build_result[:error]}", true)
+        @app.update!(status: 'failed')
+      end
+      
+      # Set up for ongoing chat
+      @broadcaster.broadcast_chat_ready
       
       Rails.logger.info "[V4] Enhanced generation pipeline completed for app ##{@app.id}"
     end
@@ -731,11 +780,16 @@ module Ai
       files_created = @app.app_files.where('created_at >= ?', @app_version.created_at)
       
       files_created.each do |app_file|
-        @app_version.app_version_files.create!(
-          app_file: app_file,
-          action: 'created',
-          content: app_file.content  # Include content for validation
-        )
+        # Check if this file is already tracked in this version to avoid constraint violations
+        existing_version_file = @app_version.app_version_files.find_by(app_file: app_file)
+        
+        unless existing_version_file
+          @app_version.app_version_files.create!(
+            app_file: app_file,
+            action: 'created',
+            content: app_file.content  # Include content for validation
+          )
+        end
       end
       
       Rails.logger.info "[V4] Tracked #{files_created.count} template files in version"
@@ -812,7 +866,7 @@ module Ai
     end
     
     def create_app_file(path, content)
-      # Create or update an app file
+      # Create or update an app file with chat feedback
       # Ensure content is not nil or empty
       content = content.presence || "// Placeholder content for #{path}"
       
@@ -822,15 +876,56 @@ module Ai
         existing_file.update!(content: content)
         Rails.logger.info "[V4] Updated existing file: #{path}"
       else
-        @app.app_files.create!(
+        new_file = @app.app_files.create!(
           path: path,
           content: content,
           team: @app.team
         )
+        
         Rails.logger.info "[V4] Created new file: #{path}"
+        
+        # Broadcast file creation with preview if it's a component
+        preview = nil
+        if path.match?(/\.(tsx|jsx|ts|js)$/) && content.length > 50
+          # Extract first few lines for preview
+          lines = content.lines.first(5)
+          preview = lines.join.strip if lines.any?
+        end
+        
+        @broadcaster&.broadcast_file_created(path, content.length, preview)
       end
     end
     
+    def determine_app_type(content)
+      content_lower = content.downcase
+      
+      return "todo/task management app" if content_lower.match?(/todo|task|checklist/)
+      return "chat application" if content_lower.match?(/chat|message|conversation/)
+      return "e-commerce store" if content_lower.match?(/shop|store|ecommerce|product|cart/)
+      return "dashboard application" if content_lower.match?(/dashboard|admin|analytics/)
+      return "blog/CMS" if content_lower.match?(/blog|cms|content|post/)
+      return "authentication system" if content_lower.match?(/auth|login|user|account/)
+      return "file management app" if content_lower.match?(/file|upload|storage|document/)
+      return "social media app" if content_lower.match?(/social|profile|feed|follow/)
+      return "productivity app" if content_lower.match?(/note|calendar|remind|schedule/)
+      
+      "web application"
+    end
+    
+    def extract_component_names_created
+      # Extract component names from recently created files
+      components = []
+      
+      @app.app_files.where("path LIKE 'src/components/%'").each do |file|
+        if file.path.match?(/\/([A-Z][a-zA-Z0-9]*)\.(tsx|ts|jsx|js)$/)
+          component_name = File.basename(file.path, '.*')
+          components << component_name unless components.include?(component_name)
+        end
+      end
+      
+      components.first(5) # Return first 5 components to avoid clutter
+    end
+
     def mark_as_failed(error)
       @app.update!(
         status: 'failed'

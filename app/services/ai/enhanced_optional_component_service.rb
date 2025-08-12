@@ -270,13 +270,21 @@ module Ai
           processed_content = "// Placeholder for #{component_info[:path]}"
         end
         
-        @app.app_files.create!(
-          path: component_info[:path],
-          content: processed_content,
-          team: @app.team
-        )
+        # Check if file already exists to avoid constraint violations
+        existing_file = @app.app_files.find_by(path: component_info[:path])
         
-        Rails.logger.info "[EnhancedOptionalComponentService] Created #{component_info[:path]}"
+        if existing_file
+          existing_file.update!(content: processed_content)
+          Rails.logger.info "[EnhancedOptionalComponentService] Updated existing #{component_info[:path]}"
+        else
+          @app.app_files.create!(
+            path: component_info[:path],
+            content: processed_content,
+            team: @app.team
+          )
+          Rails.logger.info "[EnhancedOptionalComponentService] Created #{component_info[:path]}"
+        end
+        
       else
         Rails.logger.warn "[EnhancedOptionalComponentService] Template not found: #{template_path}"
         
@@ -288,13 +296,20 @@ module Ai
     def create_placeholder_component(component_name, component_info)
       placeholder_content = generate_placeholder_content(component_name, component_info)
       
-      @app.app_files.create!(
-        path: component_info[:path],
-        content: placeholder_content,
-        team: @app.team
-      )
+      # Check if file already exists to avoid constraint violations
+      existing_file = @app.app_files.find_by(path: component_info[:path])
       
-      Rails.logger.info "[EnhancedOptionalComponentService] Created placeholder for #{component_info[:path]}"
+      if existing_file
+        existing_file.update!(content: placeholder_content)
+        Rails.logger.info "[EnhancedOptionalComponentService] Updated existing placeholder #{component_info[:path]}"
+      else
+        @app.app_files.create!(
+          path: component_info[:path],
+          content: placeholder_content,
+          team: @app.team
+        )
+        Rails.logger.info "[EnhancedOptionalComponentService] Created placeholder for #{component_info[:path]}"
+      end
     end
     
     def generate_placeholder_content(component_name, component_info)

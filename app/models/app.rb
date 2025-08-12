@@ -48,7 +48,7 @@ class App < ApplicationRecord
   before_validation :generate_slug
   after_create :create_default_env_vars
   after_create :initiate_ai_generation, if: :should_auto_generate?
-  after_create :generate_app_logo
+  after_create :generate_app_logo, :generate_app_name
   # 🚅 add callbacks above.
 
   # Delegate to team's database config for hybrid architecture
@@ -88,6 +88,10 @@ class App < ApplicationRecord
 
   def generate_app_logo
     GenerateAppLogoJob.perform_later(id)
+  end
+
+  def generate_app_name
+    GenerateAppNameJob.perform_later(id)
   end
 
   def visitor_count

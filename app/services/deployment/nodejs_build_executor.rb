@@ -17,8 +17,8 @@ module Deployment
 
     def initialize(app)
       @app = app
-      @account_id = Rails.application.credentials.cloudflare[:account_id]
-      @api_token = Rails.application.credentials.cloudflare[:api_token]
+      @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
+      @api_token = ENV['CLOUDFLARE_API_TOKEN']
       @build_id = SecureRandom.hex(8)
       
       Rails.logger.info "[NodejsBuildExecutor] Initializing for app ##{@app.id}, build_id: #{@build_id}"
@@ -76,7 +76,7 @@ module Deployment
       self.class.headers({
         'Authorization' => "Bearer #{@api_token}",
         'Content-Type' => 'application/json',
-        'X-Auth-Email' => Rails.application.credentials.cloudflare[:email]
+        'X-Auth-Email' => ENV['CLOUDFLARE_EMAIL']
       })
     end
 
@@ -410,7 +410,7 @@ module Deployment
       
       # Invoke the build worker
       response = self.class.post(
-        "https://#{BUILD_WORKER_NAME}.#{Rails.application.credentials.cloudflare[:subdomain]}.workers.dev/",
+        "https://#{BUILD_WORKER_NAME}.#{@account_id}.workers.dev/",
         body: build_request.to_json,
         headers: { 'Content-Type' => 'application/json' },
         timeout: BUILD_TIMEOUT

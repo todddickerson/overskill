@@ -5,9 +5,9 @@ module Deployment
     
     def initialize(app)
       @app = app
-      @account_id = Rails.application.credentials.dig(:cloudflare, :account_id)
-      @api_token = Rails.application.credentials.dig(:cloudflare, :api_token)
-      @zone_id = Rails.application.credentials.dig(:cloudflare, :zone_id)
+      @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
+      @api_token = ENV['CLOUDFLARE_API_TOKEN']
+      @zone_id = ENV['CLOUDFLARE_ZONE_ID']
       
       self.class.headers('Authorization' => "Bearer #{@api_token}")
     end
@@ -94,12 +94,12 @@ module Deployment
     def deploy_worker(worker_name, script_content)
       Rails.logger.info "[CloudflareWorkersDeployer] Uploading Worker script (#{script_content.bytesize} bytes)"
       
-      # Use multipart form data for Worker upload
+      # Send JavaScript code directly for simple deployments
       response = self.class.put(
         "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
-        body: build_worker_upload_body(script_content),
+        body: script_content,
         headers: { 
-          'Content-Type' => 'multipart/form-data'
+          'Content-Type' => 'application/javascript'
         }
       )
       
@@ -145,8 +145,8 @@ module Deployment
       secrets = {}
       
       # Platform secrets (hidden from users)
-      secrets['SUPABASE_URL'] = Rails.application.credentials.dig(:supabase, :url)
-      secrets['SUPABASE_SECRET_KEY'] = Rails.application.credentials.dig(:supabase, :service_key)
+      secrets['SUPABASE_URL'] = ENV['SUPABASE_URL']
+      secrets['SUPABASE_SECRET_KEY'] = ENV['SUPABASE_SERVICE_KEY']
       
       # System defaults
       secrets['APP_ID'] = @app.id.to_s

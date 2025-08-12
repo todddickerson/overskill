@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_12_151116) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -212,7 +212,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
     t.index ["metadata"], name: "index_app_chat_messages_on_metadata", using: :gin
     t.index ["status"], name: "index_app_chat_messages_on_status"
     t.index ["user_id"], name: "index_app_chat_messages_on_user_id"
-    t.check_constraint "role::text = 'assistant'::text AND (status::text = ANY (ARRAY['planning'::character varying, 'executing'::character varying, 'generating'::character varying, 'completed'::character varying, 'failed'::character varying, 'validation_error'::character varying]::text[])) OR role::text <> 'assistant'::text AND status IS NULL", name: "check_status_only_for_assistant"
+    t.check_constraint "role::text = 'assistant'::text AND (status::text = ANY (ARRAY['planning'::character varying::text, 'executing'::character varying::text, 'generating'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'validation_error'::character varying::text])) OR role::text <> 'assistant'::text AND status IS NULL", name: "check_status_only_for_assistant"
   end
 
   create_table "app_collaborators", force: :cascade do |t|
@@ -467,6 +467,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
     t.text "build_error"
     t.datetime "last_built_at"
     t.string "build_id"
+    t.datetime "name_generated_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
