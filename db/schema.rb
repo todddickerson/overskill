@@ -411,6 +411,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
     t.datetime "completed_at"
     t.jsonb "metadata", default: {}
     t.text "error_message"
+    t.integer "ai_tokens_input", default: 0
+    t.integer "ai_tokens_output", default: 0
+    t.integer "ai_cost_cents", default: 0
+    t.string "ai_model_used"
+    t.index ["ai_cost_cents"], name: "index_app_versions_on_ai_cost_cents"
+    t.index ["ai_model_used"], name: "index_app_versions_on_ai_model_used"
     t.index ["app_id"], name: "index_app_versions_on_app_id"
     t.index ["bookmarked"], name: "index_app_versions_on_bookmarked"
     t.index ["metadata"], name: "index_app_versions_on_metadata", using: :gin
