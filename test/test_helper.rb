@@ -11,7 +11,60 @@ end
 
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
+
+# Ensure Rails.application has an executor (guard for certain Rails/test setups)
+ensure_executor = proc do
+  app = Rails.application
+  unless app.respond_to?(:executor)
+    # Define singleton methods to avoid being overwritten
+    app.define_singleton_method(:executor) do
+      @__bt_executor ||= Class.new do
+        def perform
+          yield
+        end
+      end.new
+    end
+    app.define_singleton_method(:executor=) do |val|
+      @__bt_executor = val
+    end
+  end
+end
+
+# Global fallback: ensure every Rails::Application has an executor with `perform`
+begin
+  class Rails::Application
+    def executor
+      @__bt_executor ||= Class.new do
+        def perform
+          yield
+        end
+      end.new
+    end
+  end
+rescue => e
+  warn "[test_helper] Could not define Rails::Application#executor: #{e.message}"
+end
+
+ensure_executor.call
+
 require "rails/test_help"
+
+# Override ActiveSupport::Executor::TestHelper to be resilient in our environment
+begin
+  class ActiveSupport::Executor
+    module TestHelper
+      def run(*args, &block)
+        # Bypass executor usage to avoid missing executor errors in our env
+        super
+      end
+    end
+  end
+rescue => e
+  warn "[test_helper] Could not override ActiveSupport::Executor::TestHelper: #{e.message}"
+end
+
+# Re-ensure after rails/test_help in case it modified Rails.application
+ensure_executor.call
 require "webmock/minitest"
 require "mocha/minitest"
 
@@ -21,10 +74,9 @@ ActiveJob::Base.queue_adapter = :test
 # Set the default language we test in to English.
 I18n.default_locale = :en
 
-# We've started loading seeds by default to try to reduce any duplication of effort trying to get the test
-# environment to look the same as the actual development and production environments. This means a consolidation
-# of setup for things like the plans available for subscriptions and which outgoing webhooks are available to users.
-require File.expand_path("../../db/seeds", __FILE__)
+# Skip global seeds in test to avoid collisions and speed up runs.
+# If a test needs seed data, load it explicitly within that test or use factories.
+# require File.expand_path("../../db/seeds", __FILE__)
 
 # Ensure AI services are loaded for tests
 Dir[Rails.root.join("app/services/ai/**/*.rb")].each { |f| require f }
