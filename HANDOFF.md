@@ -25,10 +25,67 @@
 - ✅ **Build Performance**: 819ms builds, 336KB optimized Worker bundles
 - ✅ **Zero Errors**: No console errors, all assets loading successfully
 
+### 🔄 Swapping from V4 to V4 Enhanced
+
+**To enable V4 Enhanced (recommended):**
+1. Set in `.env.local`: `APP_GENERATION_VERSION=v4_enhanced`
+2. Restart Rails server and Sidekiq workers
+3. All new app generations will use V4 Enhanced
+
+**Key Improvements in V4 Enhanced:**
+- ✅ Real-time visual progress feedback during generation
+- ✅ Fixed duplicate package.json creation bug
+- ✅ Proper error recovery with status updates
+- ✅ Broadcasting to correct channels (`app_#{id}_chat`)
+- ✅ Transaction safety for all file operations
+- ✅ User-friendly error messages with recovery suggestions
+
 ### Critical Context: Clean Slate Approach
 - **No Backward Compatibility Needed**: Old apps will be discarded
 - **V3 → V4 Migration**: Complete architecture overhaul
 - **Focus**: Vite + TypeScript + React Router (removing INSTANT MODE entirely)
+
+---
+
+## 📋 V4 ROADMAP - What's Left
+
+### ✅ Completed (Week 1-2)
+- V4 Core Infrastructure with templates
+- V4 Enhanced with real-time chat UX
+- Duplicate file prevention and error recovery
+- Broadcasting fixes for UI feedback
+
+### 🎯 Ready for Week 3 Implementation
+Based on V4_WEEK3_READINESS.md priorities:
+
+#### 1. **Custom Domain Management (HIGH)**
+- Cloudflare for SaaS API integration
+- Automatic SSL certificate provisioning
+- Domain verification workflows
+- Custom domain → Worker routing
+
+#### 2. **SSL Automation (HIGH)**
+- Certificate provisioning via Cloudflare
+- Automatic renewal handling
+- Fallback to subdomain on failure
+- Zero-downtime SSL updates
+
+#### 3. **Secrets API Enhancement (MEDIUM)**
+- Fix PATCH permissions for Cloudflare API
+- Enhanced secret rotation capabilities
+- Per-environment secret management
+- Audit logging for secret changes
+
+#### 4. **Production Optimization (MEDIUM)**
+- Enhanced build optimization (3min builds)
+- Advanced caching strategies
+- CDN integration for static assets
+- Performance monitoring hooks
+
+### ⚠️ Known Issues to Address
+1. **Cloudflare Secrets API**: PATCH endpoint returns 403 (workaround: delete/recreate)
+2. **Build Time Variability**: Occasional npm install slowdowns
+3. **Supabase Table Limits**: 500 tables per project max (need sharding strategy)
 
 ---
 

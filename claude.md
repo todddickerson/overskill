@@ -239,21 +239,27 @@ end
 - **Claude 3 Opus**: Model ID `claude-3-opus-20240229` - Previous premium model
 - **Kimi-K2**: May timeout with function calling, use StructuredAppGenerator instead
 
-## AI App Generation System (V4 - TEMPLATE-BASED)
+## AI App Generation System (V4 Enhanced - PRODUCTION READY)
+
+### 🎯 Current Implementation: V4 Enhanced (August 12, 2025)
+- **Status**: 🟢 PRODUCTION READY with real-time chat UX
+- **Configuration**: Set `APP_GENERATION_VERSION=v4_enhanced` in .env.local
+- **Fixed Issues**: Duplicate file creation, broadcasting channels, error recovery
 
 ### Key Components
-- **AI_APP_STANDARDS.md**: PRO MODE ONLY - Vite + TypeScript + React Router (INSTANT MODE removed)
-- **Ai::AppBuilderV4**: Template-based orchestrator with Claude 4 conversation loop
+- **Ai::AppBuilderV4Enhanced**: Enhanced orchestrator with 6-phase visual feedback
+- **ChatProgressBroadcasterV2**: Real-time updates via `app_#{app.id}_chat` channel
 - **Ai::SharedTemplateService**: Core foundation files (auth, routing, database wrapper)
 - **Integration Services**: LineReplaceService (90% token savings) + SmartSearchService
-- **Claude 4 Primary**: Extended thinking with conversation loop for multi-file generation
+- **Error Recovery**: Smart error handling with status updates and user suggestions
 
-### V4 Generation Flow
-1. **Simple Architecture**: All apps use consistent Supabase-first approach
-2. **Shared Foundation**: Generate core files all apps need (templates)
-3. **AI Customization**: Claude 4 generates app-specific features via conversation
-4. **Surgical Edits**: Use LineReplaceService for minimal changes
-5. **Build & Deploy**: Fast dev (45s) or optimized prod (3min) via API only
+### V4 Enhanced Generation Flow
+1. **Phase 1: Understanding Requirements** - Analyze and plan with visual feedback
+2. **Phase 2: Planning Architecture** - File structure and dependency detection  
+3. **Phase 3: Setting Up Foundation** - SharedTemplateService with progress
+4. **Phase 4: Generating Features** - AI customization with approval workflow
+5. **Phase 5: Validating & Building** - ExternalViteBuilder with live output
+6. **Phase 6: Deploying** - CloudflareWorkersDeployer with status updates
 
 ### Claude 4 Conversation Loop
 ```ruby
