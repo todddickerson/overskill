@@ -425,7 +425,7 @@ module Ai
     
     def get_recommended_version(package_name)
       # Common package versions (could be fetched from npm registry in production)
-      VERSION_MAP = {
+      version_map = {
         'react' => '^18.2.0',
         'react-dom' => '^18.2.0',
         'typescript' => '^5.0.0',
@@ -445,12 +445,12 @@ module Ai
         'zod' => '^3.22.0'
       }.freeze
       
-      VERSION_MAP[package_name] || 'latest'
+      version_map[package_name] || 'latest'
     end
     
     def get_dependency_type(package_name)
       # Determine if package should be in dependencies or devDependencies
-      DEV_DEPENDENCIES = %w[
+      dev_dependencies = %w[
         typescript vite @vitejs/plugin-react
         @types/react @types/react-dom @types/node
         tailwindcss autoprefixer postcss
@@ -459,7 +459,7 @@ module Ai
         @babel/core @babel/preset-react webpack webpack-cli
       ].freeze
       
-      DEV_DEPENDENCIES.include?(package_name) ? 'devDependencies' : 'dependencies'
+      dev_dependencies.include?(package_name) ? 'devDependencies' : 'dependencies'
     end
     
     def calculate_confidence(deps)
