@@ -575,8 +575,7 @@ module Ai
     
     def mark_as_failed(error)
       @app.update!(
-        status: 'failed',
-        error_message: error.message
+        status: 'failed'
       )
       
       @app_version.update!(
