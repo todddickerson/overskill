@@ -18,6 +18,7 @@
                     method: :post,
                     data: { 
                       turbo_frame: user_signed_in ? "_top" : "auth_modal",
+                      turbo: user_signed_in ? false : true,
                       controller: "generator",
                       generator_user_signed_in_value: user_signed_in.to_s
                     },
@@ -59,6 +60,7 @@
                   method: :post,
                   data: { 
                     turbo_frame: user_signed_in ? "_top" : "auth_modal",
+                    turbo: user_signed_in ? false : true,
                     controller: "generator",
                     generator_user_signed_in_value: user_signed_in.to_s
                   },
