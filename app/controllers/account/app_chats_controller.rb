@@ -11,9 +11,24 @@ class Account::AppChatsController < Account::ApplicationController
     @message.role = "user"
 
     if @message.save
-      # Process the request with AI - always use V3 Optimized orchestrator
-      Rails.logger.info "[AppChats] Using V3 Optimized orchestrator for message ##{@message.id}"
-      ProcessAppUpdateJobV3.perform_later(@message)
+      # Process the request with AI - use configured orchestrator version
+      orchestrator_version = Rails.application.config.app_generation_version
+      
+      case orchestrator_version
+      when :v4_enhanced
+        Rails.logger.info "[AppChats] Using V4 Enhanced orchestrator with visual feedback for message ##{@message.id}"
+        ProcessAppUpdateJobV4.perform_later(@message, use_enhanced: true)
+      when :v4
+        Rails.logger.info "[AppChats] Using V4 orchestrator for message ##{@message.id}"
+        ProcessAppUpdateJobV4.perform_later(@message, use_enhanced: false)
+      when :v3
+        Rails.logger.info "[AppChats] Using V3 Optimized orchestrator for message ##{@message.id}"
+        ProcessAppUpdateJobV3.perform_later(@message)
+      else
+        # Default to V4 Enhanced
+        Rails.logger.info "[AppChats] Using V4 Enhanced orchestrator (default) for message ##{@message.id}"
+        ProcessAppUpdateJobV4.perform_later(@message, use_enhanced: true)
+      end
 
       respond_to do |format|
         format.turbo_stream do

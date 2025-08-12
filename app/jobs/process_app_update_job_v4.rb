@@ -21,11 +21,17 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     end
   end
   
-  def perform(message)
+  def perform(message, use_enhanced: true)
     Rails.logger.info "[ProcessAppUpdateJobV4] Starting V4 orchestrator for message ##{message.id} (app ##{message.app.id})"
     
-    # Use the new V4 orchestrator with template-based generation
-    orchestrator = Ai::AppBuilderV4.new(message)
+    # Use enhanced V4 with visual feedback by default
+    orchestrator = if use_enhanced
+      Rails.logger.info "[ProcessAppUpdateJobV4] Using ENHANCED V4 builder with real-time feedback"
+      Ai::AppBuilderV4Enhanced.new(message)
+    else
+      Rails.logger.info "[ProcessAppUpdateJobV4] Using standard V4 builder"
+      Ai::AppBuilderV4.new(message)
+    end
     
     # V4 has built-in retry logic (MAX_RETRIES = 2)
     orchestrator.execute!
