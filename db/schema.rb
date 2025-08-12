@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_12_151116) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_12_193912) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -468,12 +468,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_151116) do
     t.datetime "last_built_at"
     t.string "build_id"
     t.datetime "name_generated_at"
+    t.string "subdomain"
+    t.datetime "last_deployed_at"
+    t.datetime "published_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
     t.index ["featured"], name: "index_apps_on_featured"
     t.index ["slug"], name: "index_apps_on_slug", unique: true
     t.index ["status"], name: "index_apps_on_status"
+    t.index ["subdomain"], name: "index_apps_on_subdomain", unique: true
     t.index ["team_id"], name: "index_apps_on_team_id"
     t.index ["use_custom_database"], name: "index_apps_on_use_custom_database"
     t.index ["visibility"], name: "index_apps_on_visibility"

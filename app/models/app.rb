@@ -40,12 +40,18 @@ class App < ApplicationRecord
 
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true
+  validates :subdomain, uniqueness: true, allow_nil: true,
+    format: { 
+      with: /\A[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?\z/,
+      message: "must be alphanumeric with hyphens, 1-63 characters"
+    }
   validates :creator, scope: true
   validates :prompt, presence: true
   validates :base_price, presence: true, numericality: {greater_than_or_equal_to: 0}
   # 🚅 add validations above.
 
   before_validation :generate_slug
+  before_validation :generate_subdomain
   after_create :create_default_env_vars
   after_create :initiate_ai_generation, if: :should_auto_generate?
   after_create :generate_app_logo, :generate_app_name
@@ -76,14 +82,32 @@ class App < ApplicationRecord
   end
 
   def published_url
-    # Return the actual deployment URL if deployed, otherwise use the predicted subdomain
-    return deployment_url if deployment_url.present?
+    # Return production URL if published, otherwise preview URL
+    return production_url if production_url.present? && published?
+    return preview_url if preview_url.present?
     
-    # Generate the subdomain the same way the deployment service does
-    subdomain = name.downcase.gsub(/[^a-z0-9\-]/, '-').gsub(/-+/, '-').gsub(/^-|-$/, '')
-    subdomain = "app-#{id}" if subdomain.blank?
+    # Fallback to predicted URL based on subdomain
+    return "https://#{subdomain}.overskill.app" if subdomain.present?
     
-    "https://#{subdomain}.overskill.app"
+    # Last resort: generate from slug
+    "https://#{slug}.overskill.app"
+  end
+  
+  # Check if app can be published to production
+  def can_publish?
+    status == 'ready' && preview_url.present? && app_files.exists?
+  end
+  
+  # Publish app to production
+  def publish_to_production!
+    service = Deployment::ProductionDeploymentService.new(self)
+    service.deploy_to_production!
+  end
+  
+  # Update subdomain (with uniqueness check)
+  def update_subdomain!(new_subdomain)
+    service = Deployment::ProductionDeploymentService.new(self)
+    service.update_subdomain(new_subdomain)
   end
 
   def generate_app_logo
@@ -197,6 +221,38 @@ class App < ApplicationRecord
 
   def generate_slug
     self.slug ||= name&.parameterize
+  end
+  
+  def generate_subdomain
+    return if subdomain.present?
+    
+    # Start with slug as base
+    base = slug || name&.parameterize
+    return unless base.present?
+    
+    # Sanitize for subdomain requirements
+    candidate = base.downcase
+      .gsub(/[^a-z0-9\-]/, '-')
+      .gsub(/-+/, '-')
+      .gsub(/^-|-$/, '')
+      .slice(0, 63)
+    
+    # Ensure uniqueness
+    if App.where(subdomain: candidate).where.not(id: id).exists?
+      # Add number suffix if not unique
+      counter = 2
+      loop do
+        candidate_with_number = "#{candidate[0..60]}-#{counter}"
+        unless App.where(subdomain: candidate_with_number).where.not(id: id).exists?
+          candidate = candidate_with_number
+          break
+        end
+        counter += 1
+        break if counter > 100 # Safety limit
+      end
+    end
+    
+    self.subdomain = candidate
   end
 
   def create_default_env_vars

@@ -92,6 +92,154 @@ class Account::AppDeploymentsController < Account::ApplicationController
     }
   end
   
+  # POST /account/teams/:team_id/apps/:app_id/publish
+  # Publish app from preview to production with unique subdomain
+  def publish
+    unless @app.can_publish?
+      respond_to do |format|
+        format.html { 
+          redirect_to account_team_app_path(current_team, @app), 
+            alert: "App must be in 'ready' state with a preview deployment before publishing."
+        }
+        format.json { 
+          render json: { error: "App not ready for production" }, status: :unprocessable_entity 
+        }
+      end
+      return
+    end
+    
+    # Run deployment in background job
+    PublishAppToProductionJob.perform_later(@app)
+    
+    respond_to do |format|
+      format.html {
+        redirect_to account_team_app_path(current_team, @app),
+          notice: "Publishing app to production at #{@app.subdomain}.overskill.app. This may take a few minutes..."
+      }
+      format.json {
+        render json: {
+          message: "Publishing to production",
+          subdomain: @app.subdomain,
+          predicted_url: "https://#{@app.subdomain}.overskill.app"
+        }
+      }
+    end
+  end
+  
+  # PATCH /account/teams/:team_id/apps/:app_id/subdomain
+  def update_subdomain
+    new_subdomain = params[:subdomain]&.strip&.downcase
+    
+    if new_subdomain.blank?
+      respond_to do |format|
+        format.html { 
+          redirect_to account_team_app_path(current_team, @app), 
+            alert: "Subdomain cannot be blank."
+        }
+        format.json { 
+          render json: { error: "Subdomain cannot be blank" }, status: :unprocessable_entity 
+        }
+      end
+      return
+    end
+    
+    # Validate format
+    unless new_subdomain.match?(/\A[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?\z/)
+      respond_to do |format|
+        format.html {
+          redirect_to account_team_app_path(current_team, @app),
+            alert: "Subdomain must be alphanumeric with hyphens, 1-63 characters, no leading/trailing hyphens."
+        }
+        format.json {
+          render json: { error: "Invalid subdomain format" }, status: :unprocessable_entity
+        }
+      end
+      return
+    end
+    
+    # Check uniqueness
+    if App.where(subdomain: new_subdomain).where.not(id: @app.id).exists?
+      respond_to do |format|
+        format.html {
+          redirect_to account_team_app_path(current_team, @app),
+            alert: "Subdomain '#{new_subdomain}' is already taken. Please choose another."
+        }
+        format.json {
+          render json: { error: "Subdomain already taken" }, status: :unprocessable_entity
+        }
+      end
+      return
+    end
+    
+    # Update subdomain (and redeploy if published)
+    result = @app.update_subdomain!(new_subdomain)
+    
+    if result[:success]
+      respond_to do |format|
+        format.html {
+          redirect_to account_team_app_path(current_team, @app),
+            notice: "Subdomain updated to '#{new_subdomain}'. " +
+                    (@app.published? ? "Production URL: #{@app.production_url}" : "")
+        }
+        format.json {
+          render json: {
+            success: true,
+            subdomain: new_subdomain,
+            production_url: @app.production_url
+          }
+        }
+      end
+    else
+      respond_to do |format|
+        format.html {
+          redirect_to account_team_app_path(current_team, @app),
+            alert: "Failed to update subdomain: #{result[:error]}"
+        }
+        format.json {
+          render json: { error: result[:error] }, status: :unprocessable_entity
+        }
+      end
+    end
+  end
+  
+  # POST /account/teams/:team_id/apps/:app_id/unpublish
+  def unpublish
+    if @app.published?
+      @app.update!(status: 'ready', production_url: nil, published_at: nil)
+      
+      # Optionally remove production worker
+      begin
+        service = Deployment::ProductionDeploymentService.new(@app)
+        service.send(:cleanup_old_worker, @app.subdomain)
+      rescue => e
+        Rails.logger.error "Failed to cleanup production worker: #{e.message}"
+      end
+      
+      respond_to do |format|
+        format.html {
+          redirect_to account_team_app_path(current_team, @app),
+            notice: "App unpublished from production. Preview still available."
+        }
+        format.json {
+          render json: {
+            success: true,
+            message: "App unpublished from production"
+          }
+        }
+      end
+    else
+      respond_to do |format|
+        format.html {
+          redirect_to account_team_app_path(current_team, @app),
+            alert: "App is not currently published."
+        }
+        format.json {
+          render json: { error: "App not published" }, status: :unprocessable_entity
+        }
+      end
+    end
+  end
+  
   def logs
     deployment_id = params[:deployment_id]
     deployment = @app.deployment_logs.find(deployment_id)

@@ -122,6 +122,9 @@ Rails.application.routes.draw do
             get :deployment_info
             get :activity_monitor
             post :deploy
+            post :publish, controller: "app_deployments"
+            post :unpublish, controller: "app_deployments"
+            patch :subdomain, action: :update_subdomain, controller: "app_deployments"
             post :generate_logo
             post :upload_logo
             post :debug_error
