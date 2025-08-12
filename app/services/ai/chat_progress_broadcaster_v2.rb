@@ -1,7 +1,8 @@
-# Enhanced Chat Progress Broadcaster with CableReady and Rails 8 patterns
+# Enhanced Chat Progress Broadcaster with Turbo Streams and Rails 8 patterns
 module Ai
   class ChatProgressBroadcasterV2
-    include CableReady::Broadcaster
+    include ActionView::RecordIdentifier
+    include ActionView::Helpers::TagHelper
     
     attr_reader :chat_message, :channel
     
@@ -14,29 +15,29 @@ module Ai
     # Main broadcast methods that use Turbo Streams and CableReady
     
     def broadcast_phase(phase_number, phase_name, total_phases = 6)
-      # Update main progress bar
-      cable_ready[channel].morph(
-        selector: "#chat-progress-#{chat_message.id}",
+      # Use Turbo Streams for updates
+      Turbo::StreamsChannel.broadcast_update_to(
+        "chat_message_#{chat_message.id}",
+        target: "chat-progress-#{chat_message.id}",
         html: render_progress_bar(phase_number, total_phases, phase_name)
       )
       
-      # Add phase to timeline with animation
-      cable_ready[channel].append(
-        selector: "#chat-timeline-#{chat_message.id}",
+      # Add phase to timeline
+      Turbo::StreamsChannel.broadcast_append_to(
+        "chat_message_#{chat_message.id}",
+        target: "chat-timeline-#{chat_message.id}",
         html: render_phase_item(phase_number, phase_name, "in_progress")
       )
       
-      # Broadcast the updates
-      cable_ready.broadcast
-      
-      # Also send via Turbo Stream for redundancy
-      broadcast_turbo_stream(
-        target: "chat_message_#{chat_message.id}",
-        partial: "chat_messages/progress_update",
-        locals: { 
-          phase: phase_number, 
+      # Also broadcast via Action Cable for custom handling
+      ActionCable.server.broadcast(
+        "chat_progress_#{chat_message.id}",
+        {
+          action: 'update_progress',
+          phase: phase_number,
           phase_name: phase_name,
-          total: total_phases 
+          total: total_phases,
+          html: render_progress_bar(phase_number, total_phases, phase_name)
         }
       )
     end
@@ -47,62 +48,69 @@ module Ai
       case operation
       when :creating
         # Add file to tree with pending status
-        cable_ready[channel].append(
-          selector: "#file-tree-#{chat_message.id}",
+        Turbo::StreamsChannel.broadcast_append_to(
+          "chat_message_#{chat_message.id}",
+          target: "file-tree-#{chat_message.id}",
           html: render_file_tree_item(file_path, "creating")
         )
         
-        # Show code preview with syntax highlighting
+        # Show code preview if provided
         if content_preview
-          cable_ready[channel].morph(
-            selector: "#code-preview-#{chat_message.id}",
+          Turbo::StreamsChannel.broadcast_update_to(
+            "chat_message_#{chat_message.id}",
+            target: "code-preview-#{chat_message.id}",
             html: render_code_preview(file_path, content_preview)
           )
         end
         
       when :created
-        # Update file status with success animation
-        cable_ready[channel].add_css_class(
-          selector: "##{file_id}",
-          name: "animate-pulse-once bg-green-50 dark:bg-green-900/20"
-        )
-        cable_ready[channel].morph(
-          selector: "##{file_id}-status",
+        # Update file status with success
+        Turbo::StreamsChannel.broadcast_update_to(
+          "chat_message_#{chat_message.id}",
+          target: "#{file_id}-status",
           html: render_file_status("created")
         )
         
+        # Broadcast custom event for animation
+        ActionCable.server.broadcast(
+          "chat_progress_#{chat_message.id}",
+          {
+            action: 'add_file',
+            file_id: file_id,
+            status: 'created'
+          }
+        )
+        
       when :updated
-        # Show diff preview with animations
-        cable_ready[channel].morph(
-          selector: "#diff-preview-#{chat_message.id}",
+        # Show diff preview
+        Turbo::StreamsChannel.broadcast_update_to(
+          "chat_message_#{chat_message.id}",
+          target: "diff-preview-#{chat_message.id}",
           html: render_diff_preview(file_path, content_preview)
         )
         
       when :failed
-        # Mark file as failed with error styling
-        cable_ready[channel].add_css_class(
-          selector: "##{file_id}",
-          name: "bg-red-50 dark:bg-red-900/20"
-        )
-        cable_ready[channel].morph(
-          selector: "##{file_id}-status",
-          html: render_file_status("failed", content_preview) # error message
+        # Mark file as failed
+        Turbo::StreamsChannel.broadcast_update_to(
+          "chat_message_#{chat_message.id}",
+          target: "#{file_id}-status",
+          html: render_file_status("failed", content_preview)
         )
       end
-      
-      cable_ready.broadcast
     end
     
     def broadcast_dependency_check(dependencies, missing = [], resolved = [])
-      cable_ready[channel].morph(
-        selector: "#dependency-panel-#{chat_message.id}",
+      Turbo::StreamsChannel.broadcast_update_to(
+        "chat_message_#{chat_message.id}",
+        target: "dependency-panel-#{chat_message.id}",
         html: render_dependency_panel(dependencies, missing, resolved)
       )
       
-      # Add subtle notification for missing dependencies
+      # Add notification for missing dependencies
       if missing.any?
-        cable_ready[channel].append(
-          selector: "#chat-notifications-#{chat_message.id}",
+        Turbo::StreamsChannel.broadcast_append_to(
+          "chat_message_#{chat_message.id}",
+          target: "chat-notifications-#{chat_message.id}",
           html: render_notification(
             "Missing dependencies detected: #{missing.join(', ')}",
             type: "warning",
@@ -110,74 +118,83 @@ module Ai
           )
         )
       end
-      
-      cable_ready.broadcast
     end
     
     def broadcast_build_output(output_line, stream_type = :stdout)
-      # Stream build output in real-time with proper formatting
-      cable_ready[channel].append(
-        selector: "#build-output-#{chat_message.id}",
+      # Stream build output in real-time
+      Turbo::StreamsChannel.broadcast_append_to(
+        "chat_message_#{chat_message.id}",
+        target: "build-output-#{chat_message.id}",
         html: render_build_output_line(output_line, stream_type)
       )
       
-      # Auto-scroll to bottom
-      cable_ready[channel].dispatch_event(
-        selector: "#build-output-#{chat_message.id}",
-        name: "build:output:scroll"
+      # Send scroll event via Action Cable
+      ActionCable.server.broadcast(
+        "chat_progress_#{chat_message.id}",
+        {
+          action: 'update_build_output',
+          line: output_line,
+          stream: stream_type
+        }
       )
-      
-      cable_ready.broadcast
     end
     
     def broadcast_error(error_message, recovery_suggestions = [], technical_details = nil)
-      cable_ready[channel].morph(
-        selector: "#error-panel-#{chat_message.id}",
+      Turbo::StreamsChannel.broadcast_update_to(
+        "chat_message_#{chat_message.id}",
+        target: "error-panel-#{chat_message.id}",
         html: render_error_panel(error_message, recovery_suggestions, technical_details)
       )
       
-      # Add shake animation to draw attention
-      cable_ready[channel].add_css_class(
-        selector: "#error-panel-#{chat_message.id}",
-        name: "animate-shake"
+      # Send error event for animation
+      ActionCable.server.broadcast(
+        "chat_progress_#{chat_message.id}",
+        {
+          action: 'show_error',
+          message: error_message
+        }
       )
-      
-      cable_ready.broadcast
     end
     
     def broadcast_completion(success: true, stats: {})
       elapsed_time = Time.current - @start_time
       
-      cable_ready[channel].morph(
-        selector: "#chat-status-#{chat_message.id}",
+      Turbo::StreamsChannel.broadcast_update_to(
+        "chat_message_#{chat_message.id}",
+        target: "chat-status-#{chat_message.id}",
         html: render_completion_status(success, elapsed_time, stats)
       )
       
-      # Add celebration animation if successful
+      # Send completion event
       if success
-        cable_ready[channel].dispatch_event(
-          selector: "#chat-message-#{chat_message.id}",
-          name: "generation:complete:success"
+        ActionCable.server.broadcast(
+          "chat_progress_#{chat_message.id}",
+          {
+            action: 'dispatch_event',
+            event_name: 'generation:complete:success',
+            stats: stats
+          }
         )
       end
-      
-      cable_ready.broadcast
     end
     
     # Interactive controls
     
     def request_user_approval(changes, callback_id)
-      cable_ready[channel].morph(
-        selector: "#approval-panel-#{chat_message.id}",
+      Turbo::StreamsChannel.broadcast_update_to(
+        "chat_message_#{chat_message.id}",
+        target: "approval-panel-#{chat_message.id}",
         html: render_approval_panel(changes, callback_id)
       )
       
-      cable_ready[channel].dispatch_event(
-        selector: "#approval-panel-#{chat_message.id}",
-        name: "approval:requested"
+      ActionCable.server.broadcast(
+        "chat_progress_#{chat_message.id}",
+        {
+          action: 'dispatch_event',
+          event_name: 'approval:requested',
+          callback_id: callback_id
+        }
       )
-      
-      cable_ready.broadcast
     end
     
     private
@@ -340,15 +357,6 @@ module Ai
     
     def detect_language(path)
       File.extname(path).delete('.')
-    end
-    
-    def broadcast_turbo_stream(target:, partial:, locals: {})
-      Turbo::StreamsChannel.broadcast_update_to(
-        "chat_message_#{chat_message.id}",
-        target: target,
-        partial: partial,
-        locals: locals
-      )
     end
   end
 end

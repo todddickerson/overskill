@@ -1,6 +1,6 @@
 // Stimulus controller for chat progress and real-time updates
 import { Controller } from "@hotwired/stimulus"
-import { CableReady } from "cable_ready"
+import consumer from "../channels/consumer"
 
 export default class extends Controller {
   static targets = [
@@ -19,9 +19,17 @@ export default class extends Controller {
   }
   
   connect() {
-    // Subscribe to CableReady broadcasts
-    if (this.hasChannelValue) {
-      CableReady.subscribe(this.channelValue, this.handleCableReady.bind(this))
+    // Subscribe to Action Cable channel for real-time updates
+    if (this.hasMessageIdValue) {
+      this.subscription = consumer.subscriptions.create(
+        { 
+          channel: "ChatProgressChannel",
+          message_id: this.messageIdValue
+        },
+        {
+          received: (data) => this.handleChannelData(data)
+        }
+      )
     }
     
     // Initialize animations
@@ -34,24 +42,33 @@ export default class extends Controller {
   }
   
   disconnect() {
-    if (this.hasChannelValue) {
-      CableReady.unsubscribe(this.channelValue)
+    if (this.subscription) {
+      this.subscription.unsubscribe()
     }
   }
   
-  // Handle CableReady operations
-  handleCableReady(operations) {
-    // Process any custom events from CableReady
-    operations.forEach(operation => {
-      if (operation.name === 'dispatch_event') {
-        this.handleCustomEvent(operation.detail)
-      }
-    })
+  // Handle channel data from Action Cable
+  handleChannelData(data) {
+    // Handle different types of updates
+    switch(data.action) {
+      case 'update_progress':
+        this.updateProgress(data)
+        break
+      case 'add_file':
+        this.addFileToTree(data)
+        break
+      case 'update_build_output':
+        this.appendBuildOutput(data)
+        break
+      case 'dispatch_event':
+        this.handleCustomEvent(data)
+        break
+    }
   }
   
   // Handle custom events
-  handleCustomEvent(detail) {
-    switch(detail.name) {
+  handleCustomEvent(data) {
+    switch(data.event_name) {
       case 'build:output:scroll':
         this.scrollBuildOutput()
         break
@@ -61,6 +78,31 @@ export default class extends Controller {
       case 'approval:requested':
         this.highlightApprovalPanel()
         break
+    }
+  }
+  
+  // Update progress bar
+  updateProgress(data) {
+    if (this.hasProgressBarTarget && data.html) {
+      this.progressBarTarget.innerHTML = data.html
+    }
+  }
+  
+  // Add file to tree
+  addFileToTree(data) {
+    if (this.hasFileTreeTarget && data.html) {
+      this.fileTreeTarget.insertAdjacentHTML('beforeend', data.html)
+    }
+  }
+  
+  // Append build output
+  appendBuildOutput(data) {
+    if (this.hasBuildOutputTarget && data.line) {
+      const line = document.createElement('div')
+      line.className = data.stream === 'stderr' ? 'text-red-400' : 'text-gray-300'
+      line.textContent = data.line
+      this.buildOutputTarget.appendChild(line)
+      this.scrollBuildOutput()
     }
   }
   
