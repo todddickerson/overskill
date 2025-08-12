@@ -463,7 +463,7 @@ module Deployment
           if (url.pathname.endsWith('.js')) {
             console.log('[Worker] JS asset not found:', url.pathname);
             console.log('[Worker] Available assets:', Object.keys(ASSETS));
-            return new Response('JavaScript asset not found: ' + url.pathname + '\nAvailable: ' + Object.keys(ASSETS).join(', '), { 
+            return new Response('JavaScript asset not found: ' + url.pathname + '\\nAvailable: ' + Object.keys(ASSETS).join(', '), { 
               status: 404,
               headers: { 'Content-Type': 'text/plain' }
             });

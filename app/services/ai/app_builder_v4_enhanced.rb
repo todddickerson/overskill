@@ -47,7 +47,8 @@ module Ai
         
         # Complete!
         app.update!(status: 'ready')
-        chat_message.update!(status: 'completed')
+        # Note: Only assistant messages have status field
+        chat_message.update!(status: 'completed') if chat_message.role == 'assistant'
         
         broadcaster.broadcast_completion(
           success: true,
@@ -312,7 +313,8 @@ module Ai
       
       # Update app status to failed
       app.update!(status: 'failed') rescue nil
-      chat_message.update!(status: 'failed') rescue nil
+      # Only assistant messages have status field
+      chat_message.update!(status: 'failed') if chat_message.role == 'assistant' rescue nil
       
       # Broadcast user-friendly error
       suggestions = case error.message
