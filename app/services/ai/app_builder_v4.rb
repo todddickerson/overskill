@@ -918,7 +918,7 @@ module Ai
       
       @app.app_files.where("path LIKE 'src/components/%'").each do |file|
         if file.path.match?(/\/([A-Z][a-zA-Z0-9]*)\.(tsx|ts|jsx|js)$/)
-          component_name = File.basename(file.path, '.*')
+          component_name = ::File.basename(file.path, '.*')
           components << component_name unless components.include?(component_name)
         end
       end
