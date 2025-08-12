@@ -45,9 +45,13 @@ class PublishAppToProductionJob < ApplicationJob
   private
   
   def create_success_message(app, result)
+    # Get the user from the creator membership
+    user = app.creator&.user
+    return unless user  # Skip if no user found
+    
     AppChatMessage.create!(
       app: app,
-      user: app.creator.user,
+      user: user,
       role: 'assistant',
       content: "🎉 **App successfully published to production!**\n\n" +
                "🔗 Production URL: #{result[:production_url]}\n" +
@@ -64,9 +68,13 @@ class PublishAppToProductionJob < ApplicationJob
   end
   
   def create_failure_message(app, error)
+    # Get the user from the creator membership
+    user = app.creator&.user
+    return unless user  # Skip if no user found
+    
     AppChatMessage.create!(
       app: app,
-      user: app.creator.user,
+      user: user,
       role: 'assistant',
       content: "❌ **Failed to publish app to production**\n\n" +
                "Error: #{error}\n\n" +

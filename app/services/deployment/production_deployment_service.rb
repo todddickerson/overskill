@@ -262,6 +262,7 @@ module Deployment
     def create_production_version
       # Create a version record for this production deployment
       version = @app.app_versions.create!(
+        team: @app.team,  # Add required team association
         version_number: next_version_number,
         commit_message: "Production deployment",
         deployed: true,
@@ -273,7 +274,8 @@ module Deployment
       @app.app_files.each do |file|
         version.app_version_files.create!(
           app_file: file,
-          action: 'deployed'
+          action: 'deployed',
+          team: @app.team  # Add required team association
         )
       end
       
