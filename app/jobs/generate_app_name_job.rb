@@ -23,9 +23,9 @@ class GenerateAppNameJob < ApplicationJob
       Rails.logger.error "[AppName] Failed to generate name for app #{app.id}: #{result[:error]}"
     end
   rescue ActiveRecord::RecordNotFound => e
-    # Re-raise RecordNotFound as it indicates a real system error
-    Rails.logger.error "[AppName] App not found: #{app_id}"
-    raise e
+    # If app was deleted, log and exit gracefully (don't retry)
+    Rails.logger.info "[AppName] App #{app_id} not found - likely deleted. Skipping name generation."
+    return
   rescue => e
     Rails.logger.error "[AppName] Exception in GenerateAppNameJob: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")

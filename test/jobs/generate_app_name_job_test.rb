@@ -122,9 +122,9 @@ class GenerateAppNameJobTest < ActiveJob::TestCase
   end
 
   test "should handle missing app gracefully" do
-    # Test with non-existent app ID - the job should let the exception propagate
-    # as this indicates a real error in the system
-    assert_raises(ActiveRecord::RecordNotFound) do
+    # Test with non-existent app ID - the job should exit gracefully
+    # without raising an exception (app was likely deleted)
+    assert_nothing_raised do
       GenerateAppNameJob.perform_now(99999)
     end
   end
