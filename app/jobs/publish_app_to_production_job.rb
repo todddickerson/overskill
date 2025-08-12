@@ -1,6 +1,6 @@
 # Background job for publishing apps to production
 class PublishAppToProductionJob < ApplicationJob
-  queue_as :deployments
+  queue_as :deployment
   
   def perform(app)
     Rails.logger.info "[PublishJob] Starting production deployment for app ##{app.id}"
