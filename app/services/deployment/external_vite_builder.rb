@@ -383,12 +383,8 @@ module Deployment
     
     def wrap_for_worker_deployment_hybrid(hybrid_html, external_assets)
       # Create Worker template that serves HTML and external JS assets
-      # More robust escaping to prevent syntax errors in template literals
-      escaped_html = hybrid_html
-        .gsub('\\', '\\\\')  # Escape backslashes first
-        .gsub('`', '\\`')    # Escape backticks for template literals
-        .gsub('${', '\\${')  # Escape template literal expressions
-        .gsub("\r", "")      # Remove carriage returns
+      # Use JSON encoding for maximum safety - this handles ALL escaping properly
+      escaped_html = hybrid_html.to_json[1..-2]  # Remove the surrounding quotes from JSON
       
       # Create asset map for the Worker with safe escaping
       assets_map = external_assets.map do |asset|
