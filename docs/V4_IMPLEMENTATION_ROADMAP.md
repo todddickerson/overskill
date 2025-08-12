@@ -181,25 +181,548 @@ module Deployment
 end
 ```
 
-#### ✅ Week 1 Success Criteria
+#### ✅ Week 1 Success Criteria ✅ COMPLETE (Aug 12, 2025)
 - [x] V4 orchestrator replaces V3 successfully ✅
 - [x] Shared templates generate foundation files ✅
-- [x] Vite builds execute via Cloudflare Workers ✅
-- [x] LineReplaceService and SmartSearchService integrated ✅ COMPLETE (Aug 12)
-- [x] Claude API integrated with token tracking ✅ COMPLETE (Aug 12)
-- [x] Supabase UI components integrated ✅ COMPLETE (Aug 12)
-- [ ] End-to-end generation works (basic test app) ⚠️ READY TO TEST
+- [x] Vite builds execute successfully ✅ (npm/Node.js fixed)
+- [x] LineReplaceService and SmartSearchService integrated ✅ 
+- [x] Claude API integrated with token tracking ✅ 
+- [x] Supabase UI components integrated ✅ 
+- [x] End-to-end generation works (39 files, 9KB worker) ✅ VALIDATED
+
+**🎉 MAJOR MILESTONE**: V4 basic generation pipeline is working! Apps generate successfully with professional components and build properly.
+
+#### ✅ Week 2 Success Criteria (The Real Game Changer)
+- [ ] **ChatMessageProcessor** handles ongoing user conversations ⚠️ CRITICAL
+- [ ] **FileContextAnalyzer** understands current app state ⚠️ CRITICAL  
+- [ ] **ActionPlanGenerator** creates intelligent change plans ⚠️ CRITICAL
+- [ ] **ComponentSuggestionEngine** suggests relevant components ⚠️ CRITICAL
+- [ ] **LivePreviewManager** enables real-time updates ⚠️ CRITICAL
+- [ ] Example chat scenarios working (auth, todo modifications, etc.) ⚠️ CRITICAL
+
+**🚀 SUCCESS METRIC**: User can have ongoing conversations to iteratively build and modify their apps, just like Lovable.dev/Bolt.new
 
 ---
 
-### **Week 2: Secrets Management & Environment Variables**
+### **Week 2: Chat-Based Development Loop** 🚀 CRITICAL ADDITION
 *August 19-25, 2025*
 
-#### 🎯 Primary Goals
+#### 🎯 Primary Goals - The Missing Core of AI App Builder
+- **Continuous Chat-Based Development**: Handle ongoing user messages to modify, enhance, and fix apps
+- **Context-Aware Code Changes**: Understand current app state and make intelligent modifications  
+- **Component Library Integration**: Suggest and use existing components based on user requests
+- **Smart File Management**: Know which files to modify based on conversation context
+- **Iterative Development Workflow**: Support ongoing conversation threads like Lovable.dev/Bolt.new
+
+#### 📋 Core Chat Development Services
+
+##### Day 1-2: ChatMessageProcessor - The Brain 🧠
+**The central service that makes OverSkill a true conversational AI app builder:**
+
+```ruby
+# /app/services/ai/chat_message_processor.rb
+module Ai
+  class ChatMessageProcessor
+    # This is the heart of our Lovable.dev/Bolt.new competitor
+    
+    def initialize(app_chat_message)
+      @app = app_chat_message.app
+      @message = app_chat_message
+      @context = build_conversation_context
+    end
+    
+    def process!
+      # 1. Classify the message type and intent
+      message_analysis = classify_message_intent
+      
+      # 2. Analyze current app state and files
+      app_context = analyze_current_app_state
+      
+      # 3. Determine appropriate action
+      action_plan = generate_action_plan(message_analysis, app_context)
+      
+      # 4. Execute the changes
+      execute_changes(action_plan)
+      
+      # 5. Update preview and provide feedback
+      update_preview_and_respond
+    end
+    
+    private
+    
+    MESSAGE_TYPES = {
+      initial_generation: /^(create|build|generate|make)\s+.*app/i,
+      add_feature: /^(add|include|implement)\s+/i,
+      modify_feature: /^(change|update|modify|edit)\s+/i,
+      fix_bug: /^(fix|debug|resolve|correct)\s+/i,
+      style_change: /^(style|design|color|theme)\s+/i,
+      component_request: /^(use|add).*component/i,
+      deployment_request: /^(deploy|publish|launch)\s+/i,
+      question: /^(how|what|why|when|where)\s+/i
+    }
+    
+    def classify_message_intent
+      content = @message.content.downcase
+      
+      # Determine primary message type
+      message_type = MESSAGE_TYPES.find { |type, pattern| content.match?(pattern) }&.first || :general_request
+      
+      # Extract specific entities (components, files, features)
+      entities = extract_entities(content)
+      
+      # Determine urgency and scope  
+      scope = determine_change_scope(content)
+      
+      {
+        type: message_type,
+        entities: entities,
+        scope: scope,
+        urgency: classify_urgency(content),
+        confidence: calculate_confidence(content)
+      }
+    end
+    
+    def analyze_current_app_state
+      FileContextAnalyzer.new(@app).analyze
+    end
+    
+    def generate_action_plan(message_analysis, app_context)
+      ActionPlanGenerator.new(@app, @message, message_analysis, app_context).generate
+    end
+  end
+end
+```
+
+##### Day 2-3: FileContextAnalyzer - Understanding Current State 🔍
+**Analyzes current app state to make intelligent modifications:**
+
+```ruby
+# /app/services/ai/file_context_analyzer.rb
+module Ai
+  class FileContextAnalyzer
+    def initialize(app)
+      @app = app
+    end
+    
+    def analyze
+      {
+        # Current file structure and contents
+        file_structure: build_file_tree,
+        
+        # Components and their purposes
+        existing_components: identify_existing_components,
+        
+        # Current dependencies and libraries
+        dependencies: parse_package_json,
+        
+        # Routing structure
+        routes: analyze_routing_structure,
+        
+        # Database schema (from app-scoped tables)
+        database_schema: infer_database_schema,
+        
+        # UI patterns and styling approach
+        ui_patterns: analyze_ui_patterns,
+        
+        # Recent changes and conversation history
+        recent_changes: get_recent_file_changes,
+        
+        # Potential improvement areas
+        suggestions: generate_improvement_suggestions
+      }
+    end
+    
+    private
+    
+    def identify_existing_components
+      components = {}
+      
+      @app.app_files.where("path LIKE 'src/components/%'").find_each do |file|
+        component_info = analyze_component_file(file)
+        components[component_info[:name]] = component_info
+      end
+      
+      components
+    end
+    
+    def analyze_component_file(file)
+      content = file.content
+      
+      {
+        name: extract_component_name(file.path),
+        path: file.path,
+        type: classify_component_type(content),
+        props: extract_component_props(content),
+        dependencies: extract_imports(content),
+        purpose: infer_component_purpose(content),
+        complexity: calculate_component_complexity(content),
+        reusable: assess_reusability(content)
+      }
+    end
+    
+    def analyze_routing_structure
+      router_file = @app.app_files.find_by(path: 'src/router.tsx')
+      return {} unless router_file
+      
+      extract_routes_from_content(router_file.content)
+    end
+    
+    def infer_database_schema
+      # Analyze database interactions in components to infer schema
+      db_interactions = []
+      
+      @app.app_files.where("content LIKE '%db.from%' OR content LIKE '%supabase%'").find_each do |file|
+        interactions = extract_database_calls(file.content)
+        db_interactions.concat(interactions)
+      end
+      
+      build_schema_from_interactions(db_interactions)
+    end
+  end
+end
+```
+
+##### Day 3-4: ActionPlanGenerator - Smart Change Planning 🎯
+**Generates intelligent plans for code changes based on context:**
+
+```ruby
+# /app/services/ai/action_plan_generator.rb
+module Ai
+  class ActionPlanGenerator
+    def initialize(app, message, message_analysis, app_context)
+      @app = app
+      @message = message
+      @analysis = message_analysis
+      @context = app_context
+    end
+    
+    def generate
+      case @analysis[:type]
+      when :add_feature
+        plan_feature_addition
+      when :modify_feature
+        plan_feature_modification  
+      when :fix_bug
+        plan_bug_fix
+      when :style_change
+        plan_style_changes
+      when :component_request
+        plan_component_integration
+      else
+        plan_general_changes
+      end
+    end
+    
+    private
+    
+    def plan_feature_addition
+      # Example: "Add user authentication"
+      feature_request = @message.content
+      
+      {
+        type: :feature_addition,
+        steps: [
+          {
+            action: :suggest_components,
+            components: ComponentSuggestionEngine.new(@app).suggest_for_request(feature_request),
+            rationale: "These components will provide the functionality you requested"
+          },
+          {
+            action: :modify_files,
+            files: determine_files_to_modify(feature_request),
+            changes: generate_specific_changes(feature_request)
+          },
+          {
+            action: :add_dependencies,
+            packages: suggest_required_packages(feature_request)
+          },
+          {
+            action: :update_routing,
+            routes: suggest_new_routes(feature_request)
+          }
+        ],
+        estimated_time: estimate_implementation_time,
+        preview_available: true
+      }
+    end
+    
+    def plan_feature_modification
+      # Example: "Change the todo list to show completed items differently"
+      
+      # Find relevant files
+      relevant_files = find_files_for_modification
+      
+      # Analyze current implementation
+      current_implementation = analyze_current_implementation(relevant_files)
+      
+      {
+        type: :feature_modification,
+        target_files: relevant_files,
+        current_state: current_implementation,
+        proposed_changes: generate_modification_plan,
+        impact_assessment: assess_change_impact,
+        preview_available: true
+      }
+    end
+    
+    def determine_files_to_modify(request)
+      FileImpactAnalyzer.new(@app, request, @context).determine_affected_files
+    end
+  end
+end
+```
+
+##### Day 4-5: ComponentSuggestionEngine - Smart Component Usage 🧩
+**Suggests relevant components and patterns based on user requests:**
+
+```ruby
+# /app/services/ai/component_suggestion_engine.rb
+module Ai
+  class ComponentSuggestionEngine
+    def initialize(app)
+      @app = app
+      @available_components = load_available_components
+    end
+    
+    def suggest_for_request(request)
+      # Parse request to understand what functionality is needed
+      functionality_needed = parse_functionality_request(request)
+      
+      suggestions = []
+      
+      # Check for exact matches in our component library
+      exact_matches = find_exact_component_matches(functionality_needed)
+      suggestions.concat(exact_matches)
+      
+      # Suggest complementary components
+      complementary = suggest_complementary_components(exact_matches)
+      suggestions.concat(complementary)
+      
+      # Suggest from successful app patterns
+      pattern_suggestions = suggest_from_app_patterns(functionality_needed)
+      suggestions.concat(pattern_suggestions)
+      
+      rank_and_filter_suggestions(suggestions)
+    end
+    
+    private
+    
+    COMPONENT_LIBRARY = {
+      'authentication' => {
+        components: ['supabase_ui_auth', 'password-based-auth', 'social-auth'],
+        patterns: ['login-flow', 'signup-flow', 'protected-routes'],
+        dependencies: ['@supabase/auth-ui-react'],
+        typical_files: ['src/pages/auth/Login.tsx', 'src/components/auth/AuthForm.tsx']
+      },
+      'chat' => {
+        components: ['supabase_ui_realtime', 'realtime-chat', 'realtime-cursor'],
+        patterns: ['chat-room', 'message-list', 'typing-indicator'],
+        dependencies: ['@supabase/realtime-js'],
+        typical_files: ['src/components/Chat.tsx', 'src/hooks/useChat.ts']
+      },
+      'file-upload' => {
+        components: ['supabase_ui_data', 'dropzone', 'file-preview'],
+        patterns: ['drag-drop-upload', 'progress-indicator'],
+        dependencies: ['@supabase/storage-js'],
+        typical_files: ['src/components/FileUpload.tsx']
+      },
+      'dashboard' => {
+        components: ['shadcn_ui_core', 'card', 'chart', 'data-table'],
+        patterns: ['metrics-grid', 'sidebar-nav', 'responsive-layout'],
+        dependencies: ['recharts', 'lucide-react'],
+        typical_files: ['src/pages/Dashboard.tsx', 'src/components/MetricsCard.tsx']
+      }
+    }
+    
+    def parse_functionality_request(request)
+      request_lower = request.downcase
+      
+      # Extract functionality keywords
+      functionalities = []
+      
+      COMPONENT_LIBRARY.each do |functionality, config|
+        if request_lower.include?(functionality) || 
+           config[:components].any? { |comp| request_lower.include?(comp.gsub('_', ' ')) }
+          functionalities << functionality
+        end
+      end
+      
+      # Also check for specific component names
+      component_mentions = extract_component_mentions(request_lower)
+      functionalities.concat(component_mentions)
+      
+      functionalities.uniq
+    end
+    
+    def find_exact_component_matches(functionalities)
+      matches = []
+      
+      functionalities.each do |functionality|
+        if COMPONENT_LIBRARY[functionality]
+          matches << {
+            type: :exact_match,
+            functionality: functionality,
+            components: COMPONENT_LIBRARY[functionality][:components],
+            confidence: 0.95,
+            rationale: "Direct match for #{functionality} functionality"
+          }
+        end
+      end
+      
+      matches
+    end
+    
+    def suggest_from_app_patterns(functionalities)
+      # Analyze successful apps in our system for patterns
+      successful_apps = @app.class.where(status: 'generated').includes(:app_files)
+      
+      pattern_suggestions = []
+      
+      functionalities.each do |functionality|
+        # Find apps that successfully implement this functionality
+        similar_apps = find_apps_with_functionality(successful_apps, functionality)
+        
+        if similar_apps.any?
+          common_patterns = extract_common_patterns(similar_apps, functionality)
+          pattern_suggestions << {
+            type: :pattern_match,
+            functionality: functionality,
+            patterns: common_patterns,
+            confidence: 0.8,
+            rationale: "Based on #{similar_apps.count} successful apps with similar functionality"
+          }
+        end
+      end
+      
+      pattern_suggestions
+    end
+  end
+end
+```
+
+##### Day 5: Live Preview Integration - Real-time Updates ⚡
+**Enables real-time preview updates as users chat:**
+
+```ruby
+# /app/services/ai/live_preview_manager.rb
+module Ai
+  class LivePreviewManager
+    def initialize(app)
+      @app = app
+    end
+    
+    def update_preview_after_changes(changed_files)
+      # 1. Trigger incremental build
+      incremental_build_result = trigger_incremental_build(changed_files)
+      
+      # 2. Update preview deployment
+      if incremental_build_result[:success]
+        update_preview_deployment(incremental_build_result)
+      end
+      
+      # 3. Broadcast updates to user's browser via ActionCable
+      broadcast_preview_updates
+      
+      # 4. Return preview URL and status
+      {
+        preview_url: @app.preview_url,
+        status: incremental_build_result[:success] ? 'updated' : 'failed',
+        build_time: incremental_build_result[:build_time],
+        changes_applied: changed_files.count
+      }
+    end
+    
+    private
+    
+    def trigger_incremental_build(changed_files)
+      # For development speed, only rebuild affected components
+      if changed_files.count <= 3 && only_component_changes?(changed_files)
+        FastComponentRebuild.new(@app, changed_files).execute
+      else
+        # Full rebuild for complex changes
+        Deployment::ExternalViteBuilder.new(@app).build_for_preview
+      end
+    end
+    
+    def broadcast_preview_updates
+      ActionCable.server.broadcast(
+        "app_#{@app.id}_preview", {
+          type: 'preview_updated',
+          app_id: @app.id,
+          preview_url: @app.preview_url,
+          timestamp: Time.current.iso8601
+        }
+      )
+    end
+  end
+end
+```
+
+#### 🎯 Chat Development Message Flow
+**The complete flow that makes OverSkill competitive with Lovable.dev:**
+
+```mermaid
+graph TD
+    A[User sends message] --> B[ChatMessageProcessor.process!]
+    B --> C[Classify message intent]
+    C --> D[Analyze current app state]  
+    D --> E[Generate action plan]
+    E --> F[Suggest components if needed]
+    F --> G[Execute code changes]
+    G --> H[Update live preview]
+    H --> I[Respond with preview link]
+    I --> J[User sees changes immediately]
+    J --> K[User continues conversation]
+    K --> A
+```
+
+#### 📱 Example Chat Scenarios
+
+**Scenario 1: Adding Authentication**
+```
+User: "Add user authentication with Google sign-in"
+AI: "I'll add Supabase authentication with Google OAuth. This will include:
+     - Login/signup pages with social auth
+     - Protected route wrapper  
+     - User profile management
+     Adding 4 new files and updating routing..."
+AI: "✅ Authentication added! Preview: https://preview-123.overskill.app"
+User: "The login button should be bigger"
+AI: "I'll update the login button styling..."
+AI: "✅ Button size increased! Updated preview automatically."
+```
+
+**Scenario 2: Modifying Existing Feature**
+```
+User: "Change the todo list to show completed items in gray"
+AI: "I found your TodoItem component. I'll update the styling to show 
+     completed items with gray text and strikethrough..."
+AI: "✅ Styling updated! Completed todos now appear in gray."
+User: "Also add a delete button to each todo"
+AI: "I'll add a delete button with trash icon next to each todo item..."
+```
+
+**Scenario 3: Component Discovery**
+```
+User: "I want to add a chat feature"
+AI: "I can add a real-time chat using Supabase Realtime. This includes:
+     - Multi-user chat component
+     - Message history
+     - Online user presence
+     - Typing indicators
+     Would you like me to add this?"
+User: "Yes, add it to a new /chat page"
+AI: "Adding real-time chat system with dedicated page..."
+```
+
+### **Week 2.5: Secrets Management & Environment Variables**
+*August 26-September 1, 2025*
+
+#### 🎯 Primary Goals  
 - Enhanced AppEnvVar model with var_type enum
 - Platform secrets vs user secrets separation
 - Automatic Cloudflare Workers secrets synchronization
-- Preview vs production URL management
+- Chat-based environment variable management
 
 #### 📋 Specific Deliverables
 

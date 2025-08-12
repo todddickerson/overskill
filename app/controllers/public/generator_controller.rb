@@ -59,6 +59,10 @@ class Public::GeneratorController < Public::ApplicationController
         create
       end
     end
+    respond_to do |format|
+      format.html { redirect_to account_app_editor_path(app), notice: "Creating your app..." }
+      format.turbo_stream { redirect_to account_app_editor_path(app), status: :see_other }
+    end
   end
   
   def create
