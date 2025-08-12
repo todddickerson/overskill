@@ -137,17 +137,40 @@ module Deployment
       Dir.chdir(temp_dir) do
         Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
         
-        # Install dependencies
-        unless system('npm install --silent')
-          raise "npm install failed. Check Node.js installation."
+        # Use full path to npm if needed, or set PATH
+        npm_path = `which npm`.strip
+        if npm_path.empty?
+          # Try common npm locations
+          npm_path = ['/usr/local/bin/npm', '/opt/homebrew/bin/npm', "#{ENV['HOME']}/.nvm/versions/node/*/bin/npm"].find { |p| Dir.glob(p).any? }
+          npm_path = Dir.glob(npm_path).first if npm_path
         end
+        
+        if npm_path.nil? || npm_path.empty?
+          Rails.logger.error "[ExternalViteBuilder] npm not found in PATH"
+          raise "npm not found. Please ensure Node.js is installed."
+        end
+        
+        Rails.logger.info "[ExternalViteBuilder] Using npm at: #{npm_path}"
+        
+        # Install dependencies
+        install_output = `#{npm_path} install 2>&1`
+        install_result = $?.success?
+        
+        unless install_result
+          Rails.logger.error "[ExternalViteBuilder] npm install failed with exit code: #{$?.exitstatus}"
+          Rails.logger.error "[ExternalViteBuilder] npm install output: #{install_output}"
+          raise "npm install failed: #{install_output.lines.last(5).join}"
+        end
+        
+        Rails.logger.info "[ExternalViteBuilder] Dependencies installed successfully"
         
         Rails.logger.info "[ExternalViteBuilder] Running Vite build (#{mode} mode)..."
         
         # Run the appropriate build command
-        build_command = mode == 'production' ? 'npm run build' : 'npm run build:preview'
+        build_command = mode == 'production' ? "#{npm_path} run build" : "#{npm_path} run build:preview"
         
         unless system(build_command)
+          Rails.logger.error "[ExternalViteBuilder] Vite build failed with exit code: #{$?.exitstatus}"
           raise "Vite build failed. Check build configuration."
         end
         

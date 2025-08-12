@@ -293,7 +293,7 @@ module Ai
         # Add new dependencies with latest version marker
         new_dependencies.each do |dep|
           unless package_json['dependencies'].key?(dep)
-            package_json['dependencies'][dep] = '^latest'
+            package_json['dependencies'][dep] = 'latest'
             Rails.logger.info "[V4] Added dependency: #{dep}"
           end
         end
