@@ -1,4 +1,4 @@
-# Background job to sync users between Rails and Supabase
+# Background job to sync users between Rails and Supabase across multiple shards
 class SupabaseAuthSyncJob < ApplicationJob
   queue_as :default
   
@@ -33,8 +33,8 @@ class SupabaseAuthSyncJob < ApplicationJob
   private
   
   def create_supabase_user(user, service)
-    # Skip if already synced
-    return if user.supabase_user_id.present?
+    # Skip if already synced to any shard
+    return if user.user_shard_mappings.synced.any?
     
     # Create Supabase auth user with temporary password
     result = service.create_user(
@@ -48,13 +48,32 @@ class SupabaseAuthSyncJob < ApplicationJob
     )
     
     if result[:success]
+      # Store the primary Supabase user ID (from first successful shard)
       user.update!(
         supabase_user_id: result[:data]['id'],
         supabase_sync_status: 'synced',
         supabase_last_synced_at: Time.current
       )
       
-      # Create profile in Supabase
+      # Create user shard mappings for successful syncs
+      result[:synced_shards]&.each do |shard_name|
+        shard = DatabaseShard.find_by(name: shard_name)
+        next unless shard
+        
+        mapping = user.user_shard_mappings.find_or_initialize_by(database_shard: shard)
+        mapping.update!(
+          supabase_user_id: result[:data]['id'],
+          sync_status: 'synced',
+          last_synced_at: Time.current
+        )
+      end
+      
+      # Log failed shards for monitoring
+      result[:failed_shards]&.each do |failed|
+        Rails.logger.error "[SupabaseSync] Failed to sync user #{user.id} to #{failed[:shard]}: #{failed[:error]}"
+      end
+      
+      # Create profile in Supabase across all shards
       profile_result = service.create_profile(user)
       
       unless profile_result[:success]
@@ -62,14 +81,19 @@ class SupabaseAuthSyncJob < ApplicationJob
       end
     else
       user.update!(supabase_sync_status: 'failed')
-      raise "Failed to create Supabase user: #{result[:error]}"
+      raise "Failed to create Supabase user on any shard: #{result[:error]}"
     end
   end
   
   def update_supabase_user(user, service)
-    return unless user.supabase_user_id.present?
+    # Get all shard mappings for this user
+    mappings = user.user_shard_mappings.includes(:database_shard)
+    return if mappings.empty?
     
-    result = service.update_user(user.supabase_user_id, {
+    # Use the primary Supabase user ID if available, otherwise use from first mapping
+    supabase_user_id = user.supabase_user_id || mappings.first.supabase_user_id
+    
+    result = service.update_user(supabase_user_id, {
       email: user.email,
       user_metadata: {
         name: user.name,
@@ -84,18 +108,32 @@ class SupabaseAuthSyncJob < ApplicationJob
         supabase_last_synced_at: Time.current
       )
       
-      # Update profile
+      # Update shard mappings for successful syncs
+      result[:synced_shards]&.each do |shard_name|
+        mapping = mappings.find { |m| m.database_shard.name == shard_name }
+        mapping&.update!(
+          sync_status: 'synced',
+          last_synced_at: Time.current
+        )
+      end
+      
+      # Update profile across all shards
       service.create_profile(user)
     else
       user.update!(supabase_sync_status: 'error')
-      raise "Failed to update Supabase user: #{result[:error]}"
+      raise "Failed to update Supabase user on any shard: #{result[:error]}"
     end
   end
   
   def delete_supabase_user(user, service)
-    return unless user.supabase_user_id.present?
+    # Get all shard mappings for this user
+    mappings = user.user_shard_mappings.includes(:database_shard)
     
-    result = service.delete_user(user.supabase_user_id)
+    # Use the primary Supabase user ID if available, otherwise use from first mapping
+    supabase_user_id = user.supabase_user_id || mappings.first&.supabase_user_id
+    return unless supabase_user_id
+    
+    result = service.delete_user(supabase_user_id)
     
     if result[:success]
       user.update!(
@@ -103,8 +141,19 @@ class SupabaseAuthSyncJob < ApplicationJob
         supabase_sync_status: 'deleted',
         supabase_last_synced_at: Time.current
       )
+      
+      # Update shard mappings for successful deletions
+      result[:synced_shards]&.each do |shard_name|
+        mapping = mappings.find { |m| m.database_shard.name == shard_name }
+        mapping&.update!(sync_status: 'deleted')
+      end
+      
+      # Log failed deletions
+      result[:failed_shards]&.each do |failed|
+        Rails.logger.error "[SupabaseSync] Failed to delete user #{user.id} from #{failed[:shard]}: #{failed[:error]}"
+      end
     else
-      Rails.logger.error "Failed to delete Supabase user #{user.supabase_user_id}: #{result[:error]}"
+      Rails.logger.error "Failed to delete Supabase user #{supabase_user_id} from any shard: #{result[:error]}"
     end
   end
 end

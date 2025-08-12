@@ -47,6 +47,36 @@ module Deployment
       set_worker_secrets(worker_name)
     end
     
+    def update_worker_hot(hot_update_code)
+      Rails.logger.info "[CloudflareWorkersDeployer] Deploying hot update for app ##{@app.id}"
+      
+      worker_name = generate_worker_name(:preview)
+      
+      # Deploy the hot update worker code
+      response = self.class.put(
+        "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
+        headers: { 'Content-Type' => 'application/javascript' },
+        body: hot_update_code
+      )
+      
+      if response.success?
+        Rails.logger.info "[CloudflareWorkersDeployer] Hot update deployed successfully"
+        
+        {
+          success: true,
+          worker_name: worker_name,
+          deployment_type: :hot_update,
+          deployed_at: Time.current
+        }
+      else
+        Rails.logger.error "[CloudflareWorkersDeployer] Hot update deployment failed: #{response.body}"
+        { success: false, error: response.body }
+      end
+    rescue => e
+      Rails.logger.error "[CloudflareWorkersDeployer] Hot update deployment error: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
     private
     
     def generate_worker_name(deployment_type)

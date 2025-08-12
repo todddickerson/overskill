@@ -16,6 +16,21 @@ module Deployment
       end
     end
     
+    def build_for_preview_with_context(build_context = {})
+      Rails.logger.info "[ExternalViteBuilder] Starting incremental preview build for app ##{@app.id}"
+      Rails.logger.info "[ExternalViteBuilder] Build context: #{build_context.inspect}"
+      
+      execute_build do |temp_dir|
+        if build_context[:incremental] && build_context[:changed_files]
+          # Incremental build focusing on changed files
+          build_with_incremental_mode(temp_dir, build_context[:changed_files])
+        else
+          # Fall back to standard fast build
+          build_with_mode(temp_dir, 'development')
+        end
+      end
+    end
+    
     def build_for_production
       Rails.logger.info "[ExternalViteBuilder] Starting optimized production build for app ##{@app.id}"
       
@@ -176,6 +191,48 @@ module Deployment
         
         # Read the built JavaScript bundle
         read_build_output(temp_dir)
+      end
+    end
+    
+    def build_with_incremental_mode(temp_dir, changed_files)
+      Rails.logger.info "[ExternalViteBuilder] Incremental build for #{changed_files.count} changed files"
+      
+      Dir.chdir(temp_dir) do
+        Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
+        
+        # Use cached npm install if available
+        install_output = `#{npm_path} install 2>&1`
+        install_result = $?.success?
+        
+        unless install_result
+          Rails.logger.error "[ExternalViteBuilder] npm install failed: #{install_output}"
+          raise "npm install failed: #{install_output.lines.last(3).join}"
+        end
+        
+        Rails.logger.info "[ExternalViteBuilder] Running incremental Vite build..."
+        
+        # Use Vite's incremental build capabilities
+        build_command = "#{npm_path} run build:preview"
+        
+        unless system(build_command)
+          Rails.logger.error "[ExternalViteBuilder] Incremental Vite build failed with exit code: #{$?.exitstatus}"
+          raise "Incremental Vite build failed. Check build configuration."
+        end
+        
+        # Read the build output
+        read_build_output(temp_dir)
+      end
+    end
+    
+    def npm_path
+      @npm_path ||= begin
+        path = `which npm`.strip
+        if path.empty?
+          # Try common npm locations
+          path = ['/usr/local/bin/npm', '/opt/homebrew/bin/npm', "#{ENV['HOME']}/.nvm/versions/node/*/bin/npm"].find { |p| Dir.glob(p).any? }
+          path = Dir.glob(path).first if path
+        end
+        path
       end
     end
     

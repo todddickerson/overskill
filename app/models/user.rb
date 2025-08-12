@@ -8,6 +8,8 @@ class User < ApplicationRecord
   # has_many :purchases # TODO: uncomment when Purchase model exists
   has_many :active_follows, class_name: "Follow", foreign_key: "follower_id"
   has_many :following, through: :active_follows, source: :followed
+  has_many :user_shard_mappings, dependent: :destroy
+  has_many :database_shards, through: :user_shard_mappings
   # 🚅 add has_many associations above.
 
   has_many :oauth_google_oauth2_accounts, class_name: 'Oauth::GoogleOauth2Account' if google_oauth2_enabled?

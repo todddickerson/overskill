@@ -12,6 +12,7 @@ end
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require "webmock/minitest"
 
 # Configure ActiveJob to use test adapter for testing
 ActiveJob::Base.queue_adapter = :test

@@ -779,6 +779,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
     t.string "locale"
   end
 
+  create_table "user_shard_mappings", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "database_shard_id", null: false
+    t.string "supabase_user_id", null: false
+    t.string "sync_status", default: "pending"
+    t.datetime "last_synced_at"
+    t.text "sync_error"
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["database_shard_id", "supabase_user_id"], name: "idx_on_database_shard_id_supabase_user_id_28c0521d33", unique: true
+    t.index ["database_shard_id"], name: "index_user_shard_mappings_on_database_shard_id"
+    t.index ["sync_status"], name: "index_user_shard_mappings_on_sync_status"
+    t.index ["user_id", "database_shard_id"], name: "index_user_shard_mappings_on_user_id_and_database_shard_id", unique: true
+    t.index ["user_id"], name: "index_user_shard_mappings_on_user_id"
+  end
+
   create_table "users", id: :serial, force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -983,6 +1000,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_07_141554) do
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "memberships"
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "scaffolding_completely_concrete_tangible_things", column: "tangible_thing_id"
   add_foreign_key "team_database_configs", "teams"
+  add_foreign_key "user_shard_mappings", "database_shards"
+  add_foreign_key "user_shard_mappings", "users"
   add_foreign_key "users", "oauth_applications", column: "platform_agent_of_id"
   add_foreign_key "webhooks_incoming_oauth_github_account_webhooks", "oauth_github_accounts"
   add_foreign_key "webhooks_incoming_oauth_google_oauth2_account_webhooks", "oauth_google_oauth2_accounts"
