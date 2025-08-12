@@ -1,0 +1,167 @@
+<%# Enhanced chat message with visual feedback components %>
+<div id="chat-message-<%= chat_message.id %>" 
+     class="chat-message rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 mb-4"
+     data-controller="chat-progress"
+     data-chat-progress-message-id-value="<%= chat_message.id %>"
+     data-chat-progress-channel-value="ChatChannel:<%= chat_message.id %>">
+  
+  <%# Message header %>
+  <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <%# User/AI avatar %>
+        <div class="flex-shrink-0">
+          <% if chat_message.from_user? %>
+            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+              <span class="text-white text-sm font-medium">
+                <%= chat_message.user.name.first.upcase %>
+              </span>
+            </div>
+          <% else %>
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+          <% end %>
+        </div>
+        
+        <%# Message metadata %>
+        <div>
+          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <%= chat_message.from_user? ? chat_message.user.name : 'AI Assistant' %>
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            <%= chat_message.created_at.strftime("%H:%M") %>
+          </p>
+        </div>
+      </div>
+      
+      <%# Status indicator %>
+      <div id="chat-status-<%= chat_message.id %>">
+        <% if chat_message.generating? %>
+          <div class="flex items-center space-x-2">
+            <div class="typing-indicator text-blue-500">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <span class="text-sm text-gray-500 dark:text-gray-400">Generating...</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  
+  <%# Message content %>
+  <div class="px-4 py-3">
+    <div class="prose prose-sm dark:prose-invert max-w-none">
+      <%= simple_format(chat_message.content) %>
+    </div>
+  </div>
+  
+  <%# Generation progress section (shown during AI processing) %>
+  <% if chat_message.generating? || chat_message.has_generation_data? %>
+    <div class="px-4 pb-4 space-y-4">
+      
+      <%# Main progress bar %>
+      <div id="chat-progress-<%= chat_message.id %>" data-chat-progress-target="progressBar">
+        <%= render 'chat_messages/components/progress_bar', 
+                   current: 0, 
+                   total: 6, 
+                   label: "Starting generation...",
+                   percentage: 0 %>
+      </div>
+      
+      <%# Phase timeline %>
+      <div id="chat-timeline-<%= chat_message.id %>" 
+           class="space-y-2 max-h-64 overflow-y-auto" 
+           data-chat-progress-target="phaseList">
+        <!-- Phases will be inserted here dynamically -->
+      </div>
+      
+      <%# File tree panel %>
+      <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Files
+          </h4>
+          <button class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  data-action="click->chat-progress#expandFileTree">
+            Expand all
+          </button>
+        </div>
+        <div id="file-tree-<%= chat_message.id %>" 
+             class="space-y-1 max-h-64 overflow-y-auto"
+             data-chat-progress-target="fileTree">
+          <!-- File tree items will be inserted here -->
+        </div>
+      </div>
+      
+      <%# Dependency panel %>
+      <div id="dependency-panel-<%= chat_message.id %>" data-chat-progress-target="dependencyPanel">
+        <!-- Dependency panel will be inserted here when needed -->
+      </div>
+      
+      <%# Build output %>
+      <details class="group">
+        <summary class="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+          Build Output
+        </summary>
+        <div class="mt-2 rounded-lg bg-gray-900 p-3">
+          <div id="build-output-<%= chat_message.id %>" 
+               class="font-mono text-xs text-gray-300 space-y-1 max-h-64 overflow-y-auto"
+               data-chat-progress-target="buildOutput">
+            <!-- Build output lines will be streamed here -->
+          </div>
+        </div>
+      </details>
+      
+      <%# Error panel (shown when errors occur) %>
+      <div id="error-panel-<%= chat_message.id %>" data-chat-progress-target="errorPanel">
+        <!-- Error panel will be inserted here if needed -->
+      </div>
+      
+      <%# Approval panel (shown when user approval needed) %>
+      <div id="approval-panel-<%= chat_message.id %>" data-chat-progress-target="approvalPanel">
+        <!-- Approval panel will be inserted here when needed -->
+      </div>
+      
+      <%# Notifications area %>
+      <div id="chat-notifications-<%= chat_message.id %>" class="space-y-2">
+        <!-- Notifications will be inserted here -->
+      </div>
+    </div>
+  <% end %>
+  
+  <%# App preview (if app was generated) %>
+  <% if chat_message.app_generated? && chat_message.app %>
+    <div class="px-4 pb-4">
+      <div class="rounded-lg border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+              <h3 class="text-sm font-medium text-green-900 dark:text-green-100">
+                App Generated Successfully!
+              </h3>
+              <p class="text-sm text-green-700 dark:text-green-300">
+                Your app is ready and deployed.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <a href="<%= chat_message.app.preview_url %>" 
+               target="_blank"
+               class="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors">
+              View App →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
