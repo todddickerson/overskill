@@ -260,8 +260,8 @@ module Ai
     def create_component_file(component_name, component_info, category_key)
       template_path = Rails.root.join('app', 'templates', 'optional', component_info[:template_source])
       
-      if File.exist?(template_path)
-        template_content = File.read(template_path)
+      if ::File.exist?(template_path)
+        template_content = ::File.read(template_path)
         processed_content = process_component_template(template_content)
         
         @app.app_files.create!(
@@ -321,6 +321,87 @@ module Ai
         .gsub('{{APP_ID}}', @app.id.to_s)
         .gsub('{{APP_NAME}}', @app.name)
         .gsub('{{APP_SLUG}}', @app.slug)
+    end
+    
+    public
+    
+    # Detect which components to add based on AI response
+    def detect_and_add_components(ai_response_text)
+      components_added = []
+      
+      # Check for authentication components
+      if ai_response_text.match?(/\b(auth|login|signup|sign.?up|sign.?in|password|authentication)\b/i)
+        add_component_category('supabase_ui_auth')
+        components_added << 'supabase_ui_auth' unless components_added.include?('supabase_ui_auth')
+      end
+      
+      # Check for file upload
+      if ai_response_text.match?(/\b(upload|dropzone|file|storage|attachment)\b/i)
+        add_component_category('supabase_ui_data')
+        components_added << 'supabase_ui_data'
+      end
+      
+      # Check for realtime features
+      if ai_response_text.match?(/\b(realtime|chat|cursor|presence|collaboration)\b/i)
+        add_component_category('supabase_ui_realtime')
+        components_added << 'supabase_ui_realtime'
+      end
+      
+      # Check for UI components
+      if ai_response_text.match?(/\b(button|card|dialog|form|input)\b/i)
+        add_component_category('shadcn_ui_core')
+        components_added << 'shadcn_ui_core'
+      end
+      
+      # Check for database management
+      if ai_response_text.match?(/\b(database|sql|query|platform)\b/i)
+        if ai_response_text.match?(/\b(management|admin|platform)\b/i)
+          add_component_category('supabase_ui_platform')
+          components_added << 'supabase_ui_platform'
+        end
+      end
+      
+      Rails.logger.info "[EnhancedOptionalComponentService] Detected and added components: #{components_added.join(', ')}" if components_added.any?
+      components_added
+    end
+    
+    # Get list of dependencies needed for added components
+    def get_required_dependencies
+      dependencies = Set.new
+      
+      # Check which categories have been added by looking at files
+      @app.app_files.pluck(:path).each do |path|
+        # Supabase auth components
+        if path.include?('components/auth/password-based-auth')
+          dependencies.add('@supabase/auth-helpers-react')
+        end
+        
+        # Dropzone
+        if path.include?('components/data/dropzone')
+          dependencies.add('react-dropzone')
+        end
+        
+        # Realtime components
+        if path.include?('components/realtime/')
+          dependencies.add('@supabase/realtime-js')
+        end
+        
+        # shadcn/ui components
+        if path.include?('components/ui/')
+          dependencies.add('@radix-ui/react-dialog')
+          dependencies.add('@radix-ui/react-slot')
+          dependencies.add('class-variance-authority')
+          dependencies.add('lucide-react')
+        end
+        
+        # Platform kit
+        if path.include?('components/platform/')
+          dependencies.add('@monaco-editor/react')
+          dependencies.add('recharts')
+        end
+      end
+      
+      dependencies.to_a
     end
   end
 end

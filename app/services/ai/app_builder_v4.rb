@@ -210,7 +210,25 @@ module Ai
       prompt = build_generation_prompt(component_context)
       
       # Use Claude conversation loop for multi-file generation
-      generate_with_claude_conversation(prompt)
+      response = generate_with_claude_conversation(prompt)
+      
+      # Detect and add optional components based on AI response
+      if response && response[:files]
+        enhanced_component_service = Ai::EnhancedOptionalComponentService.new(@app)
+        
+        # Analyze all generated content for component needs
+        all_content = response[:files].map { |f| f[:content] }.join("\n")
+        all_content += @message.content # Include original request
+        
+        components_added = enhanced_component_service.detect_and_add_components(all_content)
+        
+        if components_added.any?
+          Rails.logger.info "[V4] Added enhanced components: #{components_added.join(', ')}"
+          
+          # Update package.json with new dependencies
+          update_package_json_dependencies(enhanced_component_service.get_required_dependencies)
+        end
+      end
       
       Rails.logger.info "[V4] App-specific features generated"
     end
@@ -218,15 +236,23 @@ module Ai
     def integrate_requested_components
       Rails.logger.info "[V4] Integrating requested components"
       
-      # Analyze generated files to identify needed components
-      components_needed = analyze_component_requirements
+      # Use EnhancedOptionalComponentService for component detection
+      enhanced_service = Ai::EnhancedOptionalComponentService.new(@app)
       
-      # Copy optional component templates as needed
-      components_needed.each do |component|
-        integrate_component(component)
+      # Analyze user request for explicit component requests
+      if @message.content.match?(/\b(add|include|use)\s+(shadcn|supabase)\s+(ui|components?)\b/i)
+        if @message.content.match?(/auth|authentication/i)
+          enhanced_service.add_component_category('supabase_ui_auth')
+        end
+        if @message.content.match?(/chat|realtime/i)
+          enhanced_service.add_component_category('supabase_ui_realtime')
+        end
+        if @message.content.match?(/upload|dropzone/i)
+          enhanced_service.add_component_category('supabase_ui_data')
+        end
       end
       
-      Rails.logger.info "[V4] Integrated #{components_needed.size} components"
+      Rails.logger.info "[V4] Integrated requested components"
     end
     
     def apply_smart_edits
@@ -250,6 +276,32 @@ module Ai
       end
       
       Rails.logger.info "[V4] Smart edits completed"
+    end
+    
+    def update_package_json_dependencies(new_dependencies)
+      return if new_dependencies.empty?
+      
+      package_file = @app.app_files.find_by(path: 'package.json')
+      return unless package_file
+      
+      begin
+        package_json = JSON.parse(package_file.content)
+        package_json['dependencies'] ||= {}
+        
+        # Add new dependencies with latest version marker
+        new_dependencies.each do |dep|
+          unless package_json['dependencies'].key?(dep)
+            package_json['dependencies'][dep] = '^latest'
+            Rails.logger.info "[V4] Added dependency: #{dep}"
+          end
+        end
+        
+        # Save updated package.json
+        package_file.update!(content: JSON.pretty_generate(package_json))
+        Rails.logger.info "[V4] Updated package.json with #{new_dependencies.size} new dependencies"
+      rescue JSON::ParserError => e
+        Rails.logger.error "[V4] Failed to parse package.json: #{e.message}"
+      end
     end
     
     def build_generation_prompt(component_context)
@@ -297,6 +349,7 @@ module Ai
       end
       
       Rails.logger.info "[V4] Claude conversation completed. Generated #{files_created.size} files"
+      { success: true, files: files_created }
     end
     
     def plan_files_needed

@@ -30,34 +30,36 @@ module Deployment
     def execute_build
       @temp_dir = create_temp_directory
       
-      benchmark "[ExternalViteBuilder] Build execution" do
-        begin
-          # Write all app files to temp directory
-          write_app_files_to_disk
-          
-          # Execute the build process
-          built_code = yield(@temp_dir)
-          
-          # Return build result
-          {
-            success: true,
-            built_code: built_code,
-            build_time: Time.current - @start_time,
-            output_size: built_code.bytesize,
-            temp_dir: @temp_dir
-          }
-        rescue => e
-          Rails.logger.error "[ExternalViteBuilder] Build failed: #{e.message}"
-          Rails.logger.error e.backtrace.first(5).join("\n")
-          
-          {
-            success: false,
-            error: e.message,
-            build_time: Time.current - @start_time
-          }
-        ensure
-          cleanup_temp_directory
-        end
+      Rails.logger.info "[ExternalViteBuilder] Starting build execution"
+      start_time = Time.current
+      
+      begin
+        # Write all app files to temp directory
+        write_app_files_to_disk
+        
+        # Execute the build process
+        built_code = yield(@temp_dir)
+        
+        # Return build result
+        {
+          success: true,
+          built_code: built_code,
+          build_time: Time.current - start_time,
+          output_size: built_code.bytesize,
+          temp_dir: @temp_dir
+        }
+      rescue => e
+        Rails.logger.error "[ExternalViteBuilder] Build failed: #{e.message}"
+        Rails.logger.error e.backtrace.first(5).join("\n")
+        
+        {
+          success: false,
+          error: e.message,
+          build_time: Time.current - start_time
+        }
+      ensure
+        cleanup_temp_directory
+        Rails.logger.info "[ExternalViteBuilder] Build execution completed in #{Time.current - start_time}s"
       end
     end
     
