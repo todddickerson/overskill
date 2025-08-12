@@ -1,0 +1,30 @@
+name = "app-{{APP_ID}}"
+main = "dist/index.js"
+compatibility_date = "2024-08-01"
+
+[env.production]
+name = "app-{{APP_ID}}"
+
+[env.production.vars]
+VITE_SUPABASE_URL = "{{SUPABASE_URL}}"
+VITE_SUPABASE_ANON_KEY = "{{SUPABASE_ANON_KEY}}"
+VITE_APP_ID = "{{APP_ID}}"
+VITE_OWNER_ID = "{{OWNER_ID}}"
+VITE_ANALYTICS_ENABLED = "true"
+
+[env.development.vars]
+VITE_SUPABASE_URL = "{{SUPABASE_URL}}"
+VITE_SUPABASE_ANON_KEY = "{{SUPABASE_ANON_KEY}}"
+VITE_APP_ID = "{{APP_ID}}"
+VITE_OWNER_ID = "{{OWNER_ID}}"
+VITE_ANALYTICS_ENABLED = "false"
+
+[site]
+bucket = "./dist"
+
+[build]
+command = "npm run build"
+
+[[routes]]
+pattern = "/*"
+zone_name = "overskill.app"
