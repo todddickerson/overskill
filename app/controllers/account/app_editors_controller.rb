@@ -17,10 +17,16 @@ class Account::AppEditorsController < Account::ApplicationController
         end
       end
       format.turbo_stream do
-        if params[:file_id]
-          render turbo_stream: turbo_stream.replace("code_editor",
+        # Only stream updates for actual Turbo Frame interactions that target the code editor
+        if turbo_frame_request? && params[:file_id]
+          render turbo_stream: turbo_stream.replace(
+            "code_editor",
             partial: "account/app_editors/code_editor",
-            locals: {file: @selected_file, app: @app})
+            locals: { file: @selected_file, app: @app }
+          )
+        else
+          # Fallback: serve the full HTML page so Turbo performs a normal visit
+          render :show, formats: [:html]
         end
       end
     end
