@@ -683,6 +683,12 @@ module Ai
           if response[:tool_calls].present?
             Rails.logger.info "[V5_TOOLS] Claude made #{response[:tool_calls].size} tool calls"
             
+            # CRITICAL: Add text content to conversation_flow BEFORE tools
+            if response[:content].present?
+              add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+              Rails.logger.info "[V5_TOOLS] Added text content to conversation_flow before tools"
+            end
+            
             # CRITICAL: Add Claude's tool_use message to conversation history FIRST
             assistant_message = {
               role: 'assistant',
@@ -754,6 +760,13 @@ module Ai
         when 'stop', 'end_turn'
           # Claude finished normally
           Rails.logger.info "[V5_TOOLS] Claude completed response normally"
+          
+          # Add text content to conversation_flow if present
+          if response[:content].present?
+            add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+            Rails.logger.info "[V5_TOOLS] Added final text content to conversation_flow"
+          end
+          
           break
           
         else
