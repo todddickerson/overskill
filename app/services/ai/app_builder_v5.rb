@@ -22,7 +22,10 @@ module Ai
       
       # Initialize agent components
       @prompt_service = Prompts::AgentPromptService.new(agent_variables)
-      @goal_tracker = GoalTracker.new(chat_message.content)
+      
+      # TODO: Consider adding GoalTracker as a tool call instead of internal logic
+      # For now, simplify by removing GoalTracker to reduce confusion
+      # @goal_tracker = GoalTracker.new(chat_message.content)
       
       # Debug: check if prompt service works
       Rails.logger.debug "[V5_DEBUG] Prompt service initialized"
@@ -34,7 +37,6 @@ module Ai
       # Initialize state
       @agent_state = {
         iteration: 0,
-        goals: @goal_tracker.goals,
         context: {},
         history: [],
         errors: [],
@@ -66,14 +68,12 @@ module Ai
         app.update!(status: 'generating')
         update_thinking_status("Phase 1/6: Starting AI Agent")
         
-        # Extract goals from user request
+        # Analyze requirements (let Claude handle goal extraction naturally)
         update_thinking_status("Analyzing your requirements...")
-        @goal_tracker.extract_goals_from_request(@chat_message.content)
         
-        # Log the goals
-        log_claude_event("GOALS_EXTRACTED", {
-          total_goals: @goal_tracker.goals.count,
-          goals: @goal_tracker.goals.map(&:description).join(", ")
+        # Log the start
+        log_claude_event("AGENT_LOOP_STARTED", {
+          user_request: @chat_message.content.truncate(100)
         })
         
         # Execute agent loop
@@ -115,8 +115,8 @@ module Ai
         result = execute_iteration
         Rails.logger.info "[V5_LOOP] Iteration result: #{result[:type]}"
         
-        # Update goal progress based on result
-        update_goal_progress(result)
+        # Update progress tracking
+        update_progress_tracking(result)
         
         # Check for loop detection
         if loop_detected?(result)
@@ -142,10 +142,9 @@ module Ai
       # Assess current state
       current_state = assess_current_state
       
-      # Update progress
-      progress = @goal_tracker.assess_progress
+      # Update progress (simplified - let Claude determine completion naturally)
       update_thinking_status(
-        "Iteration #{@iteration_count}: #{progress[:completed]}/#{progress[:total_goals]} goals completed"
+        "Iteration #{@iteration_count}: Analyzing current state and determining next actions"
       )
       
       # Determine next action based on state
@@ -165,20 +164,14 @@ module Ai
         state: current_state,
         action: next_action,
         result: result,
-        verification: verification,
-        goals_progress: @goal_tracker.assess_progress
+        verification: verification
       }
     end
     
     def assess_current_state
-      progress = @goal_tracker.assess_progress
-      
       {
         app_id: app.id,
         iteration: @iteration_count,
-        goals: @goal_tracker.goals,
-        completed_goals: @goal_tracker.completed_goals,
-        goal_progress: progress,
         context_completeness: @context_manager.completeness_score,
         files_generated: @agent_state[:generated_files].count,
         recent_operations: @recent_operations&.count || 0,
@@ -481,7 +474,8 @@ module Ai
       status_complete = @completion_status == :complete
       intervention_required = @completion_status == :user_intervention_required
       high_confidence = (result[:verification] && result[:verification][:confidence] && result[:verification][:confidence] >= COMPLETION_CONFIDENCE_THRESHOLD)
-      goals_achieved = @goal_tracker.all_goals_achieved?
+      # Let Claude determine completion naturally through conversation
+      natural_completion = @completion_status == :complete
       await_input = result[:action] == :await_user_input
       
       if termination_by_evaluator
@@ -492,13 +486,13 @@ module Ai
         Rails.logger.info "[V5_LOOP] Termination: user intervention required"
       elsif high_confidence
         Rails.logger.info "[V5_LOOP] Termination: high confidence #{result[:verification][:confidence]}"
-      elsif goals_achieved
-        Rails.logger.info "[V5_LOOP] Termination: all goals achieved"
+      elsif natural_completion
+        Rails.logger.info "[V5_LOOP] Termination: natural completion achieved"
       elsif await_input
         Rails.logger.info "[V5_LOOP] Termination: awaiting user input"
       end
       
-      termination_by_evaluator || status_complete || intervention_required || high_confidence || goals_achieved || await_input
+      termination_by_evaluator || status_complete || intervention_required || high_confidence || natural_completion || await_input
     end
     
     def finalize_app_generation
@@ -1119,7 +1113,8 @@ module Ai
     end
     
     def build_messages_with_context(prompt)
-      base_messages = [
+      # Start with system prompt and original user request
+      messages = [
         { role: 'system', content: @prompt_service.generate_prompt },
         { role: 'user', content: @chat_message.content }
       ]
@@ -1137,35 +1132,86 @@ module Ai
             Use os-view to check file contents before modifying them.
           TEMPLATE
         }
-        base_messages << template_context
+        messages << template_context
       end
       
-      # Add iteration context
+      # CRITICAL FIX: Add conversation history from previous iterations
+      if @iteration_count > 1
+        add_conversation_history(messages)
+      end
+      
+      # Add current iteration context 
       if @iteration_count > 1
         context_message = {
           role: 'system',
           content: build_iteration_context
         }
-        base_messages << context_message
+        messages << context_message
       end
       
-      # Add specific prompt
-      base_messages << { role: 'user', content: prompt } if prompt.is_a?(String)
+      # Add specific prompt for this iteration
+      if prompt.is_a?(String) && prompt != @chat_message.content
+        messages << { role: 'user', content: prompt }
+      end
       
-      base_messages
+      messages
+    end
+    
+    # NEW METHOD: Add conversation history so Claude sees what it has already done
+    def add_conversation_history(messages)
+      # Add key loop messages as assistant responses so Claude sees its own work
+      @assistant_message.loop_messages.each_with_index do |loop_msg, index|
+        next unless loop_msg['content'].present?
+        
+        # Skip status messages, include substantive responses
+        next if loop_msg['type'] == 'status'
+        
+        messages << {
+          role: 'assistant',
+          content: loop_msg['content']
+        }
+        
+        # Limit history to avoid token overload (keep last 5 substantial messages)
+        break if index >= 4
+      end
+      
+      # Add tool execution summary to show Claude what actions were taken
+      if @assistant_message.tool_calls.any?
+        recent_tools = @assistant_message.tool_calls.last(10)
+        tool_summary = format_tool_execution_summary(recent_tools)
+        
+        messages << {
+          role: 'system',
+          content: <<~TOOLS
+            RECENT ACTIONS TAKEN:
+            #{tool_summary}
+            
+            Continue from where you left off. Avoid repeating these exact actions.
+          TOOLS
+        }
+      end
+    end
+    
+    def format_tool_execution_summary(tools)
+      tools.map do |tool|
+        status_icon = case tool['status']
+        when 'complete' then '✅'
+        when 'error' then '❌' 
+        when 'running' then '🔄'
+        else '⏳'
+        end
+        
+        file_info = tool['file_path'] ? " → #{tool['file_path']}" : ""
+        "#{status_icon} #{tool['name']}#{file_info}"
+      end.join("\n")
     end
     
     def build_iteration_context
-      progress = @goal_tracker.assess_progress
       recent_ops = format_recent_operations
       stagnation_warnings = check_stagnation_warnings
       
       context = <<~CONTEXT
         AGENT LOOP ITERATION #{@iteration_count} OF #{MAX_ITERATIONS}
-        
-        CURRENT GOALS STATUS:
-        #{format_goals_status(progress)}
-        #{progress[:completion_percentage] >= 80 ? "🎯 NEARLY COMPLETE - Focus on finishing remaining tasks" : ""}
         
         LOOP DETECTION STATUS:
         #{recent_ops.present? ? recent_ops : "No repetitive operations detected"}
@@ -1183,7 +1229,7 @@ module Ai
         #{stagnation_warnings}
         
         GUIDANCE:
-        #{generate_iteration_guidance(progress)}
+        #{generate_iteration_guidance}
       CONTEXT
       
       context
@@ -1271,14 +1317,7 @@ module Ai
       # )
     end
     
-    def format_goals_status(progress)
-      <<~STATUS
-        Total Goals: #{progress[:total_goals]}
-        Completed: #{progress[:completed]} (#{progress[:completion_percentage]}%)
-        Remaining: #{progress[:remaining]}
-        Next Priority: #{progress[:next_priority_goal]&.description || 'None'}
-      STATUS
-    end
+    # Removed format_goals_status - no longer using GoalTracker
     
     def format_previous_actions(history)
       return "None yet" if history.empty?
@@ -1351,10 +1390,10 @@ module Ai
       
       warnings = []
       
-      # Check for low progress
-      progress = @goal_tracker.assess_progress
-      if @iteration_count >= 5 && progress[:completion_percentage] < 30
-        warnings << "⚠️  LOW PROGRESS WARNING: #{progress[:completion_percentage]}% complete after #{@iteration_count} iterations"
+      # Check for low file generation progress
+      files_generated = @agent_state[:generated_files].count
+      if @iteration_count >= 5 && files_generated < 3
+        warnings << "⚠️  LOW PROGRESS WARNING: Only #{files_generated} files generated after #{@iteration_count} iterations"
       end
       
       # Check verification confidence trend
@@ -1369,15 +1408,10 @@ module Ai
       warnings.any? ? "\n\nWARNINGS:\n#{warnings.join("\n")}" : ""
     end
     
-    def generate_iteration_guidance(progress)
+    def generate_iteration_guidance
       guidance = []
       
-      # Goal-specific guidance
-      if progress[:next_priority_goal]
-        guidance << "🎯 PRIORITY: #{progress[:next_priority_goal].description}"
-      end
-      
-      # Stage-specific guidance
+      # Stage-specific guidance based on iteration
       case @iteration_count
       when 1..2
         guidance << "📋 SETUP PHASE: Focus on project structure and dependencies"
@@ -1389,11 +1423,12 @@ module Ai
         guidance << "🚀 COMPLETION PHASE: Finalize and deploy"
       end
       
-      # Completion guidance
-      if progress[:completion_percentage] >= 80
-        guidance << "✨ NEARLY DONE: Focus on completion rather than adding new features"
-      elsif progress[:remaining] <= 1
-        guidance << "🏁 FINAL GOAL: Complete remaining task to finish generation"
+      # Progress-based guidance
+      files_count = @agent_state[:generated_files].count
+      if files_count >= 5
+        guidance << "✨ GOOD PROGRESS: #{files_count} files created - focus on quality over quantity"
+      elsif @iteration_count >= 5 && files_count < 3
+        guidance << "📝 FOCUS NEEDED: Consider creating more substantial implementation"
       end
       
       guidance.join("\n")
@@ -1758,43 +1793,22 @@ module Ai
     
     # Goal Progress and Loop Detection Methods
     
-    def update_goal_progress(result)
+    # Simplified progress tracking - let Claude determine completion naturally
+    def update_progress_tracking(result)
       return unless result && result[:type]
       
-      # Track successful operations for goal completion
+      # Log significant operations for debugging
       case result[:type]
       when :tools_executed
-        # Check if foundation files were created
-        if result[:data]&.any? { |r| foundation_file_created?(r) }
-          mark_goal_complete_by_type(:foundation)
-        end
-        
-        # Check if features were implemented
-        if result[:data]&.any? { |r| feature_file_created?(r) }
-          mark_goal_complete_by_type(:features)
-        end
+        files_created = result[:data]&.count { |r| r[:success] && r[:path] } || 0
+        Rails.logger.info "[V5_PROGRESS] #{files_created} files created/modified in iteration #{@iteration_count}"
         
       when :verification_complete
-        # Mark deployment goal as complete if build successful
-        if result[:data]&.dig(:build_successful)
-          mark_goal_complete_by_type(:deployment)
-        end
+        success = result[:data]&.dig(:build_successful)
+        Rails.logger.info "[V5_PROGRESS] Verification #{success ? 'passed' : 'failed'}"
         
       when :generation_complete
-        # Mark all remaining goals complete
-        @goal_tracker.mark_all_complete
-      end
-      
-      # Log progress for debugging
-      progress = @goal_tracker.assess_progress
-      Rails.logger.info "[V5_GOAL] Progress: #{progress[:completed]}/#{progress[:total_goals]} goals complete (#{progress[:completion_percentage]}%)"
-    end
-    
-    def mark_goal_complete_by_type(goal_type)
-      goal = @goal_tracker.goals.find { |g| g.type == goal_type }
-      if goal
-        @goal_tracker.mark_goal_complete(goal)
-        Rails.logger.info "[V5_GOAL] Completed goal: #{goal.description}"
+        Rails.logger.info "[V5_PROGRESS] Generation marked complete by agent"
       end
     end
     
