@@ -127,6 +127,7 @@ module Ai
       
       messages.each do |msg|
         if msg[:role] == "system"
+          # Support both string and array format for system prompts (for caching)
           system_message = msg[:content]
         else
           api_messages << msg
@@ -141,7 +142,16 @@ module Ai
       }
       
       # Add system message as top-level parameter if present
-      body[:system] = system_message if system_message
+      # Supports both string and array format for prompt caching
+      if system_message
+        # If system_message is already an array (for caching), use it directly
+        # Otherwise wrap string in array format
+        if system_message.is_a?(Array)
+          body[:system] = system_message
+        else
+          body[:system] = system_message
+        end
+      end
 
       Rails.logger.info "[AI] Calling Anthropic API with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
@@ -229,6 +239,7 @@ module Ai
       
       messages.each do |msg|
         if msg[:role] == "system"
+          # Support both string and array format for system prompts (for caching)
           system_message = msg[:content]
         else
           api_messages << msg
@@ -248,7 +259,12 @@ module Ai
       }
       
       # Add system message as top-level parameter if present
-      body[:system] = system_message if system_message
+      # Supports both string and array format for prompt caching
+      if system_message
+        # If system_message is already an array (for caching), use it directly
+        # Otherwise use string format
+        body[:system] = system_message
+      end
       
       # Add extended thinking configuration for Claude 4 models (disabled for now due to API format issues)
       # TODO: Re-enable once we have proper API documentation for thinking parameter format
@@ -342,6 +358,7 @@ module Ai
         content: text_content,
         tool_calls: tool_calls,
         thinking_blocks: thinking_blocks,
+        stop_reason: result.dig("stop_reason"),  # CRITICAL: Add stop_reason for proper tool handling
         usage: usage,
         model: model_id,
         cache_performance: extract_cache_performance(usage)

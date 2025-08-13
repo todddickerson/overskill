@@ -574,42 +574,278 @@ module Ai
       # Generate Helicone session for tracking
       helicone_session = "overskill-v5-#{@app.id}-#{Time.current.to_i}"
       
-      # Use chat_with_tools for tool support with caching
-      begin
-        response = client.chat_with_tools(
-          messages,
-          tools,
-          model: :claude_sonnet_4,  # Use symbol for model
-          use_cache: true,         # Enable prompt caching for 83% cost savings
-          temperature: 0.7,
-          max_tokens: 48000,       # Increased for complex operations + thinking budget
-          helicone_session: helicone_session,
-          extended_thinking: true, # Enable extended thinking with interleaved reasoning
-          thinking_budget: 16000   # 16k thinking budget for complex agent operations
-        )
-      rescue => e
-        log_claude_event("API_CALL_ERROR", {
-          error: e.message,
-          class: e.class.name
-        })
-        raise e
-      end
+      # CRITICAL FIX: Implement proper tool calling cycle with result feedback
+      final_response = execute_tool_calling_cycle(client, messages, tools, helicone_session)
       
-      log_claude_event("API_CALL_RESPONSE", {
-        has_content: response[:content].present?,
-        tool_calls: response[:tool_calls]&.size || 0,
-        thinking_blocks: response[:thinking_blocks]&.size || 0,
-        response_preview: response[:content].to_s[0..200],
-        has_extended_thinking: response[:thinking_blocks]&.any?
+      log_claude_event("API_CALL_COMPLETE", {
+        final_content: final_response[:content].present?,
+        thinking_blocks: final_response[:thinking_blocks]&.size || 0,
+        tool_cycles: final_response[:tool_cycles] || 0
       })
       
-      # Process tool calls if present
-      if response[:tool_calls].present?
-        log_claude_event("PROCESSING_TOOLS", { count: response[:tool_calls].size })
-        process_tool_calls(response[:tool_calls])
+      final_response
+    end
+
+    # CRITICAL FIX: Implement proper tool calling cycle according to Anthropic docs
+    def execute_tool_calling_cycle(client, messages, tools, helicone_session)
+      conversation_messages = messages.dup
+      tool_cycles = 0
+      max_tool_cycles = 5  # Prevent infinite loops
+      
+      loop do
+        # Make API call to Claude
+        begin
+          response = client.chat_with_tools(
+            conversation_messages,
+            tools,
+            model: :claude_sonnet_4,
+            use_cache: true,
+            temperature: 0.7,
+            max_tokens: 48000,
+            helicone_session: helicone_session,
+            extended_thinking: true,
+            thinking_budget: 16000
+          )
+        rescue => e
+          log_claude_event("API_CALL_ERROR", {
+            error: e.message,
+            class: e.class.name
+          })
+          raise e
+        end
+        
+        # Handle different stop reasons
+        stop_reason = response[:stop_reason] || 'stop'
+        
+        case stop_reason
+        when 'tool_use'
+          # Claude wants to use tools - execute them and continue conversation
+          if response[:tool_calls].present?
+            Rails.logger.info "[V5_TOOLS] Claude made #{response[:tool_calls].size} tool calls"
+            
+            # CRITICAL: Add Claude's tool_use message to conversation history FIRST
+            assistant_message = {
+              role: 'assistant',
+              content: build_assistant_content_with_tools(response)
+            }
+            conversation_messages << assistant_message
+            
+            # Execute all tool calls and collect results
+            tool_results = execute_and_format_tool_results(response[:tool_calls])
+            
+            # CRITICAL: Add tool results as user message with correct formatting
+            # Tool results MUST come FIRST in content array (per Anthropic docs)
+            user_message = {
+              role: 'user',
+              content: tool_results  # All tool results in single message
+            }
+            conversation_messages << user_message
+            
+            tool_cycles += 1
+            
+            # Safety check for infinite tool loops
+            if tool_cycles >= max_tool_cycles
+              Rails.logger.warn "[V5_TOOLS] Max tool cycles reached (#{max_tool_cycles})"
+              break
+            end
+            
+            # Continue the loop to get Claude's next response
+            next
+          else
+            Rails.logger.warn "[V5_TOOLS] Stop reason 'tool_use' but no tool calls found"
+            break
+          end
+          
+        when 'max_tokens'
+          # Response was truncated - need to handle this
+          Rails.logger.warn "[V5_TOOLS] Response truncated (max_tokens reached)"
+          last_content = response[:content]
+          if last_content && last_content.end_with?('...')
+            # Attempt to continue with higher token limit
+            Rails.logger.info "[V5_TOOLS] Attempting to continue truncated response"
+            # TODO: Implement truncation recovery
+          end
+          break
+          
+        when 'stop', 'end_turn'
+          # Claude finished normally
+          Rails.logger.info "[V5_TOOLS] Claude completed response normally"
+          break
+          
+        else
+          Rails.logger.warn "[V5_TOOLS] Unknown stop reason: #{stop_reason}"
+          break
+        end
       end
       
-      response
+      # Return final response with tool cycle count
+      response.merge(tool_cycles: tool_cycles)
+    end
+
+    # Build assistant content with tool calls in correct format
+    def build_assistant_content_with_tools(response)
+      content_blocks = []
+      
+      # Add text content first if present
+      if response[:content].present?
+        content_blocks << {
+          type: 'text',
+          text: response[:content]
+        }
+      end
+      
+      # Add thinking blocks if present (for interleaved thinking)
+      if response[:thinking_blocks]&.any?
+        response[:thinking_blocks].each do |thinking_block|
+          content_blocks << thinking_block
+        end
+      end
+      
+      # Add tool_use blocks
+      if response[:tool_calls]&.any?
+        response[:tool_calls].each do |tool_call|
+          content_blocks << {
+            type: 'tool_use',
+            id: tool_call['id'],
+            name: tool_call['function']['name'],
+            input: JSON.parse(tool_call['function']['arguments'])
+          }
+        end
+      end
+      
+      content_blocks
+    end
+
+    # Execute tools and format results according to Anthropic specs
+    def execute_and_format_tool_results(tool_calls)
+      tool_results = []
+      
+      # Execute ALL tool calls and collect results
+      tool_calls.each do |tool_call|
+        tool_name = tool_call['function']['name']
+        tool_args = JSON.parse(tool_call['function']['arguments'])
+        tool_id = tool_call['id']
+        
+        Rails.logger.info "[V5_TOOLS] Executing #{tool_name} with args: #{tool_args.keys.join(', ')}"
+        
+        # Execute the tool
+        result = execute_single_tool(tool_name, tool_args)
+        
+        # Format result according to Anthropic tool_result spec
+        tool_result_block = {
+          type: 'tool_result',
+          tool_use_id: tool_id
+        }
+        
+        if result[:error]
+          tool_result_block[:content] = result[:error]
+          tool_result_block[:is_error] = true
+        else
+          # Format successful result
+          if result[:content].is_a?(String)
+            tool_result_block[:content] = result[:content]
+          else
+            # Convert complex results to JSON string
+            tool_result_block[:content] = result.to_json
+          end
+        end
+        
+        tool_results << tool_result_block
+      end
+      
+      # CRITICAL: Return array of tool_result blocks (they must come first in content array)
+      tool_results
+    end
+
+    # Execute a single tool and return result in consistent format
+    def execute_single_tool(tool_name, tool_args)
+      log_claude_event("TOOL_EXECUTE_START", {
+        tool: tool_name,
+        file: tool_args['file_path'],
+        content_length: tool_args['content']&.length || 0
+      })
+      
+      # Skip os-write calls with blank content to prevent validation errors
+      if tool_name == 'os-write' && tool_args['content'].blank?
+        Rails.logger.warn "[V5_TOOL] Skipping os-write with blank content for #{tool_args['file_path']}"
+        return { error: "Skipped os-write with blank content for #{tool_args['file_path']}" }
+      end
+      
+      # Update UI with tool execution
+      add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
+      
+      result = case tool_name
+      when 'os-write'
+        write_file(tool_args['file_path'], tool_args['content'])
+      when 'os-view', 'os-read'
+        read_file(tool_args['file_path'])
+      when 'os-line-replace'
+        replace_file_content(tool_args)
+      when 'os-delete'
+        delete_file(tool_args['file_path'])
+      when 'os-add-dependency'
+        add_dependency(tool_args['package'])
+      when 'os-remove-dependency'
+        remove_dependency(tool_args['package'])
+      when 'os-rename'
+        rename_file(tool_args['old_path'], tool_args['new_path'])
+      when 'os-search-files'
+        search_files(tool_args)
+      when 'os-download-to-repo'
+        download_to_repo(tool_args['source_url'], tool_args['target_path'])
+      when 'os-fetch-website'
+        fetch_website(tool_args['url'], tool_args['formats'])
+      when 'os-read-console-logs'
+        read_console_logs(tool_args['search'])
+      when 'os-read-network-requests'
+        read_network_requests(tool_args['search'])
+      when 'generate_image'
+        generate_image(tool_args)
+      when 'edit_image'
+        edit_image(tool_args)
+      when 'web_search'
+        web_search(tool_args)
+      when 'read_project_analytics'
+        read_project_analytics(tool_args)
+      else
+        { error: "Unknown tool: #{tool_name}" }
+      end
+      
+      log_claude_event("TOOL_EXECUTE_COMPLETE", {
+        tool: tool_name,
+        success: !result[:error],
+        error: result[:error]
+      })
+      
+      # Update tool status - find the specific tool call for this tool
+      tool_call_to_update = @assistant_message.tool_calls.reverse.find do |tc|
+        tc['name'] == tool_name && 
+        tc['file_path'] == tool_args['file_path'] && 
+        tc['status'] == 'running'
+      end
+      
+      if tool_call_to_update
+        tool_call_to_update['status'] = result[:error] ? 'error' : 'complete'
+        @assistant_message.save!
+      end
+      
+      # Format result consistently
+      if result[:success]
+        # Convert successful results to text content for Claude
+        content = case tool_name
+        when 'os-write'
+          "File written successfully: #{result[:path]}"
+        when 'os-view', 'os-read'
+          result[:content] || "File read successfully"
+        when 'os-line-replace'
+          "File content replaced successfully: #{result[:path]}"
+        else
+          result.to_json
+        end
+        { content: content }
+      else
+        { error: result[:error] || "Tool execution failed" }
+      end
     end
     
     def process_tool_calls(tool_calls)
@@ -1131,40 +1367,21 @@ module Ai
     end
     
     def build_messages_with_context(prompt)
-      # Start with system prompt and original user request
+      # OPTIMIZED: Use cached prompt builder for better performance
+      # Long-form data (template files) goes at TOP of system prompt for caching
+      
+      # Build optimized system prompt with caching
+      system_prompt = build_cached_system_prompt
+      
+      # Start with optimized system prompt and user request
       messages = [
-        { role: 'system', content: @prompt_service.generate_prompt },
+        { role: 'system', content: system_prompt },
         { role: 'user', content: @chat_message.content }
       ]
-      
-      # Add template files context on first iteration
-      if @iteration_count == 1 && @agent_state[:generated_files].any?
-        template_context = {
-          role: 'system', 
-          content: <<~TEMPLATE
-            EXISTING TEMPLATE FILES:
-            The following files already exist from the overskill_20250728 template:
-            #{@agent_state[:generated_files].map(&:path).sort.join("\n")}
-            
-            You can read and modify these existing files using os-view and os-line-replace tools.
-            Use os-view to check file contents before modifying them.
-          TEMPLATE
-        }
-        messages << template_context
-      end
       
       # CRITICAL FIX: Add conversation history from previous iterations
       if @iteration_count > 1
         add_conversation_history(messages)
-      end
-      
-      # Add current iteration context 
-      if @iteration_count > 1
-        context_message = {
-          role: 'system',
-          content: build_iteration_context
-        }
-        messages << context_message
       end
       
       # Add specific prompt for this iteration
@@ -1173,6 +1390,79 @@ module Ai
       end
       
       messages
+    end
+    
+    # Build optimized system prompt with caching support
+    def build_cached_system_prompt
+      # Use CachedPromptBuilder for optimal caching
+      builder = Ai::Prompts::CachedPromptBuilder.new(
+        base_prompt: @prompt_service.generate_prompt(include_context: false),
+        template_files: get_template_files_for_caching,
+        context_data: build_current_context_data
+      )
+      
+      # Use array format for optimal caching when enabled
+      if use_array_system_prompt?
+        # Array format enables cache_control on specific blocks
+        builder.build_system_prompt_array
+      else
+        # String format for backward compatibility
+        builder.build_system_prompt_string
+      end
+    end
+    
+    # Check if we should use array format for system prompts
+    def use_array_system_prompt?
+      # Enable when we have substantial template content to cache
+      template_size = get_template_files_for_caching.sum { |f| f.content&.length || 0 }
+      template_size > 10_000  # Use array format for 10K+ chars of template content
+    end
+    
+    # Get template files for caching (long-form data goes first)
+    def get_template_files_for_caching
+      # Only include on first iteration or when needed
+      return [] unless @iteration_count <= 1
+      
+      # Get template files that exist
+      template_files = []
+      if @agent_state[:generated_files].any?
+        # Include actual file content for caching
+        @agent_state[:generated_files].first(10).each do |file|
+          if file.respond_to?(:content) && file.content.present?
+            template_files << file
+          end
+        end
+      end
+      
+      template_files
+    end
+    
+    # Build current context data (changes frequently, don't cache)
+    def build_current_context_data
+      return {} if @iteration_count <= 1
+      
+      {
+        iteration_data: {
+          iteration: @iteration_count,
+          max_iterations: MAX_ITERATIONS,
+          files_generated: @agent_state[:generated_files].count,
+          last_action: @agent_state[:history].last&.dig(:action, :type),
+          confidence: (@agent_state[:verification_results].last&.dig(:confidence) || 0) * 100
+        },
+        recent_operations: format_recent_operations_for_context,
+        verification_results: @agent_state[:verification_results].last
+      }
+    end
+    
+    def format_recent_operations_for_context
+      return [] unless @recent_operations&.any?
+      
+      @recent_operations.last(5).map do |op|
+        {
+          type: op[:key].split(':').first,
+          description: op[:key]
+        }
+      end
     end
     
     # NEW METHOD: Add conversation history so Claude sees what it has already done
