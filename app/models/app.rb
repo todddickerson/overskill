@@ -194,13 +194,13 @@ class App < ApplicationRecord
     # This ensures Action Cable has something to broadcast to immediately
     assistant_message = app_chat_messages.create!(
       role: "assistant",
-      content: "Starting agent loop...",
+      content: "Thinking..",
       user: message.user,
       status: "executing",
       iteration_count: 0,
       loop_messages: [],
       tool_calls: [],
-      thinking_status: "Initializing AI agent...",
+      thinking_status: "Initializing Overskill AI...",
       is_code_generation: false
     )
     

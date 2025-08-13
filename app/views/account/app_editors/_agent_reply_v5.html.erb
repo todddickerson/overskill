@@ -1,8 +1,9 @@
 <%# V5 Agent Reply Partial - Single container that updates via save & broadcast %>
 <div id="app_chat_message_<%= message.id %>" 
      class="mb-4 agent-reply-container"
-     data-controller="agent-reply"
-     data-agent-reply-message-id-value="<%= message.id %>">
+     data-controller="agent-reply state-preserving"
+     data-agent-reply-message-id-value="<%= message.id %>"
+     data-state-preserving-target="container">
   
   <div class="flex items-start space-x-2">
     <%# OverSkill Logo %>
@@ -65,7 +66,10 @@
       
       <%# 3. Tool Calls - Compressed view that expands %>
       <% if message.tool_calls.any? %>
-        <details class="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <details class="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                 data-state-preserving-target="details"
+                 data-details-id="tools_<%= message.id %>"
+                 data-action="toggle->state-preserving#detailsToggled">
           <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <i class="fas fa-tools"></i>

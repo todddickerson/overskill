@@ -1253,12 +1253,12 @@ module Ai
           app: @app,
           user: @chat_message.user,
           role: 'assistant',
-          content: 'Starting agent loop...', # Required field
+          content: 'Thinking..', # Required field
           status: 'executing',
           iteration_count: 0,
           loop_messages: [],
           tool_calls: [],
-          thinking_status: nil,
+          thinking_status: "Initializing Overskill AI...",
           is_code_generation: false
         )
       end
