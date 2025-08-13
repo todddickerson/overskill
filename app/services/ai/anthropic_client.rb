@@ -72,30 +72,37 @@ module Ai
 
     def initialize(api_key = nil)
       @api_key = api_key || ENV.fetch("ANTHROPIC_API_KEY")
-      @helicone_key = ENV['HELICONE_API_KEY']
       
-      headers = {
+      # Build base headers
+      @base_headers = {
         "x-api-key" => @api_key,
         "content-type" => "application/json",
         "anthropic-version" => "2023-06-01",
         "anthropic-beta" => "prompt-caching-2024-07-31,interleaved-thinking-2025-05-14,context-1m-2025-08-07"
       }
       
+      @context_cache = ContextCacheService.new
+      @error_handler = EnhancedErrorHandler.new
+    end
+    
+    # Build options with current environment state
+    def build_request_options
+      helicone_key = ENV['HELICONE_API_KEY']
+      headers = @base_headers.dup
+      
       # Add Helicone headers if API key is available
-      if @helicone_key.present?
-        headers["Helicone-Auth"] = "Bearer #{@helicone_key}"
+      if helicone_key.present?
+        headers["Helicone-Auth"] = "Bearer #{helicone_key}"
         headers["Helicone-Cache-Enabled"] = "true"  # Enable Helicone caching
         Rails.logger.info "[AI] Using Helicone API gateway for observability and analytics"
       else
         Rails.logger.debug "[AI] Using direct Anthropic API (set HELICONE_API_KEY for observability)"
       end
       
-      @options = {
+      {
         headers: headers,
         timeout: 300  # 5 minute timeout for complex generations
       }
-      @context_cache = ContextCacheService.new
-      @error_handler = EnhancedErrorHandler.new
     end
 
     def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: false, thinking_budget: nil)
@@ -156,8 +163,9 @@ module Ai
       Rails.logger.info "[AI] Calling Anthropic API with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
       # Prepare request options with optional Helicone session tracking
-      request_options = @options.merge(body: body.to_json)
-      if @helicone_key.present? && helicone_session.present?
+      request_options = build_request_options.merge(body: body.to_json)
+      helicone_key = ENV['HELICONE_API_KEY']
+      if helicone_key.present? && helicone_session.present?
         request_options[:headers] = request_options[:headers].merge({
           "Helicone-Session-Id" => helicone_session,
           "Helicone-Session-Name" => "OverSkill-App-Generation"
@@ -199,7 +207,7 @@ module Ai
         cost = calculate_cost_with_cache(usage, model_id)
         cache_savings = calculate_cache_savings(usage, model_id)
         
-        helicone_status = @helicone_key.present? ? " [Helicone: ✓]" : ""
+        helicone_status = ENV['HELICONE_API_KEY'].present? ? " [Helicone: ✓]" : ""
         Rails.logger.info "[AI] Anthropic usage#{helicone_status} - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
       end
 
@@ -276,8 +284,9 @@ module Ai
       Rails.logger.info "[AI] Calling Anthropic API with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
       # Prepare request options with optional Helicone session tracking
-      request_options = @options.merge(body: body.to_json)
-      if @helicone_key.present? && helicone_session.present?
+      request_options = build_request_options.merge(body: body.to_json)
+      helicone_key = ENV['HELICONE_API_KEY']
+      if helicone_key.present? && helicone_session.present?
         request_options[:headers] = request_options[:headers].merge({
           "Helicone-Session-Id" => helicone_session,
           "Helicone-Session-Name" => "OverSkill-Tool-Calling"
@@ -318,7 +327,7 @@ module Ai
         cost = calculate_cost_with_cache(usage, model_id)
         cache_savings = calculate_cache_savings(usage, model_id)
         
-        helicone_status = @helicone_key.present? ? " [Helicone: ✓]" : ""
+        helicone_status = ENV['HELICONE_API_KEY'].present? ? " [Helicone: ✓]" : ""
         Rails.logger.info "[AI] Anthropic tools usage#{helicone_status} - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
       end
 
@@ -395,7 +404,7 @@ module Ai
 
     # Check if Helicone integration is active
     def helicone_enabled?
-      @helicone_key.present?
+      ENV['HELICONE_API_KEY'].present?
     end
 
     # Get Helicone dashboard info
