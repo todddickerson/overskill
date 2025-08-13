@@ -15,33 +15,43 @@ module Ai
 
     def generate_logo
       Rails.logger.info "[Logo] Generating logo for app: #{@app.name}"
+      
+      # Broadcast progress update
+      broadcast_progress("Generating logo...")
 
       # Choose provider
       result = nil
       if @ideogram_client
         # Use Ideogram
+        broadcast_progress("Creating logo with Ideogram...")
         prompt = build_ideogram_logo_prompt(@app.name, @app.prompt)
         result = @ideogram_client.generate_image(prompt: prompt)
         # Normalize to expected shape
         if result[:success]
+          broadcast_progress("Attaching logo...")
           attach_logo_from_url(result[:image_url])
+          broadcast_complete("Logo generated successfully (Ideogram)")
           return { success: true, message: "Logo generated successfully (Ideogram)" }
         else
           Rails.logger.warn "[Logo] Ideogram failed, falling back to OpenAI: #{result[:error]}"
+          broadcast_progress("Fallback to OpenAI...")
         end
       end
 
       # Fallback to OpenAI
+      broadcast_progress("Generating logo with OpenAI...")
       result = @openai_client.generate_app_logo(@app.name, @app.prompt)
 
       if result[:success]
         # Attach from URL if provided, otherwise from base64 when available
+        broadcast_progress("Attaching logo to app...")
         if result[:image_url].present?
           attach_logo_from_url(result[:image_url])
         elsif result[:image_b64].present?
           attach_logo_from_base64(result[:image_b64])
         else
           Rails.logger.error "[Logo] No image payload returned (neither URL nor base64)."
+          broadcast_error("No image returned from provider")
           return { success: false, error: "No image returned from provider" }
         end
 
@@ -49,13 +59,16 @@ module Ai
         @app.update(logo_prompt: result[:revised_prompt]) if result[:revised_prompt]
 
         Rails.logger.info "[Logo] Successfully generated logo for app: #{@app.name}"
+        broadcast_complete("Logo generated successfully")
         { success: true, message: "Logo generated successfully" }
       else
         Rails.logger.error "[Logo] Failed to generate logo: #{result[:error]}"
+        broadcast_error(result[:error])
         { success: false, error: result[:error] }
       end
     rescue => e
       Rails.logger.error "[Logo] Exception: #{e.message}"
+      broadcast_error(e.message)
       { success: false, error: e.message }
     end
 
@@ -82,6 +95,38 @@ module Ai
     end
 
     private
+    
+    # Progress broadcasting methods
+    def broadcast_progress(message)
+      ActionCable.server.broadcast(
+        "app_#{@app.id}_chat",
+        {
+          action: "logo_progress",
+          message: message
+        }
+      )
+    end
+    
+    def broadcast_complete(message)
+      ActionCable.server.broadcast(
+        "app_#{@app.id}_chat",
+        {
+          action: "logo_complete",
+          message: message
+        }
+      )
+    end
+    
+    def broadcast_error(error_message)
+      ActionCable.server.broadcast(
+        "app_#{@app.id}_chat",
+        {
+          action: "logo_error",
+          message: "Logo generation failed: #{error_message}"
+        }
+      )
+    end
+    
     def build_ideogram_logo_prompt(app_name, app_description)
       clean_name = app_name.to_s.strip[0..50]
       clean_description = app_description.to_s.strip[0..200]
