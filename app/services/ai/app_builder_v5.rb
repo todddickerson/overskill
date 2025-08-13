@@ -540,6 +540,8 @@ module Ai
     end
     
     def finalize_app_generation
+      Rails.logger.info "[V5_FINALIZE] Starting finalization, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
+      
       if @completion_status == :complete
         # Deploy the app
         update_thinking_status("Phase 6/6: Deploying")
@@ -552,12 +554,16 @@ module Ai
             deployed_at: Time.current
           )
           
+          Rails.logger.info "[V5_FINALIZE] Before update!, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
+          
           @assistant_message.update!(
             thinking_status: nil,
             status: 'completed',
             content: "App successfully generated and deployed! Preview: #{app.preview_url}",
             conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
           )
+          
+          Rails.logger.info "[V5_FINALIZE] After update!, conversation_flow size: #{@assistant_message.reload.conversation_flow&.size}"
         else
           app.update!(status: 'failed')
           @assistant_message.update!(
@@ -2267,6 +2273,8 @@ module Ai
         'timestamp' => Time.current.iso8601
       }
       
+      Rails.logger.info "[V5_FLOW] Adding to conversation_flow: type=#{type}, flow_size=#{@assistant_message.conversation_flow.size}"
+      
       case type
       when 'message'
         flow_entry['content'] = content
@@ -2281,6 +2289,8 @@ module Ai
       
       @assistant_message.conversation_flow << flow_entry
       @assistant_message.save!
+      
+      Rails.logger.info "[V5_FLOW] Saved conversation_flow, new size: #{@assistant_message.conversation_flow.size}"
     end
     
     def get_or_create_template_version
