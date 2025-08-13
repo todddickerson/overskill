@@ -555,14 +555,16 @@ module Ai
           @assistant_message.update!(
             thinking_status: nil,
             status: 'completed',
-            content: "App successfully generated and deployed! Preview: #{app.preview_url}"
+            content: "App successfully generated and deployed! Preview: #{app.preview_url}",
+            conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
           )
         else
           app.update!(status: 'failed')
           @assistant_message.update!(
             thinking_status: nil,
             status: 'failed',
-            content: "Deployment failed: #{deploy_result[:error]}"
+            content: "Deployment failed: #{deploy_result[:error]}",
+            conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
           )
         end
       else
@@ -570,7 +572,8 @@ module Ai
         @assistant_message.update!(
           thinking_status: nil,
           status: 'failed',
-          content: "Generation incomplete after #{@iteration_count} iterations"
+          content: "Generation incomplete after #{@iteration_count} iterations",
+          conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
         )
       end
     end
@@ -1759,7 +1762,8 @@ module Ai
       @assistant_message.update!(
         thinking_status: nil,
         status: 'failed',
-        content: "An error occurred: #{error.message}. Please try again."
+        content: "An error occurred: #{error.message}. Please try again.",
+        conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
       )
       
       # Track error in analytics (disabled for now - class not implemented)
