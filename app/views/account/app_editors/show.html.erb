@@ -207,15 +207,17 @@
         <div class="hidden lg:flex items-center space-x-3">
           <!-- Preview Controls (shown when preview tab is active) -->
           <div class="flex items-center space-x-2 mr-4" data-main-tabs-target="previewControls">
-            <!-- Page Selector (Desktop) -->
+            <% # Only show page selector for multi-page apps (not SPAs with Cloudflare URLs) %>
+            <% if @app.preview_url.blank? && @app.app_files.where(file_type: 'html').count > 1 %>
+            <!-- Page Selector (Desktop) - Only for multi-page apps -->
             <div class="relative"
                  data-controller="page-selector"
                  data-page-selector-app-id-value="<%= @app.id %>"
-                 data-page-selector-current-page-value="index.html">
+                 data-page-selector-current-page-value="<%= @app.app_files.find_by(path: 'index.html', file_type: 'html')&.path || @app.app_files.find_by(file_type: 'html')&.path || 'index.html' %>">
               <button class="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
                       data-action="click->page-selector#toggleDropdown">
                 <i class="fas fa-file-code text-sm text-gray-500 dark:text-gray-400"></i>
-                <span class="text-sm text-gray-700 dark:text-gray-300" data-page-selector-target="currentPageName">index.html</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-page-selector-target="currentPageName"><%= @app.app_files.find_by(path: 'index.html', file_type: 'html')&.path || @app.app_files.find_by(file_type: 'html')&.path || 'index.html' %></span>
                 <i class="fas fa-chevron-down text-xs text-gray-500 dark:text-gray-400"></i>
               </button>
               
@@ -239,6 +241,7 @@
                 </div>
               </div>
             </div>
+            <% end %>
             
             <!-- Device Toggle -->
             <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
@@ -432,10 +435,13 @@
     <div id="mobile_preview_controls"
          class="hidden border-b border-gray-200 dark:border-gray-700"
          data-mobile-navigation-target="previewControls"
+         <% if @app.preview_url.blank? && @app.app_files.where(file_type: 'html').count > 1 %>
          data-controller="page-selector"
          data-page-selector-app-id-value="<%= @app.id %>"
-         data-page-selector-current-page-value="index.html">
+         data-page-selector-current-page-value="<%= @app.app_files.find_by(path: 'index.html', file_type: 'html')&.path || @app.app_files.find_by(file_type: 'html')&.path || 'index.html' %>"
+         <% end %>>
       <div class="flex items-center justify-between px-3 py-2">
+        <% if @app.preview_url.blank? && @app.app_files.where(file_type: 'html').count > 1 %>
         <!-- Page Selector -->
         <div class="flex-1 mr-2 relative">
           <button class="w-full flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded px-2.5 py-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -467,6 +473,7 @@
             </div>
           </div>
         </div>
+        <% end %>
         
         <!-- Control Actions -->
         <div class="flex items-center space-x-1">

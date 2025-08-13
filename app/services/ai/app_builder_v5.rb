@@ -1171,6 +1171,7 @@ module Ai
     
     def determine_file_type(path)
       case path
+      when /\.html?$/ then 'html'
       when /\.tsx?$/ then 'typescript'
       when /\.jsx?$/ then 'javascript'
       when /\.css$/ then 'css'
