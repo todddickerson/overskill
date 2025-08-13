@@ -348,8 +348,10 @@ module Ai
       generated_file = store_generated_file(file_path, content)
       @agent_state[:generated_files] << generated_file
       
-      # Update tool call status to complete
-      @assistant_message.tool_calls.last['status'] = 'complete'
+      # Update tool call status to complete - must reassign array for change detection
+      updated_tool_calls = @assistant_message.tool_calls.deep_dup
+      updated_tool_calls.last['status'] = 'complete'
+      @assistant_message.tool_calls = updated_tool_calls
       @assistant_message.save!
       
       { 
@@ -1055,16 +1057,26 @@ module Ai
           error: result[:error]
         })
         
-        # Update tool status - find the specific tool call for this tool
-        tool_call_to_update = @assistant_message.tool_calls.reverse.find do |tc|
-          tc['name'] == tool_name && 
-          tc['file_path'] == tool_args['file_path'] && 
-          tc['status'] == 'running'
+        # Update tool status - find and update the specific tool call
+        new_status = result[:error] ? 'error' : 'complete'
+        
+        # Clone the array to trigger change detection
+        updated_tool_calls = @assistant_message.tool_calls.deep_dup
+        tool_updated = false
+        
+        updated_tool_calls.reverse.each do |tc|
+          if tc['name'] == tool_name && 
+             tc['file_path'] == tool_args['file_path'] && 
+             tc['status'] == 'running'
+            tc['status'] = new_status
+            tool_updated = true
+            break
+          end
         end
         
-        if tool_call_to_update
-          new_status = result[:error] ? 'error' : 'complete'
-          tool_call_to_update['status'] = new_status
+        if tool_updated
+          # Reassign to trigger ActiveRecord change detection for JSONB field
+          @assistant_message.tool_calls = updated_tool_calls
           
           # Also update status in conversation_flow
           update_tool_status_in_flow(tool_name, tool_args['file_path'], new_status)
@@ -2188,7 +2200,8 @@ module Ai
         'timestamp' => Time.current.iso8601
       }
       
-      @assistant_message.tool_calls << tool_call
+      # Must reassign the array for ActiveRecord to detect the change in JSONB field
+      @assistant_message.tool_calls = @assistant_message.tool_calls + [tool_call]
       
       # Accumulate tool calls for batching
       @pending_tool_calls ||= []
@@ -2214,7 +2227,10 @@ module Ai
       # Update the status in conversation_flow when tool completes
       return unless @assistant_message.conversation_flow.present?
       
-      @assistant_message.conversation_flow.each do |item|
+      # Clone the array to trigger change detection
+      updated_flow = @assistant_message.conversation_flow.deep_dup
+      
+      updated_flow.each do |item|
         next unless item['type'] == 'tools'
         
         if item['calls'].present?
@@ -2226,6 +2242,8 @@ module Ai
         end
       end
       
+      # Reassign to trigger ActiveRecord change detection for JSONB field
+      @assistant_message.conversation_flow = updated_flow
       @assistant_message.save!
     end
     
@@ -2299,7 +2317,8 @@ module Ai
         flow_entry['content'] = content
       end
       
-      @assistant_message.conversation_flow << flow_entry
+      # Must reassign the array for ActiveRecord to detect the change in JSONB field
+      @assistant_message.conversation_flow = @assistant_message.conversation_flow + [flow_entry]
       @assistant_message.save!
       
       Rails.logger.info "[V5_FLOW] Saved conversation_flow, new size: #{@assistant_message.conversation_flow.size}"
