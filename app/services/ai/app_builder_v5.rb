@@ -290,12 +290,9 @@ module Ai
         # Call Claude to implement features
         response = call_ai_with_context(feature_prompt)
         
-        # Always capture Claude's conversational response for the user (with thinking blocks)
+        # Only capture Claude's actual conversational response if present (with thinking blocks)
         if response[:content].present?
           add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
-        elsif response[:tool_calls].present?
-          # If Claude only responded with tools, add a status message before tools
-          add_loop_message("Implementing the requested features using the following tools:", type: 'content')
         end
         
         # Process any tool calls from the response
