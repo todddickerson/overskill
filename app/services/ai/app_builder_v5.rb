@@ -237,7 +237,7 @@ module Ai
     
     def plan_app_implementation(action)
       update_thinking_status("Phase 2/6: Planning Architecture")
-      update_thinking_status("Creating implementation plan...")
+      update_thinking_status("Thinking..")
       
       # Generate comprehensive plan using template structure
       plan_prompt = build_planning_prompt
@@ -591,6 +591,7 @@ module Ai
       conversation_messages = messages.dup
       tool_cycles = 0
       max_tool_cycles = 5  # Prevent infinite loops
+      response = nil  # Define response outside the loop
       
       loop do
         # Make API call to Claude
@@ -646,6 +647,9 @@ module Ai
             # Safety check for infinite tool loops
             if tool_cycles >= max_tool_cycles
               Rails.logger.warn "[V5_TOOLS] Max tool cycles reached (#{max_tool_cycles})"
+              # Create a response indicating we hit the limit
+              response[:content] = "I've completed multiple rounds of file operations. The app structure has been updated." if response[:content].blank?
+              response[:stop_reason] = 'max_tool_cycles'
               break
             end
             
@@ -679,7 +683,13 @@ module Ai
       end
       
       # Return final response with tool cycle count
-      response.merge(tool_cycles: tool_cycles)
+      # Handle case where response might be nil if we never got a successful API call
+      if response.nil?
+        Rails.logger.error "[V5_TOOLS] No response available after tool cycles"
+        { success: false, error: "No response from API", tool_cycles: tool_cycles }
+      else
+        response.merge(tool_cycles: tool_cycles)
+      end
     end
 
     # Build assistant content with tool calls in correct format

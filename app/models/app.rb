@@ -194,7 +194,7 @@ class App < ApplicationRecord
     # This ensures Action Cable has something to broadcast to immediately
     assistant_message = app_chat_messages.create!(
       role: "assistant",
-      content: "Thinking..",
+      content: " ",
       user: message.user,
       status: "executing",
       iteration_count: 0,
