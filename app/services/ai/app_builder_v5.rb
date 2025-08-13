@@ -490,7 +490,16 @@ module Ai
         content.include?('ready for preview') ||
         content.include?('ready to preview') ||
         content.include?('implementation is complete') ||
-        content.include?('successfully implemented')
+        content.include?('successfully implemented') ||
+        content.include?("perfect! i've created") ||
+        content.include?("i've successfully created") ||
+        content.include?("i've created a beautiful") ||
+        content.include?("i've built a") ||
+        content.include?("i've implemented") ||
+        content.include?("with the following features:") ||
+        content.include?("with the following amazing features:") ||
+        content.include?("everything you need for") ||
+        content.include?("the app includes everything")
       end
     end
     

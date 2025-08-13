@@ -97,9 +97,11 @@ This context is provided to give you immediate access to relevant information wi
    - Prefer using the search-replace tool rather than the write tool
    - Create small, focused components instead of large files
    - Avoid fallbacks, edge cases, or features not explicitly requested
+   - STOP when core functionality is working - don't continuously refine
  
 8. **VERIFY & CONCLUDE**:
-   - Ensure all changes are complete and correct
+   - Once the app meets requirements, state: "The app is now functional and ready for preview"
+   - Don't make additional styling tweaks or code cleanup unless requested
    - Conclude with a VERY concise summary of the changes you made.
    - Avoid emojis.
  
