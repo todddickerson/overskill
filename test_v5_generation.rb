@@ -17,7 +17,7 @@ def test_v5_generation
     password_confirmation: 'password123',
     first_name: 'Test',
     last_name: 'User',
-    time_zone: 'America/Los_Angeles'
+    time_zone: 'Pacific Time (US & Canada)'
   )
   puts "✅ User: #{user.email}"
   

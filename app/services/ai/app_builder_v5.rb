@@ -41,6 +41,21 @@ module Ai
         generated_files: [],
         verification_results: []
       }
+      
+      # Load template files before starting
+      initialize_template_files
+    end
+    
+    def initialize_template_files
+      # Create template version and load files if they don't exist
+      template_version = get_or_create_template_version
+      if template_version
+        Rails.logger.info "[V5_TEMPLATE] Loaded template v1.0.0 with #{template_version.app_version_files.count} files"
+        # Track template files as already generated
+        template_version.app_version_files.includes(:app_file).each do |version_file|
+          @agent_state[:generated_files] << version_file.app_file
+        end
+      end
     end
     
     def execute!
@@ -231,6 +246,34 @@ module Ai
     def execute_tool_operations(action)
       update_thinking_status("Phase 4/6: Generating Features")
       
+      # Special handling for implementing features - call Claude to do the work
+      if action[:tools].any? { |t| t[:type] == :implement_features }
+        update_thinking_status("Implementing app-specific features...")
+        
+        # Build prompt for implementing features
+        feature_prompt = <<~PROMPT
+          Now implement the specific features requested by the user. 
+          Use the existing template files as a foundation.
+          
+          User request: #{@chat_message.content}
+          
+          Use the os-write, os-line-replace, and other tools to implement the features.
+          Focus on creating a working implementation that meets all requirements.
+        PROMPT
+        
+        # Call Claude to implement features
+        response = call_ai_with_context(feature_prompt)
+        
+        # Process any tool calls from the response
+        if response[:tool_calls].present?
+          tool_results = process_tool_calls(response[:tool_calls])
+          return { type: :tools_executed, data: tool_results }
+        else
+          return { type: :tools_executed, data: [{ success: true, content: response[:content] }] }
+        end
+      end
+      
+      # Original tool processing logic
       results = []
       action[:tools].each_with_index do |tool, index|
         update_thinking_status("Executing: #{tool[:description]}")
@@ -364,9 +407,10 @@ module Ai
       when :tools_executed
         # Check if files were created successfully
         success_rate = result[:data].count { |r| !r[:error] } / result[:data].count.to_f
+        # Don't be too confident just because tools succeeded - we need to verify the app works
         { 
           success: success_rate > 0.8, 
-          confidence: success_rate,
+          confidence: [success_rate * 0.7, 0.8].min,  # Cap at 0.8 for tool execution
           details: result[:data]
         }
       when :verification_complete
@@ -380,19 +424,45 @@ module Ai
         }
       when :generation_complete
         { success: true, confidence: 1.0 }
+      when :plan_created
+        # Plan was created, continue with implementation
+        { success: true, confidence: 0.3 }
+      when :context_gathered
+        # Context was gathered, continue processing
+        { success: true, confidence: 0.2 }
+      when :error
+        # Error occurred
+        { success: false, confidence: 0.0, error: result[:error] }
       else
-        { success: true, confidence: 0.5 }
+        # Default case - continue processing
+        { success: true, confidence: 0.4 }
       end
     end
     
     def should_terminate?(result)
       # Use termination evaluator
-      @termination_evaluator.should_terminate?(@agent_state, result) ||
-        @completion_status == :complete ||
-        @completion_status == :user_intervention_required ||
-        result[:verification][:confidence] >= COMPLETION_CONFIDENCE_THRESHOLD ||
-        @goal_tracker.all_goals_achieved? ||
-        result[:action] == :await_user_input
+      termination_by_evaluator = @termination_evaluator.should_terminate?(@agent_state, result)
+      status_complete = @completion_status == :complete
+      intervention_required = @completion_status == :user_intervention_required
+      high_confidence = (result[:verification] && result[:verification][:confidence] && result[:verification][:confidence] >= COMPLETION_CONFIDENCE_THRESHOLD)
+      goals_achieved = @goal_tracker.all_goals_achieved?
+      await_input = result[:action] == :await_user_input
+      
+      if termination_by_evaluator
+        Rails.logger.info "[V5_LOOP] Termination: evaluator said to stop"
+      elsif status_complete
+        Rails.logger.info "[V5_LOOP] Termination: status is complete"
+      elsif intervention_required
+        Rails.logger.info "[V5_LOOP] Termination: user intervention required"
+      elsif high_confidence
+        Rails.logger.info "[V5_LOOP] Termination: high confidence #{result[:verification][:confidence]}"
+      elsif goals_achieved
+        Rails.logger.info "[V5_LOOP] Termination: all goals achieved"
+      elsif await_input
+        Rails.logger.info "[V5_LOOP] Termination: awaiting user input"
+      end
+      
+      termination_by_evaluator || status_complete || intervention_required || high_confidence || goals_achieved || await_input
     end
     
     def finalize_app_generation
@@ -765,6 +835,22 @@ module Ai
         { role: 'system', content: @prompt_service.generate_prompt },
         { role: 'user', content: @chat_message.content }
       ]
+      
+      # Add template files context on first iteration
+      if @iteration_count == 1 && @agent_state[:generated_files].any?
+        template_context = {
+          role: 'system', 
+          content: <<~TEMPLATE
+            EXISTING TEMPLATE FILES:
+            The following files already exist from the overskill_20250728 template:
+            #{@agent_state[:generated_files].map(&:path).sort.join("\n")}
+            
+            You can read and modify these existing files using os-view and os-line-replace tools.
+            Use os-view to check file contents before modifying them.
+          TEMPLATE
+        }
+        base_messages << template_context
+      end
       
       # Add iteration context
       if @iteration_count > 1
@@ -1223,7 +1309,8 @@ module Ai
         # Create AppVersionFile to track this file in v1.0.0
         version.app_version_files.create!(
           app_file: app_file,
-          action: 'created'
+          action: 'created',
+          content: content
         )
       end
       
@@ -1339,20 +1426,21 @@ module Ai
   
   class AgentDecisionEngine
     def determine_next_action(state)
-      # Simplified decision logic
+      # Improved decision logic that considers goals progress
       if state[:iteration] == 1
         { type: :plan_implementation, description: "Create initial plan" }
-      elsif state[:files_generated] == 0
-        { 
-          type: :execute_tools, 
-          description: "Generate initial files",
-          tools: determine_initial_tools(state)
-        }
       elsif state[:errors].any?
         { 
           type: :debug_issues, 
           description: "Fix errors",
           issues: state[:errors]
+        }
+      elsif !has_app_specific_features?(state) 
+        # Check if we need to implement the actual app features
+        { 
+          type: :execute_tools, 
+          description: "Implement app-specific features",
+          tools: determine_feature_tools(state)
         }
       elsif needs_verification?(state)
         { type: :verify_changes, description: "Verify generated code" }
@@ -1367,7 +1455,31 @@ module Ai
       end
     end
     
+    def has_app_specific_features?(state)
+      # Check if app-specific features have been implemented
+      # Look for signs that the todo app functionality exists
+      return false unless state[:files_generated] > 0
+      
+      # Check if we have key todo app files
+      files = state[:generated_files] || []
+      file_paths = files.map { |f| f.respond_to?(:path) ? f.path : f.to_s }
+      
+      # Look for key indicators that todo features are implemented
+      has_todo_component = file_paths.any? { |p| p.include?('Todo') || p.include?('todo') }
+      has_task_component = file_paths.any? { |p| p.include?('Task') || p.include?('task') }
+      
+      # Need both todo-related files AND sufficient implementation
+      has_todo_component && state[:iteration] >= 3
+    end
+    
     private
+    
+    def determine_feature_tools(state)
+      # Tools for implementing app-specific features
+      [
+        { type: :implement_features, description: 'Implement app-specific functionality' }
+      ]
+    end
     
     def determine_initial_tools(state)
       [
@@ -1405,7 +1517,11 @@ module Ai
     private
     
     def all_goals_satisfied?(state)
-      state[:goals].empty?
+      # Check if all goals are completed
+      return false unless state[:goals].is_a?(Array) && state[:completed_goals].is_a?(Array)
+      
+      # All goals are satisfied when completed_goals contains all goals
+      state[:goals].all? { |goal| state[:completed_goals].include?(goal) }
     end
     
     def stagnation_detected?(state)
