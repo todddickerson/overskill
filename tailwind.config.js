@@ -28,7 +28,9 @@ try {
       './tmp/gems/*/app/javascript/**/*.js',
     ],
     theme: { extend: { colors: {}, fontFamily: {}, fontSize: { '2xs': ['0.65rem', { lineHeight: '0.9rem', letterSpacing: '1px' }] } } },
-    plugins: [],
+    plugins: [
+      require('@tailwindcss/typography'),
+    ],
   }
 }
 

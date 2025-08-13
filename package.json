@@ -61,6 +61,7 @@
     "@rails/actioncable": "^8.0.200",
     "@rails/actiontext": "^8.0.200",
     "@rails/activestorage": "^8.0.200",
+    "@tailwindcss/typography": "^0.5.16",
     "cable_ready": "^5.0.6",
     "codemirror": "^6.0.2",
     "jstz": "^2.1.1",
