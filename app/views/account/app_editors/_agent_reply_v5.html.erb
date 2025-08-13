@@ -12,6 +12,10 @@
         class: "w-6 h-6 flex-shrink-0 mt-0.5" %>
     
     <div class="flex-1">
+      <%# Agent Name %>
+      <div class="flex items-center space-x-2">
+        <span class="text-gray-900 dark:text-white font-overskill-bold text-base mt-0.5 mb-3">overskill</span>
+      </div>
       <%# 1. Thinking Status - Shows when agent is processing %>
       <% if message.thinking_status.present? %>
         <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-2">

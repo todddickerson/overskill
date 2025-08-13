@@ -839,16 +839,45 @@ module Ai
         @assistant_message.save!
       end
       
-      # Format result consistently
+      # Format result consistently with rich feedback for Claude
       if result[:success]
-        # Convert successful results to text content for Claude
+        # Convert successful results to text content for Claude with detailed confirmation
         content = case tool_name
         when 'os-write'
-          "File written successfully: #{result[:path]}"
+          lines_written = tool_args['content'].lines.count
+          file_size = tool_args['content'].bytesize
+          "✅ File written successfully: #{result[:path]}\n" \
+          "• Lines written: #{lines_written}\n" \
+          "• File size: #{file_size} bytes\n" \
+          "• Status: File created/updated and saved to disk"
         when 'os-view', 'os-read'
-          result[:content] || "File read successfully"
+          if result[:content]
+            lines_read = result[:content].lines.count
+            "File contents retrieved:\n#{result[:content]}\n\n" \
+            "📄 File: #{tool_args['file_path']}\n" \
+            "• Lines: #{lines_read}\n" \
+            "• Status: Successfully read"
+          else
+            "File read successfully"
+          end
         when 'os-line-replace'
-          "File content replaced successfully: #{result[:path]}"
+          lines_replaced = (tool_args['last_replaced_line'].to_i - tool_args['first_replaced_line'].to_i + 1)
+          new_lines = tool_args['replace'].lines.count
+          "✅ File content replaced successfully: #{result[:path]}\n" \
+          "• Lines replaced: #{tool_args['first_replaced_line']}-#{tool_args['last_replaced_line']} (#{lines_replaced} lines)\n" \
+          "• New content: #{new_lines} lines inserted\n" \
+          "• Status: Changes saved to disk"
+        when 'os-delete'
+          "✅ File deleted successfully: #{result[:path]}\n" \
+          "• Status: File removed from project"
+        when 'os-add-dependency'
+          "✅ Dependency added: #{tool_args['package']}\n" \
+          "• Status: Package added to project dependencies"
+        when 'os-rename'
+          "✅ File renamed successfully\n" \
+          "• From: #{tool_args['old_path']}\n" \
+          "• To: #{tool_args['new_path']}\n" \
+          "• Status: File moved and all references updated"
         else
           result.to_json
         end
