@@ -475,9 +475,31 @@ module Ai
       end
     end
     
+    def check_for_completion_signal
+      # Check recent messages for Claude's completion signal
+      return false unless @assistant_message.loop_messages.present?
+      
+      # Check last few messages for the completion signal
+      recent_messages = @assistant_message.loop_messages.last(3)
+      
+      recent_messages.any? do |msg|
+        content = msg['content'].to_s.downcase
+        # Look for phrases that indicate the app is ready
+        content.include?('functional and ready for preview') ||
+        content.include?('app is now functional') ||
+        content.include?('ready for preview') ||
+        content.include?('ready to preview') ||
+        content.include?('implementation is complete') ||
+        content.include?('successfully implemented')
+      end
+    end
+    
     def should_terminate?(result)
       # Safety check for nil result
       return false if result.nil?
+      
+      # Check if Claude explicitly said the app is ready for preview
+      app_ready_signal = check_for_completion_signal
       
       # Use termination evaluator
       termination_by_evaluator = @termination_evaluator.should_terminate?(@agent_state, result)
@@ -488,7 +510,10 @@ module Ai
       natural_completion = @completion_status == :complete
       await_input = result[:action] == :await_user_input
       
-      if termination_by_evaluator
+      if app_ready_signal
+        Rails.logger.info "[V5_LOOP] Termination: Claude signaled app is ready for preview"
+        add_loop_message("✓ App is functional and ready for preview", type: 'status')
+      elsif termination_by_evaluator
         Rails.logger.info "[V5_LOOP] Termination: evaluator said to stop"
       elsif status_complete
         Rails.logger.info "[V5_LOOP] Termination: status is complete"
@@ -502,7 +527,7 @@ module Ai
         Rails.logger.info "[V5_LOOP] Termination: awaiting user input"
       end
       
-      termination_by_evaluator || status_complete || intervention_required || high_confidence || natural_completion || await_input
+      app_ready_signal || termination_by_evaluator || status_complete || intervention_required || high_confidence || natural_completion || await_input
     end
     
     def finalize_app_generation
