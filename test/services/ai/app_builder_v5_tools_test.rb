@@ -236,6 +236,10 @@ class Ai::AppBuilderV5ToolsTest < ActiveSupport::TestCase
       }
     }.to_json
     
+    # Ensure clean package.json for this test
+    existing = @app.app_files.find_by(path: "package.json")
+    existing&.destroy
+    
     @app.app_files.create!(
       path: "package.json",
       content: package_json,
@@ -279,6 +283,10 @@ class Ai::AppBuilderV5ToolsTest < ActiveSupport::TestCase
       }
     }.to_json
     
+    # Ensure clean package.json for this test
+    existing = @app.app_files.find_by(path: "package.json")
+    existing&.destroy
+    
     @app.app_files.create!(
       path: "package.json",
       content: package_json,
@@ -321,6 +329,9 @@ class Ai::AppBuilderV5ToolsTest < ActiveSupport::TestCase
   # os-search-files tool tests
   # ============================================
   test "os-search-files finds matching content" do
+    # Clear any existing files to ensure clean test
+    @app.app_files.destroy_all
+    
     # Create test files
     @app.app_files.create!(
       path: "src/component1.tsx",
@@ -405,5 +416,189 @@ class Ai::AppBuilderV5ToolsTest < ActiveSupport::TestCase
     assert_equal 1, results.count
     assert results.first[:error].present?
     assert_match /Unknown tool/, results.first[:error]
+  end
+  
+  # ============================================
+  # os-download-to-repo tool tests
+  # ============================================
+  test "os-download-to-repo creates placeholder file" do
+    result = @builder.send(:download_to_repo, "https://example.com/test.png", "assets/test.png")
+    
+    assert result[:success]
+    assert_equal "assets/test.png", result[:path]
+    
+    file = @app.app_files.find_by(path: "assets/test.png")
+    assert file.present?
+    assert_match /Downloaded from: https:\/\/example.com\/test.png/, file.content
+  end
+  
+  # ============================================
+  # os-fetch-website tool tests
+  # ============================================
+  test "os-fetch-website returns website content" do
+    result = @builder.send(:fetch_website, "https://example.com", "markdown")
+    
+    assert result[:success]
+    assert_equal "https://example.com", result[:url]
+    assert result[:content].include?("Website Content")
+    assert_equal "markdown", result[:formats]
+  end
+  
+  # ============================================
+  # os-read-console-logs tool tests
+  # ============================================
+  test "os-read-console-logs returns filtered logs" do
+    result = @builder.send(:read_console_logs, "error")
+    
+    assert result[:success]
+    assert_equal "error", result[:search_query]
+    assert result[:logs].any? { |log| log.downcase.include?("error") }
+    assert_equal result[:logs].count, result[:total_found]
+  end
+  
+  test "os-read-console-logs returns all logs when no search query" do
+    result = @builder.send(:read_console_logs, nil)
+    
+    assert result[:success]
+    assert result[:logs].count >= 3 # Mock data has at least 3 logs
+  end
+  
+  # ============================================
+  # os-read-network-requests tool tests
+  # ============================================
+  test "os-read-network-requests returns filtered requests" do
+    result = @builder.send(:read_network_requests, "500")
+    
+    assert result[:success]
+    assert_equal "500", result[:search_query]
+    assert result[:requests].any? { |req| req.include?("500") }
+  end
+  
+  # ============================================
+  # generate_image tool tests
+  # ============================================
+  test "generate_image creates placeholder file with valid dimensions" do
+    args = {
+      'prompt' => 'A beautiful sunset',
+      'target_path' => 'src/assets/sunset.jpg',
+      'width' => 512,
+      'height' => 512,
+      'model' => 'flux.schnell'
+    }
+    
+    result = @builder.send(:generate_image, args)
+    
+    assert result[:success]
+    assert_equal 'src/assets/sunset.jpg', result[:path]
+    assert_equal 'A beautiful sunset', result[:prompt]
+    assert_equal '512x512', result[:dimensions]
+    
+    file = @app.app_files.find_by(path: 'src/assets/sunset.jpg')
+    assert file.present?
+    assert file.content.include?('Generated image placeholder')
+  end
+  
+  test "generate_image validates dimensions" do
+    args = {
+      'prompt' => 'Test image',
+      'target_path' => 'test.jpg',
+      'width' => 400, # Invalid - less than 512
+      'height' => 400
+    }
+    
+    result = @builder.send(:generate_image, args)
+    
+    assert result[:error].present?
+    assert_match /dimensions must be between 512 and 1920/, result[:error]
+  end
+  
+  test "generate_image validates dimension multiples" do
+    args = {
+      'prompt' => 'Test image',
+      'target_path' => 'test.jpg',
+      'width' => 513, # Invalid - not multiple of 32
+      'height' => 512
+    }
+    
+    result = @builder.send(:generate_image, args)
+    
+    assert result[:error].present?
+    assert_match /dimensions must be multiples of 32/, result[:error]
+  end
+  
+  # ============================================
+  # edit_image tool tests
+  # ============================================
+  test "edit_image creates placeholder with existing source images" do
+    # Create source image
+    source_file = @app.app_files.create!(
+      path: 'src/assets/original.jpg',
+      content: 'original image content',
+      file_type: 'image',
+      team: @team
+    )
+    
+    args = {
+      'image_paths' => ['src/assets/original.jpg'],
+      'prompt' => 'make it darker',
+      'target_path' => 'src/assets/edited.jpg',
+      'strength' => 0.7
+    }
+    
+    result = @builder.send(:edit_image, args)
+    
+    assert result[:success]
+    assert_equal 'src/assets/edited.jpg', result[:path]
+    assert_equal ['src/assets/original.jpg'], result[:source_images]
+    assert_equal 0.7, result[:strength]
+  end
+  
+  test "edit_image validates source images exist" do
+    args = {
+      'image_paths' => ['non/existent.jpg'],
+      'prompt' => 'edit this',
+      'target_path' => 'edited.jpg'
+    }
+    
+    result = @builder.send(:edit_image, args)
+    
+    assert result[:error].present?
+    assert_match /Source images not found/, result[:error]
+  end
+  
+  # ============================================
+  # web_search tool tests
+  # ============================================
+  test "web_search returns search results" do
+    args = {
+      'query' => 'react hooks',
+      'numResults' => 3,
+      'category' => 'documentation'
+    }
+    
+    result = @builder.send(:web_search, args)
+    
+    assert result[:success]
+    assert_equal 'react hooks', result[:query]
+    assert_equal 3, result[:results].count
+    assert result[:results].first[:title].include?('react hooks')
+  end
+  
+  # ============================================
+  # read_project_analytics tool tests
+  # ============================================
+  test "read_project_analytics returns analytics data" do
+    args = {
+      'startdate' => '2025-01-01',
+      'enddate' => '2025-01-31',
+      'granularity' => 'daily'
+    }
+    
+    result = @builder.send(:read_project_analytics, args)
+    
+    assert result[:success]
+    assert_equal @app.id, result[:app_id]
+    assert result[:data][:metrics][:page_views].present?
+    assert result[:data][:traffic_sources][:organic].present?
   end
 end

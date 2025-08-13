@@ -645,6 +645,18 @@ module Ai
           download_to_repo(tool_args['source_url'], tool_args['target_path'])
         when 'os-fetch-website'
           fetch_website(tool_args['url'], tool_args['formats'])
+        when 'os-read-console-logs'
+          read_console_logs(tool_args['search'])
+        when 'os-read-network-requests'
+          read_network_requests(tool_args['search'])
+        when 'generate_image'
+          generate_image(tool_args)
+        when 'edit_image'
+          edit_image(tool_args)
+        when 'web_search'
+          web_search(tool_args)
+        when 'read_project_analytics'
+          read_project_analytics(tool_args)
         else
           { error: "Unknown tool: #{tool_name}" }
         end
@@ -876,6 +888,215 @@ module Ai
         url: url,
         content: "# Website Content\nFetched from: #{url}\n\nPlaceholder content for testing.",
         formats: formats || 'markdown'
+      }
+    end
+    
+    def read_console_logs(search_query)
+      # For V5, return placeholder logs
+      # In production, this would integrate with browser console logs API
+      
+      mock_logs = [
+        "[INFO] App initialization complete",
+        "[WARN] Deprecated API usage detected",
+        "[ERROR] Failed to load resource: network timeout"
+      ]
+      
+      filtered_logs = search_query.present? ? 
+        mock_logs.select { |log| log.downcase.include?(search_query.downcase) } : 
+        mock_logs
+      
+      {
+        success: true,
+        logs: filtered_logs,
+        search_query: search_query,
+        total_found: filtered_logs.count
+      }
+    end
+    
+    def read_network_requests(search_query)
+      # For V5, return placeholder network requests
+      # In production, this would integrate with browser network API
+      
+      mock_requests = [
+        "GET /api/users - 200 OK (150ms)",
+        "POST /api/auth/login - 401 Unauthorized (250ms)",
+        "GET /api/data - 500 Internal Server Error (1200ms)"
+      ]
+      
+      filtered_requests = search_query.present? ?
+        mock_requests.select { |req| req.downcase.include?(search_query.downcase) } :
+        mock_requests
+      
+      {
+        success: true,
+        requests: filtered_requests,
+        search_query: search_query,
+        total_found: filtered_requests.count
+      }
+    end
+    
+    def generate_image(args)
+      # For V5, return placeholder image generation
+      # In production, this would integrate with image generation API (DALL-E, Midjourney, etc.)
+      
+      prompt = args['prompt']
+      target_path = args['target_path']
+      width = args['width'] || 512
+      height = args['height'] || 512
+      model = args['model'] || 'flux.schnell'
+      
+      # Validate dimensions
+      if width < 512 || height < 512 || width > 1920 || height > 1920
+        return { error: "Image dimensions must be between 512 and 1920 pixels" }
+      end
+      
+      if width % 32 != 0 || height % 32 != 0
+        return { error: "Image dimensions must be multiples of 32" }
+      end
+      
+      # Create placeholder file
+      placeholder_content = "// Generated image placeholder: #{prompt}\n// Dimensions: #{width}x#{height}\n// Model: #{model}\n// TODO: Replace with actual image generation API"
+      
+      file = @app.app_files.find_or_initialize_by(path: target_path)
+      file.content = placeholder_content
+      file.file_type = determine_file_type(target_path)
+      file.team = @app.team
+      file.save!
+      
+      {
+        success: true,
+        path: target_path,
+        prompt: prompt,
+        dimensions: "#{width}x#{height}",
+        model: model,
+        note: "Placeholder implementation - requires image generation API integration"
+      }
+    end
+    
+    def edit_image(args)
+      # For V5, return placeholder image editing
+      # In production, this would integrate with image editing API
+      
+      image_paths = args['image_paths']
+      prompt = args['prompt']
+      target_path = args['target_path']
+      strength = args['strength'] || 0.8
+      
+      # Validate inputs
+      if image_paths.blank? || image_paths.empty?
+        return { error: "At least one image path is required" }
+      end
+      
+      if strength < 0.0 || strength > 1.0
+        return { error: "Strength must be between 0.0 and 1.0" }
+      end
+      
+      # Check if source images exist
+      missing_files = image_paths.reject { |path| @app.app_files.exists?(path: path) }
+      if missing_files.any?
+        return { error: "Source images not found: #{missing_files.join(', ')}" }
+      end
+      
+      # Create placeholder edited image
+      placeholder_content = "// Edited image placeholder\n// Source images: #{image_paths.join(', ')}\n// Edit prompt: #{prompt}\n// Strength: #{strength}\n// TODO: Replace with actual image editing API"
+      
+      file = @app.app_files.find_or_initialize_by(path: target_path)
+      file.content = placeholder_content
+      file.file_type = determine_file_type(target_path)
+      file.team = @app.team
+      file.save!
+      
+      {
+        success: true,
+        path: target_path,
+        source_images: image_paths,
+        prompt: prompt,
+        strength: strength,
+        note: "Placeholder implementation - requires image editing API integration"
+      }
+    end
+    
+    def web_search(args)
+      # For V5, return placeholder search results
+      # In production, this would integrate with search API (Google, Bing, etc.)
+      
+      query = args['query']
+      num_results = args['numResults'] || 5
+      links = args['links'] || 0
+      image_links = args['imageLinks'] || 0
+      category = args['category']
+      
+      # Mock search results
+      mock_results = [
+        {
+          title: "#{query} - Documentation",
+          url: "https://example.com/docs/#{query.parameterize}",
+          snippet: "Official documentation for #{query}. Learn how to implement and use #{query} effectively.",
+          category: category || "documentation"
+        },
+        {
+          title: "#{query} Tutorial - Getting Started",
+          url: "https://tutorial-site.com/#{query.parameterize}",
+          snippet: "Step-by-step tutorial covering #{query} basics and advanced techniques.",
+          category: category || "tutorial"
+        },
+        {
+          title: "#{query} GitHub Repository",
+          url: "https://github.com/example/#{query.parameterize}",
+          snippet: "Open source implementation of #{query} with examples and community contributions.",
+          category: "github"
+        }
+      ].first(num_results)
+      
+      {
+        success: true,
+        query: query,
+        results: mock_results,
+        total_results: mock_results.count,
+        category: category,
+        note: "Placeholder implementation - requires search API integration"
+      }
+    end
+    
+    def read_project_analytics(args)
+      # For V5, return placeholder analytics data
+      # In production, this would integrate with analytics API (Google Analytics, etc.)
+      
+      start_date = args['startdate']
+      end_date = args['enddate']
+      granularity = args['granularity'] || 'daily'
+      
+      # Mock analytics data
+      mock_data = {
+        date_range: {
+          start: start_date,
+          end: end_date,
+          granularity: granularity
+        },
+        metrics: {
+          page_views: 1250,
+          unique_visitors: 892,
+          bounce_rate: 0.35,
+          average_session_duration: 180
+        },
+        top_pages: [
+          { path: "/", views: 450, title: "Home" },
+          { path: "/features", views: 320, title: "Features" },
+          { path: "/pricing", views: 180, title: "Pricing" }
+        ],
+        traffic_sources: {
+          organic: 0.45,
+          direct: 0.30,
+          social: 0.15,
+          referral: 0.10
+        }
+      }
+      
+      {
+        success: true,
+        data: mock_data,
+        app_id: @app.id,
+        note: "Placeholder implementation - requires analytics API integration"
       }
     end
     
