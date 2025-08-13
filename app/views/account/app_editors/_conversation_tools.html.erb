@@ -1,0 +1,61 @@
+<%# Partial for rendering a group of tool calls %>
+<% tool_count = tools.is_a?(Array) ? tools.size : (tools['calls'] || tools['tool_calls'] || []).size %>
+<% tool_items = tools.is_a?(Array) ? tools : (tools['calls'] || tools['tool_calls'] || []) %>
+
+<details class="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+         data-state-preserving-target="details"
+         data-details-id="tools_group_<%= message_id %>_<%= index %>"
+         data-action="toggle->state-preserving#detailsToggled">
+  <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <i class="fas fa-tools"></i>
+      <span><%= pluralize(tool_count, 'tool') %> used</span>
+    </div>
+    <span class="text-xs text-blue-600 dark:text-blue-400" data-state-preserving-target="toggleText" data-show-text="Show" data-hide-text="Hide">Show</span>
+  </summary>
+  
+  <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+    <% tool_items.each do |tool| %>
+      <div class="flex items-start space-x-2 text-xs">
+        <%# Tool icon based on tool name %>
+        <% icon_class = case tool['name']
+          when /write|create/ then 'fa-file-circle-plus text-green-500'
+          when /edit|update|replace/ then 'fa-pen-to-square text-blue-500'
+          when /delete|remove/ then 'fa-trash text-red-500'
+          when /search|find/ then 'fa-magnifying-glass text-purple-500'
+          when /read|view/ then 'fa-eye text-gray-500'
+          when /image/ then 'fa-image text-indigo-500'
+          when /web/ then 'fa-globe text-cyan-500'
+          else 'fa-gear text-gray-500'
+        end %>
+        <i class="fas <%= icon_class %> mt-0.5"></i>
+        
+        <div class="flex-1">
+          <span class="font-medium text-gray-700 dark:text-gray-300">
+            <%= tool['name'].to_s.gsub(/^os-/, '').humanize %>
+          </span>
+          
+          <% if tool['file_path'].present? %>
+            <span class="text-gray-500 dark:text-gray-400 ml-1">
+              [<%= tool['file_path'] %>]
+            </span>
+          <% end %>
+          
+          <% if tool['status'] == 'error' %>
+            <span class="text-red-500 ml-2">
+              <i class="fas fa-times-circle"></i> Failed
+            </span>
+          <% elsif tool['status'] == 'running' %>
+            <span class="text-yellow-500 ml-2">
+              <i class="fas fa-spinner fa-spin"></i> Running
+            </span>
+          <% else %>
+            <span class="text-green-500 ml-2">
+              <i class="fas fa-check-circle"></i>
+            </span>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</details>

@@ -32,99 +32,49 @@
       <%# 2. Conversation Flow - Interleaved messages and tool calls %>
       <% if message.conversation_flow.present? && message.conversation_flow.any? %>
         <div class="space-y-3 mb-3">
-          <% message.conversation_flow.each_with_index do |flow_item, index| %>
-            <% case flow_item['type'] %>
-            <% when 'message', 'content' %>
-              <%# Loop message content %>
-              <div class="agent-loop-message" 
-                   id="conversation_flow_<%= message.id %>_<%= index %>"
-                   data-iteration="<%= flow_item['iteration'] || 0 %>">
-                <% loop_msg = flow_item['content'] || flow_item %>
-                <% if loop_msg.is_a?(Hash) %>
-                  <% case loop_msg['type'] %>
-                  <% when 'status' %>
-                    <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
-                      <i class="fas fa-info-circle"></i>
-                      <span><%= loop_msg['content'] %></span>
-                    </div>
-                  <% when 'error' %>
-                    <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
-                      <i class="fas fa-exclamation-triangle"></i>
-                      <span><%= loop_msg['content'] %></span>
-                    </div>
-                  <% else %>
-                    <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
-                      <%= render_markdown(loop_msg['content']) %>
-                    </div>
-                  <% end %>
-                <% else %>
-                  <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
-                    <%= render_markdown(loop_msg) %>
-                  </div>
+          <%# Group consecutive tool entries %>
+          <% grouped_flow = [] %>
+          <% current_tools = [] %>
+          
+          <% message.conversation_flow.each_with_index do |item, idx| %>
+            <% if item['type'] == 'tools' %>
+              <%# Accumulate consecutive tool entries %>
+              <% current_tools.concat(item['calls'] || item['tool_calls'] || []) %>
+              <%# Check if next item is also tools, if not, flush %>
+              <% next_item = message.conversation_flow[idx + 1] %>
+              <% if !next_item || next_item['type'] != 'tools' %>
+                <%# Flush accumulated tools %>
+                <% if current_tools.any? %>
+                  <% grouped_flow << { 'type' => 'grouped_tools', 'calls' => current_tools, 'iteration' => item['iteration'] } %>
+                  <% current_tools = [] %>
                 <% end %>
-              </div>
-              
-            <% when 'tools' %>
-              <%# Tool calls batch %>
-              <% tool_calls = flow_item['calls'] || flow_item['tool_calls'] || [] %>
-              <% if tool_calls.any? %>
-                <details class="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-                         data-state-preserving-target="details"
-                         data-details-id="flow_tools_<%= message.id %>_<%= index %>"
-                         data-action="toggle->state-preserving#detailsToggled">
-                  <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 flex items-center justify-between">
-                    <div class="flex items-center space-x-2">
-                      <i class="fas fa-tools"></i>
-                      <span><%= pluralize(tool_calls.count, 'tool') %> used</span>
-                    </div>
-                    <span class="text-xs text-blue-600 dark:text-blue-400">Show</span>
-                  </summary>
-                  
-                  <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
-                    <% tool_calls.each do |tool| %>
-                      <div class="flex items-start space-x-2 text-xs">
-                        <% icon_class = case tool['name']
-                          when /write|create/ then 'fa-file-circle-plus text-green-500'
-                          when /edit|update|replace/ then 'fa-pen-to-square text-blue-500'
-                          when /delete|remove/ then 'fa-trash text-red-500'
-                          when /search|find/ then 'fa-magnifying-glass text-purple-500'
-                          when /read|view/ then 'fa-eye text-gray-500'
-                          when /image/ then 'fa-image text-indigo-500'
-                          when /web/ then 'fa-globe text-cyan-500'
-                          else 'fa-gear text-gray-500'
-                        end %>
-                        <i class="fas <%= icon_class %> mt-0.5"></i>
-                        
-                        <div class="flex-1">
-                          <span class="font-medium text-gray-700 dark:text-gray-300">
-                            <%= tool['name'].to_s.gsub(/^os-/, '').humanize %>
-                          </span>
-                          
-                          <% if tool['file_path'].present? %>
-                            <span class="text-gray-500 dark:text-gray-400 ml-1">
-                              [<%= tool['file_path'] %>]
-                            </span>
-                          <% end %>
-                          
-                          <% if tool['status'] == 'error' %>
-                            <span class="text-red-500 ml-2">
-                              <i class="fas fa-times-circle"></i> Failed
-                            </span>
-                          <% elsif tool['status'] == 'running' %>
-                            <span class="text-yellow-500 ml-2">
-                              <i class="fas fa-spinner fa-spin"></i> Running
-                            </span>
-                          <% else %>
-                            <span class="text-green-500 ml-2">
-                              <i class="fas fa-check-circle"></i>
-                            </span>
-                          <% end %>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
-                </details>
               <% end %>
+            <% else %>
+              <%# Flush any pending tools before adding non-tool item %>
+              <% if current_tools.any? %>
+                <% grouped_flow << { 'type' => 'grouped_tools', 'calls' => current_tools } %>
+                <% current_tools = [] %>
+              <% end %>
+              <% grouped_flow << item %>
+            <% end %>
+          <% end %>
+          
+          <%# Render grouped flow %>
+          <% grouped_flow.each_with_index do |flow_item, index| %>
+            <% case flow_item['type'] %>
+            <% when 'grouped_tools' %>
+              <%# Render grouped tools using partial %>
+              <%= render 'account/app_editors/conversation_tools', 
+                         tools: flow_item,
+                         message_id: message.id,
+                         index: index %>
+              
+            <% when 'message', 'content' %>
+              <%# Render message using partial %>
+              <%= render 'account/app_editors/conversation_message',
+                         item: flow_item,
+                         message_id: message.id,
+                         index: index %>
               
             <% when 'status' %>
               <%# Status update %>

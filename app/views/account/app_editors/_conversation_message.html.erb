@@ -1,0 +1,32 @@
+<%# Partial for rendering a conversation message %>
+<div class="agent-loop-message" 
+     id="conversation_item_<%= message_id %>_<%= index %>"
+     data-iteration="<%= item['iteration'] || 0 %>">
+  
+  <% content = item['content'] || item %>
+  
+  <% if content.is_a?(Hash) %>
+    <% case content['type'] %>
+    <% when 'status' %>
+      <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+        <i class="fas fa-info-circle"></i>
+        <span><%= content['content'] %></span>
+      </div>
+      
+    <% when 'error' %>
+      <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span><%= content['content'] %></span>
+      </div>
+      
+    <% else %>
+      <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+        <%= render_markdown(content['content']) %>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+      <%= render_markdown(content) %>
+    </div>
+  <% end %>
+</div>

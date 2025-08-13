@@ -756,6 +756,9 @@ module Ai
     def execute_and_format_tool_results(tool_calls)
       tool_results = []
       
+      # Clear pending tools at start to batch this group together
+      @pending_tool_calls = []
+      
       # Execute ALL tool calls and collect results
       tool_calls.each do |tool_call|
         tool_name = tool_call['function']['name']
@@ -764,7 +767,7 @@ module Ai
         
         Rails.logger.info "[V5_TOOLS] Executing #{tool_name} with args: #{tool_args.keys.join(', ')}"
         
-        # Execute the tool
+        # Execute the tool (this will add to pending_tool_calls)
         result = execute_single_tool(tool_name, tool_args)
         
         # Format result according to Anthropic tool_result spec
@@ -796,6 +799,9 @@ module Ai
         tool_results << tool_result_block
       end
       
+      # Flush all pending tool calls as a batch to conversation_flow
+      flush_pending_tool_calls
+      
       # CRITICAL: Return array of tool_result blocks (they must come first in content array)
       tool_results
     end
@@ -814,8 +820,10 @@ module Ai
         return { error: "Skipped os-write with blank content for #{tool_args['file_path']}" }
       end
       
-      # Update UI with tool execution
+      # Update UI with tool execution - mark as running initially
       add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
+      
+      # Don't flush here - let the caller handle batching
       
       result = case tool_name
       when 'os-write'
@@ -868,7 +876,12 @@ module Ai
       end
       
       if tool_call_to_update
-        tool_call_to_update['status'] = result[:error] ? 'error' : 'complete'
+        new_status = result[:error] ? 'error' : 'complete'
+        tool_call_to_update['status'] = new_status
+        
+        # Also update status in conversation_flow
+        update_tool_status_in_flow(tool_name, tool_args['file_path'], new_status)
+        
         @assistant_message.save!
       end
       
@@ -922,6 +935,9 @@ module Ai
     
     def process_tool_calls(tool_calls)
       results = []
+      
+      # Clear pending tools at start to batch this group together
+      @pending_tool_calls = []
       
       tool_calls.each do |tool_call|
         tool_name = tool_call['function']['name']
@@ -995,7 +1011,12 @@ module Ai
         end
         
         if tool_call_to_update
-          tool_call_to_update['status'] = result[:error] ? 'error' : 'complete'
+          new_status = result[:error] ? 'error' : 'complete'
+          tool_call_to_update['status'] = new_status
+          
+          # Also update status in conversation_flow
+          update_tool_status_in_flow(tool_name, tool_args['file_path'], new_status)
+          
           @assistant_message.save!
         else
           Rails.logger.warn "[V5_TOOL] Could not find running tool call to update: #{tool_name} #{tool_args['file_path']}"
@@ -1003,6 +1024,9 @@ module Ai
         
         results << result
       end
+      
+      # Flush all pending tool calls as a batch to conversation_flow
+      flush_pending_tool_calls
       
       results
     end
@@ -2110,13 +2134,11 @@ module Ai
       
       @assistant_message.tool_calls << tool_call
       
-      # Check if we should batch tools or add them immediately
+      # Accumulate tool calls for batching
       @pending_tool_calls ||= []
-      @pending_tool_calls << tool_call
+      @pending_tool_calls << tool_call.dup  # Use dup to avoid reference issues
       
-      # For now, add immediately (we can optimize batching later)
-      flush_pending_tool_calls
-      
+      # Don't flush immediately - let the caller decide when to flush
       @assistant_message.save!
     end
     
@@ -2130,6 +2152,25 @@ module Ai
       )
       
       @pending_tool_calls = []
+    end
+    
+    def update_tool_status_in_flow(tool_name, file_path, new_status)
+      # Update the status in conversation_flow when tool completes
+      return unless @assistant_message.conversation_flow.present?
+      
+      @assistant_message.conversation_flow.each do |item|
+        next unless item['type'] == 'tools'
+        
+        if item['calls'].present?
+          item['calls'].each do |tool|
+            if tool['name'] == tool_name && tool['file_path'] == file_path
+              tool['status'] = new_status
+            end
+          end
+        end
+      end
+      
+      @assistant_message.save!
     end
     
     def update_iteration_count
