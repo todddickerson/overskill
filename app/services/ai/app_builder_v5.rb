@@ -171,15 +171,21 @@ module Ai
     end
     
     def assess_current_state
+      progress = @goal_tracker.assess_progress
+      
       {
         app_id: app.id,
         iteration: @iteration_count,
         goals: @goal_tracker.goals,
         completed_goals: @goal_tracker.completed_goals,
+        goal_progress: progress,
         context_completeness: @context_manager.completeness_score,
         files_generated: @agent_state[:generated_files].count,
+        recent_operations: @recent_operations&.count || 0,
+        loop_risk: assess_loop_risk,
         errors: @agent_state[:errors],
         last_action: @agent_state[:history].last&.dig(:action, :type),
+        last_verification_confidence: @agent_state[:verification_results].last&.dig(:confidence) || 0,
         user_prompt: @chat_message.content
       }
     end
@@ -929,25 +935,37 @@ module Ai
     end
     
     def build_iteration_context
-      <<~CONTEXT
+      progress = @goal_tracker.assess_progress
+      recent_ops = format_recent_operations
+      stagnation_warnings = check_stagnation_warnings
+      
+      context = <<~CONTEXT
         AGENT LOOP ITERATION #{@iteration_count} OF #{MAX_ITERATIONS}
         
         CURRENT GOALS STATUS:
-        #{format_goals_status(@goal_tracker.assess_progress)}
+        #{format_goals_status(progress)}
+        #{progress[:completion_percentage] >= 80 ? "🎯 NEARLY COMPLETE - Focus on finishing remaining tasks" : ""}
+        
+        LOOP DETECTION STATUS:
+        #{recent_ops.present? ? recent_ops : "No repetitive operations detected"}
         
         PREVIOUS ACTIONS TAKEN:
         #{format_previous_actions(@agent_state[:history])}
         
-        GENERATED FILES SO FAR:
-        #{@agent_state[:generated_files].map(&:path).join("\n")}
+        GENERATED FILES SO FAR (#{@agent_state[:generated_files].count} files):
+        #{format_generated_files(@agent_state[:generated_files])}
         
         CURRENT CONTEXT COMPLETENESS: #{@context_manager.completeness_score}%
         
         LAST VERIFICATION RESULTS:
-        #{@agent_state[:verification_results].last}
+        #{format_verification_results(@agent_state[:verification_results].last)}
+        #{stagnation_warnings}
         
-        Continue working towards completing all goals. Focus on what still needs to be done.
+        GUIDANCE:
+        #{generate_iteration_guidance(progress)}
       CONTEXT
+      
+      context
     end
     
     def agent_variables
@@ -1042,9 +1060,122 @@ module Ai
     end
     
     def format_previous_actions(history)
+      return "None yet" if history.empty?
+      
       history.last(3).map do |h|
-        "- Iteration #{h[:iteration]}: #{h[:action][:type]} (#{h[:verification][:success] ? 'Success' : 'Failed'})"
+        status = h[:verification][:success] ? '✅ Success' : '❌ Failed'
+        confidence = h[:verification][:confidence] ? " (#{(h[:verification][:confidence] * 100).to_i}% confidence)" : ""
+        "- Iteration #{h[:iteration]}: #{h[:action][:type]}#{confidence} #{status}"
       end.join("\n")
+    end
+    
+    # Enhanced Context Formatting Methods
+    
+    def format_recent_operations
+      return "" unless @recent_operations&.any?
+      
+      # Group by file path and show counts
+      operation_counts = @recent_operations.group_by { |op| op[:key].split(':').first }.transform_values(&:count)
+      repeated_files = operation_counts.select { |file, count| count >= 2 }
+      
+      if repeated_files.any?
+        warning = "⚠️  REPEATED OPERATIONS DETECTED:\n"
+        repeated_files.each do |file, count|
+          iterations = @recent_operations.select { |op| op[:key].start_with?(file) }.map { |op| op[:iteration] }.join(', ')
+          warning += "   #{file}: #{count} operations in iterations #{iterations}\n"
+        end
+        warning += "   Avoid repeating these operations unless necessary.\n"
+        warning
+      else
+        ""
+      end
+    end
+    
+    def format_generated_files(files)
+      return "None yet" if files.empty?
+      
+      # Group by file type for better organization
+      grouped = files.group_by { |f| File.extname(f.path) }
+      
+      result = []
+      grouped.each do |ext, group|
+        type_label = case ext
+        when '.tsx' then "React Components (#{group.count})"
+        when '.ts' then "TypeScript Files (#{group.count})"
+        when '.json' then "Config Files (#{group.count})"
+        when '.css' then "Stylesheets (#{group.count})"
+        else "#{ext} Files (#{group.count})"
+        end
+        
+        result << "#{type_label}:"
+        group.each { |f| result << "  - #{f.path}" }
+      end
+      
+      result.join("\n")
+    end
+    
+    def format_verification_results(result)
+      return "None yet" unless result
+      
+      if result[:success]
+        "✅ Success (#{(result[:confidence] * 100).to_i}% confidence)"
+      else
+        error_info = result[:errors]&.any? ? " - #{result[:errors].count} errors" : ""
+        "❌ Failed (#{(result[:confidence] * 100).to_i}% confidence)#{error_info}"
+      end
+    end
+    
+    def check_stagnation_warnings
+      return "" if @iteration_count < 3
+      
+      warnings = []
+      
+      # Check for low progress
+      progress = @goal_tracker.assess_progress
+      if @iteration_count >= 5 && progress[:completion_percentage] < 30
+        warnings << "⚠️  LOW PROGRESS WARNING: #{progress[:completion_percentage]}% complete after #{@iteration_count} iterations"
+      end
+      
+      # Check verification confidence trend
+      if @agent_state[:verification_results].count >= 3
+        recent_confidence = @agent_state[:verification_results].last(3).map { |r| r[:confidence] || 0 }
+        avg_confidence = recent_confidence.sum / recent_confidence.count.to_f
+        if avg_confidence < 0.4
+          warnings << "⚠️  LOW CONFIDENCE TREND: Average #{(avg_confidence * 100).to_i}% over last 3 verifications"
+        end
+      end
+      
+      warnings.any? ? "\n\nWARNINGS:\n#{warnings.join("\n")}" : ""
+    end
+    
+    def generate_iteration_guidance(progress)
+      guidance = []
+      
+      # Goal-specific guidance
+      if progress[:next_priority_goal]
+        guidance << "🎯 PRIORITY: #{progress[:next_priority_goal].description}"
+      end
+      
+      # Stage-specific guidance
+      case @iteration_count
+      when 1..2
+        guidance << "📋 SETUP PHASE: Focus on project structure and dependencies"
+      when 3..5
+        guidance << "🏗️  BUILD PHASE: Implement core features and components"
+      when 6..8
+        guidance << "🔍 REFINEMENT PHASE: Test, debug, and optimize"
+      else
+        guidance << "🚀 COMPLETION PHASE: Finalize and deploy"
+      end
+      
+      # Completion guidance
+      if progress[:completion_percentage] >= 80
+        guidance << "✨ NEARLY DONE: Focus on completion rather than adding new features"
+      elsif progress[:remaining] <= 1
+        guidance << "🏁 FINAL GOAL: Complete remaining task to finish generation"
+      end
+      
+      guidance.join("\n")
     end
     
     # Stub methods for component classes that need to be implemented
@@ -1506,6 +1637,19 @@ module Ai
         recent_ops = @recent_operations.select { |op| op[:key] == operation_key }
         iterations = recent_ops.map { |op| op[:iteration] }.join(', ')
         Rails.logger.warn "[V5_LOOP_DETECT] #{operation_key} repeated #{count} times in iterations: #{iterations}"
+      end
+    end
+    
+    def assess_loop_risk
+      return :low if (@recent_operations&.count || 0) < 2
+      
+      operation_counts = @recent_operations.group_by { |op| op[:key] }.transform_values(&:count)
+      max_repetitions = operation_counts.values.max || 0
+      
+      case max_repetitions
+      when 0..1 then :low
+      when 2 then :medium
+      else :high
       end
     end
   end
