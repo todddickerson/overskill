@@ -44,13 +44,46 @@
 
 ---
 
-## 📋 NEXT: V5 Planning
+## ✅ COMPLETED: V5 Improvements (August 13, 2025)
 
-### V5 Focus Areas
-Based on current system, V5 will improve:
-- **Chat/AI Generation**: Enhanced app builder and chat broadcaster
-- **User Experience**: Better progress feedback and error handling
-- **AI Models**: Integration improvements and model selection
+### [x] V5 Builder Conversation Flow
+- **Fixed**: V5 builder now properly processes both text content and tool_use blocks from Claude responses
+- **Issue**: Initial messages from Claude weren't appearing in conversation_flow
+- **Solution**: Modified `AppBuilderV5` to add text content before processing tools
+
+### [x] Workers.dev Preview Deployment  
+- **Added**: Support for workers.dev URLs when overskill.app is down
+- **Configuration**: Set `USE_WORKERS_DEV_FOR_PREVIEW=true` or `OVERSKILL_DOMAIN_DOWN=true`
+- **Service**: Updated `CloudflarePreviewService` to handle both URL types
+
+### [x] App Navigation Streaming Fix
+- **Fixed**: App name and logo generators now properly update `_app_navigation` partial
+- **Issue**: Turbo Stream targets weren't matching due to instance variable vs local variable
+- **Solution**: Changed `@app` to `app` in partial for proper turbo_frame_tag ID matching
+
+### [x] Infinite Loop Prevention
+- **Created**: `BaseContextService` to prevent Claude from repeatedly reading template files
+- **Issue**: Claude was using os-view 18 times and os-line-replace 21 times in loops
+- **Solution**: Pre-load essential template files into useful-context section
+
+### [x] Markdown Rendering Improvements
+- **Enhanced**: Chat message formatting for structured content like implementation plans
+- **Improvements**: Better headers, lists, code blocks, tables, and spacing
+- **File**: Updated `app/helpers/markdown_helper.rb` with Tailwind CSS styling
+
+### [x] Helicone Integration Verification
+- **Verified**: Helicone.ai API integration is working correctly with proper headers and logging
+
+### [x] Testing Infrastructure
+- **Added**: Comprehensive Rails tests for `BaseContextService`
+- **Coverage**: File grouping, template handling, context building, error handling
+
+## 📋 NEXT: Future V5 Enhancements
+
+### Potential Areas for Further V5 Improvements
+- **Error Recovery**: Enhanced error handling with smart retry logic
+- **Context Management**: Dynamic context optimization based on conversation state
+- **AI Models**: Advanced model selection and routing
 
 ### What Stays the Same
 - ✅ Deployment system (working perfectly)
