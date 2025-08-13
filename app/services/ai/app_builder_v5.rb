@@ -518,6 +518,18 @@ module Ai
           replace_file_content(tool_args)
         when 'os-delete'
           delete_file(tool_args['file_path'])
+        when 'os-add-dependency'
+          add_dependency(tool_args['package'])
+        when 'os-remove-dependency'
+          remove_dependency(tool_args['package'])
+        when 'os-rename'
+          rename_file(tool_args['old_path'], tool_args['new_path'])
+        when 'os-search-files'
+          search_files(tool_args)
+        when 'os-download-to-repo'
+          download_to_repo(tool_args['source_url'], tool_args['target_path'])
+        when 'os-fetch-website'
+          fetch_website(tool_args['url'], tool_args['formats'])
         else
           { error: "Unknown tool: #{tool_name}" }
         end
@@ -541,7 +553,8 @@ module Ai
     def write_file(path, content)
       file = @app.app_files.find_or_initialize_by(path: path)
       file.content = content
-      file.language = determine_language(path)
+      file.file_type = determine_file_type(path)
+      file.team = @app.team  # Ensure team is set
       file.save!
       
       @agent_state[:generated_files] << file unless @agent_state[:generated_files].include?(file)
@@ -550,11 +563,18 @@ module Ai
     end
     
     def read_file(path)
-      # First check template directory
-      template_file = Rails.root.join("app/services/ai/templates/overskill_20250728", path)
+      # First check if we have a template AppVersion v1.0.0
+      template_version = get_or_create_template_version
       
-      if File.exist?(template_file)
-        { success: true, content: File.read(template_file), source: 'template' }
+      # Check template version files first
+      if template_version && (template_file = template_version.app_version_files
+                                                          .joins(:app_file)
+                                                          .find_by(app_files: { path: path }))
+        { success: true, content: template_file.app_file.content, source: 'template_version' }
+      # Then check template directory as fallback
+      elsif ::File.exist?(template_path = Rails.root.join("app/services/ai/templates/overskill_20250728", path))
+        { success: true, content: ::File.read(template_path), source: 'template_directory' }
+      # Finally check generated files
       elsif file = @app.app_files.find_by(path: path)
         { success: true, content: file.content, source: 'generated' }
       else
@@ -588,6 +608,155 @@ module Ai
         { success: true, path: path }
       else
         { error: "File not found: #{path}" }
+      end
+    end
+    
+    def add_dependency(package_spec)
+      # Parse package name and version
+      package, version = parse_package_spec(package_spec)
+      
+      # Get or create package.json
+      package_file = @app.app_files.find_or_initialize_by(path: 'package.json')
+      
+      if package_file.new_record?
+        # Create new package.json
+        package_data = {
+          "name" => @app.name.parameterize,
+          "version" => "1.0.0",
+          "private" => true,
+          "dependencies" => {}
+        }
+        package_file.content = JSON.pretty_generate(package_data)
+        package_file.team = @app.team
+        package_file.save!
+      end
+      
+      # Parse existing package.json
+      package_data = JSON.parse(package_file.content)
+      package_data["dependencies"] ||= {}
+      
+      # Add the dependency
+      package_data["dependencies"][package] = version || "latest"
+      
+      # Save updated package.json
+      package_file.update!(content: JSON.pretty_generate(package_data))
+      
+      { success: true, package: package, version: version || "latest" }
+    rescue JSON::ParserError => e
+      { error: "Invalid package.json: #{e.message}" }
+    end
+    
+    def remove_dependency(package_name)
+      package_file = @app.app_files.find_by(path: 'package.json')
+      return { error: "package.json not found" } unless package_file
+      
+      package_data = JSON.parse(package_file.content)
+      
+      if package_data["dependencies"]&.delete(package_name)
+        package_file.update!(content: JSON.pretty_generate(package_data))
+        { success: true, package: package_name }
+      else
+        { error: "Dependency #{package_name} not found" }
+      end
+    rescue JSON::ParserError => e
+      { error: "Invalid package.json: #{e.message}" }
+    end
+    
+    def rename_file(old_path, new_path)
+      file = @app.app_files.find_by(path: old_path)
+      return { error: "File not found: #{old_path}" } unless file
+      
+      # Check if new path already exists
+      if @app.app_files.exists?(path: new_path)
+        return { error: "File already exists: #{new_path}" }
+      end
+      
+      file.update!(path: new_path)
+      { success: true, old_path: old_path, new_path: new_path }
+    end
+    
+    def search_files(args)
+      query = args['query']
+      include_pattern = args['include_pattern'] || '**/*'
+      exclude_pattern = args['exclude_pattern']
+      case_sensitive = args['case_sensitive'] || false
+      
+      # Build regex
+      regex_options = case_sensitive ? 0 : Regexp::IGNORECASE
+      regex = Regexp.new(query, regex_options)
+      
+      # Find matching files
+      matches = []
+      
+      @app.app_files.each do |file|
+        # Check include pattern (handle both glob patterns and simple paths)
+        if include_pattern.end_with?('/')
+          # Simple directory pattern like 'src/'
+          next unless file.path.start_with?(include_pattern)
+        elsif include_pattern.include?('*')
+          # Glob pattern
+          next unless ::File.fnmatch(include_pattern, file.path, ::File::FNM_PATHNAME)
+        else
+          # Exact match
+          next unless file.path == include_pattern
+        end
+        
+        # Check exclude pattern
+        next if exclude_pattern && ::File.fnmatch(exclude_pattern, file.path, ::File::FNM_PATHNAME)
+        
+        # Search content
+        if file.content =~ regex
+          matches << {
+            path: file.path,
+            matches: file.content.scan(regex).take(5) # Limit matches per file
+          }
+        end
+      end
+      
+      { success: true, matches: matches, total: matches.count }
+    rescue RegexpError => e
+      { error: "Invalid regex: #{e.message}" }
+    end
+    
+    def download_to_repo(source_url, target_path)
+      # For V5, we'll just create a placeholder - actual download would require HTTP client
+      # In production, this would download the file
+      
+      file = @app.app_files.find_or_initialize_by(path: target_path)
+      file.content = "// Downloaded from: #{source_url}\n// Placeholder content for testing"
+      file.team = @app.team
+      file.save!
+      
+      { success: true, path: target_path, source: source_url }
+    end
+    
+    def fetch_website(url, formats = 'markdown')
+      # For V5, return placeholder content
+      # In production, this would fetch and convert website content
+      
+      { 
+        success: true, 
+        url: url,
+        content: "# Website Content\nFetched from: #{url}\n\nPlaceholder content for testing.",
+        formats: formats || 'markdown'
+      }
+    end
+    
+    def parse_package_spec(spec)
+      # Parse package@version format
+      if spec.include?('@')
+        parts = spec.split('@')
+        # Handle scoped packages like @types/node
+        if spec.start_with?('@')
+          package = parts[0..1].join('@')
+          version = parts[2]
+        else
+          package = parts[0]
+          version = parts[1]
+        end
+        [package, version]
+      else
+        [spec, nil]
       end
     end
     
@@ -744,14 +913,24 @@ module Ai
     
     def generate_file_content(tool, template_path)
       file_path = tool[:file_path]
+      base_content = nil
       
-      # Check if template file exists
-      template_file = File.join(template_path, file_path)
+      # First try to get content from AppVersion v1.0.0
+      template_version = get_or_create_template_version
+      if template_version
+        template_file = template_version.app_version_files
+                                      .joins(:app_file)
+                                      .find_by(app_files: { path: file_path })
+        base_content = template_file.app_file.content if template_file
+      end
       
-      if File.exist?(template_file)
-        # Use template as base
-        base_content = File.read(template_file)
-        
+      # Fallback to template directory
+      if base_content.nil?
+        template_file_path = ::File.join(template_path, file_path)
+        base_content = ::File.read(template_file_path) if ::File.exist?(template_file_path)
+      end
+      
+      if base_content
         # If it's a static file (like package.json, tsconfig), use as-is
         return base_content if static_file?(file_path)
         
@@ -781,12 +960,12 @@ module Ai
         'index.html'
       ]
       
-      static_files.include?(File.basename(path))
+      static_files.include?(::File.basename(path))
     end
     
     def build_file_enhancement_prompt(path, base_content, description)
       <<~PROMPT
-        Enhance the following #{File.extname(path)} file based on the requirements.
+        Enhance the following #{::File.extname(path)} file based on the requirements.
         
         Current file (#{path}):
         ```
@@ -803,7 +982,7 @@ module Ai
     
     def build_file_generation_prompt(path, description)
       <<~PROMPT
-        Generate a #{File.extname(path)} file for path: #{path}
+        Generate a #{::File.extname(path)} file for path: #{path}
         
         Requirements: #{description}
         User's original request: #{@chat_message.content}
@@ -817,7 +996,7 @@ module Ai
     
     def default_file_content(path)
       # Fallback content for common files
-      case File.basename(path)
+      case ::File.basename(path)
       when 'App.tsx'
         <<~TSX
         import React from 'react';
@@ -858,11 +1037,12 @@ module Ai
       app.app_files.create!(
         path: path,
         content: content,
-        language: determine_language(path)
+        file_type: determine_file_type(path),
+        team: app.team
       )
     end
     
-    def determine_language(path)
+    def determine_file_type(path)
       case path
       when /\.tsx?$/ then 'typescript'
       when /\.jsx?$/ then 'javascript'
@@ -986,6 +1166,69 @@ module Ai
       @assistant_message.status = 'completed'
       @assistant_message.thinking_status = nil
       @assistant_message.save!
+    end
+    
+    def get_or_create_template_version
+      # Cache the template version
+      @template_version ||= begin
+        # Look for v1.0.0 template version for this app
+        version = @app.app_versions.find_by(version_number: 'v1.0.0')
+        
+        # If not found, create it from template files
+        if version.nil? && template_files_exist?
+          version = create_template_version_from_files
+        end
+        
+        version
+      end
+    end
+    
+    def template_files_exist?
+      template_dir = Rails.root.join("app/services/ai/templates/overskill_20250728")
+      Dir.exist?(template_dir) && Dir.glob(::File.join(template_dir, "**/*")).any? { |f| ::File.file?(f) }
+    end
+    
+    def create_template_version_from_files
+      template_dir = Rails.root.join("app/services/ai/templates/overskill_20250728")
+      
+      version = @app.app_versions.create!(
+        version_number: 'v1.0.0',
+        team: @app.team,
+        user: @chat_message.user,
+        changelog: 'Initial template version from overskill_20250728',
+        deployed: false,
+        external_commit: false
+      )
+      
+      # Load all template files into AppFiles and AppVersionFiles
+      Dir.glob(::File.join(template_dir, "**/*")).each do |file_path|
+        next unless ::File.file?(file_path)
+        
+        relative_path = file_path.sub("#{template_dir}/", '')
+        content = ::File.read(file_path)
+        
+        # Skip empty files
+        next if content.blank?
+        
+        # Create or find AppFile
+        app_file = @app.app_files.find_or_create_by!(path: relative_path) do |f|
+          f.content = content
+          f.team = @app.team
+          f.file_type = determine_file_type(relative_path)
+        end
+        
+        # Update content if file exists
+        app_file.update!(content: content) if app_file.content != content
+        
+        # Create AppVersionFile to track this file in v1.0.0
+        version.app_version_files.create!(
+          app_file: app_file,
+          action: 'created'
+        )
+      end
+      
+      Rails.logger.info "[V5_TEMPLATE] Created AppVersion v1.0.0 with #{version.app_version_files.count} files"
+      version
     end
     
     def log_claude_event(event_type, details = {})
