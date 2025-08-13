@@ -4,7 +4,10 @@ class SupabaseAuthSyncJob < ApplicationJob
   
   retry_on StandardError, wait: 5, attempts: 3
   
-  def perform(user, action = nil)
+  def perform(user_or_id, action = nil)
+    # Load user if we received an ID
+    user = user_or_id.is_a?(User) ? user_or_id : User.find(user_or_id)
+    
     # Normalize action to a simple string to be resilient to
     # ActiveJob serialization differences (symbol/hash/string)
     normalized_action = case action

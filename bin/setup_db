@@ -1,0 +1,74 @@
+#!/usr/bin/env ruby
+# Script to properly set up database for development/test environments
+# Run this after cloning the repo or when setting up a new environment
+
+require 'pathname'
+require 'fileutils'
+
+APP_ROOT = Pathname.new File.expand_path('..', __dir__)
+
+def system!(*args)
+  system(*args) || abort("\n== Command #{args} failed ==")
+end
+
+FileUtils.chdir APP_ROOT do
+  puts '='*80
+  puts 'DATABASE SETUP SCRIPT'
+  puts '='*80
+  
+  puts "\n== Installing dependencies =="
+  system! 'gem install bundler --conservative'
+  system('bundle check') || system!('bundle install')
+  
+  puts "\n== Preparing database =="
+  system! 'bin/rails db:create'
+  system! 'bin/rails db:migrate'
+  
+  puts "\n== Ensuring critical tables exist =="
+  
+  # Check and create default database shard
+  system! 'bin/rails runner "
+    begin
+      # Check if we have a shard
+      shard = ActiveRecord::Base.connection.execute(\"SELECT * FROM database_shards LIMIT 1\").first
+      
+      if shard
+        puts \"✅ Database shard exists: #{shard[\"name\"]}\"
+      else
+        # Create default shard
+        ActiveRecord::Base.connection.execute(\"
+          INSERT INTO database_shards (
+            name, shard_number, supabase_project_id, supabase_url, 
+            supabase_anon_key, supabase_service_key, status, app_count, 
+            metadata, created_at, updated_at
+          ) VALUES (
+            \\\"shard-001\\\", 1, \\\"#{ENV[\"SUPABASE_PROJECT_ID\"] || \"development-project\"}\\\", 
+            \\\"#{ENV[\"SUPABASE_URL\"] || \"https://example.supabase.co\"}\\\",
+            \\\"#{ENV[\"SUPABASE_ANON_KEY\"] || \"dummy-anon-key\"}\\\",
+            \\\"#{ENV[\"SUPABASE_SERVICE_KEY\"] || \"dummy-service-key\"}\\\",
+            1, 0, \\\"{}\\\", NOW(), NOW()
+          )
+        \")
+        puts \"✅ Created default database shard\"
+      end
+    rescue => e
+      puts \"⚠️  Warning: #{e.message}\"
+    end
+  "'
+  
+  puts "\n== Running seeds =="
+  system! 'bin/rails db:seed'
+  
+  puts "\n== Verifying setup =="
+  if system('ruby test_db_setup.rb')
+    puts "\n✅ Database setup complete and verified!"
+  else
+    puts "\n⚠️  Setup completed but verification found issues."
+    puts "   Please review the output above."
+  end
+  
+  puts "\n== Environment-specific notes =="
+  puts "• Development: Make sure .env.local has required API keys"
+  puts "• Test: Database will be recreated for each test run"
+  puts "• Production: Use proper Supabase credentials in ENV"
+end

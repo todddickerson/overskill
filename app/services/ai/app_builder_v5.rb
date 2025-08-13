@@ -205,6 +205,11 @@ module Ai
       
       response = call_ai_with_context(context_prompt)
       
+      # Capture Claude's conversational response
+      if response[:content].present?
+        add_loop_message(response[:content], type: 'content')
+      end
+      
       @context_manager.add_context(response)
       
       # Clear thinking status and add result
@@ -236,6 +241,11 @@ module Ai
         return { type: :error, error: "Empty response from AI" }
       end
       
+      # Capture Claude's conversational response about the plan
+      if response[:content].present?
+        add_loop_message(response[:content], type: 'content')
+      end
+      
       # Extract and structure the plan
       implementation_plan = extract_implementation_plan(response)
       @context_manager.set_implementation_plan(implementation_plan)
@@ -263,6 +273,11 @@ module Ai
         
         # Call Claude to implement features
         response = call_ai_with_context(feature_prompt)
+        
+        # Always capture Claude's conversational response for the user
+        if response[:content].present?
+          add_loop_message(response[:content], type: 'content')
+        end
         
         # Process any tool calls from the response
         if response[:tool_calls].present?
@@ -373,6 +388,11 @@ module Ai
       action[:issues].each do |issue|
         fix_prompt = build_fix_prompt(issue)
         fix_response = call_ai_with_context(fix_prompt)
+        
+        # Capture Claude's explanation of the fix
+        if fix_response[:content].present?
+          add_loop_message("🔧 #{fix_response[:content]}", type: 'content')
+        end
         
         # Apply the fix
         if fix_response[:file_updates]
@@ -573,8 +593,17 @@ module Ai
         
         log_claude_event("TOOL_EXECUTE_START", {
           tool: tool_name,
-          file: tool_args['file_path']
+          file: tool_args['file_path'],
+          content_length: tool_args['content']&.length || 0
         })
+        
+        # Skip os-write calls with blank content to prevent validation errors
+        if tool_name == 'os-write' && tool_args['content'].blank?
+          Rails.logger.warn "[V5_TOOL] Skipping os-write with blank content for #{tool_args['file_path']}"
+          Rails.logger.warn "[V5_TOOL] Full tool_args: #{tool_args.inspect}"
+          results << { error: "Skipped os-write with blank content for #{tool_args['file_path']}" }
+          next
+        end
         
         # Update UI with tool execution
         add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
@@ -621,11 +650,23 @@ module Ai
     end
     
     def write_file(path, content)
+      # Validate content is not blank
+      if content.blank?
+        Rails.logger.error "[V5_ERROR] write_file called with blank content for path: #{path}"
+        return { error: "Cannot write file with blank content: #{path}" }
+      end
+      
       file = @app.app_files.find_or_initialize_by(path: path)
       file.content = content
       file.file_type = determine_file_type(path)
       file.team = @app.team  # Ensure team is set
-      file.save!
+      
+      begin
+        file.save!
+      rescue ActiveRecord::RecordInvalid => e
+        Rails.logger.error "[V5_ERROR] Failed to save file #{path}: #{e.message}"
+        return { error: "Failed to save file #{path}: #{e.message}" }
+      end
       
       @agent_state[:generated_files] << file unless @agent_state[:generated_files].include?(file)
       
@@ -1194,18 +1235,33 @@ module Ai
     # V5 UI Integration Methods - Save & Broadcast Pattern
     
     def create_assistant_message
-      AppChatMessage.create!(
-        app: @app,
-        user: @chat_message.user,
-        role: 'assistant',
-        content: 'Starting agent loop...', # Required field
-        status: 'executing',
-        iteration_count: 0,
-        loop_messages: [],
-        tool_calls: [],
-        thinking_status: nil,
-        is_code_generation: false
-      )
+      # Find existing assistant placeholder created by App#initiate_generation!
+      # This ensures Action Cable updates work from the start
+      existing_assistant = @app.app_chat_messages
+        .where(role: 'assistant')
+        .where('created_at > ?', @chat_message.created_at)
+        .where(status: 'executing')
+        .first
+      
+      if existing_assistant
+        Rails.logger.info "[V5_INIT] Using existing assistant placeholder ##{existing_assistant.id}"
+        existing_assistant
+      else
+        # Fallback: create new message if none exists
+        Rails.logger.info "[V5_INIT] Creating new assistant message (no placeholder found)"
+        AppChatMessage.create!(
+          app: @app,
+          user: @chat_message.user,
+          role: 'assistant',
+          content: 'Starting agent loop...', # Required field
+          status: 'executing',
+          iteration_count: 0,
+          loop_messages: [],
+          tool_calls: [],
+          thinking_status: nil,
+          is_code_generation: false
+        )
+      end
     end
     
     def update_thinking_status(status, seconds = nil)

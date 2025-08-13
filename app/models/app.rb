@@ -189,6 +189,22 @@ class App < ApplicationRecord
       update!(prompt: default_prompt)
       message.update!(content: default_prompt) if message.persisted?
     end
+    
+    # Create assistant placeholder message for V5 builder to update
+    # This ensures Action Cable has something to broadcast to immediately
+    assistant_message = app_chat_messages.create!(
+      role: "assistant",
+      content: "Starting agent loop...",
+      user: message.user,
+      status: "executing",
+      iteration_count: 0,
+      loop_messages: [],
+      tool_calls: [],
+      thinking_status: "Initializing AI agent...",
+      is_code_generation: false
+    )
+    
+    Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for V5 updates"
 
     # Always use V4 orchestrator (Vite + TypeScript + template-based)
     Rails.logger.info "[App] Using V4 orchestrator for app ##{id}"

@@ -57,11 +57,13 @@ class Public::GeneratorController < Public::ApplicationController
         # Call create action directly with the stored prompt
         params[:prompt] = prompt
         create
+        return # Exit after calling create to avoid double render
       end
     end
+    
+    # Normal index response - render the index view
     respond_to do |format|
-      format.html { redirect_to account_app_editor_path(app), notice: "Creating your app..." }
-      format.turbo_stream { redirect_to account_app_editor_path(app), status: :see_other }
+      format.html # Renders app/views/public/generator/index.html.erb
     end
   end
   

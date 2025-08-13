@@ -82,6 +82,11 @@ class AppChatMessage < ApplicationRecord
       ""
     end
   end
+
+  def partial_name
+    # Use V5 partial if this is an agent message with V5 fields
+    use_v5_partial? ? "agent_reply_v5" : "chat_message"
+  end
   
   private
   
@@ -108,8 +113,6 @@ class AppChatMessage < ApplicationRecord
   end
   
   def broadcast_message_updated
-    # Use V5 partial if this is an agent message with V5 fields
-    partial_name = use_v5_partial? ? "agent_reply_v5" : "chat_message"
     
     broadcast_replace_to(
       "app_#{app.id}_chat",

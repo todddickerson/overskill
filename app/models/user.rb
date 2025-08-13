@@ -27,6 +27,7 @@ class User < ApplicationRecord
   after_create :create_supabase_auth_user
   after_create :create_default_team
   after_update :sync_to_supabase_profile, if: :should_sync_to_supabase?
+  before_destroy :cleanup_background_jobs
   
   # 🚅 add callbacks above.
 
@@ -67,6 +68,29 @@ class User < ApplicationRecord
   
   def sync_to_supabase_profile
     SupabaseAuthSyncJob.perform_later(self, 'update')
+  end
+  
+  def cleanup_background_jobs
+    # Clean up any pending jobs for this user when they're deleted
+    # This prevents ActiveJob::DeserializationError for orphaned jobs
+    require 'sidekiq/api' if defined?(Sidekiq)
+    
+    if defined?(Sidekiq)
+      [Sidekiq::RetrySet.new, Sidekiq::DeadSet.new, Sidekiq::ScheduledSet.new].each do |set|
+        set.each do |job|
+          # Check if this job references this user
+          if job.args&.first == id || job.args&.first == self
+            job.delete
+            Rails.logger.info "[CLEANUP] Deleted orphaned job #{job.klass} for user #{id}"
+          end
+        rescue => e
+          Rails.logger.warn "[CLEANUP] Failed to check job: #{e.message}"
+        end
+      end
+    end
+  rescue => e
+    Rails.logger.error "[CLEANUP] Failed to cleanup jobs for user #{id}: #{e.message}"
+    # Don't prevent user deletion if cleanup fails
   end
   
   # 🚅 add methods above.

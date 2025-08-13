@@ -123,7 +123,7 @@
         <div id="chat_messages" class="space-y-4">
           <% if @messages.any? %>
             <% @messages.each do |message| %>
-              <%= render "chat_message", message: message %>
+              <%= render message.partial_name, message: message %>
             <% end %>
           <% else %>
             <div class="text-center py-8">
