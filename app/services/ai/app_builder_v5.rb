@@ -970,7 +970,15 @@ module Ai
         { success: true, content: template_file.app_file.content, source: 'template_version' }
       # Then check template directory as fallback
       elsif ::File.exist?(template_path = Rails.root.join("app/services/ai/templates/overskill_20250728", path))
-        { success: true, content: ::File.read(template_path), source: 'template_directory' }
+        # Check if it's a directory
+        if ::File.directory?(template_path)
+          # Return directory listing instead of trying to read it as a file
+          entries = Dir.entries(template_path).reject { |e| e.start_with?('.') }
+          content = "Directory: #{path}\nContents:\n#{entries.map { |e| "  - #{e}" }.join("\n")}"
+          { success: true, content: content, source: 'template_directory_listing' }
+        else
+          { success: true, content: ::File.read(template_path), source: 'template_directory' }
+        end
       # Finally check generated files
       elsif file = @app.app_files.find_by(path: path)
         { success: true, content: file.content, source: 'generated' }
