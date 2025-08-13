@@ -115,6 +115,16 @@ module Ai
         result = execute_iteration
         Rails.logger.info "[V5_LOOP] Iteration result: #{result[:type]}"
         
+        # Update goal progress based on result
+        update_goal_progress(result)
+        
+        # Check for loop detection
+        if loop_detected?(result)
+          Rails.logger.warn "[V5_LOOP] Loop detected - stopping to prevent infinite iteration"
+          add_loop_message("Loop detected in operations - stopping to prevent repetitive actions.", type: 'error')
+          break
+        end
+        
         # Check termination conditions
         if should_terminate?(result)
           Rails.logger.info "[V5_LOOP] Termination condition met"
@@ -556,7 +566,7 @@ module Ai
         response = client.chat_with_tools(
           messages,
           tools,
-          model: :claude_opus_4,  # Use symbol for model
+          model: :claude_sonnet_4,  # Use symbol for model
           use_cache: true,         # Enable prompt caching for 83% cost savings
           temperature: 0.7,
           max_tokens: 4000
@@ -639,9 +649,19 @@ module Ai
           error: result[:error]
         })
         
-        # Update tool status
-        @assistant_message.tool_calls.last['status'] = result[:error] ? 'error' : 'complete'
-        @assistant_message.save!
+        # Update tool status - find the specific tool call for this tool
+        tool_call_to_update = @assistant_message.tool_calls.reverse.find do |tc|
+          tc['name'] == tool_name && 
+          tc['file_path'] == tool_args['file_path'] && 
+          tc['status'] == 'running'
+        end
+        
+        if tool_call_to_update
+          tool_call_to_update['status'] = result[:error] ? 'error' : 'complete'
+          @assistant_message.save!
+        else
+          Rails.logger.warn "[V5_TOOL] Could not find running tool call to update: #{tool_name} #{tool_args['file_path']}"
+        end
         
         results << result
       end
@@ -1383,6 +1403,111 @@ module Ai
     def format_log_details(details)
       details.map { |k, v| "#{k}=#{v.to_s.truncate(200)}" }.join(" | ")
     end
+    
+    # Goal Progress and Loop Detection Methods
+    
+    def update_goal_progress(result)
+      return unless result && result[:type]
+      
+      # Track successful operations for goal completion
+      case result[:type]
+      when :tools_executed
+        # Check if foundation files were created
+        if result[:data]&.any? { |r| foundation_file_created?(r) }
+          mark_goal_complete_by_type(:foundation)
+        end
+        
+        # Check if features were implemented
+        if result[:data]&.any? { |r| feature_file_created?(r) }
+          mark_goal_complete_by_type(:features)
+        end
+        
+      when :verification_complete
+        # Mark deployment goal as complete if build successful
+        if result[:data]&.dig(:build_successful)
+          mark_goal_complete_by_type(:deployment)
+        end
+        
+      when :generation_complete
+        # Mark all remaining goals complete
+        @goal_tracker.mark_all_complete
+      end
+      
+      # Log progress for debugging
+      progress = @goal_tracker.assess_progress
+      Rails.logger.info "[V5_GOAL] Progress: #{progress[:completed]}/#{progress[:total_goals]} goals complete (#{progress[:completion_percentage]}%)"
+    end
+    
+    def mark_goal_complete_by_type(goal_type)
+      goal = @goal_tracker.goals.find { |g| g.type == goal_type }
+      if goal
+        @goal_tracker.mark_goal_complete(goal)
+        Rails.logger.info "[V5_GOAL] Completed goal: #{goal.description}"
+      end
+    end
+    
+    def foundation_file_created?(result)
+      return false unless result[:path]
+      foundation_files = ['package.json', 'tsconfig.json', 'vite.config.ts', 'src/main.tsx', 'src/App.tsx']
+      foundation_files.any? { |file| result[:path].include?(file) }
+    end
+    
+    def feature_file_created?(result)
+      return false unless result[:path]
+      # Look for app-specific feature files (components, pages, etc.)
+      feature_indicators = ['component', 'Component', 'page', 'Page', 'Todo', 'Task', 'List']
+      feature_indicators.any? { |indicator| result[:path].include?(indicator) }
+    end
+    
+    def loop_detected?(result)
+      return false if @iteration_count < 3
+      
+      # Track recent operations
+      @recent_operations ||= []
+      
+      if result[:type] == :tools_executed && result[:data]
+        result[:data].each do |operation|
+          next unless operation[:path]
+          
+          operation_key = "#{operation[:path]}:#{operation[:type] || 'write'}"
+          @recent_operations << {
+            key: operation_key,
+            iteration: @iteration_count,
+            timestamp: Time.current
+          }
+        end
+        
+        # Keep only recent operations (last 10 iterations)
+        @recent_operations = @recent_operations.select { |op| op[:iteration] > @iteration_count - 10 }
+        
+        # Detect loops - same file written multiple times in recent iterations
+        operation_counts = @recent_operations.group_by { |op| op[:key] }.transform_values(&:count)
+        repetitive_operations = operation_counts.select { |key, count| count >= 3 }
+        
+        if repetitive_operations.any?
+          Rails.logger.warn "[V5_LOOP_DETECT] Repetitive operations detected: #{repetitive_operations.keys.join(', ')}"
+          log_loop_details(repetitive_operations)
+          return true
+        end
+      end
+      
+      # Check for iteration counter restarting (mentioned by user)
+      if @iteration_count < (@last_iteration_count || 0)
+        Rails.logger.error "[V5_LOOP_DETECT] Iteration counter restarted! Current: #{@iteration_count}, Last: #{@last_iteration_count}"
+        return true
+      end
+      @last_iteration_count = @iteration_count
+      
+      false
+    end
+    
+    def log_loop_details(repetitive_operations)
+      repetitive_operations.each do |operation_key, count|
+        recent_ops = @recent_operations.select { |op| op[:key] == operation_key }
+        iterations = recent_ops.map { |op| op[:iteration] }.join(', ')
+        Rails.logger.warn "[V5_LOOP_DETECT] #{operation_key} repeated #{count} times in iterations: #{iterations}"
+      end
+    end
   end
   
   # Supporting classes for the agent loop
@@ -1419,11 +1544,14 @@ module Ai
     end
     
     def assess_progress
+      total_goals = @goals.count + @completed_goals.count
+      total_goals = 1 if total_goals == 0  # Prevent division by zero
+      
       {
-        total_goals: @goals.count,
+        total_goals: total_goals,
         completed: @completed_goals.count,
         remaining: @goals.count,
-        completion_percentage: (@completed_goals.count.to_f / (@goals.count + @completed_goals.count) * 100).to_i,
+        completion_percentage: (@completed_goals.count.to_f / total_goals * 100).to_i,
         next_priority_goal: @goals.min_by(&:priority)
       }
     end
@@ -1434,9 +1562,14 @@ module Ai
     end
     
     def all_goals_achieved?
-      # Only consider goals achieved if we had goals and completed them all
-      return false if @completed_goals.empty? && @goals.empty?
+      # Goals are achieved when we have completed goals and no remaining goals
       @goals.empty? && @completed_goals.any?
+    end
+    
+    def mark_all_complete
+      # Move all remaining goals to completed
+      @completed_goals.concat(@goals)
+      @goals.clear
     end
   end
   
@@ -1582,17 +1715,39 @@ module Ai
     end
     
     def stagnation_detected?(state)
-      return false if state[:iteration] < 3
+      return false if state[:iteration] < 4
       
       # Check if making progress
-      last_three = state[:history].last(3)
-      return false if last_three.count < 3
+      recent_history = state[:history].last(4)
+      return false if recent_history.count < 4
       
-      # If all had same action type and failed, we're stuck
-      actions = last_three.map { |h| h[:action][:type] }
-      verifications = last_three.map { |h| h[:verification][:success] }
+      # Multiple stagnation indicators
       
-      actions.uniq.size == 1 && verifications.none?
+      # 1. Same action type repeated and failing
+      actions = recent_history.map { |h| h[:action][:type] }
+      verifications = recent_history.map { |h| h[:verification][:success] }
+      
+      if actions.uniq.size == 1 && verifications.none?
+        Rails.logger.warn "[V5_STAGNATION] Same action #{actions.first} failing repeatedly"
+        return true
+      end
+      
+      # 2. No goal progress in recent iterations
+      goal_progress_history = recent_history.map { |h| h[:goals_progress][:completed] }
+      if goal_progress_history.uniq.size == 1 && goal_progress_history.first == goal_progress_history.last
+        Rails.logger.warn "[V5_STAGNATION] No goal progress in last #{recent_history.count} iterations"
+        return true
+      end
+      
+      # 3. Verification confidence consistently low
+      confidence_scores = recent_history.map { |h| h[:verification][:confidence] || 0 }
+      avg_confidence = confidence_scores.sum / confidence_scores.count.to_f
+      if avg_confidence < 0.3
+        Rails.logger.warn "[V5_STAGNATION] Low confidence trend: #{avg_confidence.round(2)}"
+        return true
+      end
+      
+      false
     end
     
     def error_threshold_exceeded?(state)
