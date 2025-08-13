@@ -181,7 +181,7 @@ module Ai
       end
       
       def detect_language(path)
-        case File.extname(path)
+        case ::File.extname(path)
         when '.ts', '.tsx' then 'typescript'
         when '.js', '.jsx' then 'javascript'
         when '.css' then 'css'

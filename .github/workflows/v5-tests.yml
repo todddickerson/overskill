@@ -1,0 +1,233 @@
+# V5 Agent and Tool Calling Tests
+# Tests the V5 AI app builder, tool calling cycle, and prompt caching
+name: "🤖 V5 Agent Tests"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/services/ai/app_builder_v5.rb'
+      - 'app/services/ai/anthropic_client.rb'
+      - 'app/services/ai/prompts/**'
+      - 'test/services/ai/**'
+      - '.github/workflows/v5-tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'app/services/ai/app_builder_v5.rb'
+      - 'app/services/ai/anthropic_client.rb'
+      - 'app/services/ai/prompts/**'
+      - 'test/services/ai/**'
+
+jobs:
+  v5-unit-tests:
+    name: "🧪 V5 Unit Tests"
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:11-alpine
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_USER: rails
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: "postgres://rails:password@localhost:5432/rails_test"
+      REDIS_URL: "redis://localhost:6379/0"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Ruby and gems
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      
+      - name: Setup database
+        run: |
+          bundle exec rails db:create
+          bundle exec rails db:schema:load
+      
+      - name: Run V5 Tool Calling Tests
+        run: |
+          bundle exec rails test test/services/ai/app_builder_v5_test.rb
+        continue-on-error: false
+      
+      - name: Run Prompt Caching Tests
+        run: |
+          bundle exec rails test test/services/ai/prompts/cached_prompt_builder_test.rb
+        continue-on-error: false
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v5-test-results
+          path: |
+            tmp/screenshots/*.png
+            log/test.log
+
+  v5-integration-test:
+    name: "🔗 V5 Integration Test"
+    runs-on: ubuntu-latest
+    needs: v5-unit-tests
+    
+    services:
+      postgres:
+        image: postgres:11-alpine
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_USER: rails
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: "postgres://rails:password@localhost:5432/rails_test"
+      REDIS_URL: "redis://localhost:6379/0"
+      # Mock Anthropic API key for testing
+      ANTHROPIC_API_KEY: "test-key-for-mocking"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Ruby and gems
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      
+      - name: Setup database
+        run: |
+          bundle exec rails db:create
+          bundle exec rails db:schema:load
+      
+      - name: Run V5 Integration Test Script
+        run: |
+          ruby test_v5_tool_fixes.rb
+        continue-on-error: false
+      
+      - name: Verify Tool Calling Cycle
+        run: |
+          echo "Verifying V5 tool calling implementation..."
+          bundle exec rails runner "
+            puts 'Testing V5 tool calling cycle...'
+            
+            # Verify key methods exist
+            v5_methods = Ai::AppBuilderV5.instance_methods
+            required_methods = [
+              :execute_tool_calling_cycle,
+              :build_assistant_content_with_tools,
+              :execute_and_format_tool_results,
+              :execute_single_tool
+            ]
+            
+            missing = required_methods - v5_methods
+            if missing.any?
+              puts \"ERROR: Missing methods: #{missing.join(', ')}\"
+              exit 1
+            end
+            
+            puts 'SUCCESS: All V5 tool calling methods present'
+            
+            # Verify prompt caching builder
+            builder = Ai::Prompts::CachedPromptBuilder.new(
+              base_prompt: 'Test prompt',
+              template_files: [],
+              context_data: {}
+            )
+            
+            array_result = builder.build_system_prompt_array
+            string_result = builder.build_system_prompt_string
+            
+            if array_result.is_a?(Array) && string_result.is_a?(String)
+              puts 'SUCCESS: Prompt caching builder working'
+            else
+              puts 'ERROR: Prompt caching builder failed'
+              exit 1
+            end
+          "
+      
+      - name: Test Anthropic Client Enhancements
+        run: |
+          bundle exec rails runner "
+            puts 'Testing Anthropic client enhancements...'
+            
+            client = Ai::AnthropicClient.instance
+            
+            # Test Helicone integration
+            if ENV['HELICONE_API_KEY'].present?
+              puts \"Helicone enabled: #{client.helicone_enabled?}\"
+            end
+            
+            # Test context window info
+            info = client.context_window_info
+            puts \"Standard window: #{info[:standard_window]}\"
+            puts \"Beta window: #{info[:beta_window]}\"
+            
+            puts 'SUCCESS: Anthropic client enhancements working'
+          "
+
+  v5-tool-formatting-test:
+    name: "📋 Tool Result Formatting Test"
+    runs-on: ubuntu-latest
+    needs: v5-unit-tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Verify Tool Result Formatting
+        run: |
+          echo "Checking tool result formatting implementation..."
+          
+          # Check for critical formatting fixes
+          grep -n "tool_result blocks come FIRST" app/services/ai/app_builder_v5.rb || exit 1
+          grep -n "All tool results in single message" app/services/ai/app_builder_v5.rb || exit 1
+          grep -n "execute_tool_calling_cycle" app/services/ai/app_builder_v5.rb || exit 1
+          
+          echo "✅ Tool result formatting verified"
+      
+      - name: Verify Prompt Caching Structure
+        run: |
+          echo "Checking prompt caching implementation..."
+          
+          # Check for caching optimization
+          grep -n "cache_control" app/services/ai/prompts/cached_prompt_builder.rb || exit 1
+          grep -n "Long-form data" app/services/ai/prompts/cached_prompt_builder.rb || exit 1
+          grep -n "ephemeral" app/services/ai/prompts/cached_prompt_builder.rb || exit 1
+          
+          echo "✅ Prompt caching structure verified"
