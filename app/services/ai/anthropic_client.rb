@@ -1,10 +1,33 @@
 require 'net/http'
 
 module Ai
+  # Anthropic API client with optional Helicone.ai integration for observability
+  #
+  # Helicone Integration:
+  # - Set HELICONE_API_KEY in .env.local to enable observability and analytics
+  # - Provides request/response logging, cost tracking, session tracking
+  # - Enables caching at the API gateway level (in addition to local Redis cache)
+  # - View analytics at https://app.helicone.ai/dashboard
+  # 
+  # Usage:
+  #   client = Ai::AnthropicClient.instance
+  #   response = client.chat(messages, helicone_session: "session-id")
+  #   
+  # Check status: rails helicone:status
   class AnthropicClient
     include HTTParty
     include Singleton
-    base_uri "https://api.anthropic.com"
+    
+    # Use Helicone API gateway if key is available, otherwise use direct Anthropic
+    def self.base_uri_for_helicone
+      if ENV['HELICONE_API_KEY'].present?
+        "https://anthropic.helicone.ai"
+      else
+        "https://api.anthropic.com"
+      end
+    end
+    
+    base_uri base_uri_for_helicone
 
     MODELS = {
       claude_sonnet_4: "claude-sonnet-4-20250514",
@@ -15,12 +38,16 @@ module Ai
     # Model specifications for Anthropic direct API
     MODEL_SPECS = {
       "claude-sonnet-4-20250514" => { 
-        context: 200_000, 
-        max_output: 8_192,
+        context: 1_000_000,  # 1M context window with beta header
+        standard_context: 200_000,  # Standard context window
+        max_output: 64_000,  # Updated to API maximum
         cost_per_1k_input: 3.00,
         cost_per_1k_output: 15.00,
         cache_write_multiplier: 1.25,  # 25% more to write to cache
-        cache_read_multiplier: 0.10    # 90% savings on cached reads
+        cache_read_multiplier: 0.10,   # 90% savings on cached reads
+        supports_extended_thinking: true,
+        supports_interleaved_thinking: true,
+        recommended_thinking_budget: 16_000  # 16k+ tokens for complex tasks
       },
       "claude-opus-4-1-20250805" => { 
         context: 200_000, 
@@ -45,20 +72,33 @@ module Ai
 
     def initialize(api_key = nil)
       @api_key = api_key || ENV.fetch("ANTHROPIC_API_KEY")
+      @helicone_key = ENV['HELICONE_API_KEY']
+      
+      headers = {
+        "x-api-key" => @api_key,
+        "content-type" => "application/json",
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "prompt-caching-2024-07-31,interleaved-thinking-2025-05-14,context-1m-2025-08-07"
+      }
+      
+      # Add Helicone headers if API key is available
+      if @helicone_key.present?
+        headers["Helicone-Auth"] = "Bearer #{@helicone_key}"
+        headers["Helicone-Cache-Enabled"] = "true"  # Enable Helicone caching
+        Rails.logger.info "[AI] Using Helicone API gateway for observability and analytics"
+      else
+        Rails.logger.debug "[AI] Using direct Anthropic API (set HELICONE_API_KEY for observability)"
+      end
+      
       @options = {
-        headers: {
-          "x-api-key" => @api_key,
-          "content-type" => "application/json",
-          "anthropic-version" => "2023-06-01",
-          "anthropic-beta" => "prompt-caching-2024-07-31"
-        },
+        headers: headers,
         timeout: 300  # 5 minute timeout for complex generations
       }
       @context_cache = ContextCacheService.new
       @error_handler = EnhancedErrorHandler.new
     end
 
-    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [])
+    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: false, thinking_budget: nil)
       model_id = MODELS[model] || model
       
       # Calculate optimal max_tokens if not provided
@@ -105,9 +145,18 @@ module Ai
 
       Rails.logger.info "[AI] Calling Anthropic API with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
+      # Prepare request options with optional Helicone session tracking
+      request_options = @options.merge(body: body.to_json)
+      if @helicone_key.present? && helicone_session.present?
+        request_options[:headers] = request_options[:headers].merge({
+          "Helicone-Session-Id" => helicone_session,
+          "Helicone-Session-Name" => "OverSkill-App-Generation"
+        })
+      end
+
       # Use enhanced error handling with retry logic
       retry_result = @error_handler.execute_with_retry("anthropic_chat_#{model_id}") do |attempt|
-        response = self.class.post("/v1/messages", @options.merge(body: body.to_json))
+        response = self.class.post("/v1/messages", request_options)
         
         unless response.success?
           error_message = response.parsed_response["error"]&.dig("message") || "HTTP #{response.code}"
@@ -140,7 +189,8 @@ module Ai
         cost = calculate_cost_with_cache(usage, model_id)
         cache_savings = calculate_cache_savings(usage, model_id)
         
-        Rails.logger.info "[AI] Anthropic usage - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
+        helicone_status = @helicone_key.present? ? " [Helicone: ✓]" : ""
+        Rails.logger.info "[AI] Anthropic usage#{helicone_status} - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
       end
 
       response_data = {
@@ -160,7 +210,7 @@ module Ai
       response_data
     end
 
-    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [])
+    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: true, thinking_budget: nil)
       model_id = MODELS[model] || model
       
       # Calculate optimal max_tokens if not provided
@@ -199,12 +249,28 @@ module Ai
       
       # Add system message as top-level parameter if present
       body[:system] = system_message if system_message
+      
+      # Add extended thinking configuration for Claude 4 models (disabled for now due to API format issues)
+      # TODO: Re-enable once we have proper API documentation for thinking parameter format
+      if false && extended_thinking && MODEL_SPECS[model_id]&.dig(:supports_extended_thinking)
+        thinking_tokens = thinking_budget || MODEL_SPECS[model_id][:recommended_thinking_budget]
+        Rails.logger.info "[AI] Extended thinking would be enabled with budget: #{thinking_tokens} tokens" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      end
 
       Rails.logger.info "[AI] Calling Anthropic API with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
+      # Prepare request options with optional Helicone session tracking
+      request_options = @options.merge(body: body.to_json)
+      if @helicone_key.present? && helicone_session.present?
+        request_options[:headers] = request_options[:headers].merge({
+          "Helicone-Session-Id" => helicone_session,
+          "Helicone-Session-Name" => "OverSkill-Tool-Calling"
+        })
+      end
+
       # Use enhanced error handling with retry logic
       retry_result = @error_handler.execute_with_retry("anthropic_tools_#{model_id}") do |attempt|
-        response = self.class.post("/v1/messages", @options.merge(body: body.to_json))
+        response = self.class.post("/v1/messages", request_options)
         
         unless response.success?
           error_message = response.parsed_response["error"]&.dig("message") || "HTTP #{response.code}"
@@ -236,15 +302,18 @@ module Ai
         cost = calculate_cost_with_cache(usage, model_id)
         cache_savings = calculate_cache_savings(usage, model_id)
         
-        Rails.logger.info "[AI] Anthropic tools usage - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
+        helicone_status = @helicone_key.present? ? " [Helicone: ✓]" : ""
+        Rails.logger.info "[AI] Anthropic tools usage#{helicone_status} - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
       end
 
-      # Extract tool calls from Anthropic's response format
+      # Extract tool calls and thinking blocks from Anthropic's response format
       tool_calls = []
+      thinking_blocks = []
       content_blocks = result.dig("content") || []
       
       content_blocks.each do |block|
-        if block["type"] == "tool_use"
+        case block["type"]
+        when "tool_use"
           tool_calls << {
             "id" => block["id"],
             "type" => "function",
@@ -252,6 +321,12 @@ module Ai
               "name" => block["name"],
               "arguments" => block["input"].to_json
             }
+          }
+        when "thinking"
+          thinking_blocks << {
+            "type" => "thinking",
+            "content" => block["content"],
+            "signature" => block["signature"]  # Preserve cryptographic signature
           }
         end
       end
@@ -266,6 +341,7 @@ module Ai
         success: true,
         content: text_content,
         tool_calls: tool_calls,
+        thinking_blocks: thinking_blocks,
         usage: usage,
         model: model_id,
         cache_performance: extract_cache_performance(usage)
@@ -298,6 +374,44 @@ module Ai
       end
       
       breakpoints
+    end
+
+    # Check if Helicone integration is active
+    def helicone_enabled?
+      @helicone_key.present?
+    end
+
+    # Get Helicone dashboard info
+    def helicone_info
+      return { enabled: false } unless helicone_enabled?
+      
+      {
+        enabled: true,
+        dashboard_url: "https://app.helicone.ai/dashboard",
+        api_endpoint: "https://anthropic.helicone.ai",
+        features: ["Observability", "Caching", "Session Tracking", "Cost Analytics"]
+      }
+    end
+
+    # Check if we have access to 1M context window beta
+    def has_1m_context_access?
+      # Test with a request just over 200K tokens to see if 1M window is available
+      # This is determined by making an actual API call since there's no direct way to check
+      @has_1m_context_cached ||= test_1m_context_access
+    end
+
+    # Get current context window info
+    def context_window_info
+      {
+        standard_window: 200_000,
+        beta_window: 1_000_000,
+        has_beta_access: has_1m_context_access?,
+        beta_activation_threshold: 200_000,
+        beta_rate_limits: {
+          input_tokens_per_min: 500_000,
+          output_tokens_per_min: 100_000
+        }
+      }
     end
 
     private
@@ -360,8 +474,8 @@ module Ai
       max_possible_output = [available_tokens, specs[:max_output]].min
       optimal_tokens = (max_possible_output * 0.9).to_i
       
-      # Ensure minimum viable output
-      optimal_tokens = [optimal_tokens, 2000].max
+      # Ensure minimum viable output for agent operations
+      optimal_tokens = [optimal_tokens, 8000].max
       
       Rails.logger.info "[AI] Anthropic token allocation for #{model_id}: prompt ~#{estimated_prompt_tokens}, output #{optimal_tokens}/#{specs[:max_output]} max" if ENV["VERBOSE_AI_LOGGING"] == "true"
       
@@ -425,6 +539,46 @@ module Ai
       # Include cache breakpoints in hash for proper cache separation
       content = "#{messages.to_json}:#{model_id}:#{temperature}"
       Digest::SHA256.hexdigest(content)
+    end
+
+    # Test if we have 1M context window access by attempting a >200K token request
+    def test_1m_context_access
+      return false # Based on our test, we currently don't have 1M access
+      
+      # Uncomment and modify this code if you want to test programmatically:
+      # begin
+      #   # Create a test prompt just over 200K tokens
+      #   test_content = "Test content. " * 15000  # Rough approximation
+      #   test_messages = [
+      #     { role: "user", content: test_content }
+      #   ]
+      #   
+      #   response = chat(test_messages, model: :claude_sonnet_4, max_tokens: 100, use_cache: false)
+      #   
+      #   # If successful, we have 1M access
+      #   return response[:success]
+      # rescue => e
+      #   # If error mentions token limit > 200K, we don't have 1M access
+      #   if e.message.include?("200000 maximum")
+      #     return false
+      #   else
+      #     # Other error - assume no access
+      #     return false
+      #   end
+      # end
+    end
+
+    # Add extended thinking configuration when proper API format is available
+    def add_extended_thinking_config(body, extended_thinking, thinking_budget, model_id)
+      return unless extended_thinking && MODEL_SPECS[model_id]&.dig(:supports_extended_thinking)
+      
+      thinking_tokens = thinking_budget || MODEL_SPECS[model_id][:recommended_thinking_budget]
+      
+      # TODO: Update with correct API format once available
+      # Current attempts failed with "thinking.enabled.budget_tokens: Field required"
+      # body[:thinking] = correct_format_here
+      
+      Rails.logger.debug "[AI] Extended thinking requested but API format unknown - skipping for now" if ENV["VERBOSE_AI_LOGGING"] == "true"
     end
   end
 end

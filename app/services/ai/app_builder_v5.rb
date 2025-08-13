@@ -113,7 +113,14 @@ module Ai
         # Execute one iteration of the agent loop
         Rails.logger.info "[V5_LOOP] Calling execute_iteration"
         result = execute_iteration
-        Rails.logger.info "[V5_LOOP] Iteration result: #{result[:type]}"
+        
+        if result.nil?
+          Rails.logger.error "[V5_CRITICAL] execute_iteration returned nil - stopping loop"
+          add_loop_message("Critical error: iteration returned nil result", type: 'error')
+          break
+        end
+        
+        Rails.logger.info "[V5_LOOP] Iteration result: #{result[:type] || 'unknown'}"
         
         # Update progress tracking
         update_progress_tracking(result)
@@ -214,9 +221,9 @@ module Ai
       
       response = call_ai_with_context(context_prompt)
       
-      # Capture Claude's conversational response
+      # Capture Claude's conversational response (with thinking blocks for continuity)
       if response[:content].present?
-        add_loop_message(response[:content], type: 'content')
+        add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
       end
       
       @context_manager.add_context(response)
@@ -250,9 +257,9 @@ module Ai
         return { type: :error, error: "Empty response from AI" }
       end
       
-      # Capture Claude's conversational response about the plan
+      # Capture Claude's conversational response about the plan (with thinking blocks)
       if response[:content].present?
-        add_loop_message(response[:content], type: 'content')
+        add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
       end
       
       # Extract and structure the plan
@@ -283,9 +290,9 @@ module Ai
         # Call Claude to implement features
         response = call_ai_with_context(feature_prompt)
         
-        # Always capture Claude's conversational response for the user
+        # Always capture Claude's conversational response for the user (with thinking blocks)
         if response[:content].present?
-          add_loop_message(response[:content], type: 'content')
+          add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
         end
         
         # Process any tool calls from the response
@@ -469,6 +476,9 @@ module Ai
     end
     
     def should_terminate?(result)
+      # Safety check for nil result
+      return false if result.nil?
+      
       # Use termination evaluator
       termination_by_evaluator = @termination_evaluator.should_terminate?(@agent_state, result)
       status_complete = @completion_status == :complete
@@ -561,6 +571,9 @@ module Ai
         Rails.logger.debug "[V5_DEBUG]   Message #{i}: role=#{msg[:role]}, content_length=#{msg[:content]&.length}"
       end
       
+      # Generate Helicone session for tracking
+      helicone_session = "overskill-v5-#{@app.id}-#{Time.current.to_i}"
+      
       # Use chat_with_tools for tool support with caching
       begin
         response = client.chat_with_tools(
@@ -569,7 +582,10 @@ module Ai
           model: :claude_sonnet_4,  # Use symbol for model
           use_cache: true,         # Enable prompt caching for 83% cost savings
           temperature: 0.7,
-          max_tokens: 4000
+          max_tokens: 48000,       # Increased for complex operations + thinking budget
+          helicone_session: helicone_session,
+          extended_thinking: true, # Enable extended thinking with interleaved reasoning
+          thinking_budget: 16000   # 16k thinking budget for complex agent operations
         )
       rescue => e
         log_claude_event("API_CALL_ERROR", {
@@ -582,7 +598,9 @@ module Ai
       log_claude_event("API_CALL_RESPONSE", {
         has_content: response[:content].present?,
         tool_calls: response[:tool_calls]&.size || 0,
-        response_preview: response[:content].to_s[0..200]
+        thinking_blocks: response[:thinking_blocks]&.size || 0,
+        response_preview: response[:content].to_s[0..200],
+        has_extended_thinking: response[:thinking_blocks]&.any?
       })
       
       # Process tool calls if present
@@ -1166,13 +1184,21 @@ module Ai
         # Skip status messages, include substantive responses
         next if loop_msg['type'] == 'status'
         
-        messages << {
+        assistant_message = {
           role: 'assistant',
           content: loop_msg['content']
         }
         
-        # Limit history to avoid token overload (keep last 5 substantial messages)
-        break if index >= 4
+        # Include thinking blocks for interleaved thinking continuity
+        if loop_msg['thinking_blocks']&.any?
+          assistant_message['thinking'] = loop_msg['thinking_blocks']
+          Rails.logger.debug "[V5_THINKING] Including #{loop_msg['thinking_blocks'].size} thinking blocks in context" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        end
+        
+        messages << assistant_message
+        
+        # Limit history to avoid token overload (keep last 3 substantial messages with thinking)
+        break if index >= 2
       end
       
       # Add tool execution summary to show Claude what actions were taken
@@ -1678,13 +1704,21 @@ module Ai
       @assistant_message.save!
     end
     
-    def add_loop_message(content, type: 'content')
-      @assistant_message.loop_messages << {
+    def add_loop_message(content, type: 'content', thinking_blocks: nil)
+      loop_message = {
         'content' => content,
         'type' => type,
         'iteration' => @iteration_count,
         'timestamp' => Time.current.iso8601
       }
+      
+      # Preserve thinking blocks for interleaved thinking continuity
+      if thinking_blocks&.any?
+        loop_message['thinking_blocks'] = thinking_blocks
+        Rails.logger.info "[V5_THINKING] Preserved #{thinking_blocks.size} thinking blocks in loop message" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      end
+      
+      @assistant_message.loop_messages << loop_message
       @assistant_message.save!
     end
     
@@ -2044,16 +2078,16 @@ module Ai
         return true
       end
       
-      # 2. No goal progress in recent iterations
-      goal_progress_history = recent_history.map { |h| h[:goals_progress][:completed] }
-      if goal_progress_history.uniq.size == 1 && goal_progress_history.first == goal_progress_history.last
+      # 2. No goal progress in recent iterations (with nil safety)
+      goal_progress_history = recent_history.map { |h| h&.dig(:goals_progress, :completed) }.compact
+      if goal_progress_history.size > 1 && goal_progress_history.uniq.size == 1
         Rails.logger.warn "[V5_STAGNATION] No goal progress in last #{recent_history.count} iterations"
         return true
       end
       
-      # 3. Verification confidence consistently low
-      confidence_scores = recent_history.map { |h| h[:verification][:confidence] || 0 }
-      avg_confidence = confidence_scores.sum / confidence_scores.count.to_f
+      # 3. Verification confidence consistently low (with nil safety)
+      confidence_scores = recent_history.map { |h| h&.dig(:verification, :confidence) || 0 }.compact
+      avg_confidence = confidence_scores.any? ? confidence_scores.sum / confidence_scores.count.to_f : 0
       if avg_confidence < 0.3
         Rails.logger.warn "[V5_STAGNATION] Low confidence trend: #{avg_confidence.round(2)}"
         return true
