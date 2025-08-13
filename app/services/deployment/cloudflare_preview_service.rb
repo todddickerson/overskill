@@ -49,30 +49,40 @@ class Deployment::CloudflarePreviewService
     
     return { success: false, error: "Failed to upload preview worker" } unless upload_response['success']
     
-    # Try to enable workers.dev subdomain (non-critical if it fails)
+    # Enable workers.dev subdomain for preview access
     enable_workers_dev_subdomain(worker_name)
     
-    # Ensure route exists for auto-preview domain (using overskill.app for now)
-    ensure_preview_route(preview_subdomain, worker_name)
+    # Only create custom domain route if not using workers.dev
+    use_workers_dev = ENV['USE_WORKERS_DEV_FOR_PREVIEW'] == 'true' || ENV['OVERSKILL_DOMAIN_DOWN'] == 'true'
+    unless use_workers_dev
+      # Ensure route exists for auto-preview domain (using overskill.app)
+      ensure_preview_route(preview_subdomain, worker_name)
+    end
     
     # Get both URLs
     workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
     custom_domain_url = "https://#{preview_subdomain}.overskill.app"
     
     # Update app with preview URLs
-    # Use custom domain now that wildcard DNS is configured
-    preview_url = custom_domain_url
+    # Use workers.dev URL when custom domain is down or disabled
+    use_workers_dev = ENV['USE_WORKERS_DEV_FOR_PREVIEW'] == 'true' || ENV['OVERSKILL_DOMAIN_DOWN'] == 'true'
+    preview_url = use_workers_dev ? workers_dev_url : custom_domain_url
     
     @app.update!(
       preview_url: preview_url,
       preview_updated_at: Time.current
     )
     
+    note = use_workers_dev ? 
+      "Using workers.dev URL (overskill.app is down)" : 
+      "Using custom domain #{custom_domain_url}"
+    
     { 
       success: true, 
       preview_url: preview_url,
+      workers_dev_url: workers_dev_url,
       custom_domain_url: custom_domain_url,
-      note: "Using workers.dev URL. To use custom domain, add DNS CNAME: #{preview_subdomain} -> #{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+      note: note
     }
   rescue => e
     Rails.logger.error "Preview update failed: #{e.message}"
@@ -728,25 +738,49 @@ class Deployment::CloudflarePreviewService
   
   def enable_workers_dev_subdomain(worker_name)
     # Enable the workers.dev subdomain for the worker
-    # Note: This endpoint requires account-level permissions and may not work with API tokens
     begin
+      # First check if workers.dev is already enabled for this account
+      account_response = self.class.get("/accounts/#{@account_id}/workers/subdomain")
+      
+      if account_response.success?
+        subdomain_enabled = account_response.parsed_response.dig("result", "enabled")
+        
+        if !subdomain_enabled
+          # Enable workers.dev for the account if not already enabled
+          enable_response = self.class.put(
+            "/accounts/#{@account_id}/workers/subdomain",
+            headers: { 'Content-Type' => 'application/json' },
+            body: JSON.generate({ 
+              enabled: true,
+              name: @account_id.gsub('_', '-')  # Ensure valid subdomain format
+            })
+          )
+          
+          if enable_response.success?
+            Rails.logger.info "[CloudflarePreview] Enabled workers.dev subdomain for account"
+          else
+            Rails.logger.warn "[CloudflarePreview] Failed to enable account subdomain: #{enable_response.body}"
+          end
+        end
+      end
+      
+      # Now enable subdomain for the specific worker script
       response = self.class.patch(
         "/accounts/#{@account_id}/workers/scripts/#{worker_name}/subdomain",
         headers: { 'Content-Type' => 'application/json' },
         body: JSON.generate({ enabled: true })
       )
       
-      if response.code == 200
-        Rails.logger.info "Enabled workers.dev subdomain for #{worker_name}"
+      if response.success? || response.code == 200
+        Rails.logger.info "[CloudflarePreview] Enabled workers.dev subdomain for worker #{worker_name}"
+        true
       else
-        # Log the error but don't fail the deployment
-        # The worker is still accessible via custom domain
-        Rails.logger.warn "Failed to enable workers.dev subdomain: #{response.body}"
-        Rails.logger.info "Worker is still accessible via custom domain"
+        Rails.logger.warn "[CloudflarePreview] Could not enable worker subdomain: #{response.body}"
+        false
       end
     rescue => e
-      # Don't fail if subdomain enabling fails - worker still works via custom domain
-      Rails.logger.warn "Could not enable workers.dev subdomain (non-critical): #{e.message}"
+      Rails.logger.warn "[CloudflarePreview] Workers.dev subdomain setup error: #{e.message}"
+      false
     end
   end
   
