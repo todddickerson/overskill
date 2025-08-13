@@ -1,0 +1,206 @@
+<%# V5 Agent Reply Partial - Single container that updates via save & broadcast %>
+<div id="app_chat_message_<%= message.id %>" 
+     class="mb-4 agent-reply-container"
+     data-controller="agent-reply"
+     data-agent-reply-message-id-value="<%= message.id %>">
+  
+  <div class="flex items-start space-x-2">
+    <%# OverSkill Logo %>
+    <%= image_tag "overskill-logo.svg", 
+        alt: "OverSkill", 
+        class: "w-6 h-6 flex-shrink-0 mt-0.5" %>
+    
+    <div class="flex-1">
+      <%# 1. Thinking Status - Shows when agent is processing %>
+      <% if message.thinking_status.present? %>
+        <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+          <i class="fas fa-brain text-blue-500 animate-pulse"></i>
+          <span class="thinking-text"><%= message.thinking_status %></span>
+          <% if message.thought_for_seconds.present? %>
+            <span class="text-xs text-gray-500">
+              (Thought for <%= pluralize(message.thought_for_seconds, 'second') %>)
+            </span>
+          <% end %>
+        </div>
+      <% end %>
+      
+      <%# 2. Loop Messages - Main content from agent iterations %>
+      <% if message.loop_messages.any? %>
+        <div class="space-y-3 mb-3">
+          <% message.loop_messages.each_with_index do |loop_msg, index| %>
+            <div class="agent-loop-message" 
+                 id="loop_message_<%= message.id %>_<%= index %>"
+                 data-iteration="<%= loop_msg['iteration'] || 0 %>">
+              
+              <% case loop_msg['type'] %>
+              <% when 'status' %>
+                <%# Status update (e.g., "Analyzing requirements...") %>
+                <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+                  <i class="fas fa-info-circle"></i>
+                  <span><%= loop_msg['content'] %></span>
+                </div>
+                
+              <% when 'error' %>
+                <%# Error message %>
+                <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  <span><%= loop_msg['content'] %></span>
+                </div>
+                
+              <% else %>
+                <%# Regular markdown content %>
+                <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+                  <%= render_markdown(loop_msg['content']) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% elsif message.content.present? %>
+        <%# Fallback to regular content if no loop messages %>
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 mb-3">
+          <%= render_markdown(message.content) %>
+        </div>
+      <% end %>
+      
+      <%# 3. Tool Calls - Compressed view that expands %>
+      <% if message.tool_calls.any? %>
+        <details class="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i class="fas fa-tools"></i>
+              <span><%= pluralize(message.tool_calls.count, 'tool') %> used</span>
+            </div>
+            <span class="text-xs text-blue-600 dark:text-blue-400">Show All</span>
+          </summary>
+          
+          <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+            <% message.tool_calls.each do |tool| %>
+              <div class="flex items-start space-x-2 text-xs">
+                <%# Tool icon based on tool name %>
+                <% icon_class = case tool['name']
+                  when /write|create/ then 'fa-file-plus text-green-500'
+                  when /edit|update|replace/ then 'fa-file-pen text-blue-500'
+                  when /delete|remove/ then 'fa-trash text-red-500'
+                  when /search|find/ then 'fa-search text-purple-500'
+                  when /read|view/ then 'fa-eye text-gray-500'
+                  when /image/ then 'fa-image text-indigo-500'
+                  when /web/ then 'fa-globe text-cyan-500'
+                  else 'fa-cog text-gray-500'
+                end %>
+                <i class="fas <%= icon_class %> mt-0.5"></i>
+                
+                <div class="flex-1">
+                  <span class="font-medium text-gray-700 dark:text-gray-300">
+                    <%= tool['name'].to_s.gsub(/^os-/, '').humanize %>
+                  </span>
+                  
+                  <% if tool['file_path'].present? %>
+                    <span class="text-gray-500 dark:text-gray-400 ml-1">
+                      [<%= tool['file_path'] %>]
+                    </span>
+                  <% end %>
+                  
+                  <% if tool['status'] == 'error' %>
+                    <span class="text-red-500 ml-2">
+                      <i class="fas fa-times-circle"></i> Failed
+                    </span>
+                  <% elsif tool['status'] == 'running' %>
+                    <span class="text-yellow-500 ml-2">
+                      <i class="fas fa-spinner fa-spin"></i> Running
+                    </span>
+                  <% else %>
+                    <span class="text-green-500 ml-2">
+                      <i class="fas fa-check-circle"></i>
+                    </span>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
+      
+      <%# 4. App Version Card - Only shows if code was generated %>
+      <% if message.is_code_generation && message.app_version.present? %>
+        <% version = message.app_version %>
+        <div class="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 
+                    dark:from-green-900/20 dark:to-blue-900/20 
+                    border border-green-200 dark:border-green-700 rounded-lg
+                    shadow-sm hover:shadow-md transition-shadow duration-200">
+          
+          <%# Version Header %>
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h4 class="font-medium text-gray-900 dark:text-gray-100">
+                <%= version.formatted_display_name || "App Version #{version.version_number}" %>
+              </h4>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <%= version.changelog || "AI Generated based on your requirements" %>
+              </p>
+            </div>
+            
+            <span class="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-800 
+                         text-green-800 dark:text-green-200 rounded-full font-medium">
+              v<%= version.version_number %>
+            </span>
+          </div>
+          
+          <%# Action Buttons %>
+          <div class="flex items-center space-x-2">
+            <%= link_to preview_account_app_version_path(version.app, version),
+                class: "inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200",
+                target: "_blank",
+                title: "Click to Preview App Version (+Tooltip popover)",
+                data: { turbo: false } do %>
+              <i class="fas fa-external-link-alt mr-1.5"></i>
+              Preview
+            <% end %>
+            
+            <button class="inline-flex items-center px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                    data-action="click->version#restore"
+                    data-version-id="<%= version.id %>"
+                    title: "Restore this version">
+              <i class="fas fa-undo mr-1.5"></i>
+              Restore
+            </button>
+            
+            <button class="inline-flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg transition-colors duration-200"
+                    data-action="click->code-modal#open"
+                    data-version-id="<%= version.id %>"
+                    title: "View code changes modal">
+              <i class="fas fa-code mr-1.5"></i>
+              View Code
+            </button>
+            
+            <button class="inline-flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg transition-colors duration-200"
+                    data-action="click->bookmark#toggle"
+                    data-version-id="<%= version.id %>"
+                    title: "'Favorite' App version for later search">
+              <i class="<%= version.bookmarked? ? 'fas text-yellow-500' : 'far' %> fa-bookmark"></i>
+              <% unless version.bookmarked? %>
+                <span class="ml-1">Bookmark</span>
+              <% end %>
+            </button>
+          </div>
+          
+          <%# Hover hint for version card actions %>
+          <div class="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
+            Hover to see card version buttons • Options to "Restore" → open restore modal • View Code → open code changes modal • Bookmark → "Favorite" for later
+          </div>
+        </div>
+      <% end %>
+      
+      <%# Status indicator for completed/failed messages %>
+      <% if message.status.present? && !message.thinking_status.present? %>
+        <div class="mt-2 flex items-center text-xs text-gray-500 dark:text-gray-400">
+          <div class="w-1 h-1 rounded-full mr-1.5 <%= message.status == 'completed' ? 'bg-green-500' : message.status == 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse' %>"></div>
+          <%= message.status_text %>
+          <% if message.iteration_count > 0 %>
+            <span class="ml-2">• <%= pluralize(message.iteration_count, 'iteration') %></span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

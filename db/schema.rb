@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_12_193912) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_13_124746) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -205,12 +205,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_193912) do
     t.bigint "user_id"
     t.bigint "app_version_id"
     t.jsonb "metadata", default: {}
+    t.string "thinking_status"
+    t.integer "thought_for_seconds"
+    t.jsonb "loop_messages", default: []
+    t.jsonb "tool_calls", default: []
+    t.integer "iteration_count", default: 0
+    t.boolean "is_code_generation", default: false
     t.index ["app_id", "created_at"], name: "index_app_chat_messages_on_app_id_and_created_at"
     t.index ["app_id"], name: "index_app_chat_messages_on_app_id"
     t.index ["app_version_id"], name: "index_app_chat_messages_on_app_version_id"
     t.index ["created_at"], name: "index_app_chat_messages_on_created_at"
+    t.index ["loop_messages"], name: "index_app_chat_messages_on_loop_messages", using: :gin
     t.index ["metadata"], name: "index_app_chat_messages_on_metadata", using: :gin
     t.index ["status"], name: "index_app_chat_messages_on_status"
+    t.index ["tool_calls"], name: "index_app_chat_messages_on_tool_calls", using: :gin
     t.index ["user_id"], name: "index_app_chat_messages_on_user_id"
     t.check_constraint "role::text = 'assistant'::text AND (status::text = ANY (ARRAY['planning'::character varying::text, 'executing'::character varying::text, 'generating'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'validation_error'::character varying::text])) OR role::text <> 'assistant'::text AND status IS NULL", name: "check_status_only_for_assistant"
   end

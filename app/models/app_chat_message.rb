@@ -15,7 +15,7 @@ class AppChatMessage < ApplicationRecord
 
   # Broadcast to chat channel when messages are created or updated
   after_create_commit :broadcast_message_created
-  after_update_commit :broadcast_message_updated, if: :saved_change_to_content_or_status?
+  after_update_commit :broadcast_message_updated, if: :should_broadcast_update?
 
   scope :conversation, -> { where(role: %w[user assistant]) }
 
@@ -108,15 +108,36 @@ class AppChatMessage < ApplicationRecord
   end
   
   def broadcast_message_updated
+    # Use V5 partial if this is an agent message with V5 fields
+    partial_name = use_v5_partial? ? "agent_reply_v5" : "chat_message"
+    
     broadcast_replace_to(
       "app_#{app.id}_chat",
       target: "app_chat_message_#{id}",
-      partial: "account/app_editors/chat_message",
+      partial: "account/app_editors/#{partial_name}",
       locals: { message: self }
     )
   end
   
-  def saved_change_to_content_or_status?
-    saved_change_to_content? || saved_change_to_status?
+  def should_broadcast_update?
+    # Broadcast on any relevant field change for V5
+    saved_change_to_content? || 
+    saved_change_to_status? ||
+    saved_change_to_thinking_status? ||
+    saved_change_to_loop_messages? ||
+    saved_change_to_tool_calls? ||
+    saved_change_to_iteration_count? ||
+    saved_change_to_is_code_generation?
+  end
+  
+  def use_v5_partial?
+    # Use V5 partial if any V5 fields are populated
+    role == 'assistant' && (
+      thinking_status.present? ||
+      loop_messages.present? ||
+      tool_calls.present? ||
+      iteration_count.to_i > 0 ||
+      is_code_generation?
+    )
   end
 end

@@ -16,6 +16,9 @@ module Ai
       @iteration_count = 0
       @completion_status = :active
       
+      # Create assistant reply message for V5 UI
+      @assistant_message = create_assistant_message
+      
       # Initialize agent components
       @prompt_service = Prompts::AgentPromptService.new(agent_variables)
       @goal_tracker = GoalTracker.new(chat_message.content)
@@ -65,11 +68,15 @@ module Ai
         @iteration_count += 1
         @agent_state[:iteration] = @iteration_count
         
+        # Update V5 UI with iteration count
+        update_iteration_count
+        
         Rails.logger.info "[AppBuilderV5] Starting iteration #{@iteration_count}"
         
         # Safety check for infinite loops
         if @iteration_count > MAX_ITERATIONS
           Rails.logger.warn "[AppBuilderV5] Max iterations reached"
+          add_loop_message("Maximum iterations reached. Finalizing generation.", type: 'status')
           break
         end
         
@@ -79,6 +86,7 @@ module Ai
         # Check termination conditions
         if should_terminate?(result)
           Rails.logger.info "[AppBuilderV5] Termination condition met"
+          add_loop_message("All goals completed successfully!", type: 'status')
           break
         end
         
@@ -156,7 +164,7 @@ module Ai
     end
     
     def gather_additional_context(action)
-      broadcaster.broadcast_status("Gathering additional context...")
+      update_thinking_status("Gathering additional context...")
       
       # Use the prompt service to get more specific requirements
       context_prompt = @prompt_service.generate_prompt.merge(
@@ -166,6 +174,10 @@ module Ai
       response = call_ai_with_context(context_prompt)
       
       @context_manager.add_context(response)
+      
+      # Clear thinking status and add result
+      update_thinking_status(nil)
+      add_loop_message("Analyzed project requirements and context.", type: 'status')
       
       { type: :context_gathered, data: response }
     end
@@ -219,6 +231,9 @@ module Ai
     def generate_file_with_template(tool)
       file_path = tool[:file_path]
       
+      # Add tool call with running status
+      add_tool_call("os-write", file_path: file_path, status: 'running')
+      
       # Use overskill_20250728 template as base
       template_path = Rails.root.join("app/services/ai/templates/overskill_20250728")
       
@@ -228,6 +243,10 @@ module Ai
       # Store the generated file
       generated_file = store_generated_file(file_path, content)
       @agent_state[:generated_files] << generated_file
+      
+      # Update tool call status to complete
+      @assistant_message.tool_calls.last['status'] = 'complete'
+      @assistant_message.save!
       
       { 
         type: :file_generated, 
@@ -379,14 +398,14 @@ module Ai
     end
     
     def call_ai_with_context(prompt)
-      # Use OpenRouter client with context
-      client = OpenRouterClient.new
+      # Use Anthropic client with context directly
+      client = AnthropicClient.new
       
       messages = build_messages_with_context(prompt)
       
       response = client.chat(
         messages: messages,
-        model: 'anthropic/claude-3.5-sonnet',
+        model: "claude_opus_4_1",
         tools: @prompt_service.generate_tools
       )
       
@@ -588,6 +607,68 @@ module Ai
     def setup_integration(tool)
       # Handle integration setup
       { type: :integration_setup, name: tool[:integration_name] }
+    end
+    
+    # V5 UI Integration Methods - Save & Broadcast Pattern
+    
+    def create_assistant_message
+      AppChatMessage.create!(
+        app: @app,
+        role: 'assistant',
+        content: '', # Will use loop_messages instead
+        status: 'executing',
+        iteration_count: 0,
+        loop_messages: [],
+        tool_calls: [],
+        thinking_status: nil,
+        is_code_generation: false
+      )
+    end
+    
+    def update_thinking_status(status, seconds = nil)
+      @assistant_message.thinking_status = status
+      @assistant_message.thought_for_seconds = seconds
+      @assistant_message.save!
+    end
+    
+    def add_loop_message(content, type: 'content')
+      @assistant_message.loop_messages << {
+        'content' => content,
+        'type' => type,
+        'iteration' => @iteration_count,
+        'timestamp' => Time.current.iso8601
+      }
+      @assistant_message.save!
+    end
+    
+    def add_tool_call(tool_name, file_path: nil, status: 'complete')
+      @assistant_message.tool_calls << {
+        'name' => tool_name,
+        'file_path' => file_path,
+        'status' => status,
+        'timestamp' => Time.current.iso8601
+      }
+      @assistant_message.save!
+    end
+    
+    def update_iteration_count
+      @assistant_message.iteration_count = @iteration_count
+      @assistant_message.save!
+    end
+    
+    def finalize_with_app_version(app_version)
+      @assistant_message.app_version = app_version
+      @assistant_message.is_code_generation = true
+      @assistant_message.status = 'completed'
+      @assistant_message.thinking_status = nil
+      @assistant_message.save!
+    end
+    
+    def mark_as_discussion_only
+      @assistant_message.is_code_generation = false
+      @assistant_message.status = 'completed'
+      @assistant_message.thinking_status = nil
+      @assistant_message.save!
     end
   end
   
