@@ -122,7 +122,7 @@ class Public::GeneratorController < Public::ApplicationController
     
     # Redirect to editor immediately so user can watch generation progress
     respond_to do |format|
-      format.html { redirect_to account_app_editor_path(app), notice: "Creating your app..." }
+      format.html { redirect_to account_app_editor_path(app) }
       # Let Turbo follow a proper redirect on POST (303 See Other)
       format.turbo_stream { redirect_to account_app_editor_path(app), status: :see_other }
     end

@@ -1,5 +1,5 @@
 class FastPreviewDeploymentJob < ApplicationJob
-  queue_as :deployments
+  queue_as :deployment
   
   # Deploy app instantly without build step (< 3 seconds)
   def perform(app_id)

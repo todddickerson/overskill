@@ -1,5 +1,5 @@
 class DeployBuiltAppJob < ApplicationJob
-  queue_as :deployments
+  queue_as :deployment
   
   # Deploy built app files to Cloudflare Workers
   def perform(app_id)
