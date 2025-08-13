@@ -594,6 +594,11 @@ module Ai
       response = nil  # Define response outside the loop
       
       loop do
+        # Validate conversation structure before API call (only in verbose mode)
+        if ENV["VERBOSE_AI_LOGGING"] == "true" && conversation_messages.size >= 2
+          validate_tool_calling_structure(conversation_messages)
+        end
+        
         # Make API call to Claude
         begin
           response = client.chat_with_tools(
@@ -631,6 +636,16 @@ module Ai
             }
             conversation_messages << assistant_message
             
+            # Log the assistant message structure for verification
+            if ENV["VERBOSE_AI_LOGGING"] == "true"
+              Rails.logger.info "[V5_TOOLS] Assistant tool_use message added:"
+              assistant_message[:content].each do |block|
+                if block[:type] == 'tool_use'
+                  Rails.logger.info "  - tool_use: id=#{block[:id]}, name=#{block[:name]}"
+                end
+              end
+            end
+            
             # Execute all tool calls and collect results
             tool_results = execute_and_format_tool_results(response[:tool_calls])
             
@@ -641,6 +656,17 @@ module Ai
               content: tool_results  # All tool results in single message
             }
             conversation_messages << user_message
+            
+            # Log the user message structure for verification
+            if ENV["VERBOSE_AI_LOGGING"] == "true"
+              Rails.logger.info "[V5_TOOLS] User tool_result message added:"
+              user_message[:content].each do |block|
+                if block[:type] == 'tool_result'
+                  Rails.logger.info "  - tool_result: tool_use_id=#{block[:tool_use_id]}, has_content=#{block[:content].present?}"
+                end
+              end
+              Rails.logger.info "[V5_TOOLS] Conversation now has #{conversation_messages.size} messages"
+            end
             
             tool_cycles += 1
             
@@ -744,8 +770,15 @@ module Ai
         # Format result according to Anthropic tool_result spec
         tool_result_block = {
           type: 'tool_result',
-          tool_use_id: tool_id
+          tool_use_id: tool_id  # CRITICAL: Must match the id from tool_use block
         }
+        
+        # Validation: Ensure tool_id is present
+        if tool_id.blank?
+          Rails.logger.error "[V5_TOOLS] Missing tool_id for tool_result! Tool: #{tool_name}"
+          tool_id = "missing_id_#{SecureRandom.hex(8)}"
+          tool_result_block[:tool_use_id] = tool_id
+        end
         
         if result[:error]
           tool_result_block[:content] = result[:error]
@@ -2117,6 +2150,32 @@ module Ai
       @assistant_message.status = 'completed'
       @assistant_message.thinking_status = nil
       @assistant_message.save!
+    end
+    
+    # Validate tool calling structure follows Anthropic requirements
+    def validate_tool_calling_structure(messages)
+      # Check for assistant tool_use followed by user tool_result pattern
+      messages.each_cons(2) do |msg1, msg2|
+        if msg1[:role] == 'assistant' && msg1[:content].is_a?(Array)
+          tool_use_blocks = msg1[:content].select { |b| b[:type] == 'tool_use' }
+          
+          if tool_use_blocks.any? && msg2[:role] == 'user' && msg2[:content].is_a?(Array)
+            tool_result_blocks = msg2[:content].select { |b| b[:type] == 'tool_result' }
+            
+            # Verify IDs match
+            tool_use_ids = tool_use_blocks.map { |b| b[:id] }.sort
+            tool_result_ids = tool_result_blocks.map { |b| b[:tool_use_id] }.sort
+            
+            if tool_use_ids != tool_result_ids
+              Rails.logger.warn "[V5_TOOLS] Tool ID mismatch!"
+              Rails.logger.warn "  Tool use IDs: #{tool_use_ids.join(', ')}"
+              Rails.logger.warn "  Tool result IDs: #{tool_result_ids.join(', ')}"
+            else
+              Rails.logger.debug "[V5_TOOLS] ✅ Tool structure valid: #{tool_use_ids.size} tools with matching IDs"
+            end
+          end
+        end
+      end
     end
     
     # Add entry to conversation_flow for interleaved display
