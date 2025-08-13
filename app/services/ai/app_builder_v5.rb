@@ -1891,76 +1891,9 @@ module Ai
   
   # Supporting classes for the agent loop
   
-  class GoalTracker
-    attr_reader :goals, :completed_goals
-    
-    def initialize(user_prompt)
-      @user_prompt = user_prompt
-      @goals = []
-      @completed_goals = []
-    end
-    
-    def extract_goals_from_request(request)
-      # Use AI to extract goals
-      # For now, create basic goals based on keywords
-      @goals = [
-        Goal.new(
-          description: "Create the basic app structure",
-          type: :foundation,
-          priority: 1
-        ),
-        Goal.new(
-          description: "Implement requested features",
-          type: :features,
-          priority: 2
-        ),
-        Goal.new(
-          description: "Ensure app builds and deploys successfully",
-          type: :deployment,
-          priority: 3
-        )
-      ]
-    end
-    
-    def assess_progress
-      total_goals = @goals.count + @completed_goals.count
-      total_goals = 1 if total_goals == 0  # Prevent division by zero
-      
-      {
-        total_goals: total_goals,
-        completed: @completed_goals.count,
-        remaining: @goals.count,
-        completion_percentage: (@completed_goals.count.to_f / total_goals * 100).to_i,
-        next_priority_goal: @goals.min_by(&:priority)
-      }
-    end
-    
-    def mark_goal_complete(goal)
-      @goals.delete(goal)
-      @completed_goals << goal
-    end
-    
-    def all_goals_achieved?
-      # Goals are achieved when we have completed goals and no remaining goals
-      @goals.empty? && @completed_goals.any?
-    end
-    
-    def mark_all_complete
-      # Move all remaining goals to completed
-      @completed_goals.concat(@goals)
-      @goals.clear
-    end
-  end
+  # TODO: Consider adding goal tracking as tool calls in the future
+  # This would allow Claude to explicitly set and complete goals as needed  
   
-  class Goal
-    attr_reader :description, :type, :priority
-    
-    def initialize(description:, type:, priority:)
-      @description = description
-      @type = type
-      @priority = priority
-    end
-  end
   
   class ContextManager
     def initialize(app)
