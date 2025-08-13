@@ -63,8 +63,13 @@ module Ai
         thinking_blocks: []
       }
       
-      @mock_client.expect(:chat_with_tools, mock_response, [Array, Array, Hash])
-      @mock_client.expect(:chat_with_tools, final_response, [Array, Array, Hash])
+      # Match the actual signature: chat_with_tools(messages, tools, options_hash)
+      @mock_client.expect(:chat_with_tools, mock_response) do |messages, tools, options|
+        messages.is_a?(Array) && tools.is_a?(Array) && options.is_a?(Hash)
+      end
+      @mock_client.expect(:chat_with_tools, final_response) do |messages, tools, options|
+        messages.is_a?(Array) && tools.is_a?(Array) && options.is_a?(Hash)
+      end
       
       Ai::AnthropicClient.stub :instance, @mock_client do
         result = @builder.send(:execute_tool_calling_cycle, @mock_client, [], [], 'session-123')
@@ -142,7 +147,9 @@ module Ai
       end
       
       # Final response
-      @mock_client.expect(:chat_with_tools, {success: true, content: "Done", tool_calls: [], stop_reason: 'stop'}, [Array, Array, Hash])
+      @mock_client.expect(:chat_with_tools, {success: true, content: "Done", tool_calls: [], stop_reason: 'stop'}) do |messages, tools, options|
+        messages.is_a?(Array) && tools.is_a?(Array) && options.is_a?(Hash)
+      end
       
       Ai::AnthropicClient.stub :instance, @mock_client do
         @builder.send(:execute_tool_calling_cycle, @mock_client, [], [], 'session-123')
@@ -200,7 +207,9 @@ module Ai
         thinking_blocks: []
       }
       
-      @mock_client.expect(:chat_with_tools, mock_response, [Array, Array, Hash])
+      @mock_client.expect(:chat_with_tools, mock_response) do |messages, tools, options|
+        messages.is_a?(Array) && tools.is_a?(Array) && options.is_a?(Hash)
+      end
       
       Ai::AnthropicClient.stub :instance, @mock_client do
         result = @builder.send(:execute_tool_calling_cycle, @mock_client, [], [], 'session-123')
@@ -228,7 +237,9 @@ module Ai
       
       # Expect exactly 5 calls (max_tool_cycles)
       5.times do
-        @mock_client.expect(:chat_with_tools, mock_response, [Array, Array, Hash])
+        @mock_client.expect(:chat_with_tools, mock_response) do |messages, tools, options|
+          messages.is_a?(Array) && tools.is_a?(Array) && options.is_a?(Hash)
+        end
       end
       
       Ai::AnthropicClient.stub :instance, @mock_client do
