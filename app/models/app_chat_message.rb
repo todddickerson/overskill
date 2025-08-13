@@ -3,7 +3,6 @@ class AppChatMessage < ApplicationRecord
   belongs_to :user, optional: true
   belongs_to :app_version, optional: true
 
-  validates :content, presence: true
   validates :role, inclusion: {in: %w[user assistant system]}
 
   # AI response statuses for better user feedback
@@ -19,6 +18,7 @@ class AppChatMessage < ApplicationRecord
 
   scope :conversation, -> { where(role: %w[user assistant]) }
 
+  
   def planning?
     status == "planning"
   end
@@ -130,7 +130,8 @@ class AppChatMessage < ApplicationRecord
     saved_change_to_loop_messages? ||
     saved_change_to_tool_calls? ||
     saved_change_to_iteration_count? ||
-    saved_change_to_is_code_generation?
+    saved_change_to_is_code_generation? ||
+    saved_change_to_conversation_flow?
   end
   
   def use_v5_partial?
@@ -140,7 +141,8 @@ class AppChatMessage < ApplicationRecord
       loop_messages.present? ||
       tool_calls.present? ||
       iteration_count.to_i > 0 ||
-      is_code_generation?
+      is_code_generation? ||
+      conversation_flow.present?
     )
   end
 end

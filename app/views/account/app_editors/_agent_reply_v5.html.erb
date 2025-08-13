@@ -29,8 +29,122 @@
         </div>
       <% end %>
       
-      <%# 2. Loop Messages - Main content from agent iterations %>
-      <% if message.loop_messages.any? %>
+      <%# 2. Conversation Flow - Interleaved messages and tool calls %>
+      <% if message.conversation_flow.present? && message.conversation_flow.any? %>
+        <div class="space-y-3 mb-3">
+          <% message.conversation_flow.each_with_index do |flow_item, index| %>
+            <% case flow_item['type'] %>
+            <% when 'message', 'content' %>
+              <%# Loop message content %>
+              <div class="agent-loop-message" 
+                   id="conversation_flow_<%= message.id %>_<%= index %>"
+                   data-iteration="<%= flow_item['iteration'] || 0 %>">
+                <% loop_msg = flow_item['content'] || flow_item %>
+                <% if loop_msg.is_a?(Hash) %>
+                  <% case loop_msg['type'] %>
+                  <% when 'status' %>
+                    <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+                      <i class="fas fa-info-circle"></i>
+                      <span><%= loop_msg['content'] %></span>
+                    </div>
+                  <% when 'error' %>
+                    <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
+                      <i class="fas fa-exclamation-triangle"></i>
+                      <span><%= loop_msg['content'] %></span>
+                    </div>
+                  <% else %>
+                    <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+                      <%= render_markdown(loop_msg['content']) %>
+                    </div>
+                  <% end %>
+                <% else %>
+                  <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+                    <%= render_markdown(loop_msg) %>
+                  </div>
+                <% end %>
+              </div>
+              
+            <% when 'tools' %>
+              <%# Tool calls batch %>
+              <% tool_calls = flow_item['calls'] || flow_item['tool_calls'] || [] %>
+              <% if tool_calls.any? %>
+                <details class="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                         data-state-preserving-target="details"
+                         data-details-id="flow_tools_<%= message.id %>_<%= index %>"
+                         data-action="toggle->state-preserving#detailsToggled">
+                  <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                      <i class="fas fa-tools"></i>
+                      <span><%= pluralize(tool_calls.count, 'tool') %> used</span>
+                    </div>
+                    <span class="text-xs text-blue-600 dark:text-blue-400">Show</span>
+                  </summary>
+                  
+                  <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+                    <% tool_calls.each do |tool| %>
+                      <div class="flex items-start space-x-2 text-xs">
+                        <% icon_class = case tool['name']
+                          when /write|create/ then 'fa-file-circle-plus text-green-500'
+                          when /edit|update|replace/ then 'fa-pen-to-square text-blue-500'
+                          when /delete|remove/ then 'fa-trash text-red-500'
+                          when /search|find/ then 'fa-magnifying-glass text-purple-500'
+                          when /read|view/ then 'fa-eye text-gray-500'
+                          when /image/ then 'fa-image text-indigo-500'
+                          when /web/ then 'fa-globe text-cyan-500'
+                          else 'fa-gear text-gray-500'
+                        end %>
+                        <i class="fas <%= icon_class %> mt-0.5"></i>
+                        
+                        <div class="flex-1">
+                          <span class="font-medium text-gray-700 dark:text-gray-300">
+                            <%= tool['name'].to_s.gsub(/^os-/, '').humanize %>
+                          </span>
+                          
+                          <% if tool['file_path'].present? %>
+                            <span class="text-gray-500 dark:text-gray-400 ml-1">
+                              [<%= tool['file_path'] %>]
+                            </span>
+                          <% end %>
+                          
+                          <% if tool['status'] == 'error' %>
+                            <span class="text-red-500 ml-2">
+                              <i class="fas fa-times-circle"></i> Failed
+                            </span>
+                          <% elsif tool['status'] == 'running' %>
+                            <span class="text-yellow-500 ml-2">
+                              <i class="fas fa-spinner fa-spin"></i> Running
+                            </span>
+                          <% else %>
+                            <span class="text-green-500 ml-2">
+                              <i class="fas fa-check-circle"></i>
+                            </span>
+                          <% end %>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                </details>
+              <% end %>
+              
+            <% when 'status' %>
+              <%# Status update %>
+              <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+                <i class="fas fa-info-circle"></i>
+                <span><%= flow_item['content'] %></span>
+              </div>
+              
+            <% when 'error' %>
+              <%# Error message %>
+              <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span><%= flow_item['content'] %></span>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+        
+      <%# Fallback to old structure for backwards compatibility %>
+      <% elsif message.loop_messages.any? %>
         <div class="space-y-3 mb-3">
           <% message.loop_messages.each_with_index do |loop_msg, index| %>
             <div class="agent-loop-message" 
@@ -68,8 +182,8 @@
         </div>
       <% end %>
       
-      <%# 3. Tool Calls - Compressed view that expands %>
-      <% if message.tool_calls.any? %>
+      <%# 3. Tool Calls - Only show if not using conversation_flow %>
+      <% if message.tool_calls.any? && message.conversation_flow.blank? %>
         <details class="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
                  data-state-preserving-target="details"
                  data-details-id="tools_<%= message.id %>"

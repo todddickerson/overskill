@@ -2029,6 +2029,7 @@ module Ai
           iteration_count: 0,
           loop_messages: [],
           tool_calls: [],
+          conversation_flow: [],
           thinking_status: "Initializing Overskill AI...",
           is_code_generation: false
         )
@@ -2056,17 +2057,46 @@ module Ai
       end
       
       @assistant_message.loop_messages << loop_message
+      
+      # Also add to conversation_flow for interleaved display
+      add_to_conversation_flow(
+        type: type == 'status' ? 'status' : 'message',
+        content: loop_message
+      )
+      
       @assistant_message.save!
     end
     
     def add_tool_call(tool_name, file_path: nil, status: 'complete')
-      @assistant_message.tool_calls << {
+      tool_call = {
         'name' => tool_name,
         'file_path' => file_path,
         'status' => status,
         'timestamp' => Time.current.iso8601
       }
+      
+      @assistant_message.tool_calls << tool_call
+      
+      # Check if we should batch tools or add them immediately
+      @pending_tool_calls ||= []
+      @pending_tool_calls << tool_call
+      
+      # For now, add immediately (we can optimize batching later)
+      flush_pending_tool_calls
+      
       @assistant_message.save!
+    end
+    
+    def flush_pending_tool_calls
+      return if @pending_tool_calls.blank?
+      
+      # Add all pending tool calls to conversation_flow as a batch
+      add_to_conversation_flow(
+        type: 'tools',
+        tool_calls: @pending_tool_calls.dup
+      )
+      
+      @pending_tool_calls = []
     end
     
     def update_iteration_count
@@ -2086,6 +2116,32 @@ module Ai
       @assistant_message.is_code_generation = false
       @assistant_message.status = 'completed'
       @assistant_message.thinking_status = nil
+      @assistant_message.save!
+    end
+    
+    # Add entry to conversation_flow for interleaved display
+    def add_to_conversation_flow(type:, content: nil, tool_calls: nil, iteration: nil)
+      @assistant_message.conversation_flow ||= []
+      
+      flow_entry = {
+        'type' => type,
+        'iteration' => iteration || @iteration_count,
+        'timestamp' => Time.current.iso8601
+      }
+      
+      case type
+      when 'message'
+        flow_entry['content'] = content
+        flow_entry['thinking_blocks'] = content.is_a?(Hash) ? content['thinking_blocks'] : nil
+      when 'tools'
+        flow_entry['calls'] = tool_calls || []
+      when 'status'
+        flow_entry['content'] = content
+      when 'error'
+        flow_entry['content'] = content
+      end
+      
+      @assistant_message.conversation_flow << flow_entry
       @assistant_message.save!
     end
     

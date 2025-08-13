@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_13_124746) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_13_192756) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -211,9 +211,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_13_124746) do
     t.jsonb "tool_calls", default: []
     t.integer "iteration_count", default: 0
     t.boolean "is_code_generation", default: false
+    t.jsonb "conversation_flow", default: []
     t.index ["app_id", "created_at"], name: "index_app_chat_messages_on_app_id_and_created_at"
     t.index ["app_id"], name: "index_app_chat_messages_on_app_id"
     t.index ["app_version_id"], name: "index_app_chat_messages_on_app_version_id"
+    t.index ["conversation_flow"], name: "index_app_chat_messages_on_conversation_flow", using: :gin
     t.index ["created_at"], name: "index_app_chat_messages_on_created_at"
     t.index ["loop_messages"], name: "index_app_chat_messages_on_loop_messages", using: :gin
     t.index ["metadata"], name: "index_app_chat_messages_on_metadata", using: :gin
