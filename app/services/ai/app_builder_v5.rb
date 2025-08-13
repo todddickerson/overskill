@@ -556,30 +556,39 @@ module Ai
           
           Rails.logger.info "[V5_FINALIZE] Before update!, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
           
+          # Preserve the conversation_flow explicitly
+          preserved_flow = @assistant_message.conversation_flow || []
+          
           @assistant_message.update!(
             thinking_status: nil,
             status: 'completed',
             content: "App successfully generated and deployed! Preview: #{app.preview_url}",
-            conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
+            conversation_flow: preserved_flow  # Explicitly preserve
           )
           
           Rails.logger.info "[V5_FINALIZE] After update!, conversation_flow size: #{@assistant_message.reload.conversation_flow&.size}"
         else
           app.update!(status: 'failed')
+          # Preserve the conversation_flow explicitly
+          preserved_flow = @assistant_message.conversation_flow || []
+          
           @assistant_message.update!(
             thinking_status: nil,
             status: 'failed',
             content: "Deployment failed: #{deploy_result[:error]}",
-            conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
+            conversation_flow: preserved_flow  # Explicitly preserve
           )
         end
       else
         app.update!(status: 'failed')
+        # Preserve the conversation_flow explicitly
+        preserved_flow = @assistant_message.conversation_flow || []
+        
         @assistant_message.update!(
           thinking_status: nil,
           status: 'failed',
           content: "Generation incomplete after #{@iteration_count} iterations",
-          conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
+          conversation_flow: preserved_flow  # Explicitly preserve
         )
       end
     end
@@ -1765,11 +1774,14 @@ module Ai
       
       app.update!(status: 'failed')
       
+      # Preserve the conversation_flow explicitly
+      preserved_flow = @assistant_message.conversation_flow || []
+      
       @assistant_message.update!(
         thinking_status: nil,
         status: 'failed',
         content: "An error occurred: #{error.message}. Please try again.",
-        conversation_flow: @assistant_message.conversation_flow  # Preserve conversation_flow
+        conversation_flow: preserved_flow  # Explicitly preserve
       )
       
       # Track error in analytics (disabled for now - class not implemented)
