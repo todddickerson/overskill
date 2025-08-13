@@ -186,10 +186,13 @@ module Ai
         end
       end
 
+      # Format tools for Anthropic API (requires input_schema field)
+      formatted_tools = format_tools_for_anthropic(tools)
+      
       body = {
         model: model_id,
         messages: api_messages,
-        tools: tools,
+        tools: formatted_tools,
         tool_choice: { type: "auto" },
         temperature: temperature,
         max_tokens: max_tokens
@@ -299,6 +302,23 @@ module Ai
     end
 
     private
+    
+    # Format tools from OpenAI format to Anthropic format
+    def format_tools_for_anthropic(tools)
+      return [] if tools.blank?
+      
+      tools.map do |tool|
+        {
+          name: tool["name"] || tool[:name],
+          description: tool["description"] || tool[:description],
+          input_schema: tool["parameters"] || tool[:parameters] || {
+            type: "object",
+            properties: {},
+            required: []
+          }
+        }
+      end
+    end
 
     # Apply cache breakpoints to messages for Anthropic prompt caching
     def apply_cache_breakpoints(messages, breakpoints)

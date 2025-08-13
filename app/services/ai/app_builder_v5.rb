@@ -6,12 +6,11 @@ module Ai
     MAX_ITERATIONS = 10
     COMPLETION_CONFIDENCE_THRESHOLD = 0.85
     
-    attr_reader :chat_message, :app, :broadcaster, :agent_state
+    attr_reader :chat_message, :app, :agent_state, :assistant_message
     
     def initialize(chat_message)
       @chat_message = chat_message
       @app = chat_message.app || create_app
-      @broadcaster = ChatProgressBroadcasterV2.new(chat_message)
       @start_time = Time.current
       @iteration_count = 0
       @completion_status = :active
@@ -19,9 +18,15 @@ module Ai
       # Create assistant reply message for V5 UI
       @assistant_message = create_assistant_message
       
+      # No separate broadcaster needed - we'll use direct updates
+      
       # Initialize agent components
       @prompt_service = Prompts::AgentPromptService.new(agent_variables)
       @goal_tracker = GoalTracker.new(chat_message.content)
+      
+      # Debug: check if prompt service works
+      Rails.logger.debug "[V5_DEBUG] Prompt service initialized"
+      Rails.logger.debug "[V5_DEBUG] Agent variables: #{agent_variables.keys.join(', ')}"
       @context_manager = ContextManager.new(app)
       @decision_engine = AgentDecisionEngine.new
       @termination_evaluator = TerminationEvaluator.new
@@ -44,11 +49,17 @@ module Ai
       begin
         # Mark app as generating
         app.update!(status: 'generating')
-        broadcaster.broadcast_phase(1, "Starting AI Agent", 6)
+        update_thinking_status("Phase 1/6: Starting AI Agent")
         
         # Extract goals from user request
-        broadcaster.broadcast_status("Analyzing your requirements...")
+        update_thinking_status("Analyzing your requirements...")
         @goal_tracker.extract_goals_from_request(@chat_message.content)
+        
+        # Log the goals
+        log_claude_event("GOALS_EXTRACTED", {
+          total_goals: @goal_tracker.goals.count,
+          goals: @goal_tracker.goals.map(&:description).join(", ")
+        })
         
         # Execute agent loop
         execute_until_complete
@@ -57,6 +68,8 @@ module Ai
         finalize_app_generation
         
       rescue => e
+        Rails.logger.error "[V5_CRITICAL] AppBuilderV5 execute! failed: #{e.message}"
+        Rails.logger.error e.backtrace.first(10).join("\n")
         handle_error(e)
       end
     end
@@ -64,6 +77,8 @@ module Ai
     private
     
     def execute_until_complete
+      Rails.logger.info "[V5_LOOP] Starting execute_until_complete"
+      
       loop do
         @iteration_count += 1
         @agent_state[:iteration] = @iteration_count
@@ -71,7 +86,7 @@ module Ai
         # Update V5 UI with iteration count
         update_iteration_count
         
-        Rails.logger.info "[AppBuilderV5] Starting iteration #{@iteration_count}"
+        Rails.logger.info "[V5_LOOP] Starting iteration #{@iteration_count}"
         
         # Safety check for infinite loops
         if @iteration_count > MAX_ITERATIONS
@@ -81,11 +96,13 @@ module Ai
         end
         
         # Execute one iteration of the agent loop
+        Rails.logger.info "[V5_LOOP] Calling execute_iteration"
         result = execute_iteration
+        Rails.logger.info "[V5_LOOP] Iteration result: #{result[:type]}"
         
         # Check termination conditions
         if should_terminate?(result)
-          Rails.logger.info "[AppBuilderV5] Termination condition met"
+          Rails.logger.info "[V5_LOOP] Termination condition met"
           add_loop_message("All goals completed successfully!", type: 'status')
           break
         end
@@ -100,9 +117,9 @@ module Ai
       # Assess current state
       current_state = assess_current_state
       
-      # Broadcast progress
+      # Update progress
       progress = @goal_tracker.assess_progress
-      broadcaster.broadcast_status(
+      update_thinking_status(
         "Iteration #{@iteration_count}: #{progress[:completed]}/#{progress[:total_goals]} goals completed"
       )
       
@@ -183,13 +200,26 @@ module Ai
     end
     
     def plan_app_implementation(action)
-      broadcaster.broadcast_phase(2, "Planning Architecture", 6)
-      broadcaster.broadcast_status("Creating implementation plan...")
+      update_thinking_status("Phase 2/6: Planning Architecture")
+      update_thinking_status("Creating implementation plan...")
       
       # Generate comprehensive plan using template structure
       plan_prompt = build_planning_prompt
       
-      response = call_ai_with_context(plan_prompt)
+      begin
+        response = call_ai_with_context(plan_prompt)
+        Rails.logger.info "[V5_LOOP] AI response received: #{response.inspect[0..200]}"
+      rescue => e
+        Rails.logger.error "[V5_ERROR] Failed to call AI: #{e.message}"
+        Rails.logger.error e.backtrace.first(5).join("\n")
+        return { type: :error, error: e.message }
+      end
+      
+      # Check if response is nil or empty
+      if response.nil? || (response[:content].blank? && response[:tool_calls].blank?)
+        Rails.logger.error "[V5_ERROR] Empty response from Claude API"
+        return { type: :error, error: "Empty response from AI" }
+      end
       
       # Extract and structure the plan
       implementation_plan = extract_implementation_plan(response)
@@ -199,11 +229,11 @@ module Ai
     end
     
     def execute_tool_operations(action)
-      broadcaster.broadcast_phase(4, "Generating Features", 6)
+      update_thinking_status("Phase 4/6: Generating Features")
       
       results = []
       action[:tools].each_with_index do |tool, index|
-        broadcaster.broadcast_status("Executing: #{tool[:description]}")
+        update_thinking_status("Executing: #{tool[:description]}")
         
         result = case tool[:type]
         when :generate_file
@@ -222,7 +252,7 @@ module Ai
         
         # Update progress
         progress_percent = ((index + 1) / action[:tools].count.to_f * 100).to_i
-        broadcaster.broadcast_progress(progress_percent, "#{index + 1}/#{action[:tools].count} operations completed")
+        update_thinking_status("Progress: #{progress_percent}% - #{index + 1}/#{action[:tools].count} operations completed")
       end
       
       { type: :tools_executed, data: results }
@@ -257,8 +287,8 @@ module Ai
     end
     
     def verify_generated_code(action)
-      broadcaster.broadcast_phase(5, "Validating & Building", 6)
-      broadcaster.broadcast_status("Verifying generated code...")
+      update_thinking_status("Phase 5/6: Validating & Building")
+      update_thinking_status("Verifying generated code...")
       
       verification_results = {
         syntax_valid: true,
@@ -293,7 +323,7 @@ module Ai
     end
     
     def debug_and_fix_issues(action)
-      broadcaster.broadcast_status("Debugging and fixing issues...")
+      update_thinking_status("Debugging and fixing issues...")
       
       fixes_applied = []
       
@@ -314,8 +344,8 @@ module Ai
     end
     
     def complete_app_generation(action)
-      broadcaster.broadcast_phase(6, "Finalizing", 6)
-      broadcaster.broadcast_status("Completing app generation...")
+      update_thinking_status("Phase 6/6: Finalizing")
+      update_thinking_status("Completing app generation...")
       
       # Final validation
       final_check = perform_final_validation
@@ -368,7 +398,7 @@ module Ai
     def finalize_app_generation
       if @completion_status == :complete
         # Deploy the app
-        broadcaster.broadcast_phase(6, "Deploying", 6)
+        update_thinking_status("Phase 6/6: Deploying")
         deploy_result = deploy_app
         
         if deploy_result[:success]
@@ -378,17 +408,26 @@ module Ai
             deployed_at: Time.current
           )
           
-          broadcaster.broadcast_complete(
-            "App successfully generated and deployed!",
-            app.preview_url
+          @assistant_message.update!(
+            thinking_status: nil,
+            status: 'completed',
+            content: "App successfully generated and deployed! Preview: #{app.preview_url}"
           )
         else
           app.update!(status: 'failed')
-          broadcaster.broadcast_error("Deployment failed: #{deploy_result[:error]}")
+          @assistant_message.update!(
+            thinking_status: nil,
+            status: 'failed',
+            content: "Deployment failed: #{deploy_result[:error]}"
+          )
         end
       else
         app.update!(status: 'failed')
-        broadcaster.broadcast_error("Generation incomplete after #{@iteration_count} iterations")
+        @assistant_message.update!(
+          thinking_status: nil,
+          status: 'failed',
+          content: "Generation incomplete after #{@iteration_count} iterations"
+        )
       end
     end
     
@@ -398,24 +437,57 @@ module Ai
     end
     
     def call_ai_with_context(prompt)
+      log_claude_event("API_CALL_START", {
+        iteration: @iteration_count,
+        prompt_preview: prompt.to_s[0..200]
+      })
+      
       # Use Anthropic client singleton with caching
       client = Ai::AnthropicClient.instance
       
       messages = build_messages_with_context(prompt)
       tools = @prompt_service.generate_tools
       
+      log_claude_event("API_CALL_MESSAGES", {
+        message_count: messages.size,
+        tool_count: tools.size,
+        first_msg_role: messages.first&.dig(:role),
+        last_msg_role: messages.last&.dig(:role)
+      })
+      
+      # Debug: log actual messages content
+      Rails.logger.debug "[V5_DEBUG] Messages being sent to Claude:"
+      messages.each_with_index do |msg, i|
+        Rails.logger.debug "[V5_DEBUG]   Message #{i}: role=#{msg[:role]}, content_length=#{msg[:content]&.length}"
+      end
+      
       # Use chat_with_tools for tool support with caching
-      response = client.chat_with_tools(
-        messages,
-        tools,
-        model: :claude_opus_4,  # Use symbol for model
-        use_cache: true,         # Enable prompt caching for 83% cost savings
-        temperature: 0.7,
-        max_tokens: 4000
-      )
+      begin
+        response = client.chat_with_tools(
+          messages,
+          tools,
+          model: :claude_opus_4,  # Use symbol for model
+          use_cache: true,         # Enable prompt caching for 83% cost savings
+          temperature: 0.7,
+          max_tokens: 4000
+        )
+      rescue => e
+        log_claude_event("API_CALL_ERROR", {
+          error: e.message,
+          class: e.class.name
+        })
+        raise e
+      end
+      
+      log_claude_event("API_CALL_RESPONSE", {
+        has_content: response[:content].present?,
+        tool_calls: response[:tool_calls]&.size || 0,
+        response_preview: response[:content].to_s[0..200]
+      })
       
       # Process tool calls if present
       if response[:tool_calls].present?
+        log_claude_event("PROCESSING_TOOLS", { count: response[:tool_calls].size })
         process_tool_calls(response[:tool_calls])
       end
       
@@ -428,6 +500,11 @@ module Ai
       tool_calls.each do |tool_call|
         tool_name = tool_call['function']['name']
         tool_args = JSON.parse(tool_call['function']['arguments'])
+        
+        log_claude_event("TOOL_EXECUTE_START", {
+          tool: tool_name,
+          file: tool_args['file_path']
+        })
         
         # Update UI with tool execution
         add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
@@ -445,6 +522,12 @@ module Ai
           { error: "Unknown tool: #{tool_name}" }
         end
         
+        log_claude_event("TOOL_EXECUTE_COMPLETE", {
+          tool: tool_name,
+          success: !result[:error],
+          error: result[:error]
+        })
+        
         # Update tool status
         @assistant_message.tool_calls.last['status'] = result[:error] ? 'error' : 'complete'
         @assistant_message.save!
@@ -456,7 +539,7 @@ module Ai
     end
     
     def write_file(path, content)
-      file = @app.app_generated_files.find_or_initialize_by(path: path)
+      file = @app.app_files.find_or_initialize_by(path: path)
       file.content = content
       file.language = determine_language(path)
       file.save!
@@ -472,7 +555,7 @@ module Ai
       
       if File.exist?(template_file)
         { success: true, content: File.read(template_file), source: 'template' }
-      elsif file = @app.app_generated_files.find_by(path: path)
+      elsif file = @app.app_files.find_by(path: path)
         { success: true, content: file.content, source: 'generated' }
       else
         { error: "File not found: #{path}" }
@@ -480,7 +563,7 @@ module Ai
     end
     
     def replace_file_content(args)
-      file = @app.app_generated_files.find_by(path: args['file_path'])
+      file = @app.app_files.find_by(path: args['file_path'])
       return { error: "File not found: #{args['file_path']}" } unless file
       
       # Implement line replacement logic
@@ -499,7 +582,7 @@ module Ai
     end
     
     def delete_file(path)
-      if file = @app.app_generated_files.find_by(path: path)
+      if file = @app.app_files.find_by(path: path)
         file.destroy
         @agent_state[:generated_files].delete(file)
         { success: true, path: path }
@@ -612,19 +695,25 @@ module Ai
       Rails.logger.error "[AppBuilderV5] Error: #{error.message}"
       Rails.logger.error error.backtrace.join("\n")
       
+      # Output error to console for debugging
+      puts "\n❌ AppBuilderV5 Error: #{error.message}"
+      puts error.backtrace.first(5).join("\n")
+      
       app.update!(status: 'failed')
       
-      broadcaster.broadcast_error(
-        "An error occurred: #{error.message}. Please try again."
+      @assistant_message.update!(
+        thinking_status: nil,
+        status: 'failed',
+        content: "An error occurred: #{error.message}. Please try again."
       )
       
-      # Track error in analytics
-      Analytics::EventTracker.new.track_event(
-        'app_generation_failed',
-        app_id: app.id,
-        error: error.message,
-        iteration: @iteration_count
-      )
+      # Track error in analytics (disabled for now - class not implemented)
+      # Analytics::EventTracker.new.track_event(
+      #   'app_generation_failed',
+      #   app_id: app.id,
+      #   error: error.message,
+      #   iteration: @iteration_count
+      # )
     end
     
     def format_goals_status(progress)
@@ -766,7 +855,7 @@ module Ai
     end
     
     def store_generated_file(path, content)
-      app.app_generated_files.create!(
+      app.app_files.create!(
         path: path,
         content: content,
         language: determine_language(path)
@@ -841,8 +930,9 @@ module Ai
     def create_assistant_message
       AppChatMessage.create!(
         app: @app,
+        user: @chat_message.user,
         role: 'assistant',
-        content: '', # Will use loop_messages instead
+        content: 'Starting agent loop...', # Required field
         status: 'executing',
         iteration_count: 0,
         loop_messages: [],
@@ -897,6 +987,15 @@ module Ai
       @assistant_message.thinking_status = nil
       @assistant_message.save!
     end
+    
+    def log_claude_event(event_type, details = {})
+      # Format for easy grep filtering: [V5_CLAUDE]
+      Rails.logger.info "[V5_CLAUDE] #{event_type} | #{format_log_details(details)}"
+    end
+    
+    def format_log_details(details)
+      details.map { |k, v| "#{k}=#{v.to_s.truncate(200)}" }.join(" | ")
+    end
   end
   
   # Supporting classes for the agent loop
@@ -948,7 +1047,9 @@ module Ai
     end
     
     def all_goals_achieved?
-      @goals.empty?
+      # Only consider goals achieved if we had goals and completed them all
+      return false if @completed_goals.empty? && @goals.empty?
+      @goals.empty? && @completed_goals.any?
     end
   end
   
@@ -988,7 +1089,7 @@ module Ai
       score += 25 if @context[:requirements]
       score += 25 if @implementation_plan
       score += 25 if @context[:last_result]
-      score += 25 if @app.app_generated_files.any?
+      score += 25 if @app.app_files.any?
       score
     end
   end

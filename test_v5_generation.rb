@@ -28,10 +28,23 @@ def test_v5_generation
                team.memberships.create!(user: user, roles: ['admin'])
   puts "✅ Membership: #{membership.id}"
   
-  # 2. Create chat message
+  # 2. Create app first (required by AppChatMessage)
+  puts "\n📱 Creating app..."
+  
+  app = team.apps.create!(
+    name: "Test Todo App #{Time.current.strftime('%H%M%S')}",
+    status: 'planning',
+    prompt: 'Create a simple todo app',
+    creator: membership,
+    app_type: 'tool'
+  )
+  puts "✅ App created: #{app.id}"
+  
+  # 3. Create chat message
   puts "\n💬 Creating chat message..."
   
   message = AppChatMessage.create!(
+    app: app,
     user: user,
     role: 'user',
     content: 'Create a simple todo app with the ability to add tasks, mark them as complete, and delete them. Use modern React with TypeScript.'
@@ -81,7 +94,7 @@ def test_v5_generation
     builder.execute!
     
     # Wait for monitor to finish
-    monitor_thread.join(timeout: 60)
+    monitor_thread.join(60)
     
     # 4. Check results
     puts "\n📊 Results:"
@@ -91,11 +104,11 @@ def test_v5_generation
       puts "✅ App created: #{app.id}"
       puts "   Name: #{app.name}"
       puts "   Status: #{app.status}"
-      puts "   Files generated: #{app.app_generated_files.count}"
+      puts "   Files generated: #{app.app_files.count}"
       
-      if app.app_generated_files.any?
+      if app.app_files.any?
         puts "\n   Files:"
-        app.app_generated_files.limit(10).each do |file|
+        app.app_files.limit(10).each do |file|
           puts "   - #{file.path} (#{file.content.bytesize} bytes)"
         end
       end
