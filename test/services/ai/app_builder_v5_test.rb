@@ -1,4 +1,5 @@
 require 'test_helper'
+require 'minitest/mock'
 
 module Ai
   class AppBuilderV5Test < ActiveSupport::TestCase
@@ -12,9 +13,19 @@ module Ai
       @team = Team.create!(
         name: "Test Team"
       )
-      @team.memberships.create!(user: @user)
+      @membership = @team.memberships.create!(user: @user)
+      
+      # Create an App for the chat message
+      @app = App.create!(
+        name: "Test App",
+        team: @team,
+        creator: @membership,
+        description: "Test app for V5 builder",
+        prompt: "Build a simple todo app"
+      )
       
       @chat_message = AppChatMessage.create!(
+        app: @app,
         user: @user,
         content: "Build a simple todo app",
         role: 'user'
