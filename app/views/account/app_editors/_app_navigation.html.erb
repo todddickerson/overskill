@@ -1,4 +1,5 @@
 <!-- App Navigation Dropdown -->
+<%= turbo_frame_tag "app_navigation_#{@app.id}" do %>
 <div class="relative" data-controller="app-navigation">
   <!-- Trigger Button -->
   <button data-app-navigation-target="trigger"
@@ -103,3 +104,4 @@
     </div>
   </div>
 </div>
+<% end %>

@@ -120,6 +120,7 @@
       <!-- Chat Messages -->
       <div class="flex-1 overflow-y-auto px-4 py-4 custom-scrollbar" id="chat_container" data-controller="chat-scroller">
         <%= turbo_stream_from "app_#{@app.id}_chat" %>
+        <%= turbo_stream_from "app_#{@app.id}" %>
         <div id="chat_messages" class="space-y-4">
           <% if @messages.any? %>
             <% @messages.each do |message| %>

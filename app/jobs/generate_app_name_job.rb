@@ -19,6 +19,9 @@ class GenerateAppNameJob < ApplicationJob
     if result[:success]
       app.update(name_generated_at: Time.current)
       Rails.logger.info "[AppName] Successfully generated name for app: #{result[:new_name]}"
+      
+      # Broadcast the updated navigation to refresh the app name
+      broadcast_navigation_update(app)
     else
       Rails.logger.error "[AppName] Failed to generate name for app #{app.id}: #{result[:error]}"
     end
@@ -70,5 +73,15 @@ class GenerateAppNameJob < ApplicationJob
     
     # Default to generating a new name for short, generic names
     false
+  end
+
+  def broadcast_navigation_update(app)
+    # Broadcast to all users who might be viewing this app's editor
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{app.id}",
+      target: "app_navigation_#{app.id}",
+      partial: "account/app_editors/app_navigation",
+      locals: { app: app }
+    )
   end
 end
