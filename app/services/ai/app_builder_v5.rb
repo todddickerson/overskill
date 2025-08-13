@@ -398,18 +398,114 @@ module Ai
     end
     
     def call_ai_with_context(prompt)
-      # Use Anthropic client with context directly
-      client = AnthropicClient.new
+      # Use Anthropic client singleton with caching
+      client = Ai::AnthropicClient.instance
       
       messages = build_messages_with_context(prompt)
+      tools = @prompt_service.generate_tools
       
-      response = client.chat(
-        messages: messages,
-        model: "claude_opus_4_1",
-        tools: @prompt_service.generate_tools
+      # Use chat_with_tools for tool support with caching
+      response = client.chat_with_tools(
+        messages,
+        tools,
+        model: :claude_opus_4,  # Use symbol for model
+        use_cache: true,         # Enable prompt caching for 83% cost savings
+        temperature: 0.7,
+        max_tokens: 4000
       )
       
+      # Process tool calls if present
+      if response[:tool_calls].present?
+        process_tool_calls(response[:tool_calls])
+      end
+      
       response
+    end
+    
+    def process_tool_calls(tool_calls)
+      results = []
+      
+      tool_calls.each do |tool_call|
+        tool_name = tool_call['function']['name']
+        tool_args = JSON.parse(tool_call['function']['arguments'])
+        
+        # Update UI with tool execution
+        add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
+        
+        result = case tool_name
+        when 'os-write'
+          write_file(tool_args['file_path'], tool_args['content'])
+        when 'os-view', 'os-read'
+          read_file(tool_args['file_path'])
+        when 'os-line-replace'
+          replace_file_content(tool_args)
+        when 'os-delete'
+          delete_file(tool_args['file_path'])
+        else
+          { error: "Unknown tool: #{tool_name}" }
+        end
+        
+        # Update tool status
+        @assistant_message.tool_calls.last['status'] = result[:error] ? 'error' : 'complete'
+        @assistant_message.save!
+        
+        results << result
+      end
+      
+      results
+    end
+    
+    def write_file(path, content)
+      file = @app.app_generated_files.find_or_initialize_by(path: path)
+      file.content = content
+      file.language = determine_language(path)
+      file.save!
+      
+      @agent_state[:generated_files] << file unless @agent_state[:generated_files].include?(file)
+      
+      { success: true, path: path, file_id: file.id }
+    end
+    
+    def read_file(path)
+      # First check template directory
+      template_file = Rails.root.join("app/services/ai/templates/overskill_20250728", path)
+      
+      if File.exist?(template_file)
+        { success: true, content: File.read(template_file), source: 'template' }
+      elsif file = @app.app_generated_files.find_by(path: path)
+        { success: true, content: file.content, source: 'generated' }
+      else
+        { error: "File not found: #{path}" }
+      end
+    end
+    
+    def replace_file_content(args)
+      file = @app.app_generated_files.find_by(path: args['file_path'])
+      return { error: "File not found: #{args['file_path']}" } unless file
+      
+      # Implement line replacement logic
+      lines = file.content.split("\n")
+      start_line = args['first_replaced_line'].to_i - 1
+      end_line = args['last_replaced_line'].to_i - 1
+      
+      # Replace the specified lines
+      replacement_lines = args['replace'].split("\n")
+      lines[start_line..end_line] = replacement_lines
+      
+      file.content = lines.join("\n")
+      file.save!
+      
+      { success: true, path: args['file_path'] }
+    end
+    
+    def delete_file(path)
+      if file = @app.app_generated_files.find_by(path: path)
+        file.destroy
+        @agent_state[:generated_files].delete(file)
+        { success: true, path: path }
+      else
+        { error: "File not found: #{path}" }
+      end
     end
     
     def build_messages_with_context(prompt)
@@ -479,13 +575,37 @@ module Ai
     end
     
     def create_app
-      app = @chat_message.user.apps.create!(
-        name: "New App #{Time.current.to_i}",
+      # Return existing app if already associated with the message
+      return @chat_message.app if @chat_message.app.present?
+      
+      # Create new app
+      team = @chat_message.user.teams.first || @chat_message.user.teams.create!(name: "Default Team")
+      membership = team.memberships.find_by(user: @chat_message.user) || 
+                   team.memberships.create!(user: @chat_message.user, roles: ['admin'])
+      
+      app = team.apps.create!(
+        name: generate_app_name(@chat_message.content),
         status: 'generating',
-        prompt: @chat_message.content
+        prompt: @chat_message.content,
+        creator: membership,
+        app_type: 'tool'  # Default to tool type
       )
+      
       @chat_message.update!(app: app)
       app
+    end
+    
+    def generate_app_name(prompt)
+      # Extract a meaningful name from the prompt
+      if prompt.downcase.include?('todo')
+        "Todo App #{Time.current.strftime('%m%d')}"
+      elsif prompt.downcase.include?('chat')
+        "Chat App #{Time.current.strftime('%m%d')}"
+      elsif prompt.downcase.include?('dashboard')
+        "Dashboard #{Time.current.strftime('%m%d')}"
+      else
+        "App #{Time.current.strftime('%m%d%H%M')}"
+      end
     end
     
     def handle_error(error)
@@ -534,8 +654,115 @@ module Ai
     end
     
     def generate_file_content(tool, template_path)
-      # Generate file content based on tool and template
-      ""
+      file_path = tool[:file_path]
+      
+      # Check if template file exists
+      template_file = File.join(template_path, file_path)
+      
+      if File.exist?(template_file)
+        # Use template as base
+        base_content = File.read(template_file)
+        
+        # If it's a static file (like package.json, tsconfig), use as-is
+        return base_content if static_file?(file_path)
+        
+        # For dynamic files, enhance with AI based on requirements
+        enhance_prompt = build_file_enhancement_prompt(file_path, base_content, tool[:description])
+        response = call_ai_with_context(enhance_prompt)
+        
+        response[:content] || base_content
+      else
+        # Generate from scratch using AI
+        generation_prompt = build_file_generation_prompt(file_path, tool[:description])
+        response = call_ai_with_context(generation_prompt)
+        
+        response[:content] || default_file_content(file_path)
+      end
+    end
+    
+    def static_file?(path)
+      # Files that should be used as-is from template
+      static_files = [
+        'package.json',
+        'tsconfig.json',
+        'vite.config.ts',
+        'tailwind.config.ts',
+        'postcss.config.js',
+        '.gitignore',
+        'index.html'
+      ]
+      
+      static_files.include?(File.basename(path))
+    end
+    
+    def build_file_enhancement_prompt(path, base_content, description)
+      <<~PROMPT
+        Enhance the following #{File.extname(path)} file based on the requirements.
+        
+        Current file (#{path}):
+        ```
+        #{base_content}
+        ```
+        
+        Requirements: #{description}
+        User's original request: #{@chat_message.content}
+        
+        Modify the file to implement the requested functionality while maintaining the existing structure and patterns.
+        Return ONLY the complete file content, no explanations.
+      PROMPT
+    end
+    
+    def build_file_generation_prompt(path, description)
+      <<~PROMPT
+        Generate a #{File.extname(path)} file for path: #{path}
+        
+        Requirements: #{description}
+        User's original request: #{@chat_message.content}
+        
+        Technology stack: React, TypeScript, Vite, Tailwind CSS, Supabase
+        
+        Return ONLY the complete file content, no explanations.
+        Follow best practices and modern patterns.
+      PROMPT
+    end
+    
+    def default_file_content(path)
+      # Fallback content for common files
+      case File.basename(path)
+      when 'App.tsx'
+        <<~TSX
+        import React from 'react';
+
+        function App() {
+          return (
+            <div className="min-h-screen bg-gray-50">
+              <div className="container mx-auto px-4 py-8">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Welcome to Your App
+                </h1>
+              </div>
+            </div>
+          );
+        }
+
+        export default App;
+        TSX
+      when 'main.tsx'
+        <<~TSX
+        import React from 'react';
+        import ReactDOM from 'react-dom/client';
+        import App from './App';
+        import './index.css';
+
+        ReactDOM.createRoot(document.getElementById('root')!).render(
+          <React.StrictMode>
+            <App />
+          </React.StrictMode>
+        );
+        TSX
+      else
+        "// Generated file: #{path}\n"
+      end
     end
     
     def store_generated_file(path, content)

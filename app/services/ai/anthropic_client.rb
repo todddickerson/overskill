@@ -7,14 +7,15 @@ module Ai
     base_uri "https://api.anthropic.com"
 
     MODELS = {
-      claude_sonnet_4: "claude-3-5-sonnet-20241022",
-      claude_opus_4: "claude-3-opus-20240229",
-      claude_haiku_3_5: "claude-3-5-haiku-20241022"
+      claude_sonnet_4: "claude-sonnet-4-20250514",
+      claude_opus_4: "claude-opus-4-1-20250805",
+      claude_haiku_3_5: "claude-haiku-3-5-20241022",
+      claude_sonnet_4_20250708: "claude-sonnet-4-20250708"
     }.freeze
 
     # Model specifications for Anthropic direct API
     MODEL_SPECS = {
-      "claude-3-5-sonnet-20241022" => { 
+      "claude-sonnet-4-20250514" => { 
         context: 200_000, 
         max_output: 8_192,
         cost_per_1k_input: 3.00,
@@ -22,7 +23,7 @@ module Ai
         cache_write_multiplier: 1.25,  # 25% more to write to cache
         cache_read_multiplier: 0.10    # 90% savings on cached reads
       },
-      "claude-3-opus-20240229" => { 
+      "claude-opus-4-1-20250805" => { 
         context: 200_000, 
         max_output: 4_096,
         cost_per_1k_input: 15.00,
