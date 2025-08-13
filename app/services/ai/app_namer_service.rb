@@ -21,9 +21,6 @@ module Ai
     def generate_name!
       Rails.logger.info "[AppNamer] Generating name for app ##{@app.id} based on: '#{@prompt}'"
       
-      # Broadcast progress update
-      broadcast_progress("Generating app name...")
-      
       retries = 0
       
       begin
@@ -32,15 +29,13 @@ module Ai
         
         if generated_name.present? && valid_app_name?(generated_name)
           # Update app name
-          broadcast_progress("Updating app name...")
           old_name = @app.name
           @app.update!(name: generated_name)
           
           Rails.logger.info "[AppNamer] Successfully renamed app ##{@app.id}: '#{old_name}' → '#{generated_name}'"
           
-          # Broadcast the name change to update UI
+          # Broadcast the name change to update UI (no progress, just final update)
           broadcast_name_update(old_name, generated_name)
-          broadcast_complete("App renamed to '#{generated_name}'")
           
           return {
             success: true,
@@ -60,7 +55,6 @@ module Ai
           retry
         else
           Rails.logger.error "[AppNamer] Failed to generate name after #{MAX_RETRIES} attempts"
-          broadcast_error("Failed to generate app name after #{MAX_RETRIES} attempts")
           return {
             success: false,
             error: e.message,
@@ -71,37 +65,6 @@ module Ai
     end
     
     private
-    
-    # Progress broadcasting methods
-    def broadcast_progress(message)
-      ActionCable.server.broadcast(
-        "app_#{@app.id}_chat",
-        {
-          action: "name_progress",
-          message: message
-        }
-      )
-    end
-    
-    def broadcast_complete(message)
-      ActionCable.server.broadcast(
-        "app_#{@app.id}_chat",
-        {
-          action: "name_complete",
-          message: message
-        }
-      )
-    end
-    
-    def broadcast_error(error_message)
-      ActionCable.server.broadcast(
-        "app_#{@app.id}_chat",
-        {
-          action: "name_error",
-          message: "Name generation failed: #{error_message}"
-        }
-      )
-    end
     
     def extract_app_prompt
       # Get the most descriptive prompt available

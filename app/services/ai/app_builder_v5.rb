@@ -1620,19 +1620,34 @@ module Ai
     
     # Build current context data (changes frequently, don't cache)
     def build_current_context_data
-      return {} if @iteration_count <= 1
+      # Always include base context, even on first iteration
+      context = {}
       
-      {
-        iteration_data: {
+      # Add base template files and essential context
+      base_context_service = Ai::BaseContextService.new(@app)
+      base_context = base_context_service.build_useful_context
+      
+      # Add existing app files context to prevent re-reading
+      existing_files_context = base_context_service.build_existing_files_context(@app)
+      
+      # Combine into useful-context section
+      context[:base_template_context] = base_context
+      context[:existing_files_context] = existing_files_context if existing_files_context.present?
+      
+      # Add iteration-specific context if not first iteration
+      if @iteration_count > 1
+        context[:iteration_data] = {
           iteration: @iteration_count,
           max_iterations: MAX_ITERATIONS,
           files_generated: @agent_state[:generated_files].count,
           last_action: @agent_state[:history].last&.dig(:action, :type),
           confidence: (@agent_state[:verification_results].last&.dig(:confidence) || 0) * 100
-        },
-        recent_operations: format_recent_operations_for_context,
-        verification_results: @agent_state[:verification_results].last
-      }
+        }
+        context[:recent_operations] = format_recent_operations_for_context
+        context[:verification_results] = @agent_state[:verification_results].last
+      end
+      
+      context
     end
     
     def format_recent_operations_for_context

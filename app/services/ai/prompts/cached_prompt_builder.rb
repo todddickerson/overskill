@@ -140,6 +140,12 @@ module Ai
       def format_context_data
         @context_data.map do |key, value|
           case key
+          when :base_template_context
+            # This is pre-formatted useful-context from BaseContextService
+            value
+          when :existing_files_context
+            # This is pre-formatted existing files context
+            value
           when :iteration_data
             format_iteration_data(value)
           when :recent_operations
