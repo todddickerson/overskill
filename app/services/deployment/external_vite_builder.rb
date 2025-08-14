@@ -148,6 +148,43 @@ module Deployment
       File.write(@temp_dir.join('package.json'), JSON.pretty_generate(package_json))
     end
     
+    def build_vite_environment_variables
+      # Vite requires variables to be prefixed with VITE_ to be available in client code
+      vite_env = {}
+      
+      # App-specific variables that Vite can access
+      vite_env['VITE_APP_ID'] = @app.id.to_s
+      vite_env['VITE_ENVIRONMENT'] = Rails.env
+      
+      # Supabase configuration (public keys safe for client-side)
+      vite_env['VITE_SUPABASE_URL'] = ENV['SUPABASE_URL'] || 'https://your-project.supabase.co'
+      vite_env['VITE_SUPABASE_ANON_KEY'] = ENV['SUPABASE_ANON_KEY'] || 'your-anon-key'
+      
+      # Add user's custom environment variables with VITE_ prefix if they don't already have it
+      if @app.respond_to?(:app_env_vars)
+        begin
+          user_vars = if @app.app_env_vars.column_names.include?('var_type')
+            @app.app_env_vars.where(var_type: ['user_defined', 'system_default']).pluck(:key, :value).to_h
+          else
+            @app.app_env_vars.pluck(:key, :value).to_h
+          end
+          
+          user_vars.each do |key, value|
+            # Only include non-secret variables (no API keys, tokens, etc.)
+            unless key.downcase.include?('secret') || key.downcase.include?('key') || key.downcase.include?('token')
+              vite_key = key.start_with?('VITE_') ? key : "VITE_#{key}"
+              vite_env[vite_key] = value
+            end
+          end
+        rescue => e
+          Rails.logger.warn "[ExternalViteBuilder] Could not load user env vars: #{e.message}"
+        end
+      end
+      
+      Rails.logger.info "[ExternalViteBuilder] Setting Vite environment variables: #{vite_env.keys.join(', ')}"
+      vite_env
+    end
+    
     def build_with_mode(temp_dir, mode)
       Dir.chdir(temp_dir) do
         Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
@@ -181,12 +218,15 @@ module Deployment
         
         Rails.logger.info "[ExternalViteBuilder] Running Vite build (#{mode} mode)..."
         
+        # Set up environment variables for Vite build
+        vite_env = build_vite_environment_variables
+        
         # Run the appropriate build command
         build_command = mode == 'production' ? "#{npm_path} run build" : "#{npm_path} run build:preview"
         
         # Capture both stdout and stderr for better error reporting
         require 'open3'
-        stdout, stderr, status = Open3.capture3(build_command)
+        stdout, stderr, status = Open3.capture3(vite_env, build_command)
         
         unless status.success?
           Rails.logger.error "[ExternalViteBuilder] Vite build failed with exit code: #{status.exitstatus}"
