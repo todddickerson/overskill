@@ -80,11 +80,17 @@ module Ai
       default_model_id = MODELS[DEFAULT_MODEL]
       
       # Build base headers
+      beta_features = ["prompt-caching-2024-07-31"]
+      if MODEL_SPECS[default_model_id] && MODEL_SPECS[default_model_id][:supports_interleaved_thinking]
+        beta_features << "interleaved-thinking-2025-05-14"
+      end
+      beta_features << "context-1m-2025-08-07"
+      
       @base_headers = {
         "x-api-key" => @api_key,
         "content-type" => "application/json",
         "anthropic-version" => "2023-06-01",
-        "anthropic-beta" => "prompt-caching-2024-07-31,#{"interleaved-thinking-2025-05-14" if MODEL_SPECS[default_model_id] && MODEL_SPECS[default_model_id][:supports_interleaved_thinking]},context-1m-2025-08-07"
+        "anthropic-beta" => beta_features.join(",")
       }
       
       @context_cache = ContextCacheService.new
