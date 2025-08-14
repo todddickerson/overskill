@@ -106,8 +106,8 @@ Choose the least invasive approach:
  
 ## Debugging Guidelines
 Use debugging tools FIRST before examining or modifying code:
-- Use read-console-logs to check for errors
-- Use read-network-requests to check API calls
+- Use os-read-console-logs to check for errors
+- Use os-read-network-requests to check API calls
 - Analyze the debugging output before making changes
 - Don't hesitate to just search across the codebase to find relevant files.
  
