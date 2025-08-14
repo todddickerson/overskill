@@ -111,38 +111,42 @@ module Ai
       # Simple flow: Send context to Claude, let it do its thing, deploy
       Rails.logger.info "[V5_SIMPLE] Starting simple Claude flow"
       
+      # Detect if this is initial build or continuation
+      is_continuation = @app.app_files.any?
+      Rails.logger.info "[V5_SIMPLE] Mode: #{is_continuation ? 'CONTINUATION' : 'INITIAL BUILD'}"
+      
       @iteration_count = 1
       @agent_state[:iteration] = @iteration_count
       update_iteration_count
       
       begin
-        # Phase 1: Send full context to Claude and let it work
-        update_thinking_status("Phase 1/3: Analyzing requirements and generating app...")
+        # Phase 1: Send user's raw message to Claude - system context handles the rest
+        if is_continuation
+          update_thinking_status("Analyzing your request and updating the app...")
+        else
+          update_thinking_status("Phase 1/3: Analyzing requirements and generating app...")
+        end
         
-        # Build the prompt with all context
-        prompt = <<~PROMPT
-          Generate a complete application based on this request:
-          #{@chat_message.content}
-          
-          Use the available tools to create all necessary files.
-          Focus on creating a working implementation that meets all requirements.
-          When you're done generating files, say "I've completed generating the app files."
-        PROMPT
-        
-        # Call Claude with full context and tools
-        response = call_ai_with_context(prompt)
+        # Just send the raw user message - system prompt has all instructions
+        # No need for prompt wrapper since agent-prompt.txt explains everything
+        response = call_ai_with_context(@chat_message.content)
         
         # Claude's response (with tool calls) is already handled by execute_tool_calling_cycle
-        Rails.logger.info "[V5_SIMPLE] Claude completed generation"
+        Rails.logger.info "[V5_SIMPLE] Claude completed work"
         
         # Phase 2: Build and deploy preview
-        update_thinking_status("Phase 2/3: Building and deploying preview...")
+        update_thinking_status("Building and deploying preview...")
         deploy_result = deploy_preview_if_ready
         
         if deploy_result[:success]
           # Phase 3: Complete
-          update_thinking_status("Phase 3/3: Generation complete!")
-          add_loop_message("App generation complete. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
+          update_thinking_status("Complete!")
+          
+          if is_continuation
+            add_loop_message("App updated successfully. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
+          else
+            add_loop_message("App generation complete. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
+          end
           
           # Mark completion
           @completion_status = :complete
@@ -159,13 +163,16 @@ module Ai
     end
     
     def deploy_preview_if_ready
-      # Check if we have generated files to deploy
-      if @agent_state[:generated_files].empty?
-        Rails.logger.warn "[V5_SIMPLE] No files generated, skipping deployment"
-        return { success: false, error: "No files generated to deploy" }
+      # Check if we have files to deploy (either new or existing)
+      total_files = @app.app_files.count
+      new_files = @agent_state[:generated_files].count
+      
+      if total_files == 0
+        Rails.logger.warn "[V5_SIMPLE] No files to deploy"
+        return { success: false, error: "No files to deploy" }
       end
       
-      Rails.logger.info "[V5_SIMPLE] Deploying #{@agent_state[:generated_files].count} files"
+      Rails.logger.info "[V5_SIMPLE] Deploying app with #{total_files} total files (#{new_files} new/modified)"
       
       # Deploy using existing deploy_app method
       deploy_app
@@ -1717,23 +1724,54 @@ module Ai
       # Build optimized system prompt with caching
       system_prompt = build_cached_system_prompt
       
-      # Start with optimized system prompt and user request
+      # Start with optimized system prompt
       messages = [
-        { role: 'system', content: system_prompt },
-        { role: 'user', content: @chat_message.content }
+        { role: 'system', content: system_prompt }
       ]
       
-      # CRITICAL FIX: Add conversation history from previous iterations
+      # For continuation conversations, include previous messages
+      if @app.app_chat_messages.count > 1
+        # Add previous conversation history (excluding current message)
+        add_previous_chat_messages(messages)
+      end
+      
+      # Add current user message
+      messages << { role: 'user', content: @chat_message.content }
+      
+      # CRITICAL FIX: Add conversation history from previous iterations within this message
       if @iteration_count > 1
         add_conversation_history(messages)
       end
       
-      # Add specific prompt for this iteration
+      # Add specific prompt for this iteration if different from user message
       if prompt.is_a?(String) && prompt != @chat_message.content
         messages << { role: 'user', content: prompt }
       end
       
       messages
+    end
+    
+    def add_previous_chat_messages(messages)
+      # Get previous messages from the app's chat history (excluding current)
+      previous_messages = @app.app_chat_messages
+                              .where.not(id: @chat_message.id)
+                              .order(created_at: :asc)
+                              .last(5) # Keep last 5 messages for context
+      
+      previous_messages.each do |msg|
+        # Skip failed or error messages
+        next if msg.status == 'failed'
+        
+        if msg.role == 'user'
+          messages << { role: 'user', content: msg.content }
+        elsif msg.role == 'assistant'
+          # For assistant messages, use the final content or summary
+          assistant_content = msg.content.presence || "I processed your request and made changes to the app."
+          messages << { role: 'assistant', content: assistant_content }
+        end
+      end
+      
+      Rails.logger.info "[V5_CONTEXT] Added #{previous_messages.size} previous messages to context"
     end
     
     # Build optimized system prompt with caching support
