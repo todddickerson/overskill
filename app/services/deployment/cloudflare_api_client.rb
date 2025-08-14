@@ -25,6 +25,7 @@ module Deployment
       @zone_id = ENV['CLOUDFLARE_ZONE_ID']
       @api_token = ENV['CLOUDFLARE_API_TOKEN']
       @bucket_name = ENV['CLOUDFLARE_R2_BUCKET'] || 'overskill-apps'
+      @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
       
       Rails.logger.info "[CloudflareApiClient] Initializing for app ##{@app.id}"
       
@@ -264,7 +265,7 @@ module Deployment
           path: path,
           object_key: object_key,
           size: content.bytesize,
-          cdn_url: asset[:cdn_url] || "https://cdn.overskill.app/#{object_key}",
+          cdn_url: asset[:cdn_url] || "https://cdn.#{@base_domain}/#{object_key}",
           etag: data['etag']
         }
       end
@@ -328,13 +329,13 @@ module Deployment
 
       # Fallback routes for app
       routes << {
-        pattern: "preview-#{@app.id}.overskill.app/*",
+        pattern: "preview-#{@app.id}.#{@base_domain}/*",
         zone: @zone_id,
         type: 'preview'
       }
       
       routes << {
-        pattern: "app-#{@app.id}.overskill.app/*",
+        pattern: "app-#{@app.id}.#{@base_domain}/*",
         zone: @zone_id,
         type: 'production'
       }

@@ -10,7 +10,8 @@ class Deployment::CloudflarePreviewService
     @api_key = ENV['CLOUDFLARE_API_KEY']
     @api_token = ENV['CLOUDFLARE_API_TOKEN']
     @email = ENV['CLOUDFLARE_EMAIL']
-    @zone_id = ENV['CLOUDFLARE_ZONE_ID'] || ENV['CLOUDFLARE_ZONE'] # For overskill.app domain
+    @zone_id = ENV['CLOUDFLARE_ZONE_ID'] || ENV['CLOUDFLARE_ZONE'] # For app domain
+    @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
     
     # Use API Token if available, otherwise use Global API Key
     if @api_token.present?
@@ -61,7 +62,7 @@ class Deployment::CloudflarePreviewService
     
     # Get both URLs
     workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
-    custom_domain_url = "https://#{preview_subdomain}.overskill.app"
+    custom_domain_url = "https://#{preview_subdomain}.#{@base_domain}"
     
     # Update app with preview URLs
     # Use workers.dev URL when custom domain is down or disabled
@@ -74,7 +75,7 @@ class Deployment::CloudflarePreviewService
     )
     
     note = use_workers_dev ? 
-      "Using workers.dev URL (overskill.app is down)" : 
+      "Using workers.dev URL (#{@base_domain} is down)" : 
       "Using custom domain #{custom_domain_url}"
     
     { 
@@ -287,7 +288,7 @@ class Deployment::CloudflarePreviewService
     
     # Get both URLs
     workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
-    custom_domain_url = "https://#{subdomain}.overskill.app"
+    custom_domain_url = "https://#{subdomain}.#{@base_domain}"
     
     # Update app with deployment info based on environment
     case environment
@@ -777,7 +778,7 @@ class Deployment::CloudflarePreviewService
   end
   
   def ensure_preview_route(subdomain, worker_name)
-    route_pattern = "#{subdomain}.overskill.app/*"
+    route_pattern = "#{subdomain}.#{@base_domain}/*"
     
     # Check if route exists
     routes_response = self.class.get("/zones/#{@zone_id}/workers/routes")

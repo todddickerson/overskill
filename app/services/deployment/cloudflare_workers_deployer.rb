@@ -8,6 +8,7 @@ module Deployment
       @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
       @api_token = ENV['CLOUDFLARE_API_TOKEN']
       @zone_id = ENV['CLOUDFLARE_ZONE_ID']
+      @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
       
       self.class.headers('Authorization' => "Bearer #{@api_token}")
     end
@@ -215,10 +216,10 @@ module Deployment
                   end
       
       # The worker URL pattern
-      worker_url = "https://#{subdomain}.overskill.app"
+      worker_url = "https://#{subdomain}.#{@base_domain}"
       
       # Create or update the route
-      route_pattern = "#{subdomain}.overskill.app/*"
+      route_pattern = "#{subdomain}.#{@base_domain}/*"
       
       create_or_update_route(route_pattern, worker_name)
       

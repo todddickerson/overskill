@@ -85,7 +85,8 @@ class App < ApplicationRecord
     return preview_url if preview_url.present?
     
     # Fallback to predicted URL based on subdomain
-    "https://#{subdomain}.overskill.app" if subdomain.present?
+    base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
+    "https://#{subdomain}.#{base_domain}" if subdomain.present?
   end
   
   # Check if app can be published to production
