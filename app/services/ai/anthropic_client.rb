@@ -90,6 +90,7 @@ module Ai
       helicone_key = ENV['HELICONE_API_KEY']
       headers = @base_headers.dup
       
+      Rails.logger.debug "[AI] Building request options with Helicone key: #{helicone_key.to_s[0..8]}"
       # Add Helicone headers if API key is available
       if helicone_key.present?
         headers["Helicone-Auth"] = "Bearer #{helicone_key}"

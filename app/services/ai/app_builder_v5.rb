@@ -977,7 +977,19 @@ module Ai
         new_status = result[:error] ? 'error' : 'complete'
         tool_call_to_update['status'] = new_status
         
-        # Also update status in conversation_flow
+        # Also update status in pending_tool_calls if not yet flushed
+        if @pending_tool_calls.present?
+          @pending_tool_calls.each do |pending_tool|
+            if pending_tool['name'] == tool_name && 
+               pending_tool['file_path'] == tool_args['file_path'] && 
+               pending_tool['status'] == 'running'
+              pending_tool['status'] = new_status
+              Rails.logger.info "[V5_TOOLS] Updated pending tool status: #{tool_name} #{tool_args['file_path']} -> #{new_status}"
+            end
+          end
+        end
+        
+        # Also update status in conversation_flow if already flushed
         update_tool_status_in_flow(tool_name, tool_args['file_path'], new_status)
         
         @assistant_message.save!
@@ -1134,7 +1146,19 @@ module Ai
           # Reassign to trigger ActiveRecord change detection for JSONB field
           @assistant_message.tool_calls = updated_tool_calls
           
-          # Also update status in conversation_flow
+          # Also update status in pending_tool_calls if not yet flushed
+          if @pending_tool_calls.present?
+            @pending_tool_calls.each do |pending_tool|
+              if pending_tool['name'] == tool_name && 
+                 pending_tool['file_path'] == tool_args['file_path'] && 
+                 pending_tool['status'] == 'running'
+                pending_tool['status'] = new_status
+                Rails.logger.info "[V5_TOOLS_BATCH] Updated pending tool status: #{tool_name} #{tool_args['file_path']} -> #{new_status}"
+              end
+            end
+          end
+          
+          # Also update status in conversation_flow if already flushed
           update_tool_status_in_flow(tool_name, tool_args['file_path'], new_status)
           
           @assistant_message.save!
@@ -2325,24 +2349,37 @@ module Ai
       # Update the status in conversation_flow when tool completes
       return unless @assistant_message.conversation_flow.present?
       
+      Rails.logger.info "[V5_FLOW_UPDATE] Starting update for tool: #{tool_name}, file: #{file_path}, new_status: #{new_status}"
+      
       # Clone the array to trigger change detection
       updated_flow = @assistant_message.conversation_flow.deep_dup
+      found_and_updated = false
       
-      updated_flow.each do |item|
+      updated_flow.each_with_index do |item, idx|
         next unless item['type'] == 'tools'
         
         if item['calls'].present?
           item['calls'].each do |tool|
+            # Log what we're comparing
+            Rails.logger.debug "[V5_FLOW_UPDATE] Checking tool: name=#{tool['name']} vs #{tool_name}, file=#{tool['file_path']} vs #{file_path}"
+            
             if tool['name'] == tool_name && tool['file_path'] == file_path
+              Rails.logger.info "[V5_FLOW_UPDATE] Found match! Updating from #{tool['status']} to #{new_status}"
               tool['status'] = new_status
+              found_and_updated = true
             end
           end
         end
       end
       
-      # Reassign to trigger ActiveRecord change detection for JSONB field
-      @assistant_message.conversation_flow = updated_flow
-      @assistant_message.save!
+      if found_and_updated
+        # Reassign to trigger ActiveRecord change detection for JSONB field
+        @assistant_message.conversation_flow = updated_flow
+        @assistant_message.save!
+        Rails.logger.info "[V5_FLOW_UPDATE] Successfully saved updated conversation_flow"
+      else
+        Rails.logger.warn "[V5_FLOW_UPDATE] No matching tool found to update in conversation_flow"
+      end
     end
     
     def update_iteration_count
