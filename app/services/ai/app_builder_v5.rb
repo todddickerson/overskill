@@ -646,8 +646,12 @@ module Ai
       tool_cycles = 0
       max_tool_cycles = 5  # Prevent infinite loops
       response = nil  # Define response outside the loop
+      content_added_to_flow = false  # Track whether we've added current response content
       
       loop do
+        # Reset content tracking for each new API response
+        content_added_to_flow = false
+        
         # Validate conversation structure before API call (only in verbose mode)
         if ENV["VERBOSE_AI_LOGGING"] == "true" && conversation_messages.size >= 2
           validate_tool_calling_structure(conversation_messages)
@@ -686,6 +690,7 @@ module Ai
             # CRITICAL: Add text content to conversation_flow BEFORE tools
             if response[:content].present?
               add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+              content_added_to_flow = true  # Mark that we've added this response content
               Rails.logger.info "[V5_TOOLS] Added text content to conversation_flow before tools"
             end
             
@@ -761,10 +766,12 @@ module Ai
           # Claude finished normally
           Rails.logger.info "[V5_TOOLS] Claude completed response normally"
           
-          # Add text content to conversation_flow if present
-          if response[:content].present?
+          # Add text content to conversation_flow if present and not already added
+          if response[:content].present? && !content_added_to_flow
             add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
             Rails.logger.info "[V5_TOOLS] Added final text content to conversation_flow"
+          elsif content_added_to_flow
+            Rails.logger.info "[V5_TOOLS] Skipped adding text content - already added before tools"
           end
           
           break

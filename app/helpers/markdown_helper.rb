@@ -132,70 +132,35 @@ module MarkdownHelper
   end
   
   def add_tailwind_classes(html)
-    # Headers - optimized for structured content like implementation plans
-    html.gsub!(/<h1>/, '<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 mt-4 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1">')
-    html.gsub!(/<h2>/, '<h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-2">')
+    # Headers - smaller sizes for chat context
+    html.gsub!(/<h1>/, '<h1 class="text-base font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-1">')
+    html.gsub!(/<h2>/, '<h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-1">')
     html.gsub!(/<h3>/, '<h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mt-2 mb-1">')
     
-    # Paragraphs - better spacing for readability
-    html.gsub!(/<p>/, '<p class="mb-2 text-sm leading-relaxed">')
+    # Paragraphs - smaller margin
+    html.gsub!(/<p>/, '<p class="mb-1">')
     
-    # Lists - improved structure and spacing
-    html.gsub!(/<ul>/, '<ul class="space-y-1 my-2 text-sm">')
-    html.gsub!(/<ol>/, '<ol class="space-y-1 my-2 text-sm">')
+    # Lists - more compact
+    html.gsub!(/<ul>/, '<ul class="list-disc list-inside space-y-0.5 my-1 ml-3 text-sm">')
+    html.gsub!(/<ol>/, '<ol class="list-decimal list-inside space-y-0.5 my-1 ml-3 text-sm">')
     
-    # List items - better bullet styling and spacing
-    html.gsub!(/<li>/, '<li class="flex items-start space-x-2 pl-0">')
-    
-    # Add custom bullets for unordered lists
-    html.gsub!(/(<ul[^>]*>.*?)<li class="flex items-start space-x-2 pl-0">/m) do
-      "#{$1}<li class=\"flex items-start space-x-2 pl-0\"><span class=\"text-gray-400 dark:text-gray-500 mt-0.5 text-xs\">•</span><span class=\"flex-1\">"
-    end
-    
-    # Close span for list items in unordered lists
-    html.gsub!(/(<ul[^>]*>.*?<\/span><span class="flex-1">.*?)<\/li>/m) do
-      "#{$1}</span></li>"
-    end
-    
-    # Add custom numbers for ordered lists  
-    html.gsub!(/(<ol[^>]*>.*?)<li class="flex items-start space-x-2 pl-0">/m) do |match|
-      # Count existing li elements to get the number
-      li_count = match.scan(/<li/).length
-      "#{match.gsub(/<li class="flex items-start space-x-2 pl-0">$/, '')}<li class=\"flex items-start space-x-2 pl-0\"><span class=\"text-gray-500 dark:text-gray-400 mt-0.5 text-xs font-medium min-w-[1rem]\">#{li_count}.</span><span class=\"flex-1\">"
-    end
-    
-    # Close span for list items in ordered lists
-    html.gsub!(/(<ol[^>]*>.*?<\/span><span class="flex-1">.*?)<\/li>/m) do
-      "#{$1}</span></li>"
-    end
-    
-    # Nested lists - reduce left margin
-    html.gsub!(/<ul class="space-y-1 my-2 text-sm">([^<]*<li[^>]*>[^<]*<ul)/m) do
-      "<ul class=\"space-y-0.5 my-1 text-sm ml-4\">#{$1.gsub('<ul class="space-y-1 my-2 text-sm">', '<ul class="space-y-0.5 my-1 text-sm ml-4">')}"
-    end
-    
-    # Code blocks - better styling
-    html.gsub!(/<pre>/, '<pre class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 overflow-x-auto my-2 text-xs">')
+    # Code blocks - smaller padding
+    html.gsub!(/<pre>/, '<pre class="bg-gray-100 dark:bg-gray-800 rounded-md p-2 overflow-x-auto my-1 text-xs">')
     html.gsub!(/<code>/, '<code class="text-xs text-gray-800 dark:text-gray-200 font-mono">')
     
-    # Inline code - improved visibility
+    # Inline code (not inside pre tags)
     html.gsub!(/(<p[^>]*>.*?)<code>(.+?)<\/code>(.*?<\/p>)/m) do
-      "#{$1}<code class=\"bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200 dark:border-gray-600\">#{$2}</code>#{$3}"
+      "#{$1}<code class=\"bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-1 py-0.5 rounded text-sm\">#{$2}</code>#{$3}"
     end
     
-    # Links - better contrast
-    html.gsub!(/<a /, '<a class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-dotted hover:decoration-solid transition-colors" ')
+    # Links
+    html.gsub!(/<a /, '<a class="text-blue-600 dark:text-blue-400 hover:underline" ')
     
-    # Strong/Bold - enhanced for headers and emphasis
-    html.gsub!(/<strong>/, '<strong class="font-semibold text-gray-900 dark:text-gray-100">')
+    # Strong/Bold
+    html.gsub!(/<strong>/, '<strong class="font-semibold">')
     
-    # Blockquotes - improved styling
-    html.gsub!(/<blockquote>/, '<blockquote class="border-l-4 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10 pl-4 py-2 my-3 italic text-gray-700 dark:text-gray-300 rounded-r-md">')
-    
-    # Tables - add responsive styling
-    html.gsub!(/<table>/, '<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 my-3 text-sm">')
-    html.gsub!(/<th>/, '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-800">')
-    html.gsub!(/<td>/, '<td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">')
+    # Blockquotes
+    html.gsub!(/<blockquote>/, '<blockquote class="border-l-4 border-gray-300 dark:border-gray-600 pl-4 my-2 italic text-gray-700 dark:text-gray-300">')
     
     html
   end
