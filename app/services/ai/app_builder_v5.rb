@@ -1767,36 +1767,6 @@ module Ai
         # Limit history to avoid token overload (keep last 3 substantial messages with thinking)
         break if index >= 2
       end
-      
-      # Add tool execution summary to show Claude what actions were taken
-      if @assistant_message.tool_calls.any?
-        recent_tools = @assistant_message.tool_calls.last(10)
-        tool_summary = format_tool_execution_summary(recent_tools)
-        
-        messages << {
-          role: 'system',
-          content: <<~TOOLS
-            RECENT ACTIONS TAKEN:
-            #{tool_summary}
-            
-            Continue from where you left off. Avoid repeating these exact actions.
-          TOOLS
-        }
-      end
-    end
-    
-    def format_tool_execution_summary(tools)
-      tools.map do |tool|
-        status_icon = case tool['status']
-        when 'complete' then '✅'
-        when 'error' then '❌' 
-        when 'running' then '🔄'
-        else '⏳'
-        end
-        
-        file_info = tool['file_path'] ? " → #{tool['file_path']}" : ""
-        "#{status_icon} #{tool['name']}#{file_info}"
-      end.join("\n")
     end
     
     def build_iteration_context
