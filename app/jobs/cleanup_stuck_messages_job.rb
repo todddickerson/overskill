@@ -7,13 +7,14 @@ class CleanupStuckMessagesJob < ApplicationJob
     stuck_count = 0
     orphaned_count = 0
     
-    # Find messages stuck in processing states for more than 15 minutes
+    # Find messages stuck in processing states that haven't been updated for more than 15 minutes
+    # This ensures we don't kill active processes that are still making progress
     stuck_messages = AppChatMessage.where(
       status: ['planning', 'executing', 'generating']
-    ).where('created_at < ?', 15.minutes.ago)
+    ).where('updated_at < ?', 15.minutes.ago)
     
     stuck_messages.each do |message|
-      Rails.logger.info "[CleanupStuckMessages] Found stuck message #{message.id} in #{message.status} state for #{((Time.current - message.created_at) / 60).round} minutes"
+      Rails.logger.info "[CleanupStuckMessages] Found stuck message #{message.id} in #{message.status} state - created #{((Time.current - message.created_at) / 60).round} min ago, last updated #{((Time.current - message.updated_at) / 60).round} min ago"
       
       message.update!(
         status: 'failed',
@@ -52,8 +53,9 @@ class CleanupStuckMessagesJob < ApplicationJob
                                     .order(created_at: :asc)
                                     .first
         
-        if !next_assistant_message && user_message.created_at < 15.minutes.ago
-          Rails.logger.info "[CleanupStuckMessages] Found orphaned user message #{user_message.id} from #{((Time.current - user_message.created_at) / 60).round} minutes ago"
+        # Only mark as orphaned if the user message hasn't been touched in 15 minutes
+        if !next_assistant_message && user_message.updated_at < 15.minutes.ago
+          Rails.logger.info "[CleanupStuckMessages] Found orphaned user message #{user_message.id} from #{((Time.current - user_message.created_at) / 60).round} minutes ago, last updated #{((Time.current - user_message.updated_at) / 60).round} minutes ago"
           
           # Create a failure response
           app.app_chat_messages.create!(
