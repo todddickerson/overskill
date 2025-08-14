@@ -6,8 +6,27 @@ module Ai
       extend ActiveSupport::Concern
       
       included do
-        # Initialize file tracker when the builder is created
-        after_initialize :setup_file_tracker
+        # Setup alias method chains when included
+        # These need to be set up at the instance level, not class level
+        if method_defined?(:write_file)
+          alias_method :write_file_without_cache_invalidation, :write_file
+          alias_method :write_file, :write_file_with_cache_invalidation
+        end
+        
+        if method_defined?(:replace_file_content)
+          alias_method :replace_file_content_without_cache_invalidation, :replace_file_content
+          alias_method :replace_file_content, :replace_file_content_with_cache_invalidation
+        end
+        
+        if method_defined?(:delete_file)
+          alias_method :delete_file_without_cache_invalidation, :delete_file
+          alias_method :delete_file, :delete_file_with_cache_invalidation
+        end
+        
+        if method_defined?(:rename_file)
+          alias_method :rename_file_without_cache_invalidation, :rename_file
+          alias_method :rename_file, :rename_file_with_cache_invalidation
+        end
       end
       
       private
@@ -146,22 +165,6 @@ module Ai
         []
       end
       
-      class_methods do
-        # Setup alias method chains when included
-        def setup_cache_invalidation_hooks
-          alias_method :write_file_without_cache_invalidation, :write_file
-          alias_method :write_file, :write_file_with_cache_invalidation
-          
-          alias_method :replace_file_content_without_cache_invalidation, :replace_file_content
-          alias_method :replace_file_content, :replace_file_content_with_cache_invalidation
-          
-          alias_method :delete_file_without_cache_invalidation, :delete_file
-          alias_method :delete_file, :delete_file_with_cache_invalidation
-          
-          alias_method :rename_file_without_cache_invalidation, :rename_file
-          alias_method :rename_file, :rename_file_with_cache_invalidation
-        end
-      end
     end
   end
 end

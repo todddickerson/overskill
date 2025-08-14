@@ -38,11 +38,6 @@ module Ai
       # Initialize file change tracker for granular caching
       @file_tracker = FileChangeTracker.new(@app.id)
       
-      # Setup cache invalidation hooks if the concern is included
-      if self.class.ancestors.include?(Ai::Concerns::CacheInvalidation)
-        self.class.setup_cache_invalidation_hooks if self.class.respond_to?(:setup_cache_invalidation_hooks)
-      end
-      
       # Initialize state
       @agent_state = {
         iteration: 0,
