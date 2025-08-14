@@ -78,9 +78,20 @@
 - **Added**: Comprehensive Rails tests for `BaseContextService`
 - **Coverage**: File grouping, template handling, context building, error handling
 
-## 📋 NEXT: Future V5 Enhancements
+## 📋 NEXT: Version Preview URLs Implementation
 
-### Potential Areas for Further V5 Improvements
+### AppVersion Preview URLs (Future Enhancement)
+- **Goal**: Enable preview of any historical app version via dedicated Cloudflare Workers
+- **Reference**: See `DEPLOYMENT_ARCHITECTURE.md` for full analysis and implementation options
+- **Recommended Approach**: Hybrid model - keep last 5 versions + bookmarked as active workers
+- **Implementation**:
+  - Add `preview_url` field to `app_versions` table
+  - Create `VersionPreviewService` extending `CloudflarePreviewService`
+  - Deploy version workers on-demand as `version-{app_id}-{version_id}.workers.dev`
+  - Auto-cleanup inactive preview workers after 7 days
+- **Benefits**: Instant version switching, version comparison, rollback capability
+
+### Other Future V5 Enhancements
 - **Error Recovery**: Enhanced error handling with smart retry logic
 - **Context Management**: Dynamic context optimization based on conversation state
 - **AI Models**: Advanced model selection and routing
