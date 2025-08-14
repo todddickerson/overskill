@@ -5,8 +5,23 @@ class ProcessAppUpdateJobV4 < ApplicationJob
   # Retry configuration - V4 has its own retry logic, so limit job-level retries
   retry_on StandardError, wait: :polynomially_longer, attempts: 2 do |job, error|
     # Log the final failure
-    message = job.arguments.first
-    Rails.logger.error "[ProcessAppUpdateJobV4] Final failure for message ##{message&.id}: #{error.message}"
+    message_or_id = job.arguments.first
+    
+    # Handle both message object and ID
+    message = begin
+      case message_or_id
+      when AppChatMessage
+        message_or_id
+      when Integer, String
+        AppChatMessage.find_by(id: message_or_id)
+      else
+        nil
+      end
+    rescue
+      nil
+    end
+    
+    Rails.logger.error "[ProcessAppUpdateJobV4] Final failure for message ##{message&.id || message_or_id}: #{error.message}"
     
     # Update app status if message and app exist
     if message && message.app
@@ -21,7 +36,17 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     end
   end
   
-  def perform(message, use_enhanced: true)
+  def perform(message_or_id, use_enhanced: true)
+    # Handle both message object and ID (for robustness with ActiveJob serialization)
+    message = case message_or_id
+    when AppChatMessage
+      message_or_id
+    when Integer, String
+      AppChatMessage.find(message_or_id)
+    else
+      raise ArgumentError, "Expected AppChatMessage or ID, got #{message_or_id.class}"
+    end
+    
     Rails.logger.info "[ProcessAppUpdateJobV4] Starting V4 orchestrator for message ##{message.id} (app ##{message.app.id})"
     
     # Use enhanced V4 with visual feedback by default
@@ -32,8 +57,11 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     orchestrator.execute!
     
     Rails.logger.info "[ProcessAppUpdateJobV4] Successfully processed message ##{message.id} with V4 orchestrator"
+  rescue ActiveRecord::RecordNotFound => e
+    Rails.logger.error "[ProcessAppUpdateJobV4] Message not found: #{e.message}"
+    raise # Let job retry logic handle it
   rescue => e
-    Rails.logger.error "[ProcessAppUpdateJobV4] Error processing message ##{message.id}: #{e.message}"
+    Rails.logger.error "[ProcessAppUpdateJobV4] Error processing message ##{message&.id}: #{e.message}"
     Rails.logger.error "[ProcessAppUpdateJobV4] Backtrace: #{e.backtrace&.first(5)&.join("\n")}"
     raise # Re-raise for job-level retry logic
   end
