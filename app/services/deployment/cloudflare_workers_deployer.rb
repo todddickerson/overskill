@@ -12,9 +12,9 @@ module Deployment
       @zone_id = ENV['CLOUDFLARE_ZONE_ID']
       @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
       
-      # Use API Token if it looks like a valid token (contains dashes)
-      # Otherwise fall back to Global API Key with email
-      if @api_token.present? && @api_token.include?('-')
+      # Prefer API Token if it looks valid (contains underscore and is proper length)
+      # API tokens are typically 40+ chars with underscores, not dashes
+      if @api_token.present? && (@api_token.include?('_') || @api_token.length > 30)
         Rails.logger.info "[CloudflareWorkersDeployer] Using API Token authentication"
         self.class.headers('Authorization' => "Bearer #{@api_token}")
       elsif @api_key.present? && @email.present?
@@ -22,13 +22,6 @@ module Deployment
         self.class.headers({
           'X-Auth-Email' => @email,
           'X-Auth-Key' => @api_key
-        })
-      elsif @api_token.present? && @email.present?
-        # Fallback: API_TOKEN might actually be the Global API Key
-        Rails.logger.info "[CloudflareWorkersDeployer] Using API_TOKEN as Global API Key with email"
-        self.class.headers({
-          'X-Auth-Email' => @email,
-          'X-Auth-Key' => @api_token
         })
       else
         Rails.logger.error "[CloudflareWorkersDeployer] No valid Cloudflare authentication found"

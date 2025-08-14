@@ -221,9 +221,8 @@ module Deployment
     private
 
     def setup_http_headers
-      # Determine auth method based on credential format
-      if @api_token.present? && @api_token.include?('-')
-        # Looks like a valid API Token (contains dashes)
+      # Prefer API Token authentication (tokens typically have underscores and are 40+ chars)
+      if @api_token.present? && (@api_token.include?('_') || @api_token.length > 30)
         Rails.logger.info "[CloudflareApiClient] Using API Token authentication"
         self.class.headers({
           'Authorization' => "Bearer #{@api_token}",
@@ -235,14 +234,6 @@ module Deployment
         self.class.headers({
           'X-Auth-Email' => @email,
           'X-Auth-Key' => @api_key,
-          'Content-Type' => 'application/json'
-        })
-      elsif @api_token.present? && @email.present?
-        # API_TOKEN might be a Global API Key
-        Rails.logger.info "[CloudflareApiClient] Using API_TOKEN as Global API Key"
-        self.class.headers({
-          'X-Auth-Email' => @email,
-          'X-Auth-Key' => @api_token,
           'Content-Type' => 'application/json'
         })
       else
