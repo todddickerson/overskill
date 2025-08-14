@@ -7,10 +7,32 @@ module Deployment
       @app = app
       @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
       @api_token = ENV['CLOUDFLARE_API_TOKEN']
+      @api_key = ENV['CLOUDFLARE_API_KEY']
+      @email = ENV['CLOUDFLARE_EMAIL']
       @zone_id = ENV['CLOUDFLARE_ZONE_ID']
       @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
       
-      self.class.headers('Authorization' => "Bearer #{@api_token}")
+      # Use API Token if it looks like a valid token (contains dashes)
+      # Otherwise fall back to Global API Key with email
+      if @api_token.present? && @api_token.include?('-')
+        Rails.logger.info "[CloudflareWorkersDeployer] Using API Token authentication"
+        self.class.headers('Authorization' => "Bearer #{@api_token}")
+      elsif @api_key.present? && @email.present?
+        Rails.logger.info "[CloudflareWorkersDeployer] Using Global API Key authentication"
+        self.class.headers({
+          'X-Auth-Email' => @email,
+          'X-Auth-Key' => @api_key
+        })
+      elsif @api_token.present? && @email.present?
+        # Fallback: API_TOKEN might actually be the Global API Key
+        Rails.logger.info "[CloudflareWorkersDeployer] Using API_TOKEN as Global API Key with email"
+        self.class.headers({
+          'X-Auth-Email' => @email,
+          'X-Auth-Key' => @api_token
+        })
+      else
+        Rails.logger.error "[CloudflareWorkersDeployer] No valid Cloudflare authentication found"
+      end
     end
     
     def deploy_with_secrets(built_code:, deployment_type: :preview)

@@ -24,6 +24,8 @@ module Deployment
       @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
       @zone_id = ENV['CLOUDFLARE_ZONE_ID']
       @api_token = ENV['CLOUDFLARE_API_TOKEN']
+      @api_key = ENV['CLOUDFLARE_API_KEY']
+      @email = ENV['CLOUDFLARE_EMAIL']
       @bucket_name = ENV['CLOUDFLARE_R2_BUCKET'] || 'overskill-apps'
       @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
       
@@ -219,10 +221,33 @@ module Deployment
     private
 
     def setup_http_headers
-      self.class.headers({
-        'Authorization' => "Bearer #{@api_token}",
-        'Content-Type' => 'application/json'
-      })
+      # Determine auth method based on credential format
+      if @api_token.present? && @api_token.include?('-')
+        # Looks like a valid API Token (contains dashes)
+        Rails.logger.info "[CloudflareApiClient] Using API Token authentication"
+        self.class.headers({
+          'Authorization' => "Bearer #{@api_token}",
+          'Content-Type' => 'application/json'
+        })
+      elsif @api_key.present? && @email.present?
+        # Use Global API Key with email
+        Rails.logger.info "[CloudflareApiClient] Using Global API Key authentication"
+        self.class.headers({
+          'X-Auth-Email' => @email,
+          'X-Auth-Key' => @api_key,
+          'Content-Type' => 'application/json'
+        })
+      elsif @api_token.present? && @email.present?
+        # API_TOKEN might be a Global API Key
+        Rails.logger.info "[CloudflareApiClient] Using API_TOKEN as Global API Key"
+        self.class.headers({
+          'X-Auth-Email' => @email,
+          'X-Auth-Key' => @api_token,
+          'Content-Type' => 'application/json'
+        })
+      else
+        Rails.logger.error "[CloudflareApiClient] No valid authentication credentials found"
+      end
     end
 
     def generate_worker_name
@@ -465,8 +490,14 @@ module Deployment
       
       missing_credentials << 'CLOUDFLARE_ACCOUNT_ID' if @account_id.blank?
       missing_credentials << 'CLOUDFLARE_ZONE_ID' if @zone_id.blank?
-      missing_credentials << 'CLOUDFLARE_API_TOKEN' if @api_token.blank?
-      missing_credentials << 'CLOUDFLARE_EMAIL' if ENV['CLOUDFLARE_EMAIL'].blank?
+      
+      # Need either API Token or API Key+Email
+      if @api_token.blank? && @api_key.blank?
+        missing_credentials << 'CLOUDFLARE_API_TOKEN or CLOUDFLARE_API_KEY'
+      end
+      if (@api_key.present? || @api_token.present?) && @email.blank?
+        missing_credentials << 'CLOUDFLARE_EMAIL'
+      end
       missing_credentials << 'SUPABASE_URL' if ENV['SUPABASE_URL'].blank?
       missing_credentials << 'SUPABASE_SERVICE_KEY' if ENV['SUPABASE_SERVICE_KEY'].blank?
       
