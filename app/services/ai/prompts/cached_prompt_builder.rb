@@ -130,32 +130,36 @@ module Ai
         <<~CONTEXT
         
         <useful-context>
-        # Current Iteration Context
-        
         #{format_context_data}
         </useful-context>
         CONTEXT
       end
       
       def format_context_data
-        @context_data.map do |key, value|
+        sections = []
+        
+        @context_data.each do |key, value|
           case key
           when :base_template_context
-            # This is pre-formatted useful-context from BaseContextService
-            value
+            # This already has "# useful-context" header from BaseContextService
+            # Strip that header to avoid duplication
+            cleaned_value = value.to_s.sub(/^# useful-context\n\n?/, '')
+            sections << cleaned_value if cleaned_value.present?
           when :existing_files_context
             # This is pre-formatted existing files context
-            value
+            sections << value if value.present?
           when :iteration_data
-            format_iteration_data(value)
+            sections << format_iteration_data(value)
           when :recent_operations
-            format_recent_operations(value)
+            sections << format_recent_operations(value)
           when :verification_results
-            format_verification_results(value)
+            sections << format_verification_results(value)
           else
-            "### #{key.to_s.humanize}:\n#{value}"
+            sections << "### #{key.to_s.humanize}:\n#{value}"
           end
-        end.join("\n\n")
+        end
+        
+        sections.compact.join("\n\n")
       end
       
       def format_iteration_data(data)

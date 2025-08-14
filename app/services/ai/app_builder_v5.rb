@@ -661,9 +661,23 @@ module Ai
       response = nil  # Define response outside the loop
       content_added_to_flow = false  # Track whether we've added current response content
       
+      # Log initial message structure
+      system_msg = conversation_messages.find { |m| m[:role] == 'system' }
+      Rails.logger.info "[V5_TOOLS] Initial messages: #{conversation_messages.size} total, system_prompt: #{system_msg.present?}"
+      if system_msg
+        Rails.logger.info "[V5_TOOLS] System prompt type: #{system_msg[:content].is_a?(Array) ? 'array' : 'string'}"
+        if system_msg[:content].is_a?(Array)
+          Rails.logger.info "[V5_TOOLS] System prompt blocks: #{system_msg[:content].map { |b| b[:type] }.join(', ')}"
+        end
+      end
+      
       loop do
         # Reset content tracking for each new API response
         content_added_to_flow = false
+        
+        # Log messages being sent to API
+        Rails.logger.info "[V5_TOOLS] API Call #{tool_cycles + 1}: Sending #{conversation_messages.size} messages"
+        Rails.logger.info "[V5_TOOLS] Message roles: #{conversation_messages.map { |m| m[:role] }.join(' -> ')}"
         
         # Validate conversation structure before API call (only in verbose mode)
         if ENV["VERBOSE_AI_LOGGING"] == "true" && conversation_messages.size >= 2
