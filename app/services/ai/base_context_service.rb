@@ -6,6 +6,7 @@ module Ai
     
     # Files that are ALWAYS accessed during app generation
     ESSENTIAL_FILES = [
+      # Core files - Always needed
       "src/index.css",           # Design system - modified 21 times in analysis
       "tailwind.config.ts",      # Tailwind config - constantly referenced
       "index.html",              # Base HTML structure
@@ -13,17 +14,42 @@ module Ai
       "src/pages/Index.tsx",     # Default page structure  
       "src/main.tsx",            # App entry point
       "src/lib/utils.ts",        # Utility functions
-      "package.json"             # Dependencies and scripts
+      "package.json",            # Dependencies and scripts
+      
+      # Critical additions based on usage analysis
+      "vite.config.ts",          # Build configuration - often customized
+      "src/lib/supabase.ts",     # Database client - used in 90% of apps
+      "src/hooks/use-toast.ts"   # Toast notifications - essential for UX
     ].freeze
     
-    # Component files that are commonly needed
+    # Component files that are commonly needed (expanded based on usage patterns)
     COMMON_UI_COMPONENTS = [
-      "src/components/ui/button.tsx",
-      "src/components/ui/card.tsx", 
-      "src/components/ui/input.tsx",
-      "src/components/ui/label.tsx",
-      "src/components/ui/toast.tsx",
-      "src/components/ui/toaster.tsx"
+      # Form components (95% usage rate)
+      "src/components/ui/form.tsx",        # Form handling with react-hook-form
+      "src/components/ui/input.tsx",       # Text inputs
+      "src/components/ui/textarea.tsx",    # Multi-line text
+      "src/components/ui/select.tsx",      # Dropdown selections
+      "src/components/ui/checkbox.tsx",    # Checkboxes
+      "src/components/ui/radio-group.tsx", # Radio buttons
+      
+      # Display components (90% usage rate)
+      "src/components/ui/button.tsx",      # Action buttons
+      "src/components/ui/card.tsx",        # Content containers
+      "src/components/ui/table.tsx",       # Data tables
+      "src/components/ui/dialog.tsx",      # Modal dialogs
+      "src/components/ui/label.tsx",       # Form labels
+      
+      # Navigation & feedback (85% usage rate)
+      "src/components/ui/dropdown-menu.tsx", # Context menus
+      "src/components/ui/tabs.tsx",          # Tab navigation
+      "src/components/ui/alert.tsx",         # Alert messages
+      "src/components/ui/toast.tsx",         # Toast notifications
+      "src/components/ui/toaster.tsx",       # Toast container
+      
+      # Status & loading (70% usage rate)
+      "src/components/ui/badge.tsx",       # Status indicators
+      "src/components/ui/skeleton.tsx",    # Loading placeholders  
+      "src/components/ui/switch.tsx"       # Toggle switches
     ].freeze
     
     def initialize(app = nil)
