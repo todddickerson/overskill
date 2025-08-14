@@ -94,6 +94,88 @@ module Ai
     def execute_until_complete
       Rails.logger.info "[V5_LOOP] Starting execute_until_complete"
       
+      # Feature flag to use simple flow vs complex decision engine
+      use_simple_flow = ENV.fetch('V5_SIMPLE_FLOW', 'true') == 'true'
+      
+      if use_simple_flow
+        # SIMPLE FLOW: Just let Claude do its thing
+        Rails.logger.info "[V5_LOOP] Using SIMPLE FLOW - no decision engine"
+        execute_simple_claude_flow
+      else
+        # ORIGINAL COMPLEX FLOW with decision engine
+        execute_complex_decision_loop
+      end
+    end
+    
+    def execute_simple_claude_flow
+      # Simple flow: Send context to Claude, let it do its thing, deploy
+      Rails.logger.info "[V5_SIMPLE] Starting simple Claude flow"
+      
+      @iteration_count = 1
+      @agent_state[:iteration] = @iteration_count
+      update_iteration_count
+      
+      begin
+        # Phase 1: Send full context to Claude and let it work
+        update_thinking_status("Phase 1/3: Analyzing requirements and generating app...")
+        
+        # Build the prompt with all context
+        prompt = <<~PROMPT
+          Generate a complete application based on this request:
+          #{@chat_message.content}
+          
+          Use the available tools to create all necessary files.
+          Focus on creating a working implementation that meets all requirements.
+          When you're done generating files, say "I've completed generating the app files."
+        PROMPT
+        
+        # Call Claude with full context and tools
+        response = call_ai_with_context(prompt)
+        
+        # Claude's response (with tool calls) is already handled by execute_tool_calling_cycle
+        Rails.logger.info "[V5_SIMPLE] Claude completed generation"
+        
+        # Phase 2: Build and deploy preview
+        update_thinking_status("Phase 2/3: Building and deploying preview...")
+        deploy_result = deploy_preview_if_ready
+        
+        if deploy_result[:success]
+          # Phase 3: Complete
+          update_thinking_status("Phase 3/3: Generation complete!")
+          add_loop_message("App generation complete. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
+          
+          # Mark completion
+          @completion_status = :complete
+        else
+          add_loop_message("Deployment failed: #{deploy_result[:error]}", type: 'error')
+          @completion_status = :failed
+        end
+        
+      rescue => e
+        Rails.logger.error "[V5_SIMPLE] Error in simple flow: #{e.message}"
+        add_loop_message("Error during generation: #{e.message}", type: 'error')
+        raise e
+      end
+    end
+    
+    def deploy_preview_if_ready
+      # Check if we have generated files to deploy
+      if @agent_state[:generated_files].empty?
+        Rails.logger.warn "[V5_SIMPLE] No files generated, skipping deployment"
+        return { success: false, error: "No files generated to deploy" }
+      end
+      
+      Rails.logger.info "[V5_SIMPLE] Deploying #{@agent_state[:generated_files].count} files"
+      
+      # Deploy using existing deploy_app method
+      deploy_app
+    rescue => e
+      Rails.logger.error "[V5_SIMPLE] Deployment error: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
+    def execute_complex_decision_loop
+      # Original complex flow with decision engine
       loop do
         @iteration_count += 1
         @agent_state[:iteration] = @iteration_count
