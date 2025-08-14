@@ -854,8 +854,19 @@ module Ai
         
         Rails.logger.info "[V5_TOOLS] Executing #{tool_name} with args: #{tool_args.keys.join(', ')}"
         
-        # Execute the tool (this will add to pending_tool_calls)
-        result = execute_single_tool(tool_name, tool_args)
+        # Execute the tool with proper error handling
+        result = begin
+          execute_single_tool(tool_name, tool_args)
+        rescue StandardError => e
+          Rails.logger.error "[V5_TOOLS] Tool execution failed: #{tool_name} - #{e.message}"
+          Rails.logger.error e.backtrace.first(5).join("\n")
+          
+          # Ensure status is updated to error on exception
+          update_tool_status_to_error(tool_name, tool_args['file_path'], e.message)
+          
+          # Return error result
+          { error: "Tool execution failed: #{e.message}" }
+        end
         
         # Format result according to Anthropic tool_result spec
         tool_result_block = {
@@ -1047,20 +1058,22 @@ module Ai
         # Update UI with tool execution
         add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
         
-        result = case tool_name
-        when 'os-write'
-          write_file(tool_args['file_path'], tool_args['content'])
-        when 'os-view', 'os-read'
-          read_file(tool_args['file_path'])
-        when 'os-line-replace'
-          replace_file_content(tool_args)
-        when 'os-delete'
-          delete_file(tool_args['file_path'])
-        when 'os-add-dependency'
-          add_dependency(tool_args['package'])
-        when 'os-remove-dependency'
-          remove_dependency(tool_args['package'])
-        when 'os-rename'
+        # Execute with proper error handling
+        result = begin
+          case tool_name
+          when 'os-write'
+            write_file(tool_args['file_path'], tool_args['content'])
+          when 'os-view', 'os-read'
+            read_file(tool_args['file_path'])
+          when 'os-line-replace'
+            replace_file_content(tool_args)
+          when 'os-delete'
+            delete_file(tool_args['file_path'])
+          when 'os-add-dependency'
+            add_dependency(tool_args['package'])
+          when 'os-remove-dependency'
+            remove_dependency(tool_args['package'])
+          when 'os-rename'
           rename_file(tool_args['old_path'], tool_args['new_path'])
         when 'os-search-files'
           search_files(tool_args)
@@ -1080,8 +1093,18 @@ module Ai
           web_search(tool_args)
         when 'read_project_analytics'
           read_project_analytics(tool_args)
-        else
-          { error: "Unknown tool: #{tool_name}" }
+          else
+            { error: "Unknown tool: #{tool_name}" }
+          end
+        rescue StandardError => e
+          Rails.logger.error "[V5_TOOLS] Tool execution failed in process_tool_calls: #{tool_name} - #{e.message}"
+          Rails.logger.error e.backtrace.first(5).join("\n")
+          
+          # Ensure status is updated to error on exception
+          update_tool_status_to_error(tool_name, tool_args['file_path'], e.message)
+          
+          # Return error result
+          { error: "Tool execution failed: #{e.message}" }
         end
         
         log_claude_event("TOOL_EXECUTE_COMPLETE", {
@@ -2269,6 +2292,33 @@ module Ai
       )
       
       @pending_tool_calls = []
+    end
+    
+    def update_tool_status_to_error(tool_name, file_path, error_message)
+      # Immediately update tool status to error when exception occurs
+      if @assistant_message.present? && @assistant_message.tool_calls.present?
+        updated_tool_calls = @assistant_message.tool_calls.deep_dup
+        
+        # Find the running tool and update to error
+        updated_tool_calls.reverse.each do |tc|
+          if tc['name'] == tool_name && 
+             tc['file_path'] == file_path && 
+             tc['status'] == 'running'
+            tc['status'] = 'error'
+            tc['error'] = error_message
+            break
+          end
+        end
+        
+        # Save immediately to prevent stuck "running" status
+        @assistant_message.tool_calls = updated_tool_calls
+        @assistant_message.save!
+        
+        # Also update in conversation flow
+        update_tool_status_in_flow(tool_name, file_path, 'error')
+        
+        Rails.logger.info "[V5_TOOLS] Updated tool status to error: #{tool_name} #{file_path}"
+      end
     end
     
     def update_tool_status_in_flow(tool_name, file_path, new_status)
