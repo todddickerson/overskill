@@ -78,10 +78,12 @@
               
             <% when 'thinking' %>
               <%# Thinking message - subtle display (TODO: Consider removing later) %>
-              <div class="flex items-start space-x-2 text-xs text-gray-500 dark:text-gray-600 italic opacity-70 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                <i class="fas fa-brain text-gray-400 mt-0.5"></i>
-                <span class="whitespace-pre-wrap"><%= flow_item['content']['content'] || flow_item['content'] %></span>
-              </div>
+              <% if flow_item['content'].present? %>
+                <div class="flex items-start space-x-2 text-xs text-gray-500 dark:text-gray-600 italic opacity-70 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                  <i class="fas fa-brain text-gray-400 mt-0.5"></i>
+                  <span class="whitespace-pre-wrap"><%= flow_item['content'] %></span>
+                </div>
+              <% end %>
               
             <% when 'status' %>
               <%# Status update %>
