@@ -275,7 +275,7 @@ module Deployment
         next unless value.present?
         
         # Use Cloudflare API to set secret
-        response = self.class.patch(
+        response = self.class.put(
           "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
           body: { 
             name: key,

@@ -169,7 +169,7 @@ module Deployment
         { name: key, text: value.to_s, type: 'secret_text' }
       end
       
-      response = self.class.patch(
+      response = self.class.put(
         "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
         body: secrets_array.to_json,
         headers: { 'Content-Type' => 'application/json' }
