@@ -135,7 +135,7 @@ module Ai
         # Check termination conditions
         if should_terminate?(result)
           Rails.logger.info "[V5_LOOP] Termination condition met"
-          add_loop_message("All goals completed successfully!", type: 'status')
+          # Status message already added in should_terminate? when appropriate
           break
         end
         
@@ -523,7 +523,8 @@ module Ai
       
       if app_ready_signal
         Rails.logger.info "[V5_LOOP] Termination: Claude signaled app is ready for preview"
-        add_loop_message("✓ App is functional and ready for preview", type: 'status')
+        add_loop_message("✅ App generation complete - ready for deployment", type: 'status')
+        @completion_status = :complete  # CRITICAL: Mark as complete so deployment happens
       elsif termination_by_evaluator
         Rails.logger.info "[V5_LOOP] Termination: evaluator said to stop"
       elsif status_complete
@@ -532,6 +533,7 @@ module Ai
         Rails.logger.info "[V5_LOOP] Termination: user intervention required"
       elsif high_confidence
         Rails.logger.info "[V5_LOOP] Termination: high confidence #{result[:verification][:confidence]}"
+        @completion_status = :complete  # Mark as complete for high confidence scenarios
       elsif natural_completion
         Rails.logger.info "[V5_LOOP] Termination: natural completion achieved"
       elsif await_input
@@ -564,7 +566,7 @@ module Ai
           @assistant_message.update!(
             thinking_status: nil,
             status: 'completed',
-            content: "App successfully generated and deployed! Preview: #{app.preview_url}",
+            content: "✨ Your app has been successfully generated and deployed!\n\n🔗 **Preview URL**: #{app.preview_url}\n\nThe app is now live and ready for testing.",
             conversation_flow: preserved_flow  # Explicitly preserve
           )
           
@@ -586,12 +588,23 @@ module Ai
         # Preserve the conversation_flow explicitly
         preserved_flow = @assistant_message.conversation_flow || []
         
-        @assistant_message.update!(
-          thinking_status: nil,
-          status: 'failed',
-          content: "Generation incomplete after #{@iteration_count} iterations",
-          conversation_flow: preserved_flow  # Explicitly preserve
-        )
+        # Check if files were created even though generation is incomplete
+        files_created = app.app_files.count
+        if files_created > 0
+          @assistant_message.update!(
+            thinking_status: nil,
+            status: 'failed',
+            content: "⚠️ Generation stopped after #{@iteration_count} iterations.\n\n#{files_created} files were created but the app may be incomplete. You can try continuing the generation or start fresh.",
+            conversation_flow: preserved_flow  # Explicitly preserve
+          )
+        else
+          @assistant_message.update!(
+            thinking_status: nil,
+            status: 'failed',
+            content: "Generation could not be completed. Please try again with a clearer description of what you'd like to build.",
+            conversation_flow: preserved_flow  # Explicitly preserve
+          )
+        end
       end
     end
     
