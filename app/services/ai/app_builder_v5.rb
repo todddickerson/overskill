@@ -1794,13 +1794,55 @@ module Ai
         if msg.role == 'user'
           messages << { role: 'user', content: msg.content }
         elsif msg.role == 'assistant'
-          # For assistant messages, use the final content or summary
+          # For assistant messages in continuation, we need to include thinking blocks
+          # when thinking is enabled to satisfy Anthropic API requirements
+          content_blocks = []
+          
+          # Check if we have thinking content from previous iterations
+          if msg.loop_messages.present? && msg.loop_messages.any? { |lm| lm['thinking'].present? }
+            # Extract thinking from loop messages
+            msg.loop_messages.each do |loop_msg|
+              if loop_msg['thinking'].present?
+                content_blocks << { type: 'thinking', thinking: loop_msg['thinking'] }
+                break # Only need one thinking block per message
+              end
+            end
+          elsif msg.metadata.present? && msg.metadata['thinking'].present?
+            # Use metadata thinking if available
+            content_blocks << { type: 'thinking', thinking: msg.metadata['thinking'] }
+          else
+            # Add a minimal thinking block to satisfy API requirements
+            content_blocks << { 
+              type: 'thinking', 
+              thinking: "Processing the user's request to modify the app."
+            }
+          end
+          
+          # Add the actual text content
           assistant_content = msg.content.presence || "I processed your request and made changes to the app."
-          messages << { role: 'assistant', content: assistant_content }
+          content_blocks << { type: 'text', text: assistant_content }
+          
+          # Add tool use/results if they exist in the message
+          if msg.tool_calls.present? && msg.tool_calls.any?
+            msg.tool_calls.each do |tool_call|
+              if tool_call['type'] == 'tool_use'
+                content_blocks << tool_call
+              elsif tool_call['tool_use_id'].present?
+                # Add tool result
+                content_blocks << {
+                  type: 'tool_result',
+                  tool_use_id: tool_call['tool_use_id'],
+                  content: tool_call['content'] || tool_call['output'] || 'Tool executed successfully'
+                }
+              end
+            end
+          end
+          
+          messages << { role: 'assistant', content: content_blocks }
         end
       end
       
-      Rails.logger.info "[V5_CONTEXT] Added #{previous_messages.size} previous messages to context"
+      Rails.logger.info "[V5_CONTEXT] Added #{previous_messages.size} previous messages to context with thinking blocks"
     end
     
     # Build optimized system prompt with caching support
