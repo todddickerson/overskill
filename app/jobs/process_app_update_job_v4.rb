@@ -12,10 +12,10 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     if message && message.app
       message.app.update!(status: "failed")
       
-      # Create error message for user
+      # Create error message for user (note: this job actually uses V5 builder internally)
       message.app.app_chat_messages.create!(
         role: "assistant", 
-        content: "I encountered an error with the V4 app builder: #{error.message}\n\nThe V4 system includes automatic retries, so this indicates a persistent issue. Please try again or contact support.",
+        content: "I encountered an error with the app builder: #{error.message}\n\nThe system includes automatic retries, so this indicates a persistent issue. Please try again or contact support.",
         status: "failed"
       )
     end

@@ -15,6 +15,9 @@ class Account::AppChatsController < Account::ApplicationController
       orchestrator_version = Rails.application.config.app_generation_version
       
       case orchestrator_version
+      when :v5
+        Rails.logger.info "[AppChats] Using V5 orchestrator for message ##{@message.id}"
+        ProcessAppUpdateJobV5.perform_later(@message)
       when :v4_enhanced
         Rails.logger.info "[AppChats] Using V4 Enhanced orchestrator with visual feedback for message ##{@message.id}"
         ProcessAppUpdateJobV4.perform_later(@message, use_enhanced: true)
@@ -25,9 +28,9 @@ class Account::AppChatsController < Account::ApplicationController
         Rails.logger.info "[AppChats] Using V3 Optimized orchestrator for message ##{@message.id}"
         ProcessAppUpdateJobV3.perform_later(@message)
       else
-        # Default to V4 Enhanced
-        Rails.logger.info "[AppChats] Using V4 Enhanced orchestrator (default) for message ##{@message.id}"
-        ProcessAppUpdateJobV4.perform_later(@message, use_enhanced: true)
+        # Default to V5 now
+        Rails.logger.info "[AppChats] Using V5 orchestrator (default) for message ##{@message.id}"
+        ProcessAppUpdateJobV5.perform_later(@message)
       end
 
       respond_to do |format|

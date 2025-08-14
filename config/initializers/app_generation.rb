@@ -3,9 +3,9 @@
 # Can be overridden with environment variables
 
 Rails.application.configure do
-  # Set the default orchestrator version from ENV or default to v4_enhanced
-  # Options: :v3, :v4, :v4_enhanced
-  version = ENV.fetch('APP_GENERATION_VERSION', 'v4_enhanced')
+  # Set the default orchestrator version from ENV or default to v5
+  # Options: :v3, :v4, :v4_enhanced, :v5
+  version = ENV.fetch('APP_GENERATION_VERSION', 'v5')
   config.app_generation_version = version.to_sym
   
   # Feature flags for specific enhancements
