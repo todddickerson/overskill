@@ -205,26 +205,8 @@ class App < ApplicationRecord
 
     # Trigger job unless explicitly told not to (e.g., when controller handles it)
     unless skip_job_trigger
-      orchestrator_version = Rails.application.config.app_generation_version
-      
-      case orchestrator_version
-      when :v5
-        Rails.logger.info "[App] Triggering V5 orchestrator for message ##{message.id}"
-        ProcessAppUpdateJobV5.perform_later(message)
-      when :v4_enhanced
-        Rails.logger.info "[App] Triggering V4 Enhanced orchestrator for message ##{message.id}"
-        ProcessAppUpdateJobV4.perform_later(message, use_enhanced: true)
-      when :v4
-        Rails.logger.info "[App] Triggering V4 orchestrator for message ##{message.id}"
-        ProcessAppUpdateJobV4.perform_later(message, use_enhanced: false)
-      else
-        # Default to V5
-        Rails.logger.info "[App] Triggering V5 orchestrator (default) for message ##{message.id}"
-        ProcessAppUpdateJobV5.perform_later(message)
-      end
-    else
-      # Job execution is handled by controller separately
-      Rails.logger.info "[App] Skipping job trigger - will be handled by controller for app ##{id}"
+      Rails.logger.info "[App] Triggering V5 orchestrator for message ##{message.id}"
+      ProcessAppUpdateJobV4.perform_later(message) # handles all versions
     end
     
     # Update status

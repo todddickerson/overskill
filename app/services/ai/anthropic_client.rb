@@ -170,7 +170,31 @@ module Ai
         end
       end
 
-      Rails.logger.info "[AI] Calling Anthropic API with model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      # Enhanced debugging for API calls
+      Rails.logger.info "[AnthropicClient] API Call Details:"
+      Rails.logger.info "  Model: #{model_id}"
+      Rails.logger.info "  Messages: #{api_messages.size} messages"
+      Rails.logger.info "  System prompt: #{system_message.is_a?(Array) ? 'Array format' : (system_message.present? ? 'String format' : 'None')}"
+      Rails.logger.info "  Temperature: #{temperature}"
+      Rails.logger.info "  Max tokens: #{max_tokens}"
+      
+      # Debug message structure without content
+      if ENV["DEBUG_ANTHROPIC"] == "true"
+        api_messages.each_with_index do |msg, idx|
+          Rails.logger.info "  Message #{idx}: role=#{msg[:role]}"
+          if msg[:content].is_a?(Array)
+            msg[:content].each do |block|
+              Rails.logger.info "    - Block type: #{block[:type]}"
+              if block[:type] == 'thinking'
+                Rails.logger.info "      Has thinking: #{block[:thinking].present?}"
+                Rails.logger.info "      Has signature: #{block[:signature].present?}"
+              end
+            end
+          else
+            Rails.logger.info "    - Content type: String (#{msg[:content].to_s.length} chars)"
+          end
+        end
+      end
 
       # Prepare request options with optional Helicone session tracking
       request_options = build_request_options.merge(body: body.to_json)
@@ -187,7 +211,20 @@ module Ai
         response = self.class.post("/v1/messages", request_options)
         
         unless response.success?
-          error_message = response.parsed_response["error"]&.dig("message") || "HTTP #{response.code}"
+          error_details = response.parsed_response["error"] || {}
+          error_message = error_details["message"] || "HTTP #{response.code}"
+          error_type = error_details["type"] || "unknown_error"
+          
+          Rails.logger.error "[AnthropicClient] API Error Response:"
+          Rails.logger.error "  Type: #{error_type}"
+          Rails.logger.error "  Message: #{error_message}"
+          Rails.logger.error "  HTTP Code: #{response.code}"
+          
+          # Log the full error for debugging if needed
+          if ENV["DEBUG_ANTHROPIC"] == "true"
+            Rails.logger.error "  Full error: #{error_details.inspect}"
+          end
+          
           raise HTTParty::Error.new("Anthropic API error: #{error_message}")
         end
         
@@ -300,7 +337,36 @@ module Ai
         Rails.logger.info "[AI] Extended thinking enabled with budget: #{thinking_tokens} tokens, temperature set to 1.0" if ENV["VERBOSE_AI_LOGGING"] == "true"
       end
 
-      Rails.logger.info "[AI] Calling Anthropic API with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      # Enhanced debugging for tool calls
+      Rails.logger.info "[AnthropicClient] Tool API Call Details:"
+      Rails.logger.info "  Model: #{model_id}"
+      Rails.logger.info "  Messages: #{api_messages.size} messages"
+      Rails.logger.info "  Tools: #{formatted_tools.size} tools available"
+      Rails.logger.info "  System prompt: #{system_message.present? ? 'Present' : 'None'}"
+      Rails.logger.info "  Extended thinking: #{body[:thinking].present? ? 'Enabled' : 'Disabled'}"
+      Rails.logger.info "  Temperature: #{temperature}"
+      
+      # Debug message structure for tool calls
+      if ENV["DEBUG_ANTHROPIC"] == "true"
+        api_messages.each_with_index do |msg, idx|
+          Rails.logger.info "  Message #{idx}: role=#{msg[:role]}"
+          if msg[:content].is_a?(Array)
+            msg[:content].each do |block|
+              Rails.logger.info "    - Block: #{block[:type]}"
+              if block[:type] == 'thinking'
+                Rails.logger.info "      thinking field: #{block[:thinking].present?}"
+                Rails.logger.info "      signature field: #{block[:signature].present?}"
+              elsif block[:type] == 'tool_use'
+                Rails.logger.info "      tool: #{block[:name]}"
+              elsif block[:type] == 'tool_result'
+                Rails.logger.info "      tool_use_id: #{block[:tool_use_id]}"
+              end
+            end
+          else
+            Rails.logger.info "    - Content: String (#{msg[:content].to_s.length} chars)"
+          end
+        end
+      end
 
       # Prepare request options with optional Helicone session tracking
       request_options = build_request_options.merge(body: body.to_json)
@@ -317,7 +383,20 @@ module Ai
         response = self.class.post("/v1/messages", request_options)
         
         unless response.success?
-          error_message = response.parsed_response["error"]&.dig("message") || "HTTP #{response.code}"
+          error_details = response.parsed_response["error"] || {}
+          error_message = error_details["message"] || "HTTP #{response.code}"
+          error_type = error_details["type"] || "unknown_error"
+          
+          Rails.logger.error "[AnthropicClient] API Error Response:"
+          Rails.logger.error "  Type: #{error_type}"
+          Rails.logger.error "  Message: #{error_message}"
+          Rails.logger.error "  HTTP Code: #{response.code}"
+          
+          # Log the full error for debugging if needed
+          if ENV["DEBUG_ANTHROPIC"] == "true"
+            Rails.logger.error "  Full error: #{error_details.inspect}"
+          end
+          
           raise HTTParty::Error.new("Anthropic API error: #{error_message}")
         end
         

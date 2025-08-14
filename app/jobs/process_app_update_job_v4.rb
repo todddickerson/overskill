@@ -26,16 +26,7 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     
     # Use enhanced V4 with visual feedback by default
     use_v5 = true # New version based on Lovable leaked Agent prompts
-    orchestrator = if use_v5
-      Rails.logger.info "[ProcessAppUpdateJobV4] Using V5 builder"
-      Ai::AppBuilderV5.new(message)
-    elsif use_enhanced
-      Rails.logger.info "[ProcessAppUpdateJobV4] Using ENHANCED V4 builder with real-time feedback"
-      Ai::AppBuilderV4Enhanced.new(message)
-    else
-      Rails.logger.info "[ProcessAppUpdateJobV4] Using standard V4 builder"
-      Ai::AppBuilderV4.new(message)
-    end
+    orchestrator = Ai::AppBuilderV5.new(message)
     
     # V4 has built-in retry logic (MAX_RETRIES = 2)
     orchestrator.execute!
