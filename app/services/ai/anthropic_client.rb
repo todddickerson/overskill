@@ -45,8 +45,8 @@ module Ai
         cost_per_1k_output: 15.00,
         cache_write_multiplier: 1.25,  # 25% more to write to cache
         cache_read_multiplier: 0.10,   # 90% savings on cached reads
-        supports_extended_thinking: true,
-        supports_interleaved_thinking: true,
+        supports_extended_thinking: false,
+        supports_interleaved_thinking: false,
         recommended_thinking_budget: 16_000  # 16k+ tokens for complex tasks
       },
       "claude-opus-4-1-20250805" => { 
@@ -56,8 +56,8 @@ module Ai
         cost_per_1k_output: 75.00,
         cache_write_multiplier: 1.25,
         cache_read_multiplier: 0.10,
-        supports_extended_thinking: true,
-        supports_interleaved_thinking: true,
+        supports_extended_thinking: false,
+        supports_interleaved_thinking: false,
         recommended_thinking_budget: 16_000  # 16k+ tokens for complex tasks
       },
       "claude-3-5-haiku-20241022" => { 
@@ -76,12 +76,15 @@ module Ai
     def initialize(api_key = nil)
       @api_key = api_key || ENV.fetch("ANTHROPIC_API_KEY")
       
+      # Get the model ID string for checking specs
+      default_model_id = MODELS[DEFAULT_MODEL]
+      
       # Build base headers
       @base_headers = {
         "x-api-key" => @api_key,
         "content-type" => "application/json",
         "anthropic-version" => "2023-06-01",
-        "anthropic-beta" => "prompt-caching-2024-07-31,interleaved-thinking-2025-05-14,context-1m-2025-08-07"
+        "anthropic-beta" => "prompt-caching-2024-07-31,#{"interleaved-thinking-2025-05-14" if MODEL_SPECS[default_model_id] && MODEL_SPECS[default_model_id][:supports_interleaved_thinking]},context-1m-2025-08-07"
       }
       
       @context_cache = ContextCacheService.new
