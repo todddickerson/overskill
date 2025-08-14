@@ -702,7 +702,7 @@ module Ai
     def deploy_app
       # Build the app first
       builder = Deployment::ExternalViteBuilder.new(app)
-      build_result = builder.build!
+      build_result = builder.build_for_preview
       
       unless build_result[:success]
         return { success: false, error: build_result[:error] }
