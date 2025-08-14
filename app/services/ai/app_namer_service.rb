@@ -8,7 +8,7 @@ module Ai
     MAX_RETRIES = 2
     
     # Model preferences for naming (lightweight and fast)
-    NAMING_MODEL_PREFERENCE = 'gpt-5'
+    NAMING_MODEL_PREFERENCE = 'gpt-4o'
     
     attr_reader :app, :prompt, :client_info
     
@@ -80,7 +80,11 @@ module Ai
     end
     
     def setup_ai_client
-      @client_info = Ai::ModelClientFactory.create_client(NAMING_MODEL_PREFERENCE)
+      @client_info = {
+        client: self,  # Use self to handle the API call directly
+        model: NAMING_MODEL_PREFERENCE,
+        provider: 'openai_direct'
+      }
       Rails.logger.info "[AppNamer] Using #{@client_info[:provider]}/#{@client_info[:model]} for naming"
     end
     
@@ -99,13 +103,8 @@ module Ai
         }
       ]
       
-      # Make AI request
-      response = @client_info[:client].chat(
-        messages,
-        model: @client_info[:model],
-        temperature: 0.8,  # Higher creativity for naming
-        max_tokens: 50     # Names should be short
-      )
+      # Make direct OpenAI API request
+      response = make_openai_request(messages)
       
       if response[:success]
         # Check if we have valid content
@@ -203,6 +202,62 @@ module Ai
       name = words.present? ? words.map(&:capitalize).join(' ') : "Generated App"
       
       name
+    end
+    
+    def make_openai_request(messages)
+      require 'net/http'
+      require 'json'
+      
+      api_key = ENV['OPENAI_API_KEY']
+      unless api_key.present?
+        return { success: false, error: "OpenAI API key not configured" }
+      end
+      
+      uri = URI('https://api.openai.com/v1/chat/completions')
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      
+      request = Net::HTTP::Post.new(uri)
+      request['Authorization'] = "Bearer #{api_key}"
+      request['Content-Type'] = 'application/json'
+      
+      body = {
+        model: 'gpt-4o',
+        messages: messages,
+        temperature: 0.8,
+        max_completion_tokens: 50,  # Use max_completion_tokens for newer OpenAI models
+        stream: false
+      }
+      
+      request.body = body.to_json
+      
+      begin
+        response = http.request(request)
+        
+        if response.code == '200'
+          result = JSON.parse(response.body)
+          content = result.dig('choices', 0, 'message', 'content')
+          
+          {
+            success: true,
+            content: content,
+            usage: result['usage']
+          }
+        else
+          error_body = JSON.parse(response.body) rescue { error: response.body }
+          Rails.logger.error "[AppNamer] OpenAI API error: #{error_body}"
+          {
+            success: false,
+            error: "OpenAI API error: #{error_body['error']&.dig('message') || response.code}"
+          }
+        end
+      rescue => e
+        Rails.logger.error "[AppNamer] OpenAI request failed: #{e.message}"
+        {
+          success: false,
+          error: e.message
+        }
+      end
     end
     
     def valid_app_name?(name)

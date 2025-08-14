@@ -161,7 +161,8 @@ class App < ApplicationRecord
   end
 
   # Unified AI generation entry point
-  def initiate_generation!(initial_prompt = nil)
+  # Set skip_job_trigger to true only when the controller will handle job triggering separately
+  def initiate_generation!(initial_prompt = nil, skip_job_trigger: false)
     Rails.logger.info "[App] Initiating AI generation for app ##{id}"
     
     # Update prompt if provided
@@ -201,8 +202,29 @@ class App < ApplicationRecord
     
     Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for AI generation"
 
-    # Job execution is handled by controller routing based on APP_GENERATION_VERSION
-    Rails.logger.info "[App] App generation job will be triggered by controller for app ##{id}"
+    # Trigger job unless explicitly told not to (e.g., when controller handles it)
+    unless skip_job_trigger
+      orchestrator_version = Rails.application.config.app_generation_version
+      
+      case orchestrator_version
+      when :v5
+        Rails.logger.info "[App] Triggering V5 orchestrator for message ##{message.id}"
+        ProcessAppUpdateJobV5.perform_later(message)
+      when :v4_enhanced
+        Rails.logger.info "[App] Triggering V4 Enhanced orchestrator for message ##{message.id}"
+        ProcessAppUpdateJobV4.perform_later(message, use_enhanced: true)
+      when :v4
+        Rails.logger.info "[App] Triggering V4 orchestrator for message ##{message.id}"
+        ProcessAppUpdateJobV4.perform_later(message, use_enhanced: false)
+      else
+        # Default to V5
+        Rails.logger.info "[App] Triggering V5 orchestrator (default) for message ##{message.id}"
+        ProcessAppUpdateJobV5.perform_later(message)
+      end
+    else
+      # Job execution is handled by controller separately
+      Rails.logger.info "[App] Skipping job trigger - will be handled by controller for app ##{id}"
+    end
     
     # Update status
     update!(status: "generating") unless generating?
@@ -277,7 +299,7 @@ class App < ApplicationRecord
   
   def initiate_ai_generation
     Rails.logger.info "[App] Auto-initiating generation for new app ##{id}"
-    initiate_generation!
+    initiate_generation!  # Default behavior is to trigger job
   end
   
   # 🚅 add methods above.
