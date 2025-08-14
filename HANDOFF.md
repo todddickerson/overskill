@@ -78,6 +78,12 @@
 - **Added**: Comprehensive Rails tests for `BaseContextService`
 - **Coverage**: File grouping, template handling, context building, error handling
 
+### [x] V5 Tool Status Synchronization Fix (August 14, 2025)
+- **Fixed**: Tool status stuck showing "Running" in conversation_flow while complete in tool_calls
+- **Issue**: pending_tool_calls retained 'running' status even after tool completion
+- **Solution**: Update tool status in both tool_calls AND pending_tool_calls before flushing
+- **Added**: Debug logging to track tool status updates across all data structures
+
 ## 📋 NEXT: Version Preview URLs Implementation
 
 ### AppVersion Preview URLs (Future Enhancement)
