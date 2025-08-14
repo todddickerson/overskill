@@ -5,17 +5,21 @@ export default class extends Controller {
   static targets = ["dropdown", "currentPageName"]
   static values = { 
     appId: String,
-    currentPage: String 
+    currentPage: String,
+    previewUrl: String
   }
   
   connect() {
     console.log('PageSelectorController connected')
     console.log('App ID:', this.appIdValue)
     console.log('Current page:', this.currentPageValue)
+    console.log('Preview URL:', this.previewUrlValue)
     
     // Set initial page name
     if (this.hasCurrentPageNameTarget) {
-      this.currentPageNameTarget.textContent = this.currentPageValue || 'index.html'
+      // For React apps, default to "Home (/)"
+      const defaultName = this.hasPreviewUrlValue ? 'Home (/)' : 'index.html'
+      this.currentPageNameTarget.textContent = this.currentPageValue === '/' ? 'Home (/)' : (this.currentPageValue || defaultName)
     }
     
     // Close dropdown when clicking outside
@@ -43,12 +47,13 @@ export default class extends Controller {
     event.stopPropagation()
     
     const page = event.params.page
-    console.log('Selected page:', page)
+    const displayName = event.params.display || page
+    console.log('Selected page:', page, 'Display:', displayName)
     
     // Update current page display
     this.currentPageValue = page
     if (this.hasCurrentPageNameTarget) {
-      this.currentPageNameTarget.textContent = page
+      this.currentPageNameTarget.textContent = displayName
     }
     
     // Hide dropdown
@@ -67,21 +72,32 @@ export default class extends Controller {
     const iframes = document.querySelectorAll('[data-preview-device-target="iframe"], [data-version-preview-target="iframe"]')
     
     iframes.forEach(iframe => {
-      // Get the base preview URL
-      const currentSrc = iframe.src
-      const url = new URL(currentSrc)
-      
-      // Update the page parameter
-      url.searchParams.set('page', page)
-      
-      console.log('Updating iframe src to:', url.toString())
-      iframe.src = url.toString()
+      // For React Router apps with preview URL, append the route path
+      if (this.hasPreviewUrlValue && this.previewUrlValue) {
+        // Get the base preview URL
+        const baseUrl = this.previewUrlValue.replace(/\/$/, '') // Remove trailing slash
+        const newPath = page === '/' ? '' : page // Don't append for home route
+        const newUrl = `${baseUrl}${newPath}`
+        
+        console.log('Updating iframe src to:', newUrl)
+        iframe.src = newUrl
+      } else {
+        // Legacy behavior for HTML files
+        const currentSrc = iframe.src
+        const url = new URL(currentSrc)
+        
+        // Update the page parameter
+        url.searchParams.set('page', page)
+        
+        console.log('Updating iframe src to:', url.toString())
+        iframe.src = url.toString()
+      }
     })
     
     // Also update any mobile navigation current page displays
     const mobilePageNames = document.querySelectorAll('[data-mobile-navigation-target="currentPageName"]')
     mobilePageNames.forEach(element => {
-      element.textContent = page
+      element.textContent = this.hasCurrentPageNameTarget ? this.currentPageNameTarget.textContent : page
     })
     
     // Broadcast page change event for other components

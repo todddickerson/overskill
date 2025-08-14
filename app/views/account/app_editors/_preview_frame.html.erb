@@ -36,27 +36,28 @@
     <div class="flex-1 relative p-4">
       <div class="h-full bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden"
            data-preview-device-target="container">
-        <% if app.app_files.any? %>
-          <% # Use Cloudflare preview URL if available, otherwise fallback to Rails preview %>
-          <% preview_src = app.preview_url || account_app_preview_path(app) %>
+        <% if app.preview_url.present? %>
+          <% # For deployed apps with Cloudflare URL, use the preview URL with optional path %>
+          <% preview_src = app.preview_url %>
+          <% # Check if there's a selected page path to append (for React Router navigation) %>
+          <% if defined?(selected_page_path) && selected_page_path.present? && selected_page_path != '/' %>
+            <% preview_src = "#{app.preview_url.chomp('/')}#{selected_page_path}" %>
+          <% end %>
           <iframe 
             data-version-preview-target="iframe"
             data-preview-device-target="iframe"
             data-controller="error-detector"
             data-error-detector-app-id-value="<%= app.id %>"
+            data-preview-base-url-value="<%= app.preview_url %>"
             src="<%= preview_src %>"
             class="w-full h-full border-0"
-            <% if app.preview_url %>
-              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
-            <% else %>
-              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
-            <% end %>
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
             title="App Preview">
           </iframe>
         <% else %>
           <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
             <div class="text-center">
-              <i class="fas fa-code text-5xl mb-4 text-gray-400"></i>
+              <%= image_tag "overskill-loader.svg", class: "w-20 h-20 mb-4 mx-auto opacity-60" %>
               <p class="text-lg font-medium">No preview available yet</p>
               <p class="text-sm mt-1">Generate your app to see it here</p>
             </div>

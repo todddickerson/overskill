@@ -208,17 +208,20 @@
         <div class="hidden lg:flex items-center space-x-3">
           <!-- Preview Controls (shown when preview tab is active) -->
           <div class="flex items-center space-x-2 mr-4" data-main-tabs-target="previewControls">
-            <% # Only show page selector for multi-page apps (not SPAs with Cloudflare URLs) %>
-            <% if @app.preview_url.blank? && @app.app_files.where(file_type: 'html').count > 1 %>
-            <!-- Page Selector (Desktop) - Only for multi-page apps -->
+            <% # Show page selector for React apps with preview URL to navigate between routes %>
+            <% react_pages = @app.app_files.where("path LIKE 'src/pages/%.tsx'").pluck(:path).map { |p| p.gsub('src/pages/', '').gsub('.tsx', '') } %>
+            <% has_react_pages = react_pages.any? && @app.preview_url.present? %>
+            <% if has_react_pages %>
+            <!-- Page Selector (Desktop) - For React Router navigation -->
             <div class="relative"
                  data-controller="page-selector"
                  data-page-selector-app-id-value="<%= @app.id %>"
-                 data-page-selector-current-page-value="<%= @app.app_files.find_by(path: 'index.html', file_type: 'html')&.path || @app.app_files.find_by(file_type: 'html')&.path || 'index.html' %>">
+                 data-page-selector-current-page-value="/"
+                 data-page-selector-preview-url-value="<%= @app.preview_url %>">
               <button class="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
                       data-action="click->page-selector#toggleDropdown">
-                <i class="fas fa-file-code text-sm text-gray-500 dark:text-gray-400"></i>
-                <span class="text-sm text-gray-700 dark:text-gray-300" data-page-selector-target="currentPageName"><%= @app.app_files.find_by(path: 'index.html', file_type: 'html')&.path || @app.app_files.find_by(file_type: 'html')&.path || 'index.html' %></span>
+                <i class="fas fa-route text-sm text-gray-500 dark:text-gray-400"></i>
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-page-selector-target="currentPageName">Home (/)</span>
                 <i class="fas fa-chevron-down text-xs text-gray-500 dark:text-gray-400"></i>
               </button>
               
@@ -226,18 +229,27 @@
               <div class="absolute z-50 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden min-w-[200px]"
                    data-page-selector-target="dropdown">
                 <div class="py-1 max-h-64 overflow-y-auto">
-                  <% @app.app_files.where(file_type: 'html').each do |html_file| %>
+                  <!-- Home route -->
+                  <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
+                          data-action="click->page-selector#selectPage"
+                          data-page-selector-page-param="/"
+                          data-page-selector-display-param="Home (/)">
+                    <i class="fas fa-home text-xs text-gray-400 mr-2"></i>
+                    <span class="text-gray-700 dark:text-gray-300">Home (/)</span>
+                  </button>
+                  
+                  <% # Add other React pages %>
+                  <% react_pages.each do |page_name| %>
+                    <% next if page_name == 'Index' # Skip Index as it's the home route %>
+                    <% next if page_name == 'NotFound' # Skip NotFound as it's a catch-all %>
+                    <% route_path = "/#{page_name.downcase}" %>
                     <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
                             data-action="click->page-selector#selectPage"
-                            data-page-selector-page-param="<%= html_file.path %>">
+                            data-page-selector-page-param="<%= route_path %>"
+                            data-page-selector-display-param="<%= page_name %> (<%= route_path %>)">
                       <i class="fas fa-file-code text-xs text-gray-400 mr-2"></i>
-                      <span class="text-gray-700 dark:text-gray-300"><%= html_file.path %></span>
+                      <span class="text-gray-700 dark:text-gray-300"><%= page_name %> (<%= route_path %>)</span>
                     </button>
-                  <% end %>
-                  <% if @app.app_files.where(file_type: 'html').empty? %>
-                    <div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                      No HTML pages found
-                    </div>
                   <% end %>
                 </div>
               </div>
@@ -436,20 +448,21 @@
     <div id="mobile_preview_controls"
          class="hidden border-b border-gray-200 dark:border-gray-700"
          data-mobile-navigation-target="previewControls"
-         <% if @app.preview_url.blank? && @app.app_files.where(file_type: 'html').count > 1 %>
+         <% if has_react_pages %>
          data-controller="page-selector"
          data-page-selector-app-id-value="<%= @app.id %>"
-         data-page-selector-current-page-value="<%= @app.app_files.find_by(path: 'index.html', file_type: 'html')&.path || @app.app_files.find_by(file_type: 'html')&.path || 'index.html' %>"
+         data-page-selector-current-page-value="/"
+         data-page-selector-preview-url-value="<%= @app.preview_url %>"
          <% end %>>
       <div class="flex items-center justify-between px-3 py-2">
-        <% if @app.preview_url.blank? && @app.app_files.where(file_type: 'html').count > 1 %>
+        <% if has_react_pages %>
         <!-- Page Selector -->
         <div class="flex-1 mr-2 relative">
           <button class="w-full flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded px-2.5 py-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   data-action="click->page-selector#toggleDropdown">
             <div class="flex items-center min-w-0">
-              <i class="fas fa-file-code text-[11px] text-gray-500 dark:text-gray-400 mr-1.5"></i>
-              <span class="text-xs text-gray-700 dark:text-gray-300 truncate" data-page-selector-target="currentPageName">index.html</span>
+              <i class="fas fa-route text-[11px] text-gray-500 dark:text-gray-400 mr-1.5"></i>
+              <span class="text-xs text-gray-700 dark:text-gray-300 truncate" data-page-selector-target="currentPageName">Home (/)</span>
             </div>
             <i class="fas fa-chevron-down text-[10px] text-gray-500 dark:text-gray-400 ml-1"></i>
           </button>
@@ -458,18 +471,27 @@
           <div class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden"
                data-page-selector-target="dropdown">
             <div class="py-1 max-h-64 overflow-y-auto">
-              <% @app.app_files.where(file_type: 'html').each do |html_file| %>
+              <!-- Home route -->
+              <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
+                      data-action="click->page-selector#selectPage"
+                      data-page-selector-page-param="/"
+                      data-page-selector-display-param="Home (/)">
+                <i class="fas fa-home text-xs text-gray-400 mr-2"></i>
+                <span class="text-gray-700 dark:text-gray-300">Home (/)</span>
+              </button>
+              
+              <% # Add other React pages %>
+              <% react_pages.each do |page_name| %>
+                <% next if page_name == 'Index' # Skip Index as it's the home route %>
+                <% next if page_name == 'NotFound' # Skip NotFound as it's a catch-all %>
+                <% route_path = "/#{page_name.downcase}" %>
                 <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
                         data-action="click->page-selector#selectPage"
-                        data-page-selector-page-param="<%= html_file.path %>">
+                        data-page-selector-page-param="<%= route_path %>"
+                        data-page-selector-display-param="<%= page_name %> (<%= route_path %>)">
                   <i class="fas fa-file-code text-xs text-gray-400 mr-2"></i>
-                  <span class="text-gray-700 dark:text-gray-300"><%= html_file.path %></span>
+                  <span class="text-gray-700 dark:text-gray-300"><%= page_name %> (<%= route_path %>)</span>
                 </button>
-              <% end %>
-              <% if @app.app_files.where(file_type: 'html').empty? %>
-                <div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                  No HTML pages found
-                </div>
               <% end %>
             </div>
           </div>
