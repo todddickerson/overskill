@@ -481,8 +481,25 @@ module Deployment
           }
           
           // Inject config and serve HTML for all page routes
-          const configScript = '<script>window.APP_CONFIG=' + JSON.stringify(config) + ';</script>';
-          const finalHtml = HTML_CONTENT.replace('<div id="root">', configScript + '<div id="root">');
+          // CRITICAL: Inject env vars as both window.APP_CONFIG and window.env for compatibility
+          const envScript = `
+            <script>
+              // Inject environment variables for the app
+              window.APP_CONFIG = ${JSON.stringify(config)};
+              window.env = {
+                VITE_SUPABASE_URL: '${config.supabaseUrl}',
+                VITE_SUPABASE_ANON_KEY: '${config.supabaseAnonKey}',
+                VITE_APP_ID: '${config.appId}',
+                VITE_OWNER_ID: '${config.appId}',
+                VITE_ENVIRONMENT: '${config.environment}'
+              };
+              // Also make them available on import.meta.env for runtime access
+              if (typeof window !== 'undefined' && !window.import) {
+                window.import = { meta: { env: window.env } };
+              }
+            </script>
+          `;
+          const finalHtml = HTML_CONTENT.replace('</head>', envScript + '</head>');
           
           return new Response(finalHtml, {
             headers: {
