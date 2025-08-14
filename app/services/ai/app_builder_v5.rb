@@ -1657,16 +1657,34 @@ module Ai
     # Build optimized system prompt with caching support
     def build_cached_system_prompt
       # Use CachedPromptBuilder for optimal caching
+      template_files = get_template_files_for_caching
+      base_prompt = @prompt_service.generate_prompt(include_context: false)
+      context_data = build_current_context_data
+      
       builder = Ai::Prompts::CachedPromptBuilder.new(
-        base_prompt: @prompt_service.generate_prompt(include_context: false),
-        template_files: get_template_files_for_caching,
-        context_data: build_current_context_data
+        base_prompt: base_prompt,
+        template_files: template_files,
+        context_data: context_data
       )
       
+      # Log caching decision
+      total_template_size = template_files.sum { |f| f.content&.length || 0 }
+      will_use_array = use_array_system_prompt?
+      
+      Rails.logger.info "[V5_CACHE] System prompt format: #{will_use_array ? 'ARRAY with cache_control' : 'STRING (no caching)'}"
+      Rails.logger.info "[V5_CACHE] Template size: #{total_template_size} chars (threshold: 10,000)"
+      Rails.logger.info "[V5_CACHE] Base prompt size: #{base_prompt&.length || 0} chars"
+      
       # Use array format for optimal caching when enabled
-      if use_array_system_prompt?
+      if will_use_array
         # Array format enables cache_control on specific blocks
-        builder.build_system_prompt_array
+        system_prompt = builder.build_system_prompt_array
+        Rails.logger.info "[V5_CACHE] Built array system prompt with #{system_prompt.size} blocks"
+        system_prompt.each_with_index do |block, i|
+          has_cache = block[:cache_control].present?
+          Rails.logger.info "[V5_CACHE]   Block #{i+1}: #{block[:text]&.length || 0} chars, cache_control: #{has_cache ? 'YES' : 'NO'}"
+        end
+        system_prompt
       else
         # String format for backward compatibility
         builder.build_system_prompt_string
@@ -1682,19 +1700,32 @@ module Ai
     
     # Get template files for caching (long-form data goes first)
     def get_template_files_for_caching
-      # Only include on first iteration or when needed
-      return [] unless @iteration_count <= 1
+      # NOTE: Files might change between iterations if Claude modified them
+      # Only cache on first iteration or when we haven't modified files yet
+      return [] if @iteration_count > 1 && @agent_state[:generated_files].any?
       
-      # Get template files that exist
       template_files = []
-      if @agent_state[:generated_files].any?
-        # Include actual file content for caching
-        @agent_state[:generated_files].first(10).each do |file|
-          if file.respond_to?(:content) && file.content.present?
-            template_files << file
-          end
+      
+      # Only include base template context on first iteration (before modifications)
+      if @iteration_count == 1
+        # Get the useful context which includes all template files
+        base_context_service = Ai::BaseContextService.new(@app)
+        useful_context = base_context_service.build_useful_context
+        
+        # Create a pseudo-file object for the template content
+        # This allows CachedPromptBuilder to handle it properly
+        if useful_context.present? && useful_context.length > 1000
+          template_files << OpenStruct.new(
+            path: "template_context",
+            content: useful_context
+          )
         end
       end
+      
+      # Don't cache existing app files as they may have been modified
+      # Let them go in the dynamic context section instead
+      
+      Rails.logger.info "[V5_CACHE] Template files for caching: #{template_files.size} files, #{template_files.sum { |f| f.content&.length || 0 }} total chars (iteration #{@iteration_count})"
       
       template_files
     end

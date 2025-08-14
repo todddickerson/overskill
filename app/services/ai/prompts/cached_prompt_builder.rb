@@ -28,6 +28,10 @@ module Ai
         # This is cached and reused across iterations
         if @template_files.any?
           template_content = build_template_files_content
+          
+          # Log cache decision for debugging
+          Rails.logger.info "[CACHE] Template content size: #{template_content.length} chars, will cache: #{template_content.length > 5000}"
+          
           if template_content.length > 5000  # Only cache if substantial
             system_blocks << {
               type: "text",
