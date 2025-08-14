@@ -108,10 +108,15 @@ module Ai
       )
       
       if response[:success]
-        # Clean up the response
-        clean_name = sanitize_ai_response(response[:content])
-        Rails.logger.info "[AppNamer] AI suggested: '#{clean_name}'"
-        return clean_name
+        # Check if we have valid content
+        if response[:content].present?
+          # Clean up the response
+          clean_name = sanitize_ai_response(response[:content])
+          Rails.logger.info "[AppNamer] AI suggested: '#{clean_name}'"
+          return clean_name
+        else
+          raise "AI naming request succeeded but returned empty content"
+        end
       else
         raise "AI naming request failed: #{response[:error]}"
       end
@@ -176,14 +181,17 @@ module Ai
     
     def sanitize_ai_response(raw_response)
       # Clean up AI response to get just the name
+      # Handle nil or empty responses gracefully
+      return "Generated App" if raw_response.blank?
+      
       name = raw_response.strip
       
       # Remove quotes, extra text, explanations
       name = name.gsub(/["']/, '')  # Remove quotes
-      name = name.split('.').first   # Take first sentence
-      name = name.split(',').first   # Take part before comma
-      name = name.split(':').last    # Take part after colon
-      name = name.split("\n").first  # Take first line
+      name = name.split('.').first || name   # Take first sentence
+      name = name.split(',').first || name   # Take part before comma
+      name = name.split(':').last || name    # Take part after colon
+      name = name.split("\n").first || name  # Take first line
       
       # Remove common prefixes/suffixes
       name = name.gsub(/^(The |A |An |App |Application |Tool |System )/i, '')
@@ -191,7 +199,8 @@ module Ai
       
       # Clean whitespace and capitalize properly
       name = name.strip
-      name = name.split(' ').map(&:capitalize).join(' ')
+      words = name.split(' ')
+      name = words.present? ? words.map(&:capitalize).join(' ') : "Generated App"
       
       name
     end

@@ -2431,11 +2431,12 @@ module Ai
       # Add thinking blocks as separate messages in conversation flow
       if thinking_blocks&.any?
         thinking_blocks.each do |block|
-          thinking_content = block['content'] || block[:content]
+          # Use 'thinking' field, not 'content' (per API spec)
+          thinking_content = block['thinking'] || block[:thinking]
           next if thinking_content.blank?
           
           thinking_message = {
-            'content' => thinking_content,
+            'content' => thinking_content,  # Store internally as 'content' for display
             'type' => 'thinking',
             'iteration' => @iteration_count,
             'timestamp' => Time.current.iso8601

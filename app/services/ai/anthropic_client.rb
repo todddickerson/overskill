@@ -369,7 +369,7 @@ module Ai
         when "thinking"
           thinking_blocks << {
             "type" => "thinking",
-            "content" => block["content"],
+            "thinking" => block["thinking"],  # CORRECT: Use 'thinking' not 'content'!
             "signature" => block["signature"]  # Preserve cryptographic signature
           }
         end
