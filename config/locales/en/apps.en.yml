@@ -31,12 +31,12 @@ en:
         heading: *name
         api_title: *name
         api_description: *name
-      slug:
-        _: &slug Slug
-        label: *slug
-        heading: *slug
-        api_title: *slug
-        api_description: *slug
+      subdomain:
+        _: &subdomain Subdomain
+        label: *subdomain
+        heading: *subdomain
+        api_title: *subdomain
+        api_description: *subdomain
       description:
         _: &description Description
         label: *description
@@ -241,7 +241,7 @@ en:
     attributes:
       app:
         name: *name
-        slug: *slug
+        subdomain: *subdomain
         creator_id: *creator_id
         prompt: *prompt
         app_type: *app_type
