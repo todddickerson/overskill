@@ -291,7 +291,10 @@ module Ai
           budget_tokens: thinking_tokens
         }
         
-        Rails.logger.info "[AI] Extended thinking enabled with budget: #{thinking_tokens} tokens" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        # CRITICAL: Temperature must be 1 when thinking is enabled
+        body[:temperature] = 1.0
+        
+        Rails.logger.info "[AI] Extended thinking enabled with budget: #{thinking_tokens} tokens, temperature set to 1.0" if ENV["VERBOSE_AI_LOGGING"] == "true"
       end
 
       Rails.logger.info "[AI] Calling Anthropic API with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"

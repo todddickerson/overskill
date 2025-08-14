@@ -700,8 +700,35 @@ module Ai
     end
     
     def deploy_app
-      deployer = Deployment::CloudflareDeployerService.new(app)
-      deployer.deploy
+      # Build the app first
+      builder = Deployment::ExternalViteBuilder.new(app)
+      build_result = builder.build!
+      
+      unless build_result[:success]
+        return { success: false, error: build_result[:error] }
+      end
+      
+      # Deploy to Cloudflare
+      deployer = Deployment::CloudflareWorkersDeployer.new(app)
+      deploy_result = deployer.deploy_with_secrets(
+        built_code: build_result[:built_code],
+        deployment_type: :preview
+      )
+      
+      if deploy_result[:success]
+        { 
+          success: true, 
+          preview_url: deploy_result[:worker_url]
+        }
+      else
+        { 
+          success: false, 
+          error: deploy_result[:error]
+        }
+      end
+    rescue => e
+      Rails.logger.error "[V5_DEPLOY] Error: #{e.message}"
+      { success: false, error: e.message }
     end
     
     def call_ai_with_context(prompt)
