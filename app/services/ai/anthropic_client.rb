@@ -93,8 +93,14 @@ module Ai
       # Add Helicone headers if API key is available
       if helicone_key.present?
         headers["Helicone-Auth"] = "Bearer #{helicone_key}"
-        headers["Helicone-Cache-Enabled"] = "true"  # Enable Helicone caching
-        Rails.logger.info "[AI] Using Helicone API gateway for observability and analytics"
+        
+        # Only enable Helicone caching if explicitly enabled via environment variable
+        if ENV['HELICONE_CACHE_ENABLED'] == 'true'
+          headers["Helicone-Cache-Enabled"] = "true"
+          Rails.logger.info "[AI] Using Helicone API gateway with caching enabled"
+        else
+          Rails.logger.info "[AI] Using Helicone API gateway (caching disabled)"
+        end
       else
         Rails.logger.debug "[AI] Using direct Anthropic API (set HELICONE_API_KEY for observability)"
       end
