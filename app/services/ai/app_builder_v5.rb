@@ -649,19 +649,22 @@ module Ai
             deployed_at: Time.current
           )
           
-          Rails.logger.info "[V5_FINALIZE] Before update!, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
+          # Create AppVersion for the generated code
+          app_version = create_app_version_for_generation
+          
+          Rails.logger.info "[V5_FINALIZE] Before finalize_with_app_version, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
           
           # Preserve the conversation_flow explicitly
           preserved_flow = @assistant_message.conversation_flow || []
           
-          @assistant_message.update!(
-            thinking_status: nil,
-            status: 'completed',
-            content: "✨ Your app has been successfully generated and deployed!\n\n🔗 **Preview URL**: #{app.preview_url}\n\nThe app is now live and ready for testing.",
-            conversation_flow: preserved_flow  # Explicitly preserve
-          )
+          # Update message content with success message
+          @assistant_message.content = "✨ Your app has been successfully generated and deployed!\n\n🔗 **Preview URL**: #{app.preview_url}\n\n📦 **Version**: #{app_version.version_number}\n📁 **Files Created**: #{app_version.app_version_files.count}\n\nThe app is now live and ready for testing."
+          @assistant_message.conversation_flow = preserved_flow
           
-          Rails.logger.info "[V5_FINALIZE] After update!, conversation_flow size: #{@assistant_message.reload.conversation_flow&.size}"
+          # Finalize with app_version (sets is_code_generation=true and associates version)
+          finalize_with_app_version(app_version)
+          
+          Rails.logger.info "[V5_FINALIZE] After finalize_with_app_version, app_version: #{@assistant_message.reload.app_version_id}, is_code_generation: #{@assistant_message.is_code_generation}"
         else
           app.update!(status: 'failed')
           # Preserve the conversation_flow explicitly
@@ -775,7 +778,7 @@ module Ai
     def execute_tool_calling_cycle(client, messages, tools, helicone_session)
       conversation_messages = messages.dup
       tool_cycles = 0
-      max_tool_cycles = 5  # Prevent infinite loops
+      max_tool_cycles = 30  # Prevent infinite loops
       response = nil  # Define response outside the loop
       content_added_to_flow = false  # Track whether we've added current response content
       
@@ -1237,7 +1240,13 @@ module Ai
           web_search(tool_args)
         when 'read_project_analytics'
           read_project_analytics(tool_args)
+        when 'write_files', 'create_files'
+          # Proper implementation for batch file operations
+          process_batch_file_operation(tool_name, tool_args)
           else
+            Rails.logger.error "=" * 60
+            Rails.logger.error "❌ UNKNOWN TOOL: #{tool_name}"
+            Rails.logger.error "=" * 60
             { error: "Unknown tool: #{tool_name}" }
           end
         rescue StandardError => e
@@ -1495,6 +1504,49 @@ module Ai
       { error: "Invalid regex: #{e.message}" }
     end
     
+    # Process batch file operations (write_files, create_files)
+    def process_batch_file_operation(tool_name, tool_args)
+      Rails.logger.info "[V5_BATCH] Processing #{tool_name} with #{tool_args['files']&.size || 0} files"
+      
+      unless tool_args['files'].is_a?(Array)
+        return { error: "Invalid arguments: 'files' must be an array" }
+      end
+      
+      results = []
+      success_count = 0
+      error_count = 0
+      
+      tool_args['files'].each do |file_spec|
+        unless file_spec['path'] && file_spec['content']
+          Rails.logger.warn "[V5_BATCH] Skipping invalid file spec: #{file_spec.inspect}"
+          error_count += 1
+          next
+        end
+        
+        # Process each file
+        result = write_file(file_spec['path'], file_spec['content'])
+        
+        if result[:success]
+          success_count += 1
+          Rails.logger.info "[V5_BATCH] ✅ Created/updated: #{file_spec['path']}"
+        else
+          error_count += 1
+          Rails.logger.error "[V5_BATCH] ❌ Failed: #{file_spec['path']} - #{result[:error]}"
+        end
+        
+        results << result
+      end
+      
+      # Return summary
+      {
+        success: error_count == 0,
+        message: "Processed #{tool_args['files'].size} files: #{success_count} successful, #{error_count} failed",
+        results: results,
+        success_count: success_count,
+        error_count: error_count
+      }
+    end
+    
     def download_to_repo(source_url, target_path)
       # For V5, we'll just create a placeholder - actual download would require HTTP client
       # In production, this would download the file
@@ -1564,41 +1616,51 @@ module Ai
     end
     
     def generate_image(args)
-      # For V5, return placeholder image generation
-      # In production, this would integrate with image generation API (DALL-E, Midjourney, etc.)
-      
       prompt = args['prompt']
       target_path = args['target_path']
       width = args['width'] || 512
       height = args['height'] || 512
       model = args['model'] || 'flux.schnell'
       
-      # Validate dimensions
-      if width < 512 || height < 512 || width > 1920 || height > 1920
-        return { error: "Image dimensions must be between 512 and 1920 pixels" }
-      end
+      Rails.logger.info "[V5_IMAGE] Generating image: #{prompt} (#{width}x#{height})"
       
-      if width % 32 != 0 || height % 32 != 0
-        return { error: "Image dimensions must be multiples of 32" }
-      end
+      # Use shared image generation service
+      image_service = Ai::ImageGenerationService.new(@app)
       
-      # Create placeholder file
-      placeholder_content = "// Generated image placeholder: #{prompt}\n// Dimensions: #{width}x#{height}\n// Model: #{model}\n// TODO: Replace with actual image generation API"
-      
-      file = @app.app_files.find_or_initialize_by(path: target_path)
-      file.content = placeholder_content
-      file.file_type = determine_file_type(target_path)
-      file.team = @app.team
-      file.save!
-      
-      {
-        success: true,
-        path: target_path,
+      result = image_service.generate_and_save_image(
         prompt: prompt,
-        dimensions: "#{width}x#{height}",
+        width: width,
+        height: height,
+        target_path: target_path,
         model: model,
-        note: "Placeholder implementation - requires image generation API integration"
-      }
+        options: {
+          # OpenAI gpt-image-1 options (primary provider)
+          quality: model == 'flux.dev' ? 'hd' : 'standard',
+          style: 'vivid',
+          
+          # Ideogram options (fallback provider)
+          rendering_speed: model == 'flux.dev' ? 'DEFAULT' : 'TURBO',
+          style_type: 'GENERAL'
+        }
+      )
+      
+      if result[:success]
+        # Track the generated file in agent state
+        generated_file = @app.app_files.find_by(path: target_path)
+        @agent_state[:generated_files] << generated_file if generated_file && !@agent_state[:generated_files].include?(generated_file)
+        
+        Rails.logger.info "[V5_IMAGE] Successfully generated and saved image: #{target_path}"
+        {
+          success: true,
+          path: target_path,
+          prompt: prompt,
+          dimensions: result[:dimensions],
+          provider: result[:provider]
+        }
+      else
+        Rails.logger.error "[V5_IMAGE] Failed to generate image: #{result[:error]}"
+        result
+      end
     end
     
     def edit_image(args)
@@ -1643,6 +1705,8 @@ module Ai
         note: "Placeholder implementation - requires image editing API integration"
       }
     end
+    
+
     
     def web_search(args)
       # For V5, return placeholder search results
@@ -1881,7 +1945,7 @@ module Ai
       builder = Ai::Prompts::CachedPromptBuilder.new(
         base_prompt: base_prompt,
         template_files: template_files,
-        context_data: context_data
+       # context_data: context_data # Duplicate?
       )
       
       # Log caching decision
@@ -2657,6 +2721,123 @@ module Ai
       @assistant_message.status = 'completed'
       @assistant_message.thinking_status = nil
       @assistant_message.save!
+    end
+    
+    # Create AppVersion for generated code - tracks changes from previous version
+    def create_app_version_for_generation
+      Rails.logger.info "[V5_VERSION] Creating AppVersion for generated code"
+      
+      # Get the most recent version to build upon
+      previous_version = @app.app_versions.order(:created_at).last
+      
+      # Calculate next version number
+      if previous_version
+        current_version = previous_version.version_number.gsub('v', '').split('.').map(&:to_i)
+        current_version[1] += 1  # Increment minor version
+        next_version = "v#{current_version.join('.')}"
+      else
+        next_version = "v1.0.0"  # First version if no template exists
+      end
+      
+      # Create the version
+      version = @app.app_versions.create!(
+        version_number: next_version,
+        team: @app.team,
+        user: @chat_message.user,
+        changelog: "AI-generated changes: #{@chat_message.content.truncate(100)}",
+        deployed: true,
+        external_commit: false,
+        published_at: Time.current,
+        environment: 'preview',
+        ai_tokens_input: @total_tokens_input || 0,
+        ai_tokens_output: @total_tokens_output || 0,
+        ai_model_used: 'claude-sonnet-4',
+        metadata: {
+          generated_files: @app.app_files.count,
+          changes_from_previous: 0,  # Will be updated below
+          iterations: @iteration_count,
+          preview_url: @app.preview_url,
+          based_on_version: previous_version&.version_number
+        }
+      )
+      
+      changes_count = 0
+      
+      if previous_version
+        # Build index of files from previous version
+        previous_files = {}
+        previous_version.app_version_files.includes(:app_file).each do |vf|
+          # Use the path from app_file if exists, or from metadata if file was deleted
+          path = vf.app_file&.path || vf.metadata&.dig('deleted_path')
+          previous_files[path] = vf.content if path
+        end
+        
+        # Track changes in current version
+        current_files = @app.app_files.index_by(&:path)
+        
+        # Check each current file against previous version
+        current_files.each do |path, file|
+          if previous_files[path]
+            # File existed in previous version - check if modified
+            if previous_files[path] != file.content
+              # File was modified
+              version.app_version_files.create!(
+                app_file: file,
+                action: 'updated',
+                content: file.content
+              )
+              changes_count += 1
+            else
+              # File unchanged - still include for complete version snapshot
+              version.app_version_files.create!(
+                app_file: file,
+                action: 'unchanged',
+                content: file.content
+              )
+            end
+          else
+            # New file not in previous version
+            version.app_version_files.create!(
+              app_file: file,
+              action: 'created',
+              content: file.content
+            )
+            changes_count += 1
+          end
+        end
+        
+        # Track deleted files
+        previous_files.each do |path, content|
+          unless current_files[path]
+            # File was deleted
+            version.app_version_files.create!(
+              app_file_id: nil,  # File no longer exists
+              action: 'deleted',
+              content: content,  # Preserve the deleted content
+              metadata: { deleted_path: path }
+            )
+            changes_count += 1
+          end
+        end
+      else
+        # First version - all files are new
+        @app.app_files.each do |file|
+          version.app_version_files.create!(
+            app_file: file,
+            action: 'created',
+            content: file.content
+          )
+          changes_count += 1
+        end
+      end
+      
+      # Update metadata with actual change count
+      version.update!(metadata: version.metadata.merge(changes_from_previous: changes_count))
+      
+      Rails.logger.info "[V5_VERSION] Created AppVersion #{next_version} with #{version.app_version_files.count} file records"
+      Rails.logger.info "[V5_VERSION] Changes: #{version.app_version_files.where(action: 'created').count} new, #{version.app_version_files.where(action: 'updated').count} modified, #{version.app_version_files.where(action: 'deleted').count} deleted, #{version.app_version_files.where(action: 'unchanged').count} unchanged"
+      
+      version
     end
     
     # Validate tool calling structure follows Anthropic requirements

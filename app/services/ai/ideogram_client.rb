@@ -10,27 +10,36 @@ module Ai
       raise "IDEOGRAM_API_KEY not configured" if @api_key.blank?
     end
 
-    # Generate an image from a text prompt using Ideogram's latest API
+    # Generate an image from a text prompt using Ideogram v3 API
     # Returns: { success: true, image_url: "..." } or { success: false, error: "..." }
-    def generate_image(prompt:, rendering_speed: "TURBO", model: "ideogram-v3", aspect_ratio: "1x1")
+    def generate_image(prompt:, rendering_speed: "TURBO", model: "ideogram-v3", aspect_ratio: "1x1", num_images: 1, style_type: "GENERAL", seed: nil)
       endpoint = "/v1/#{model}/generate"
 
       headers = {
-        "Api-Key" => @api_key,
-        "Content-Type" => "application/json"
+        "Api-Key" => @api_key
+        # Note: Content-Type will be set automatically by HTTParty for multipart
       }
 
+      # Build multipart form data as per Ideogram v3 API specs
       body = {
         prompt: prompt,
         rendering_speed: rendering_speed,
-        aspect_ratio: normalize_aspect_ratio(aspect_ratio)
+        aspect_ratio: normalize_aspect_ratio(aspect_ratio),
+        num_images: num_images,
+        style_type: style_type
       }
+
+      # Add optional seed if provided
+      body[:seed] = seed if seed
+
+      Rails.logger.info "[Ideogram] Generating image with prompt: #{prompt[0..100]}"
+      Rails.logger.info "[Ideogram] Parameters: #{body.except(:prompt)}"
 
       response = self.class.post(
         File.join(@base_url, endpoint),
         headers: headers,
-        body: body.to_json,
-        timeout: 60
+        body: body,  # HTTParty will handle multipart encoding
+        timeout: 120  # Increased timeout for v3 API
       )
 
       if response.success?

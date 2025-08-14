@@ -1,415 +1,336 @@
 module Ai
-  # AI-powered image generation service for creating app assets
-  # Similar to Lovable's generate_image and edit_image tools
   class ImageGenerationService
-    include HTTParty
-    
-    # Image generation providers
-    PROVIDERS = {
-      openai: {
-        base_url: 'https://api.openai.com/v1',
-        models: {
-          'gpt-image-1': { max_size: 1024 },
-          'dall-e-3': { max_size: 1024, deprecated: true },
-          'dall-e-2': { max_size: 1024, deprecated: true }
-        }
-      },
-      stability: {
-        base_url: 'https://api.stability.ai/v1',
-        models: {
-          'stable-diffusion-xl-1024-v1-0': { max_size: 1024 },
-          'stable-diffusion-xl-beta-v2-2-2': { max_size: 512 }
-        }
-      },
-      replicate: {
-        base_url: 'https://api.replicate.com/v1',
-        models: {
-          'flux-schnell': { max_size: 1920, speed: 'fast', quality: 'good' },
-          'flux-dev': { max_size: 1920, speed: 'slow', quality: 'best' }
-        }
-      }
-    }.freeze
-    
-    # Dimension presets for common use cases
-    DIMENSION_PRESETS = {
-      square: { width: 1024, height: 1024 },
-      landscape: { width: 1792, height: 1024 },
-      portrait: { width: 1024, height: 1792 },
-      banner: { width: 1920, height: 480 },
-      hero: { width: 1920, height: 1080 },
-      thumbnail: { width: 512, height: 512 },
-      icon: { width: 256, height: 256 },
-      social: { width: 1200, height: 630 },
-      mobile: { width: 390, height: 844 }
-    }.freeze
-    
-    def initialize(app, provider: :openai)
+    attr_reader :app, :openai_client, :ideogram_client
+
+    def initialize(app = nil)
       @app = app
-      @provider = provider
-      @api_key = get_api_key(provider)
-      @base_url = PROVIDERS[provider][:base_url]
-    end
-    
-    # Generate an image based on text prompt (similar to Lovable's generate_image)
-    def generate_image(prompt:, target_path:, width: nil, height: nil, model: nil, style_preset: nil)
-      # Enhance prompt for better quality
-      enhanced_prompt = enhance_prompt(prompt, style_preset)
+      @openai_client = OpenaiClient.new
+      @ideogram_client = nil
       
-      # Determine dimensions
-      dimensions = determine_dimensions(width, height, target_path)
-      
-      # Select appropriate model based on requirements
-      selected_model = select_model(model, dimensions[:width], dimensions[:height])
-      
-      Rails.logger.info "[ImageGeneration] Generating image with #{@provider}/#{selected_model}"
-      Rails.logger.info "[ImageGeneration] Prompt: #{enhanced_prompt[0..100]}..."
-      Rails.logger.info "[ImageGeneration] Dimensions: #{dimensions[:width]}x#{dimensions[:height]}"
-      
-      # Generate based on provider
-      result = case @provider
-      when :openai
-        generate_with_openai(enhanced_prompt, selected_model, dimensions)
-      when :stability
-        generate_with_stability(enhanced_prompt, selected_model, dimensions)
-      when :replicate
-        generate_with_replicate(enhanced_prompt, selected_model, dimensions)
-      else
-        { success: false, error: "Unknown provider: #{@provider}" }
+      # Initialize Ideogram client for fallback
+      begin
+        @ideogram_client = IdeogramClient.new
+      rescue => e
+        Rails.logger.warn "[ImageGen] Ideogram not configured, will use OpenAI only: #{e.message}"
       end
-      
-      # Save the generated image if successful
-      if result[:success]
-        save_result = save_image_to_app(result[:image_data], target_path, result[:metadata])
-        
-        if save_result[:success]
-          Rails.logger.info "[ImageGeneration] Saved image to #{target_path}"
-          {
-            success: true,
-            target_path: target_path,
-            size: save_result[:size],
-            dimensions: dimensions,
-            model: selected_model,
-            provider: @provider,
-            message: "Generated and saved image to #{target_path}"
-          }
+    end
+
+    # Main image generation method with provider fallback
+    def generate_image(prompt:, width: 512, height: 512, model: 'flux.schnell', target_path: nil, options: {})
+      # Validate dimensions
+      validation_result = validate_dimensions(width, height)
+      return validation_result if validation_result[:error]
+
+      Rails.logger.info "[ImageGen] Generating image: #{prompt} (#{width}x#{height})"
+
+      begin
+        # Try OpenAI gpt-image-1 first (primary provider)
+        result = generate_with_openai(prompt, width, height, options)
+        if result[:success]
+          Rails.logger.info "[ImageGen] Successfully generated with OpenAI gpt-image-1"
+          return prepare_response(result, prompt, width, height, "gpt-image-1", target_path)
         else
-          save_result
+          Rails.logger.warn "[ImageGen] OpenAI failed: #{result[:error]}"
+        end
+
+        # Fallback to Ideogram if available
+        if @ideogram_client
+          Rails.logger.info "[ImageGen] Falling back to Ideogram"
+          result = generate_with_ideogram(prompt, width, height, options)
+          if result[:success]
+            Rails.logger.info "[ImageGen] Successfully generated with Ideogram"
+            return prepare_response(result, prompt, width, height, "ideogram", target_path)
+          else
+            Rails.logger.warn "[ImageGen] Ideogram also failed: #{result[:error]}"
+          end
+        end
+
+        # Both providers failed
+        return { error: "Failed to generate image with both OpenAI and Ideogram providers" }
+
+      rescue => e
+        Rails.logger.error "[ImageGen] Exception during image generation: #{e.message}"
+        Rails.logger.error e.backtrace.first(5).join("\n")
+        return { error: "Image generation failed: #{e.message}" }
+      end
+    end
+
+    # Generate and save image to app files (for app builder)
+    def generate_and_save_image(prompt:, width: 512, height: 512, target_path:, model: 'flux.schnell', options: {})
+      unless @app
+        return { error: "App context required for saving images" }
+      end
+
+      result = generate_image(
+        prompt: prompt,
+        width: width,
+        height: height,
+        model: model,
+        target_path: target_path,
+        options: options
+      )
+
+      if result[:success] && result[:image_data]
+        save_image_to_app_files(target_path, result[:image_data])
+        result.merge(path: target_path)
+      else
+        result
+      end
+    end
+
+    # Generate logo (for logo service)
+    def generate_logo(app_name, app_description, options: {})
+      prompt = build_logo_prompt(app_name, app_description)
+      
+      # Use square aspect ratio for logos
+      result = generate_image(
+        prompt: prompt,
+        width: 1024,
+        height: 1024,
+        options: options.merge(style_type: 'DESIGN')
+      )
+
+      if result[:success]
+        result.merge(
+          message: "Logo generated successfully (#{result[:provider]})",
+          revised_prompt: prompt
+        )
+      else
+        result
+      end
+    end
+
+    private
+
+
+
+    def validate_dimensions(width, height)
+      if width < 512 || height < 512 || width > 1920 || height > 1920
+        return { error: "Image dimensions must be between 512 and 1920 pixels" }
+      end
+
+      if width % 32 != 0 || height % 32 != 0
+        return { error: "Image dimensions must be multiples of 32" }
+      end
+
+      { valid: true }
+    end
+
+    def generate_with_ideogram(prompt, width, height, options)
+      Rails.logger.info "[ImageGen] Using Ideogram for image generation"
+
+      # Build enhanced prompt
+      enhanced_prompt = build_ideogram_prompt(prompt, width, height, options)
+      
+      # Calculate aspect ratio for Ideogram
+      aspect_ratio = calculate_ideogram_aspect_ratio(width, height)
+      
+      # Generate with Ideogram
+      result = @ideogram_client.generate_image(
+        prompt: enhanced_prompt,
+        aspect_ratio: aspect_ratio,
+        rendering_speed: options[:rendering_speed] || "TURBO",
+        style_type: options[:style_type] || "GENERAL",
+        num_images: 1
+      )
+
+      if result[:success]
+        # Download image content
+        image_data = download_image_from_url(result[:image_url])
+        if image_data
+          result.merge(image_data: image_data)
+        else
+          { success: false, error: "Failed to download image from Ideogram URL" }
         end
       else
         result
       end
-    rescue => e
-      Rails.logger.error "[ImageGeneration] Failed: #{e.message}"
-      { success: false, error: e.message }
     end
-    
-    # Edit an existing image with AI (similar to Lovable's edit_image)
-    def edit_image(image_paths:, prompt:, target_path:, strength: 0.75)
-      # This would integrate with image editing APIs
-      # For now, we'll implement a basic version
-      
-      Rails.logger.info "[ImageGeneration] Editing #{image_paths.length} images with prompt: #{prompt[0..50]}..."
-      
-      if image_paths.empty?
-        return { success: false, error: "No images provided for editing" }
-      end
-      
-      # In production, this would:
-      # 1. Load the existing images
-      # 2. Send to an AI editing API (like Stability's img2img or DALL-E edit)
-      # 3. Apply the transformations based on the prompt
-      # 4. Save the result
-      
-      {
-        success: false,
-        error: "Image editing requires API integration (coming soon)",
-        suggestion: "For now, generate a new image with your desired changes"
-      }
-    end
-    
-    # Generate multiple variations of an image
-    def generate_variations(prompt:, count: 3, base_style: nil)
-      variations = []
-      
-      count.times do |i|
-        variation_prompt = vary_prompt(prompt, i)
-        target_path = "src/assets/generated_variation_#{i + 1}.png"
-        
-        result = generate_image(
-          prompt: variation_prompt,
-          target_path: target_path,
-          style_preset: base_style
-        )
-        
-        variations << result if result[:success]
-      end
-      
-      {
-        success: true,
-        variations: variations,
-        count: variations.length
-      }
-    end
-    
-    # Generate app-specific images (icons, splash screens, etc.)
-    def generate_app_assets(app_type:, theme: nil)
-      assets = []
-      
-      # Determine what assets to generate based on app type
-      asset_configs = case app_type
-      when 'dashboard', 'saas'
-        [
-          { name: 'logo', prompt: "Modern minimalist logo for a SaaS dashboard app", size: :icon },
-          { name: 'hero', prompt: "Abstract geometric hero image for a modern dashboard", size: :hero },
-          { name: 'pattern', prompt: "Subtle geometric pattern background", size: :square }
-        ]
-      when 'landing_page'
-        [
-          { name: 'hero', prompt: "Stunning hero image for a modern landing page", size: :hero },
-          { name: 'feature1', prompt: "Icon representing speed and efficiency", size: :thumbnail },
-          { name: 'feature2', prompt: "Icon representing security and trust", size: :thumbnail },
-          { name: 'feature3', prompt: "Icon representing collaboration", size: :thumbnail }
-        ]
-      when 'game'
-        [
-          { name: 'background', prompt: "Game background with vibrant colors", size: :landscape },
-          { name: 'character', prompt: "Friendly game character sprite", size: :square },
-          { name: 'item', prompt: "Collectible game item icon", size: :icon }
-        ]
-      else
-        [
-          { name: 'logo', prompt: "Modern app logo", size: :icon },
-          { name: 'hero', prompt: "Beautiful hero image", size: :hero }
-        ]
-      end
-      
-      # Add theme to prompts if specified
-      if theme
-        asset_configs.each do |config|
-          config[:prompt] += ", #{theme} style"
-        end
-      end
-      
-      # Generate each asset
-      asset_configs.each do |config|
-        dimensions = DIMENSION_PRESETS[config[:size]]
-        target_path = "src/assets/#{config[:name]}.png"
-        
-        result = generate_image(
-          prompt: config[:prompt],
-          target_path: target_path,
-          width: dimensions[:width],
-          height: dimensions[:height]
-        )
-        
-        assets << result if result[:success]
-      end
-      
-      {
-        success: true,
-        assets: assets,
-        total: assets.length,
-        app_type: app_type
-      }
-    end
-    
-    private
-    
-    def get_api_key(provider)
-      case provider
-      when :openai
-        ENV['OPENAI_API_KEY']
-      when :stability
-        ENV['STABILITY_API_KEY']
-      when :replicate
-        ENV['REPLICATE_API_TOKEN']
-      else
-        nil
-      end
-    end
-    
-    def enhance_prompt(prompt, style_preset)
-      enhanced = prompt.dup
-      
-      # Add quality modifiers
-      quality_terms = ["high quality", "professional", "detailed", "4k", "ultra high resolution"]
-      enhanced += ", #{quality_terms.sample}"
-      
-      # Add style if specified
-      if style_preset
-        style_descriptions = {
-          modern: "modern, clean, minimalist design",
-          vintage: "vintage, retro, nostalgic style",
-          futuristic: "futuristic, sci-fi, high-tech",
-          realistic: "photorealistic, highly detailed",
-          artistic: "artistic, creative, stylized",
-          corporate: "professional, corporate, business-oriented",
-          playful: "fun, colorful, playful design"
-        }
-        
-        if style_descriptions[style_preset.to_sym]
-          enhanced += ", #{style_descriptions[style_preset.to_sym]}"
-        end
-      end
-      
-      # Add aspect ratio hint
-      enhanced += ", perfect composition"
-      
-      enhanced
-    end
-    
-    def determine_dimensions(width, height, target_path)
-      # If dimensions provided, use them
-      if width && height
-        return { width: constrain_dimension(width), height: constrain_dimension(height) }
-      end
-      
-      # Infer from target path
-      if target_path
-        case target_path.downcase
-        when /hero/
-          return DIMENSION_PRESETS[:hero]
-        when /banner/
-          return DIMENSION_PRESETS[:banner]
-        when /icon/
-          return DIMENSION_PRESETS[:icon]
-        when /thumbnail/
-          return DIMENSION_PRESETS[:thumbnail]
-        when /logo/
-          return DIMENSION_PRESETS[:icon]
-        when /background/
-          return DIMENSION_PRESETS[:landscape]
-        end
-      end
-      
-      # Default to square
-      DIMENSION_PRESETS[:square]
-    end
-    
-    def constrain_dimension(value)
-      # Ensure dimensions are multiples of 32 and within limits
-      value = (value / 32.0).round * 32
-      [[value, 1920].min, 256].max
-    end
-    
-    def select_model(requested_model, width, height)
-      return requested_model if requested_model
-      
-      max_dimension = [width, height].max
-      
-      case @provider
-      when :openai
-        'gpt-image-1'
-      when :stability
-        'stable-diffusion-xl-1024-v1-0'
-      when :replicate
-        max_dimension <= 1024 ? 'flux-schnell' : 'flux-dev'
-      else
-        'default'
-      end
-    end
-    
-    def generate_with_openai(prompt, model, dimensions)
-      return { success: false, error: "OpenAI API key not configured" } unless @api_key
-      
-      # OpenAI Images API with latest model
-      response = HTTParty.post(
-        "#{@base_url}/images/generations",
-        headers: {
-          'Authorization' => "Bearer #{@api_key}",
-          'Content-Type' => 'application/json'
-        },
-        body: {
-          model: 'gpt-image-1',
-          prompt: prompt,
-          n: 1,
-          size: "#{dimensions[:width]}x#{dimensions[:height]}",
-          response_format: 'b64_json'
-        }.to_json
+
+    def generate_with_openai(prompt, width, height, options)
+      Rails.logger.info "[ImageGen] Using OpenAI gpt-image-1 for image generation"
+
+      # Determine size parameter for OpenAI
+      openai_size = determine_openai_size(width, height)
+
+      # Map quality options - gpt-image-1 supports 'standard' and 'hd'
+      quality = case options[:quality]
+                when 'high', 'hd', 'quality' then 'hd'
+                else 'standard'
+                end
+
+      # Map style options - gpt-image-1 supports 'natural' and 'vivid'  
+      style = case options[:style]
+              when 'natural', 'realistic' then 'natural'
+              when 'vivid', 'dramatic', 'design' then 'vivid'
+              else 'vivid'  # Default to vivid for more dramatic results
+              end
+
+      result = @openai_client.generate_image(
+        prompt,
+        size: openai_size,
+        quality: quality,
+        style: style
       )
-      
-      if response.success?
-        image_data = response.parsed_response.dig('data', 0, 'b64_json')
+
+      if result[:success]
+        image_data = nil
+
+        # Handle different response formats
+        if result[:image_url].present?
+          image_data = download_image_from_url(result[:image_url])
+        elsif result[:image_b64].present?
+          image_data = Base64.decode64(result[:image_b64])
+        end
+
         if image_data
-          {
-            success: true,
-            image_data: image_data,
-            metadata: { model: 'gpt-image-1', provider: 'openai', width: dimensions[:width], height: dimensions[:height] }
-          }
+          result.merge(image_data: image_data)
         else
-          { success: false, error: "No image data in response" }
+          { success: false, error: "Failed to retrieve image content from OpenAI" }
         end
       else
-        { success: false, error: response.parsed_response['error']&.dig('message') || "API error" }
-      end
-    rescue => e
-      { success: false, error: "OpenAI generation failed: #{e.message}" }
-    end
-    
-    def generate_with_stability(prompt, model, dimensions)
-      # Stability AI implementation
-      # This would integrate with Stability AI's API
-      { 
-        success: false, 
-        error: "Stability AI integration coming soon",
-        suggestion: "Use OpenAI provider for now"
-      }
-    end
-    
-    def generate_with_replicate(prompt, model, dimensions)
-      # Replicate implementation for Flux models
-      # This would integrate with Replicate's API
-      { 
-        success: false, 
-        error: "Replicate integration coming soon",
-        suggestion: "Use OpenAI provider for now"
-      }
-    end
-    
-    def save_image_to_app(image_data, target_path, metadata = {})
-      # Ensure path is in assets folder
-      target_path = "src/assets/#{File.basename(target_path)}" unless target_path.start_with?('src/assets/')
-      
-      file = @app.app_files.find_or_initialize_by(path: target_path)
-      file.content = image_data  # Base64 encoded
-      file.file_type = 'image'
-      file.is_binary = true
-      file.team = @app.team if file.new_record?
-      
-      # Store metadata
-      file_metadata = metadata.merge({
-        generated_at: Time.current.iso8601,
-        provider: @provider,
-        dimensions: "#{metadata[:width]}x#{metadata[:height]}"
-      })
-      
-      file.metadata = file_metadata.to_json
-      
-      if file.save
-        # Clear cache
-        Ai::ContextCacheService.new.clear_app_cache(@app.id)
-        
-        {
-          success: true,
-          path: target_path,
-          size: (image_data.length * 3 / 4), # Approximate decoded size
-          metadata: file_metadata
-        }
-      else
-        { success: false, error: file.errors.full_messages.join(', ') }
+        result
       end
     end
-    
-    def vary_prompt(base_prompt, variation_index)
-      variations = [
-        "#{base_prompt}, alternative style",
-        "#{base_prompt}, different perspective",
-        "#{base_prompt}, unique interpretation",
-        "#{base_prompt}, creative variation",
-        "#{base_prompt}, fresh approach"
+
+    def build_ideogram_prompt(prompt, width, height, options)
+      aspect_info = if width > height
+                      "landscape #{width}:#{height}"
+                    elsif height > width
+                      "portrait #{height}:#{width}"
+                    else
+                      "square 1:1"
+                    end
+
+      elements = [
+        prompt,
+        "high quality",
+        "detailed",
+        "sharp focus"
       ]
+
+      # Add aspect ratio info unless it's a logo
+      unless options[:style_type] == 'DESIGN'
+        elements << "#{aspect_info} aspect ratio"
+      end
+
+      elements.join(", ")
+    end
+
+    def build_logo_prompt(app_name, app_description)
+      clean_name = app_name.to_s.strip[0..50]
+      clean_description = app_description.to_s.strip[0..200]
+
+      [
+        "Create a modern, minimalist app icon logo",
+        "transparent background",
+        "no text",
+        "bold geometric shape",
+        "high contrast",
+        "professional palette",
+        "centered composition",
+        "#{clean_name} - #{clean_description.present? ? clean_description : "web application"}"
+      ].join(", ")
+    end
+
+    def calculate_ideogram_aspect_ratio(width, height)
+      # Common aspect ratios supported by Ideogram
+      ratio = width.to_f / height.to_f
       
-      variations[variation_index % variations.length]
+      case ratio
+      when 0.5..0.75
+        height > width ? "2x3" : "3x2"
+      when 0.75..1.33
+        "1x1"
+      when 1.33..1.78
+        width > height ? "4x3" : "3x4"
+      when 1.78..2.0
+        width > height ? "16x9" : "9x16"
+      else
+        "1x1" # Default fallback
+      end
+    end
+
+    def determine_openai_size(width, height)
+      # OpenAI DALL-E 3 supports specific sizes only
+      aspect_ratio = width.to_f / height.to_f
+
+      if aspect_ratio > 1.5
+        "1792x1024"  # Wide image
+      elsif aspect_ratio < 0.67
+        "1024x1792"  # Tall image
+      else
+        "1024x1024"  # Square or near-square
+      end
+    end
+
+    def download_image_from_url(url)
+      require 'open-uri'
+
+      Rails.logger.info "[ImageGen] Downloading image from URL: #{url[0..100]}..."
+
+      # Download with timeout and size limits
+      image_data = URI.open(url,
+        read_timeout: 30,
+        "User-Agent" => "OverSkill-ImageBot/1.0"
+      ) do |file|
+        # Limit file size to 10MB
+        if file.respond_to?(:meta) && file.meta['content-length']
+          size = file.meta['content-length'].to_i
+          if size > 10.megabytes
+            Rails.logger.error "[ImageGen] Image too large: #{size} bytes"
+            return nil
+          end
+        end
+
+        file.read
+      end
+
+      Rails.logger.info "[ImageGen] Successfully downloaded image (#{image_data.bytesize} bytes)"
+      image_data
+
+    rescue => e
+      Rails.logger.error "[ImageGen] Failed to download image from URL: #{e.message}"
+      nil
+    end
+
+    def save_image_to_app_files(target_path, image_content)
+      # Save image as AppFile with binary content
+      file = @app.app_files.find_or_initialize_by(path: target_path)
+
+      # For binary files, we need to handle encoding properly
+      file.content = Base64.encode64(image_content)
+      file.file_type = determine_file_type(target_path)
+      file.team = @app.team
+      file.metadata = {
+        'binary' => true,
+        'encoding' => 'base64',
+        'original_size' => image_content.bytesize,
+        'generated_at' => Time.current.iso8601
+      }
+
+      file.save!
+      Rails.logger.info "[ImageGen] Saved image file: #{target_path} (#{image_content.bytesize} bytes)"
+    end
+
+    def determine_file_type(path)
+      case path
+      when /\.(png|jpg|jpeg|gif|webp)$/i then 'image'
+      when /\.svg$/i then 'svg'
+      else 'binary'
+      end
+    end
+
+    def prepare_response(result, prompt, width, height, provider, target_path)
+      {
+        success: true,
+        prompt: prompt,
+        dimensions: "#{width}x#{height}",
+        provider: provider,
+        image_data: result[:image_data],
+        image_url: result[:image_url],
+        path: target_path
+      }
     end
   end
 end

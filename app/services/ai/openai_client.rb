@@ -14,16 +14,19 @@ module Ai
       }
     end
 
-    def generate_image(prompt, size: "1024x1024", quality: "standard", style: "natural")
-      # Use latest OpenAI image model via Images API. Only send supported fields.
+    def generate_image(prompt, size: "1024x1024", quality: "standard", style: "vivid")
+      # Use latest GPT-4o image generation model (gpt-image-1)
       body = {
         model: "gpt-image-1",
         prompt: prompt,
         n: 1,
-        size: size
+        size: size,
+        quality: quality,
+        style: style
       }
 
-      Rails.logger.info "[AI] Generating image with gpt-image-1" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      Rails.logger.info "[AI] Generating image with gpt-image-1: #{prompt[0..100]}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      Rails.logger.info "[AI] Parameters: size=#{size}, quality=#{quality}, style=#{style}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
       response = self.class.post("/images/generations", @options.merge(body: body.to_json))
 
