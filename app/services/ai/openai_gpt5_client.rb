@@ -178,8 +178,8 @@ module Ai
         body[:verbosity] = verbosity.to_s
       end
       
-      # Add max tokens if specified
-      body[:max_tokens] = max_tokens if max_tokens
+      # Add max tokens if specified (use max_completion_tokens for newer OpenAI models)
+      body[:max_completion_tokens] = max_tokens if max_tokens
       
       # Add tools if provided (convert custom tools format)
       if tools

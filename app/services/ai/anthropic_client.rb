@@ -55,7 +55,10 @@ module Ai
         cost_per_1k_input: 15.00,
         cost_per_1k_output: 75.00,
         cache_write_multiplier: 1.25,
-        cache_read_multiplier: 0.10
+        cache_read_multiplier: 0.10,
+        supports_extended_thinking: true,
+        supports_interleaved_thinking: true,
+        recommended_thinking_budget: 16_000  # 16k+ tokens for complex tasks
       },
       "claude-3-5-haiku-20241022" => { 
         context: 200_000, 

@@ -1936,10 +1936,11 @@ module Ai
           content: loop_msg['content']
         }
         
-        # Include thinking blocks for interleaved thinking continuity
+        # Skip thinking blocks in conversation history for now
+        # The API doesn't accept thinking blocks in assistant messages sent as context
+        # Only the API itself can generate thinking blocks
         if loop_msg['thinking_blocks']&.any?
-          assistant_message['thinking'] = loop_msg['thinking_blocks']
-          Rails.logger.debug "[V5_THINKING] Including #{loop_msg['thinking_blocks'].size} thinking blocks in context" if ENV["VERBOSE_AI_LOGGING"] == "true"
+          Rails.logger.debug "[V5_THINKING] Skipping #{loop_msg['thinking_blocks'].size} thinking blocks in conversation history (not supported in context)" if ENV["VERBOSE_AI_LOGGING"] == "true"
         end
         
         messages << assistant_message
