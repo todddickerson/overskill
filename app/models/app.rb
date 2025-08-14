@@ -199,11 +199,10 @@ class App < ApplicationRecord
       is_code_generation: false
     )
     
-    Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for V5 updates"
+    Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for AI generation"
 
-    # Always use V4 orchestrator (Vite + TypeScript + template-based)
-    Rails.logger.info "[App] Using V4 orchestrator for app ##{id}"
-    ProcessAppUpdateJobV4.perform_later(message)
+    # Job execution is handled by controller routing based on APP_GENERATION_VERSION
+    Rails.logger.info "[App] App generation job will be triggered by controller for app ##{id}"
     
     # Update status
     update!(status: "generating") unless generating?
