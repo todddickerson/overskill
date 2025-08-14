@@ -1799,22 +1799,39 @@ module Ai
           content_blocks = []
           
           # Check if we have thinking content from previous iterations
-          if msg.loop_messages.present? && msg.loop_messages.any? { |lm| lm['thinking'].present? }
+          if msg.loop_messages.present? && msg.loop_messages.any? { |lm| lm['thinking'].present? || lm['type'] == 'thinking' }
             # Extract thinking from loop messages
             msg.loop_messages.each do |loop_msg|
-              if loop_msg['thinking'].present?
-                content_blocks << { type: 'thinking', thinking: loop_msg['thinking'] }
+              if loop_msg['type'] == 'thinking' && loop_msg['content'].present?
+                # Loop messages store thinking as 'content' internally
+                content_blocks << { 
+                  type: 'thinking', 
+                  thinking: loop_msg['content'],
+                  signature: loop_msg['signature'] || "sig_#{SecureRandom.hex(8)}"
+                }
+                break # Only need one thinking block per message
+              elsif loop_msg['thinking'].present?
+                content_blocks << { 
+                  type: 'thinking', 
+                  thinking: loop_msg['thinking'],
+                  signature: loop_msg['signature'] || "sig_#{SecureRandom.hex(8)}"
+                }
                 break # Only need one thinking block per message
               end
             end
           elsif msg.metadata.present? && msg.metadata['thinking'].present?
             # Use metadata thinking if available
-            content_blocks << { type: 'thinking', thinking: msg.metadata['thinking'] }
+            content_blocks << { 
+              type: 'thinking', 
+              thinking: msg.metadata['thinking'],
+              signature: msg.metadata['thinking_signature'] || "sig_#{SecureRandom.hex(8)}"
+            }
           else
             # Add a minimal thinking block to satisfy API requirements
             content_blocks << { 
               type: 'thinking', 
-              thinking: "Processing the user's request to modify the app."
+              thinking: "Processing the user's request to modify the app.",
+              signature: "sig_#{SecureRandom.hex(8)}"
             }
           end
           
@@ -2481,7 +2498,8 @@ module Ai
             'content' => thinking_content,  # Store internally as 'content' for display
             'type' => 'thinking',
             'iteration' => @iteration_count,
-            'timestamp' => Time.current.iso8601
+            'timestamp' => Time.current.iso8601,
+            'signature' => block['signature'] || block[:signature] || "sig_#{SecureRandom.hex(8)}"
           }
           
           @assistant_message.loop_messages << thinking_message
