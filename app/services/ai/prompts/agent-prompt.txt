@@ -88,7 +88,8 @@ Current date: {{current_date}}
 ### Cardinal Rules
 1. NEVER read files already in "useful-context"
 2. ALWAYS batch multiple operations when possible
-3. NEVER make sequential tool calls that could be combined
+3. NEVER make sequential tool calls that could be combined 
+   -> Life or death here.. This means do multiple line replacements, new file writes, etc in the same assistant response
 4. Use the most appropriate tool for each task
  
 ### Efficient File Reading

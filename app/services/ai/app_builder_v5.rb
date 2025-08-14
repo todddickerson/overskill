@@ -2,11 +2,12 @@
 module Ai
   class AppBuilderV5
     include Rails.application.routes.url_helpers
+    include Ai::Concerns::CacheInvalidation
     
     MAX_ITERATIONS = 30
     COMPLETION_CONFIDENCE_THRESHOLD = 0.85
     
-    attr_reader :chat_message, :app, :agent_state, :assistant_message
+    attr_reader :chat_message, :app, :agent_state, :assistant_message, :file_tracker
     
     def initialize(chat_message)
       @chat_message = chat_message
@@ -33,6 +34,14 @@ module Ai
       @context_manager = ContextManager.new(app)
       @decision_engine = AgentDecisionEngine.new
       @termination_evaluator = TerminationEvaluator.new
+      
+      # Initialize file change tracker for granular caching
+      @file_tracker = FileChangeTracker.new(@app.id)
+      
+      # Setup cache invalidation hooks if the concern is included
+      if self.class.ancestors.include?(Ai::Concerns::CacheInvalidation)
+        self.class.setup_cache_invalidation_hooks if self.class.respond_to?(:setup_cache_invalidation_hooks)
+      end
       
       # Initialize state
       @agent_state = {
@@ -1937,21 +1946,33 @@ module Ai
     
     # Build optimized system prompt with caching support
     def build_cached_system_prompt
-      # Use CachedPromptBuilder for optimal caching
+      # Use granular caching if enabled
+      use_granular = ENV['ENABLE_GRANULAR_CACHING'] != 'false'
+      
+      # Detect any external file changes before building prompt
+      if use_granular && @file_tracker
+        detect_external_changes
+      end
+      
       template_files = get_template_files_for_caching
       base_prompt = @prompt_service.generate_prompt(include_context: false)
       context_data = build_current_context_data
       
-      builder = Ai::Prompts::CachedPromptBuilder.new(
+      # Use GranularCachedPromptBuilder for file-level caching
+      builder_class = use_granular ? Ai::Prompts::GranularCachedPromptBuilder : Ai::Prompts::CachedPromptBuilder
+      
+      builder = builder_class.new(
         base_prompt: base_prompt,
         template_files: template_files,
-       # context_data: context_data # Duplicate?
+        context_data: context_data,
+        app_id: @app.id  # Pass app_id for granular caching
       )
       
       # Log caching decision
       total_template_size = template_files.sum { |f| f.content&.length || 0 }
       will_use_array = use_array_system_prompt?
       
+      Rails.logger.info "[V5_CACHE] Caching mode: #{use_granular ? 'GRANULAR file-level' : 'MONOLITHIC'}"
       Rails.logger.info "[V5_CACHE] System prompt format: #{will_use_array ? 'ARRAY with cache_control' : 'STRING (no caching)'}"
       Rails.logger.info "[V5_CACHE] Template size: #{total_template_size} chars (threshold: 10,000)"
       Rails.logger.info "[V5_CACHE] Base prompt size: #{base_prompt&.length || 0} chars"
@@ -1963,7 +1984,8 @@ module Ai
         Rails.logger.info "[V5_CACHE] Built array system prompt with #{system_prompt.size} blocks"
         system_prompt.each_with_index do |block, i|
           has_cache = block[:cache_control].present?
-          Rails.logger.info "[V5_CACHE]   Block #{i+1}: #{block[:text]&.length || 0} chars, cache_control: #{has_cache ? 'YES' : 'NO'}"
+          ttl = block.dig(:cache_control, :ttl) || 'default'
+          Rails.logger.info "[V5_CACHE]   Block #{i+1}: #{block[:text]&.length || 0} chars, cache: #{has_cache ? "YES (#{ttl})" : 'NO'}"
         end
         system_prompt
       else

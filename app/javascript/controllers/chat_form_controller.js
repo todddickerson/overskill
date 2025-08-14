@@ -195,7 +195,7 @@ export default class extends Controller {
   
   // Handle keyboard shortcuts
   handleKeydown(event) {
-    console.log('Keydown event:', event.key, 'Meta:', event.metaKey, 'Ctrl:', event.ctrlKey)
+    // console.log('Keydown event:', event.key, 'Meta:', event.metaKey, 'Ctrl:', event.ctrlKey)
     
     // Check for cmd+enter (Mac) or ctrl+enter (Windows/Linux)
     // On Mac, we want to accept ONLY metaKey (Cmd), not ctrlKey

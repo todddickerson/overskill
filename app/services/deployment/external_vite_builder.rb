@@ -184,9 +184,15 @@ module Deployment
         # Run the appropriate build command
         build_command = mode == 'production' ? "#{npm_path} run build" : "#{npm_path} run build:preview"
         
-        unless system(build_command)
-          Rails.logger.error "[ExternalViteBuilder] Vite build failed with exit code: #{$?.exitstatus}"
-          raise "Vite build failed. Check build configuration."
+        # Capture both stdout and stderr for better error reporting
+        require 'open3'
+        stdout, stderr, status = Open3.capture3(build_command)
+        
+        unless status.success?
+          Rails.logger.error "[ExternalViteBuilder] Vite build failed with exit code: #{status.exitstatus}"
+          Rails.logger.error "[ExternalViteBuilder] Build stdout: #{stdout}"
+          Rails.logger.error "[ExternalViteBuilder] Build stderr: #{stderr}"
+          raise "Vite build failed: #{stderr.presence || stdout}"
         end
         
         # Read the built JavaScript bundle
@@ -214,9 +220,15 @@ module Deployment
         # Use Vite's incremental build capabilities
         build_command = "#{npm_path} run build:preview"
         
-        unless system(build_command)
-          Rails.logger.error "[ExternalViteBuilder] Incremental Vite build failed with exit code: #{$?.exitstatus}"
-          raise "Incremental Vite build failed. Check build configuration."
+        # Capture both stdout and stderr for better error reporting
+        require 'open3'
+        stdout, stderr, status = Open3.capture3(build_command)
+        
+        unless status.success?
+          Rails.logger.error "[ExternalViteBuilder] Incremental Vite build failed with exit code: #{status.exitstatus}"
+          Rails.logger.error "[ExternalViteBuilder] Build stdout: #{stdout}"
+          Rails.logger.error "[ExternalViteBuilder] Build stderr: #{stderr}"
+          raise "Incremental Vite build failed: #{stderr.presence || stdout}"
         end
         
         # Read the build output
