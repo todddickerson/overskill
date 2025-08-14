@@ -89,15 +89,15 @@ class Deployment::CloudflarePreviewService
     { success: false, error: e.message }
   end
   
-  # Deploy to staging (preview--app-name.overskill.app)
+  # Deploy to staging (preview--app-subdomain.overskill.app)
   def deploy_staging!
-    staging_subdomain = "preview--#{generate_app_subdomain}"
+    staging_subdomain = "preview--#{@app.subdomain}"
     deploy_to_environment(:staging, staging_subdomain)
   end
   
-  # Deploy to production (app-name.overskill.app)
+  # Deploy to production (app-subdomain.overskill.app)
   def deploy_production!
-    production_subdomain = generate_app_subdomain
+    production_subdomain = @app.subdomain
     deploy_to_environment(:production, production_subdomain)
   end
   
@@ -263,15 +263,7 @@ class Deployment::CloudflarePreviewService
       (@api_token.present? || (@api_key.present? && @email.present?))
   end
   
-  def generate_app_subdomain
-    base_name = @app.name.downcase
-                         .gsub(/[^a-z0-9\-]/, '-')
-                         .gsub(/-+/, '-')
-                         .gsub(/^-|-$/, '')
-    
-    # Ensure uniqueness if needed
-    base_name.presence || "app-#{@app.id}"
-  end
+
   
   def deploy_to_environment(environment, subdomain)
     return { success: false, error: "Missing Cloudflare credentials" } unless credentials_present?
