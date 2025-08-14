@@ -32,7 +32,7 @@ module Ai
     MODELS = {
       claude_sonnet_4: "claude-sonnet-4-20250514",
       claude_opus_4: "claude-opus-4-1-20250805",
-      claude_haiku_3_5: "claude-haiku-3-5-20241022",
+      claude_haiku_3_5: "claude-3-5-haiku-20241022",
     }.freeze
 
     # Model specifications for Anthropic direct API

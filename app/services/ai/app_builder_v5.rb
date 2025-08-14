@@ -3,7 +3,7 @@ module Ai
   class AppBuilderV5
     include Rails.application.routes.url_helpers
     
-    MAX_ITERATIONS = 10
+    MAX_ITERATIONS = 30
     COMPLETION_CONFIDENCE_THRESHOLD = 0.85
     
     attr_reader :chat_message, :app, :agent_state, :assistant_message
@@ -498,6 +498,7 @@ module Ai
         content.include?("i've created a beautiful") ||
         content.include?("i've built a") ||
         content.include?("i've implemented") ||
+        content.include?("i've completed") ||
         content.include?("with the following features:") ||
         content.include?("with the following amazing features:") ||
         content.include?("everything you need for") ||
