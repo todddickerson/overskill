@@ -48,7 +48,7 @@ module DataExport
         app: {
           id: @app.id,
           name: @app.name,
-          slug: @app.slug,
+          subdomain: @app.subdomain,
           created_at: @app.created_at.iso8601
         },
         team: {
@@ -70,16 +70,16 @@ module DataExport
       require 'zip'
       require 'tempfile'
       
-      temp_file = Tempfile.new(["#{@app.slug}_export", '.zip'])
+      temp_file = Tempfile.new(["#{@app.subdomain}_export", '.zip'])
       
       Zip::File.open(temp_file.path, Zip::File::CREATE) do |zipfile|
         # Add SQL export
-        zipfile.get_output_stream("#{@app.slug}_schema_and_data.sql") do |f|
+        zipfile.get_output_stream("#{@app.subdomain}_schema_and_data.sql") do |f|
           f.puts export_to_sql
         end
         
         # Add JSON export
-        zipfile.get_output_stream("#{@app.slug}_data.json") do |f|
+        zipfile.get_output_stream("#{@app.subdomain}_data.json") do |f|
           f.puts JSON.pretty_generate(export_to_json)
         end
         
@@ -104,7 +104,7 @@ module DataExport
     def generate_header
       <<~SQL
         -- OverSkill Data Export
-        -- App: #{@app.name} (#{@app.slug})
+        -- App: #{@app.name} (#{@app.subdomain})
         -- Team: #{@team.name}
         -- Exported at: #{Time.current}
         -- Export Version: 1.0
@@ -451,7 +451,7 @@ module DataExport
         
         ### Files Included:
         
-        1. **#{@app.slug}_schema_and_data.sql** - Complete SQL export including:
+        1. **#{@app.subdomain}_schema_and_data.sql** - Complete SQL export including:
            - Database schema
            - All table structures
            - Row-Level Security (RLS) policies
@@ -459,7 +459,7 @@ module DataExport
            - Audit system setup
            - Performance indexes
         
-        2. **#{@app.slug}_data.json** - JSON export of all data for easier processing
+        2. **#{@app.subdomain}_data.json** - JSON export of all data for easier processing
         
         3. **app_files/** - All application files (if any)
         

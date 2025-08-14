@@ -20,19 +20,19 @@ class ExportAllAppsJob < ApplicationJob
         
         # Export to ZIP for each app
         zip_file = exporter.export_to_zip
-        export_path = export_dir.join("#{app.slug}_export.zip")
+        export_path = export_dir.join("#{app.subdomain}_export.zip")
         FileUtils.mv(zip_file.path, export_path)
         
         exported_files << {
           app_name: app.name,
-          app_slug: app.slug,
+          app_subdomain: app.subdomain,
           file_path: export_path,
           file_size: File.size(export_path)
         }
       end
       
       # Create master ZIP file
-      master_zip_path = export_dir.join("#{team.slug}_all_apps_export.zip")
+      master_zip_path = export_dir.join("#{team.name.parameterize}_all_apps_export.zip")
       
       Zip::File.open(master_zip_path, Zip::File::CREATE) do |zipfile|
         # Add each app's export

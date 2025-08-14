@@ -30,7 +30,7 @@ class Api::V1::AppsControllerTest < Api::Test
     app = App.find(app_data["id"])
 
     assert_equal_or_nil app_data["name"], app.name
-    assert_equal_or_nil app_data["slug"], app.slug
+    assert_equal_or_nil app_data["subdomain"], app.subdomain
     assert_equal_or_nil app_data["description"], app.description
     assert_equal_or_nil app_data["creator_id"], app.creator_id
     assert_equal_or_nil app_data["prompt"], app.prompt
@@ -110,7 +110,7 @@ class Api::V1::AppsControllerTest < Api::Test
       access_token: access_token,
       app: {
         name: "Alternative String Value",
-        slug: "Alternative String Value",
+        subdomain: "alternative-string-value",
         description: "Alternative String Value",
         prompt: "Alternative String Value",
         stripe_product_id: "Alternative String Value",
@@ -129,7 +129,7 @@ class Api::V1::AppsControllerTest < Api::Test
     # But we have to manually assert the value was properly updated.
     @app.reload
     assert_equal @app.name, "Alternative String Value"
-    assert_equal @app.slug, "Alternative String Value"
+    assert_equal @app.subdomain, "alternative-string-value"
     assert_equal @app.description, "Alternative String Value"
     assert_equal @app.prompt, "Alternative String Value"
     assert_equal @app.stripe_product_id, "Alternative String Value"

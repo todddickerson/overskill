@@ -16,7 +16,7 @@ class Ai::ChatMessageProcessorTest < ActiveSupport::TestCase
     
     @app = App.create!(
       name: "Test App #{Time.current.to_i}",
-      slug: "test-app-#{Time.current.to_i}",
+      subdomain: "test-app-#{Time.current.to_i}",
       team: @team,
       creator: @membership,
       prompt: "Test app prompt"

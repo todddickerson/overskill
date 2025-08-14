@@ -49,7 +49,7 @@ module Ai
           
           custom_variables = {
             platform_name: "#{team.name} Builder",
-            tool_prefix: "#{team.slug}-",
+            tool_prefix: "#{team.name.parameterize}-",
             current_date: Date.current.strftime("%Y-%m-%d"),
             context_section_name: "app_context"
           }

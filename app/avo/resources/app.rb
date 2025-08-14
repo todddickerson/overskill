@@ -9,7 +9,7 @@ class Avo::Resources::App < Avo::BaseResource
     field :id, as: :id
     field :team, as: :belongs_to
     field :name, as: :text
-    field :slug, as: :text
+    field :subdomain, as: :text
     field :description, as: :textarea
     field :creator, as: :belongs_to
     field :prompt, as: :textarea

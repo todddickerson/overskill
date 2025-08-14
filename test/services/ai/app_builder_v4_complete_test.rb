@@ -197,7 +197,7 @@ class Ai::AppBuilderV4CompleteTest < ActiveSupport::TestCase
   end
 
   test "process_template_variables replaces all variables" do
-    template = "Welcome to {{APP_NAME}} (ID: {{APP_ID}}, Slug: {{APP_SLUG}})"
+    template = "Welcome to {{APP_NAME}} (ID: {{APP_ID}}, Subdomain: {{APP_SLUG}})"
     processed = @builder.send(:process_template_variables, template)
     
     assert_includes processed, @app.name

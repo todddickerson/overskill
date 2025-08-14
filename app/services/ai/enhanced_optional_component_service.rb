@@ -341,7 +341,7 @@ module Ai
       content
         .gsub('{{APP_ID}}', @app.id.to_s)
         .gsub('{{APP_NAME}}', @app.name)
-        .gsub('{{APP_SLUG}}', @app.slug)
+        .gsub('{{APP_SLUG}}', @app.subdomain)
     end
     
     public

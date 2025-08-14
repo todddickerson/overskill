@@ -2,7 +2,7 @@ FactoryBot.define do
   factory :app do
     association :team
     name { "Test App #{SecureRandom.hex(3)}" }
-    sequence(:slug) { |n| "test-app-#{n}" }
+    sequence(:subdomain) { |n| "test-app-#{n}" }
     description { "A test application" }
     prompt { "Create a simple test app" }
     app_type { "utility" }

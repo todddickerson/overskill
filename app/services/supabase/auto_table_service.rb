@@ -95,7 +95,7 @@ class Supabase::AutoTableService
         { name: 'title', type: 'text', required: true },
         { name: 'content', type: 'text', required: true },
         { name: 'published', type: 'boolean', default: false },
-        { name: 'slug', type: 'text' }
+        { name: 'subdomain', type: 'text' }
       ]
     else
       # Generic columns

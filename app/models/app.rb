@@ -39,8 +39,7 @@ class App < ApplicationRecord
   # 🚅 add scopes above.
 
   validates :name, presence: true
-  validates :slug, presence: true, uniqueness: true
-  validates :subdomain, uniqueness: true, allow_nil: true,
+  validates :subdomain, presence: true, uniqueness: true,
     format: { 
       with: /\A[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?\z/,
       message: "must be alphanumeric with hyphens, 1-63 characters"
@@ -50,7 +49,6 @@ class App < ApplicationRecord
   validates :base_price, presence: true, numericality: {greater_than_or_equal_to: 0}
   # 🚅 add validations above.
 
-  before_validation :generate_slug
   before_validation :generate_subdomain
   after_create :create_default_env_vars
   after_create :initiate_ai_generation, if: :should_auto_generate?
@@ -87,10 +85,7 @@ class App < ApplicationRecord
     return preview_url if preview_url.present?
     
     # Fallback to predicted URL based on subdomain
-    return "https://#{subdomain}.overskill.app" if subdomain.present?
-    
-    # Last resort: generate from slug
-    "https://#{slug}.overskill.app"
+    "https://#{subdomain}.overskill.app" if subdomain.present?
   end
   
   # Check if app can be published to production
@@ -235,15 +230,11 @@ class App < ApplicationRecord
 
   private
 
-  def generate_slug
-    self.slug ||= name&.parameterize
-  end
-  
   def generate_subdomain
     return if subdomain.present?
     
-    # Start with slug as base
-    base = slug || name&.parameterize
+    # Generate from name
+    base = name&.parameterize
     return unless base.present?
     
     # Sanitize for subdomain requirements

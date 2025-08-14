@@ -13,7 +13,7 @@ class Ai::AppBuilderV4WithComponentsTest < ActiveSupport::TestCase
     
     @app = App.create!(
       name: 'Chat Application',
-      slug: 'chat-app',
+      subdomain: 'chat-app',
       team: @team,
       creator: @membership,
       prompt: 'Build a realtime chat application',

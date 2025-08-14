@@ -17,23 +17,23 @@ class AppTest < ActiveSupport::TestCase
     assert_includes app.errors[:name], "can't be blank"
   end
 
-  test "generates slug if blank" do
-    app = build(:app, name: "My Cool App", slug: nil)
+  test "generates subdomain if blank" do
+    app = build(:app, name: "My Cool App", subdomain: nil)
     assert app.valid?
-    assert_equal "my-cool-app", app.slug
+    assert_equal "my-cool-app", app.subdomain
   end
 
-  test "slug must be unique" do
-    create(:app, slug: "test-app", team: @team, creator: @membership)
-    duplicate = build(:app, slug: "test-app", team: @team, creator: @membership)
+  test "subdomain must be unique" do
+    create(:app, subdomain: "test-app", team: @team, creator: @membership)
+    duplicate = build(:app, subdomain: "test-app", team: @team, creator: @membership)
     assert_not duplicate.valid?
-    assert_includes duplicate.errors[:slug], "has already been taken"
+    assert_includes duplicate.errors[:subdomain], "has already been taken"
   end
 
-  test "generates slug before validation if blank" do
-    app = build(:app, name: "My Cool App", slug: nil, team: @team, creator: @membership)
+  test "generates subdomain before validation if blank" do
+    app = build(:app, name: "My Cool App", subdomain: nil, team: @team, creator: @membership)
     app.valid?
-    assert_equal "my-cool-app", app.slug
+    assert_equal "my-cool-app", app.subdomain
   end
 
   test "has many app_files" do

@@ -751,7 +751,7 @@ module Ai
       when "APP_ID"
         @app.id.to_s
       when "APP_SLUG"
-        @app.slug || @app.name.parameterize
+        @app.subdomain || @app.name.parameterize
       else
         placeholder # Keep original if unknown
       end

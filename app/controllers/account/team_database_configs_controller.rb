@@ -54,20 +54,20 @@ class Account::TeamDatabaseConfigsController < Account::ApplicationController
     respond_to do |format|
       format.sql do
         send_data exporter.export_to_sql,
-                  filename: "#{@app.slug}_export_#{Time.current.strftime('%Y%m%d_%H%M%S')}.sql",
+                  filename: "#{@app.subdomain}_export_#{Time.current.strftime('%Y%m%d_%H%M%S')}.sql",
                   type: 'text/plain'
       end
       
       format.json do
         send_data exporter.export_to_json.to_json,
-                  filename: "#{@app.slug}_export_#{Time.current.strftime('%Y%m%d_%H%M%S')}.json",
+                  filename: "#{@app.subdomain}_export_#{Time.current.strftime('%Y%m%d_%H%M%S')}.json",
                   type: 'application/json'
       end
       
       format.zip do
         zip_file = exporter.export_to_zip
         send_file zip_file.path,
-                  filename: "#{@app.slug}_export_#{Time.current.strftime('%Y%m%d_%H%M%S')}.zip",
+                  filename: "#{@app.subdomain}_export_#{Time.current.strftime('%Y%m%d_%H%M%S')}.zip",
                   type: 'application/zip',
                   disposition: 'attachment'
         # Clean up temp file after sending

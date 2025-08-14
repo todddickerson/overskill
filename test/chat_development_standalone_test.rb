@@ -86,13 +86,13 @@ else
 
   # Mock models for testing
   class MockApp
-    attr_accessor :id, :app_files, :name, :slug, :team, :creator, :prompt, :status
+    attr_accessor :id, :app_files, :name, :subdomain, :team, :creator, :prompt, :status
     
     def initialize(attributes = {})
       @id = attributes[:id] || 123
       @app_files = MockAppFiles.new
       @name = attributes[:name] || "Test App"
-      @slug = attributes[:slug] || "test-app"
+      @subdomain = attributes[:subdomain] || "test-app"
       @status = attributes[:status] || "generated"
       @prompt = attributes[:prompt] || "Test prompt"
     end

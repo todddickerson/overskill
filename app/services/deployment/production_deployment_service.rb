@@ -63,7 +63,7 @@ module Deployment
       return { success: false, error: "Invalid subdomain" } unless valid_subdomain?(new_subdomain)
       return { success: false, error: "Subdomain already taken" } unless subdomain_available?(new_subdomain)
       
-      old_subdomain = @app.subdomain || @app.slug
+      old_subdomain = @app.subdomain
       
       begin
         # 1. Deploy to new subdomain
@@ -73,7 +73,6 @@ module Deployment
         # 2. Update app
         @app.update!(
           subdomain: new_subdomain,
-          slug: new_subdomain, # Keep slug in sync
           production_url: "https://#{new_subdomain}.overskill.app"
         )
         
@@ -100,8 +99,8 @@ module Deployment
     end
     
     def ensure_unique_subdomain
-      # Use existing subdomain if set, otherwise generate from slug
-      subdomain = @app.subdomain || @app.slug
+      # Use existing subdomain if set, otherwise generate from name
+      subdomain = @app.subdomain || @app.name.parameterize
       
       # Ensure it's valid and unique
       subdomain = sanitize_subdomain(subdomain)
@@ -140,12 +139,7 @@ module Deployment
     
     def subdomain_available?(subdomain)
       # Check if subdomain is already taken by another app
-      existing = App.where(subdomain: subdomain).where.not(id: @app.id).exists?
-      
-      # Also check slug field for backwards compatibility
-      existing ||= App.where(slug: subdomain).where.not(id: @app.id).exists?
-      
-      !existing
+      !App.where(subdomain: subdomain).where.not(id: @app.id).exists?
     end
     
     def build_for_production

@@ -104,7 +104,6 @@ class Public::GeneratorController < Public::ApplicationController
     app = current_team.apps.create!(
       creator: current_membership,
       name: generate_app_name(prompt),
-      slug: generate_unique_slug,
       prompt: prompt,
       app_type: "saas",  # Single type
       framework: "react", # Single framework
@@ -165,7 +164,5 @@ class Public::GeneratorController < Public::ApplicationController
     words.any? ? words.join(" ").titleize : "My App #{Time.current.to_i}"
   end
   
-  def generate_unique_slug
-    "app-#{SecureRandom.hex(6)}"
-  end
+
 end

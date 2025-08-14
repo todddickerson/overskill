@@ -32,7 +32,7 @@ module Deployment
       
       { 
         success: true, 
-        url: "https://#{@app.slug}.overskill.app",
+        url: "https://#{@app.subdomain}.overskill.app",
         message: "Deployed with secure secrets"
       }
     rescue => e
@@ -302,7 +302,7 @@ module Deployment
     
     def configure_routes(worker_name)
       # Set up custom domain routing
-      subdomain = @app.slug
+      subdomain = @app.subdomain
       route_pattern = "#{subdomain}.overskill.app/*"
       
       self.class.post(

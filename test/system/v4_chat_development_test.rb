@@ -384,7 +384,7 @@ class V4ChatDevelopmentTest < ApplicationSystemTestCase
     # Test FileContextAnalyzer with minimal files
     minimal_app = App.create!(
       name: "Minimal Test App",
-      slug: "minimal-#{Time.current.to_i}",
+      subdomain: "minimal-#{Time.current.to_i}",
       team: @team,
       creator: @membership,
       prompt: "minimal"
@@ -404,7 +404,7 @@ class V4ChatDevelopmentTest < ApplicationSystemTestCase
   def create_test_app(prompt)
     App.create!(
       name: "V4 System Test App #{Time.current.to_i}",
-      slug: "v4-test-#{Time.current.to_i}",
+      subdomain: "v4-test-#{Time.current.to_i}",
       team: @team,
       creator: @membership,
       prompt: prompt,

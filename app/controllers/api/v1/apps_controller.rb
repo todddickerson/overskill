@@ -45,7 +45,7 @@ if defined?(Api::V1::ApplicationController)
         strong_params = params.require(:app).permit(
           *permitted_fields,
           :name,
-          :slug,
+          :subdomain,
           :description,
           :creator_id,
           :prompt,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_13_192756) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_14_115717) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -438,7 +438,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_13_192756) do
   create_table "apps", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.string "name", null: false
-    t.string "slug", null: false
     t.text "description"
     t.bigint "creator_id", null: false
     t.text "prompt", null: false
@@ -478,14 +477,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_13_192756) do
     t.datetime "last_built_at"
     t.string "build_id"
     t.datetime "name_generated_at"
-    t.string "subdomain"
+    t.string "subdomain", null: false
     t.datetime "last_deployed_at"
     t.datetime "published_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
     t.index ["featured"], name: "index_apps_on_featured"
-    t.index ["slug"], name: "index_apps_on_slug", unique: true
     t.index ["status"], name: "index_apps_on_status"
     t.index ["subdomain"], name: "index_apps_on_subdomain", unique: true
     t.index ["team_id"], name: "index_apps_on_team_id"

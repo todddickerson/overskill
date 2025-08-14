@@ -76,7 +76,7 @@ module DataImport
           zip.glob('app_files/**/*').each do |entry|
             next if entry.directory?
             
-            # Extract app slug from filename pattern
+            # Extract app subdomain from filename pattern
             if entry.name =~ /app_files\/(.+)/
               file_path = $1
               # Find the app and create/update the file
@@ -115,8 +115,8 @@ module DataImport
     end
     
     def create_or_find_app(app_data)
-      # Try to find existing app by slug
-      app = @team.apps.find_by(slug: app_data[:slug])
+      # Try to find existing app by subdomain (or fall back to legacy slug)
+      app = @team.apps.find_by(subdomain: app_data[:subdomain] || app_data[:slug])
       
       if app
         # Update existing app
@@ -128,7 +128,7 @@ module DataImport
         # Create new app
         app = @team.apps.create!(
           name: app_data[:name],
-          slug: app_data[:slug] || app_data[:name].parameterize,
+          subdomain: app_data[:subdomain] || app_data[:slug] || app_data[:name].parameterize,
           creator: @team.memberships.find_by(user: @user),
           prompt: "Imported from data export",
           status: "imported",
