@@ -1798,7 +1798,9 @@ module Ai
           # when thinking is enabled to satisfy Anthropic API requirements
           content_blocks = []
           
+          # IMPORTANT: Thinking block must come FIRST in the content array
           # Check if we have thinking content from previous iterations
+          thinking_added = false
           if msg.loop_messages.present? && msg.loop_messages.any? { |lm| lm['thinking'].present? || lm['type'] == 'thinking' }
             # Extract thinking from loop messages
             msg.loop_messages.each do |loop_msg|
@@ -1809,6 +1811,7 @@ module Ai
                   thinking: loop_msg['content'],
                   signature: loop_msg['signature'] || "sig_#{SecureRandom.hex(8)}"
                 }
+                thinking_added = true
                 break # Only need one thinking block per message
               elsif loop_msg['thinking'].present?
                 content_blocks << { 
@@ -1816,17 +1819,23 @@ module Ai
                   thinking: loop_msg['thinking'],
                   signature: loop_msg['signature'] || "sig_#{SecureRandom.hex(8)}"
                 }
+                thinking_added = true
                 break # Only need one thinking block per message
               end
             end
-          elsif msg.metadata.present? && msg.metadata['thinking'].present?
+          end
+          
+          if !thinking_added && msg.metadata.present? && msg.metadata['thinking'].present?
             # Use metadata thinking if available
             content_blocks << { 
               type: 'thinking', 
               thinking: msg.metadata['thinking'],
               signature: msg.metadata['thinking_signature'] || "sig_#{SecureRandom.hex(8)}"
             }
-          else
+            thinking_added = true
+          end
+          
+          if !thinking_added
             # Add a minimal thinking block to satisfy API requirements
             content_blocks << { 
               type: 'thinking', 
@@ -1835,7 +1844,7 @@ module Ai
             }
           end
           
-          # Add the actual text content
+          # Add the actual text content AFTER the thinking block
           assistant_content = msg.content.presence || "I processed your request and made changes to the app."
           content_blocks << { type: 'text', text: assistant_content }
           
