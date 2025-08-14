@@ -112,8 +112,10 @@ module Ai
       Rails.logger.info "[V5_SIMPLE] Starting simple Claude flow"
       
       # Detect if this is initial build or continuation
-      is_continuation = @app.app_files.any?
+      # Check if there are previous assistant messages (not just template files)
+      is_continuation = @app.app_chat_messages.where(role: 'assistant').where.not(id: @assistant_message.id).exists?
       Rails.logger.info "[V5_SIMPLE] Mode: #{is_continuation ? 'CONTINUATION' : 'INITIAL BUILD'}"
+      Rails.logger.info "[V5_SIMPLE] Total messages: #{@app.app_chat_messages.count}, previous assistant messages: #{@app.app_chat_messages.where(role: 'assistant').where.not(id: @assistant_message.id).count}"
       
       @iteration_count = 1
       @agent_state[:iteration] = @iteration_count
