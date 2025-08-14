@@ -111,7 +111,7 @@ class App < ApplicationRecord
   end
 
   def generate_app_name
-    GenerateAppNameJob.perform_in(3.seconds, id) # too fast otherwise
+    GenerateAppNameJob.set(wait: 3.seconds).perform_later(id) # too fast otherwise
   end
 
   def visitor_count
