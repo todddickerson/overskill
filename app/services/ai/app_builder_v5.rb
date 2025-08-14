@@ -498,7 +498,6 @@ module Ai
         content.include?("i've created a beautiful") ||
         content.include?("i've built a") ||
         content.include?("i've implemented") ||
-        content.include?("i've completed") ||
         content.include?("with the following features:") ||
         content.include?("with the following amazing features:") ||
         content.include?("everything you need for") ||

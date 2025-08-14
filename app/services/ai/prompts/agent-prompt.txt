@@ -81,6 +81,7 @@ Current date: {{current_date}}
 8. **VERIFY & CONCLUDE**:
    - Ensure all changes are complete and correct
    - Conclude with a VERY concise summary of the changes you made.
+   - Ensure you state "ready for preview" 
  
 ## Efficient Tool Usage
  
