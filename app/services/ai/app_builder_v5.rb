@@ -2247,26 +2247,48 @@ module Ai
     end
     
     def add_loop_message(content, type: 'content', thinking_blocks: nil)
-      loop_message = {
-        'content' => content,
-        'type' => type,
-        'iteration' => @iteration_count,
-        'timestamp' => Time.current.iso8601
-      }
-      
-      # Preserve thinking blocks for interleaved thinking continuity
+      # Add thinking blocks as separate messages in conversation flow
       if thinking_blocks&.any?
-        loop_message['thinking_blocks'] = thinking_blocks
-        Rails.logger.info "[V5_THINKING] Preserved #{thinking_blocks.size} thinking blocks in loop message" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        thinking_blocks.each do |block|
+          thinking_content = block['content'] || block[:content]
+          next if thinking_content.blank?
+          
+          thinking_message = {
+            'content' => thinking_content,
+            'type' => 'thinking',
+            'iteration' => @iteration_count,
+            'timestamp' => Time.current.iso8601
+          }
+          
+          @assistant_message.loop_messages << thinking_message
+          
+          # Add to conversation_flow for display
+          add_to_conversation_flow(
+            type: 'thinking',
+            content: thinking_message
+          )
+          
+          Rails.logger.info "[V5_THINKING] Added thinking block to conversation flow (#{thinking_content.length} chars)"
+        end
       end
       
-      @assistant_message.loop_messages << loop_message
-      
-      # Also add to conversation_flow for interleaved display
-      add_to_conversation_flow(
-        type: type == 'status' ? 'status' : 'message',
-        content: loop_message
-      )
+      # Add the main content message if present
+      if content.present?
+        loop_message = {
+          'content' => content,
+          'type' => type,
+          'iteration' => @iteration_count,
+          'timestamp' => Time.current.iso8601
+        }
+        
+        @assistant_message.loop_messages << loop_message
+        
+        # Also add to conversation_flow for interleaved display
+        add_to_conversation_flow(
+          type: type == 'status' ? 'status' : 'message',
+          content: loop_message
+        )
+      end
       
       @assistant_message.save!
     end

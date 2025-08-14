@@ -281,11 +281,17 @@ module Ai
         body[:system] = system_message
       end
       
-      # Add extended thinking configuration for Claude 4 models (disabled for now due to API format issues)
-      # TODO: Re-enable once we have proper API documentation for thinking parameter format
-      if false && extended_thinking && MODEL_SPECS[model_id]&.dig(:supports_extended_thinking)
+      # Add extended thinking configuration for Claude 4 models
+      if extended_thinking && MODEL_SPECS[model_id]&.dig(:supports_extended_thinking)
         thinking_tokens = thinking_budget || MODEL_SPECS[model_id][:recommended_thinking_budget]
-        Rails.logger.info "[AI] Extended thinking would be enabled with budget: #{thinking_tokens} tokens" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        
+        # According to the user's example, this is the correct format
+        body[:thinking] = {
+          type: "enabled",
+          budget_tokens: thinking_tokens
+        }
+        
+        Rails.logger.info "[AI] Extended thinking enabled with budget: #{thinking_tokens} tokens" if ENV["VERBOSE_AI_LOGGING"] == "true"
       end
 
       Rails.logger.info "[AI] Calling Anthropic API with tools, model: #{model_id}" if ENV["VERBOSE_AI_LOGGING"] == "true"

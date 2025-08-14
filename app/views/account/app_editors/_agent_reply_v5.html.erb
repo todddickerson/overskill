@@ -76,6 +76,13 @@
                          message_id: message.id,
                          index: index %>
               
+            <% when 'thinking' %>
+              <%# Thinking message - subtle display (TODO: Consider removing later) %>
+              <div class="flex items-start space-x-2 text-xs text-gray-500 dark:text-gray-600 italic opacity-70 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                <i class="fas fa-brain text-gray-400 mt-0.5"></i>
+                <span class="whitespace-pre-wrap"><%= flow_item['content']['content'] || flow_item['content'] %></span>
+              </div>
+              
             <% when 'status' %>
               <%# Status update %>
               <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
