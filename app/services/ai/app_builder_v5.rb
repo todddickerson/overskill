@@ -653,6 +653,9 @@ module Ai
             deployed_at: Time.current
           )
           
+          # Broadcast preview frame update to editor
+          broadcast_preview_frame_update
+          
           # Create AppVersion for the generated code
           app_version = create_app_version_for_generation
           
@@ -3265,5 +3268,22 @@ module Ai
     def complexity_limit_reached?(state)
       state[:generated_files].count > 100
     end
+  end
+  
+  # Broadcast preview frame update when app is deployed
+  def broadcast_preview_frame_update
+    return unless @app&.preview_url.present?
+    
+    Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
+    
+    # Broadcast to the app editor channel to update the preview frame
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{@app.id}_editor",
+      target: "preview_frame",
+      partial: "account/app_editors/preview_frame",
+      locals: { app: @app }
+    )
+  rescue => e
+    Rails.logger.warn "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
   end
 end
