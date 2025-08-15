@@ -128,9 +128,11 @@ module Ai
       begin
         # Phase 1: Send user's raw message to Claude - system context handles the rest
         if is_continuation
-          update_thinking_status("Analyzing your request and updating the app...")
+          # update_thinking_status("Analyzing your request and updating the app...")
+          update_thinking_status("Thinking...")
         else
-          update_thinking_status("Phase 1/3: Analyzing requirements and generating app...")
+          # update_thinking_status("Phase 1/3: Analyzing requirements and generating app...")
+          update_thinking_status("Thinking...")
         end
         
         # Just send the raw user message - system prompt has all instructions
@@ -1397,19 +1399,68 @@ module Ai
       file = @app.app_files.find_by(path: args['file_path'])
       return { error: "File not found: #{args['file_path']}" } unless file
       
-      # Implement line replacement logic
-      lines = file.content.split("\n")
-      start_line = args['first_replaced_line'].to_i - 1
-      end_line = args['last_replaced_line'].to_i - 1
-      
-      # Replace the specified lines
-      replacement_lines = args['replace'].split("\n")
-      lines[start_line..end_line] = replacement_lines
-      
-      file.content = lines.join("\n")
-      file.save!
-      
-      { success: true, path: args['file_path'] }
+      # Use LineReplaceService for proper validation and replacement
+      if defined?(Ai::LineReplaceService)
+        result = Ai::LineReplaceService.replace_lines(
+          file,
+          args['search'],
+          args['first_replaced_line'].to_i,
+          args['last_replaced_line'].to_i,
+          args['replace']
+        )
+        
+        if result[:success]
+          { success: true, path: args['file_path'] }
+        else
+          { error: result[:message] || "Line replacement failed" }
+        end
+      else
+        # Fallback to improved basic implementation
+        lines = file.content.lines(chomp: true)  # Preserve line endings properly
+        start_line = args['first_replaced_line'].to_i - 1
+        end_line = args['last_replaced_line'].to_i - 1
+        
+        # Validate line range
+        if start_line < 0 || end_line >= lines.length || start_line > end_line
+          return { error: "Invalid line range: #{args['first_replaced_line']}-#{args['last_replaced_line']}" }
+        end
+        
+        # If search pattern provided, validate it matches
+        if args['search'].present?
+          existing_content = lines[start_line..end_line].join("\n")
+          search_pattern = args['search'].strip
+          
+          # Handle ellipsis patterns
+          if search_pattern.include?('...')
+            parts = search_pattern.split('...')
+            if parts.size == 2
+              prefix = parts[0].strip
+              suffix = parts[1].strip
+              unless existing_content.strip.start_with?(prefix) && existing_content.strip.end_with?(suffix)
+                Rails.logger.warn "[V5] Pattern mismatch: search doesn't match content at lines #{args['first_replaced_line']}-#{args['last_replaced_line']}"
+                # Continue anyway for backward compatibility
+              end
+            end
+          elsif existing_content.strip != search_pattern
+            Rails.logger.warn "[V5] Pattern mismatch: search doesn't match content at lines #{args['first_replaced_line']}-#{args['last_replaced_line']}"
+            # Continue anyway for backward compatibility
+          end
+        end
+        
+        # Replace the specified lines
+        replacement_text = args['replace'] || ""
+        replacement_lines = replacement_text.lines(chomp: true)
+        
+        # Perform replacement
+        lines[start_line..end_line] = replacement_lines
+        
+        # Join with proper line endings
+        file.content = lines.join("\n")
+        file.content += "\n" unless file.content.end_with?("\n")
+        file.save!
+        
+        { success: true, path: args['file_path'] }
+      end
     end
     
     def delete_file(path)

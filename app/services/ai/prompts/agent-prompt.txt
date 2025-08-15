@@ -278,7 +278,7 @@ I need to update button styles and add a utility function. Let me first check wh
 First, I'll examine the current button component and utils file, then make both changes.
  
 [Parallel tool calls would be made here to view files not already in context]
-[Then, parallel tool calls would be made to make the changes using os-line-replace operations]
+[Then, PARALLEL tool calls (multiple in a row) would be made to make the changes using os-line-replace operations]
  
 Added hover effect to button and created capitalizeString utility function.
  
