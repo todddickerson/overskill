@@ -221,6 +221,7 @@ module Ai
         "high contrast",
         "professional palette",
         "centered composition",
+        "fill size",
         "#{clean_name} - #{clean_description.present? ? clean_description : "web application"}"
       ].join(", ")
     end

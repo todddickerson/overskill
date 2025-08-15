@@ -58,8 +58,36 @@
           <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
             <div class="text-center">
               <%= image_tag "overskill-loader.svg", class: "w-20 h-20 mb-4 mx-auto opacity-60" %>
-              <p class="text-lg font-medium">No preview available yet</p>
-              <p class="text-sm mt-1">Generate your app to see it here</p>
+              <p class="text-lg font-medium">Spinning up preview...</p>
+
+              <!-- Auto-scrolling feature list (bottom-to-top) with fades -->
+              <div class="relative mt-4 max-w-sm mx-auto h-40 overflow-hidden">
+                <!-- top/bottom fade overlays -->
+                <div class="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-gray-50 dark:from-gray-800 to-transparent"></div>
+                <div class="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-gray-50 dark:from-gray-800 to-transparent"></div>
+
+                <ul class="vertical-marquee text-sm text-gray-600 dark:text-gray-300 space-y-3 mx-auto w-max">
+                  <li class="flex items-center gap-2"><i class="fas fa-magic"></i><span>AI‑first app generation in minutes</span></li>
+                  <li class="flex items-center gap-2"><i class="fas fa-database"></i><span>Built‑in database & User logins</span></li>
+                  <li class="flex items-center gap-2"><i class="fas fa-dollar-sign"></i><span>Stripe Connect payments & payouts day one</span></li>
+                  <li class="flex items-center gap-2"><i class="fas fa-cloud-upload-alt"></i><span>One‑click global deploys on Cloudflare</span></li>
+                  <li class="flex items-center gap-2"><i class="fas fa-store"></i><span>Marketplace & subscriptions baked in</span></li>
+                  <li class="flex items-center gap-2"><i class="far fa-eye"></i><span>Instant live preview while you edit</span></li>
+                  <li class="flex items-center gap-2"><i class="fas fa-shield-alt"></i><span>Security scanning & best practices</span></li>
+                  <li class="flex items-center gap-2"><i class="fab fa-github"></i><span>Export clean code to GitHub anytime</span></li>
+                  <li class="flex items-center gap-2"><i class="fas fa-chart-line"></i><span>Built‑in analytics, logs, and insights</span></li>
+                  <!-- duplicate items for seamless loop -->
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-magic"></i><span>AI‑first app generation in minutes</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-database"></i><span>Built‑in database & auth (Supabase)</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-dollar-sign"></i><span>Stripe Connect payments & payouts day one</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-cloud-upload-alt"></i><span>One‑click global deploys on Cloudflare</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-store"></i><span>Marketplace & subscriptions baked in</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="far fa-eye"></i><span>Instant live preview while you edit</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-shield-alt"></i><span>Security scanning & RLS best practices</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fab fa-github"></i><span>Export clean code to GitHub anytime</span></li>
+                  <li aria-hidden="true" class="flex items-center gap-2"><i class="fas fa-chart-line"></i><span>Built‑in analytics, logs, and insights</span></li>
+                </ul>
+              </div>
             </div>
           </div>
         <% end %>
@@ -67,3 +95,22 @@
     </div>
   </div>
 </div>
+
+<style>
+/* Simple bottom-to-top marquee for the features list.
+   Kept inline to scope to this preview-only view. */
+@keyframes vertical-marquee {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+.vertical-marquee {
+  display: inline-block;
+  will-change: transform;
+  animation: vertical-marquee 14s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vertical-marquee { animation: none; }
+}
+</style>
