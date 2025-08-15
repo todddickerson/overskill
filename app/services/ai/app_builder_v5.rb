@@ -644,7 +644,8 @@ module Ai
     def finalize_app_generation
       Rails.logger.info "[V5_FINALIZE] Starting finalization, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
       
-      if @completion_status == :complete
+      # Always try to deploy if we have files
+      if app.app_files.count > 0
         # Deploy the app
         update_thinking_status("Phase 6/6: Deploying")
         deploy_result = deploy_app
@@ -3414,12 +3415,19 @@ module Ai
       
       Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
       
-      # Broadcast to the app editor channel to update the preview frame
+      # Broadcast to the app channel that users are subscribed to
       Turbo::StreamsChannel.broadcast_replace_to(
-        "app_#{@app.id}_editor",
+        "app_#{@app.id}",
         target: "preview_frame",
         partial: "account/app_editors/preview_frame",
         locals: { app: @app }
+      )
+      
+      # Also broadcast a refresh action to the chat channel for better UX
+      Turbo::StreamsChannel.broadcast_action_to(
+        "app_#{@app.id}_chat",
+        action: "refresh",
+        target: "preview_frame"
       )
     rescue => e
       Rails.logger.warn "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
