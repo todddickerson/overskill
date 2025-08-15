@@ -125,6 +125,26 @@ When generating apps, ensure:
    - Add routes between {{AI_ROUTES_START}} and {{AI_ROUTES_END}} markers
    - For landing pages, replace default "/" route with <Route path="/" element={<Index />} />
    - Keep authentication routes intact unless specifically changing auth flow
+
+### CRITICAL Import Requirements
+**NEVER use a component without importing it first!**
+1. Before using ANY component in JSX, verify it's imported at the top of the file
+2. For shadcn/ui components, ALWAYS add the import:
+   ```typescript
+   import { Button } from "@/components/ui/button"
+   import { Card, CardContent, CardHeader } from "@/components/ui/card"
+   import { Badge } from "@/components/ui/badge"
+   ```
+3. For custom components:
+   ```typescript
+   import { ComponentName } from "@/components/ComponentName"
+   ```
+4. For React hooks and utilities:
+   ```typescript
+   import { useState, useEffect } from "react"
+   ```
+5. When creating new components, list ALL required imports FIRST before writing the component
+6. If you receive "Fix these missing imports" message, immediately add the missing imports to the specified files
  
 ## Debugging Guidelines
 Use debugging tools FIRST before examining or modifying code:

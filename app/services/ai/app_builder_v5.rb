@@ -717,6 +717,25 @@ module Ai
       # Ensure postcss.config.js exists with proper ES module format
       ensure_postcss_config
       
+      # Validate imports before building
+      import_errors = validate_imports
+      if import_errors.any?
+        Rails.logger.warn "[V5_DEPLOY] Import validation failed: #{import_errors.join('; ')}"
+        
+        # Give AI one chance to fix the import errors
+        fix_success = send_import_errors_to_ai(import_errors)
+        
+        if !fix_success
+          return { success: false, error: "Import validation failed: #{import_errors.first}" }
+        end
+        
+        # Re-validate after AI fix
+        import_errors = validate_imports
+        if import_errors.any?
+          return { success: false, error: "Import validation still failing after fix attempt: #{import_errors.first}" }
+        end
+      end
+      
       # Build the app first
       builder = Deployment::ExternalViteBuilder.new(app)
       build_result = builder.build_for_preview
@@ -757,6 +776,112 @@ module Ai
     rescue => e
       Rails.logger.error "[V5_DEPLOY] Error: #{e.message}"
       { success: false, error: e.message }
+    end
+    
+    # Validate that all component imports are present
+    def validate_imports
+      errors = []
+      
+      # HTML elements and React built-ins that don't need imports
+      html_elements = %w[div span section article main header footer nav aside p h1 h2 h3 h4 h5 h6 
+                        a ul ol li button input form label select option textarea img svg path
+                        table thead tbody tr td th pre code strong em small iframe video audio
+                        canvas details summary dialog template slot]
+      
+      react_builtins = %w[Fragment StrictMode Suspense]
+      
+      # TypeScript types and internal references that don't need imports
+      ts_types = %w[HTMLDivElement HTMLButtonElement HTMLInputElement HTMLTextAreaElement 
+                    HTMLTableElement HTMLTableSectionElement HTMLTableRowElement HTMLTableCellElement
+                    HTMLTableCaptionElement HTMLHeadingElement HTMLParagraphElement HTMLSpanElement
+                    HTMLAnchorElement HTMLImageElement HTMLFormElement HTMLSelectElement]
+      
+      # Common internal/context values that are defined in same file
+      internal_refs = %w[Comp FormField FormFieldContextValue FormItemContextValue ChartContextProps
+                         ChartStyle CarouselContextProps DialogPortal SheetPortal DrawerPortal
+                         AlertDialogPortal TFieldValues]
+      
+      app.app_files.where("path LIKE '%.tsx' OR path LIKE '%.jsx'").each do |file|
+        next if file.path.include?('test') || file.path.include?('spec')
+        
+        content = file.content
+        
+        # Find all JSX component usage (CapitalCase tags)
+        used_components = content.scan(/<([A-Z]\w+)/).flatten.uniq
+        
+        # Find all imports
+        imported_components = []
+        
+        # Standard imports: import { Component } from
+        content.scan(/import\s*{([^}]+)}\s*from/).each do |imports|
+          imported_components.concat(imports[0].split(',').map(&:strip))
+        end
+        
+        # Default imports: import Component from
+        content.scan(/import\s+([A-Z]\w+)\s+from/).each do |import|
+          imported_components << import[0]
+        end
+        
+        # Namespace imports: import * as Something
+        content.scan(/import\s+\*\s+as\s+(\w+)/).each do |import|
+          imported_components << import[0]
+        end
+        
+        # Find missing components
+        missing = used_components - imported_components - html_elements - react_builtins - ts_types - internal_refs
+        
+        # Check for components that might be from destructured namespace imports
+        missing.reject! do |comp|
+          # Check if it's used as Namespace.Component
+          content.include?("#{comp}.") || 
+          # Check if there's a matching import path
+          content.match?(/from\s+['"].*#{comp.downcase}['"]/) ||
+          # Skip platform-specific components
+          comp == 'OverSkillBadge' || comp == 'Router' ||
+          # Skip if it's a type reference (used in extends/implements)
+          content.match?(/extends\s+#{comp}/) ||
+          content.match?(/implements\s+#{comp}/)
+        end
+        
+        if missing.any?
+          errors << "#{file.path}: Missing imports for #{missing.join(', ')}"
+          Rails.logger.warn "[V5_IMPORT_CHECK] #{file.path} missing: #{missing.join(', ')}"
+        end
+      end
+      
+      errors
+    end
+    
+    # Send import errors to AI for fixing
+    def send_import_errors_to_ai(errors)
+      Rails.logger.info "[V5_IMPORT_FIX] Sending import errors to AI for fixing"
+      
+      # Create a concise error message for the AI
+      error_message = "Fix these missing imports:\n" + errors.map { |e| "• #{e}" }.join("\n")
+      
+      # Create a user message in the chat
+      fix_message = app.app_chat_messages.create!(
+        user: @chat_message.user,
+        team: app.team,
+        role: 'user',
+        content: error_message,
+        status: 'sent'
+      )
+      
+      # Let AI process the fix
+      result = process_with_tools(error_message)
+      
+      # Check if AI made any file changes
+      if result[:tool_calls] && result[:tool_calls].any? { |tc| tc[:name].start_with?('os-') }
+        Rails.logger.info "[V5_IMPORT_FIX] AI attempted to fix imports"
+        return true
+      else
+        Rails.logger.warn "[V5_IMPORT_FIX] AI did not make any file changes"
+        return false
+      end
+    rescue => e
+      Rails.logger.error "[V5_IMPORT_FIX] Error sending to AI: #{e.message}"
+      return false
     end
     
     # Ensure postcss.config.js exists with proper ES module format
