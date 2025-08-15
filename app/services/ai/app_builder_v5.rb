@@ -1781,7 +1781,7 @@ module Ai
         model: model,
         options: {
           # OpenAI gpt-image-1 options (primary provider)
-          quality: model == 'flux.dev' ? 'hd' : 'standard',
+          quality: model == 'flux.dev' ? 'high' : 'medium',
           # style removed: OpenAI images API no longer accepts 'style'
           
           # Ideogram options (fallback provider)

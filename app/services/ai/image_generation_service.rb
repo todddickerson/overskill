@@ -294,12 +294,13 @@ module Ai
       file.content = Base64.encode64(image_content)
       file.file_type = determine_file_type(target_path)
       file.team = @app.team
-      file.metadata = {
-        'binary' => true,
-        'encoding' => 'base64',
-        'original_size' => image_content.bytesize,
-        'generated_at' => Time.current.iso8601
-      }
+      # Skip metadata assignment as AppFile doesn't have this column
+      # file.metadata = {
+      #   'binary' => true,
+      #   'encoding' => 'base64',
+      #   'original_size' => image_content.bytesize,
+      #   'generated_at' => Time.current.iso8601
+      # }
 
       file.save!
       Rails.logger.info "[ImageGen] Saved image file: #{target_path} (#{image_content.bytesize} bytes)"
