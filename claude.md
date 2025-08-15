@@ -208,6 +208,47 @@ end
 # Production: https://app-{app-id}.overskill.app
 ```
 
+## Import Strategy (Template-Based Approach)
+
+### Overview
+We use a **template-based import strategy** inspired by Base44, prioritizing reliability over bundle optimization. This prevents missing import errors and ensures consistent app generation.
+
+### Key Components
+
+1. **ComponentRequirementsAnalyzer** (`app/services/ai/component_requirements_analyzer.rb`)
+   - Pre-analyzes user prompts to determine required components
+   - Detects app type (landing, saas, dashboard, todo, etc.)
+   - Maps keywords to required icons and UI components
+   - Generates import templates automatically
+
+2. **Common Icons Helper** (`src/lib/common-icons.ts` in every app)
+   - Pre-exports 50+ commonly used Lucide React icons
+   - Prevents "Missing import: Shield" type errors
+   - Usage: `import { Menu, X, Check, Shield } from '@/lib/common-icons'`
+
+3. **Strict Icon Whitelist** (in agent-prompt.txt)
+   - Only approved Lucide React icons can be used
+   - AI receives list of valid icons upfront
+   - Prevents hallucination of non-existent icons
+
+### Import Rules for AI
+- **ALWAYS** determine required imports BEFORE writing code
+- **ONLY** use icons from the approved whitelist
+- **PREFER** importing from `@/lib/common-icons` for common icons
+- **NEVER** import non-existent icons (will break the app)
+
+### Example Import Templates
+```typescript
+// Landing/SaaS Pages
+import { Menu, X, Check, Star, Zap, Crown, Shield } from '@/lib/common-icons';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+
+// Dashboard Pages
+import { Home, User, Settings, TrendingUp } from '@/lib/common-icons';
+import { Select, SelectContent, SelectItem } from "@/components/ui/select";
+```
+
 ## AI Considerations
 
 ### Claude 4 Series (Latest - Recommended)
