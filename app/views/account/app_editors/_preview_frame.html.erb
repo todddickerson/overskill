@@ -1,8 +1,8 @@
-<div id="preview_frame" class="h-full flex flex-col" 
+<div id="preview_frame" class="h-full flex flex-col min-h-0" 
      data-controller="version-preview"
      data-version-preview-app-id-value="<%= app.id %>">
   
-  <div class="h-full bg-gray-50 dark:bg-gray-900 flex flex-col">
+  <div class="h-full bg-gray-50 dark:bg-gray-900 flex flex-col min-h-0">
     
     <!-- Version header (hidden by default) -->
     <div data-version-preview-target="versionHeader" 
@@ -33,7 +33,7 @@
     </div>
     
     <!-- Preview Content Area -->  
-    <div class="flex-1 relative p-4">
+    <div class="flex-1 relative p-4 box-border min-h-0">
       <div class="h-full bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden"
            data-preview-device-target="container">
         <% if app.preview_url.present? %>
