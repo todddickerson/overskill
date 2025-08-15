@@ -147,6 +147,106 @@ class App < ApplicationRecord
       Rails.logger.error e.backtrace.join("\n")
     end
   end
+  
+  # Unified AI generation entry point
+  # Set skip_job_trigger to true only when the controller will handle job triggering separately
+  def initiate_generation!(initial_prompt = nil, skip_job_trigger: false)
+    Rails.logger.info "[App] Initiating AI generation for app ##{id}"
+    
+    # Update prompt if provided
+    update!(prompt: initial_prompt) if initial_prompt.present?
+    
+    # Create initial user message if needed
+    message = if app_chat_messages.empty? && prompt.present?
+      app_chat_messages.create!(
+        role: "user",
+        content: prompt,  # Raw prompt - let AI service enhance as needed
+        user: creator.user
+      )
+    else
+      app_chat_messages.last
+    end
+    
+    # Default prompt if none provided
+    if prompt.blank? && message.content.blank?
+      default_prompt = "Generate a simple app with a home page and about page"
+      update!(prompt: default_prompt)
+      message.update!(content: default_prompt) if message.persisted?
+    end
+    
+    # Create assistant placeholder message for V5 builder to update
+    # This ensures Action Cable has something to broadcast to immediately
+    assistant_message = app_chat_messages.create!(
+      role: "assistant",
+      content: " ",
+      user: message.user,
+      status: "executing",
+      iteration_count: 0,
+      loop_messages: [],
+      tool_calls: [],
+      thinking_status: "Initializing Overskill AI...",
+      is_code_generation: false
+    )
+    
+    Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for AI generation"
+
+    # Trigger job unless explicitly told not to (e.g., when controller handles it)
+    unless skip_job_trigger
+      Rails.logger.info "[App] Triggering V5 orchestrator for message ##{message.id}"
+      ProcessAppUpdateJobV4.perform_later(message) # handles all versions
+    end
+    
+    # Update status
+    update!(status: "generating") unless generating?
+  end
+  
+  # AI Model selection for A/B testing
+  AI_MODELS = {
+    'gpt-5' => 'GPT-5 (Fast & Efficient)',
+    'claude-sonnet-4' => 'Claude Sonnet 4 (Advanced Reasoning)'
+  }.freeze
+  
+  def ai_model_name
+    AI_MODELS[ai_model] || AI_MODELS['gpt-5']
+  end
+  
+  def using_claude?
+    ai_model == 'claude-sonnet-4'
+  end
+  
+  def using_gpt5?
+    ai_model == 'gpt-5' || ai_model.nil?
+  end
+  
+  # Badge and referral system
+  def hide_badge!
+    update!(show_overskill_badge: false)
+  end
+  
+  def show_badge!
+    update!(show_overskill_badge: true)
+  end
+  
+  def remix_url
+    base_url = ENV.fetch('BASE_URL', 'https://overskill.app')
+    "#{base_url}/remix?template=#{obfuscated_id}"
+  end
+  
+  # Generate obfuscated ID for sharing
+  def obfuscated_id
+    # Use a simple base64 encoding with ID padding for now
+    # You can replace this with hashids or another obfuscation method
+    Base64.urlsafe_encode64("app-#{id}").gsub('=', '')
+  end
+  
+  def self.find_by_obfuscated_id(obfuscated)
+    # Decode the obfuscated ID
+    decoded = Base64.urlsafe_decode64(obfuscated + '==')
+    id = decoded.gsub('app-', '').to_i
+    find_by(id: id)
+  rescue
+    nil
+  end
 
   private
 
@@ -207,107 +307,6 @@ class App < ApplicationRecord
     app_env_vars.select(&:available_for_ai?).map do |env_var|
       { key: env_var.key, description: env_var.description }
     end
-  end
-
-  # Unified AI generation entry point
-  # Set skip_job_trigger to true only when the controller will handle job triggering separately
-  def initiate_generation!(initial_prompt = nil, skip_job_trigger: false)
-    Rails.logger.info "[App] Initiating AI generation for app ##{id}"
-    
-    # Update prompt if provided
-    update!(prompt: initial_prompt) if initial_prompt.present?
-    
-    # Create initial user message if needed
-    message = if app_chat_messages.empty? && prompt.present?
-      app_chat_messages.create!(
-        role: "user",
-        content: prompt,  # Raw prompt - let AI service enhance as needed
-        user: creator.user
-      )
-    else
-      app_chat_messages.last
-    end
-    
-    # Default prompt if none provided
-    if prompt.blank? && message.content.blank?
-      default_prompt = "Generate a simple app with a home page and about page"
-      update!(prompt: default_prompt)
-      message.update!(content: default_prompt) if message.persisted?
-    end
-    
-    # Create assistant placeholder message for V5 builder to update
-    # This ensures Action Cable has something to broadcast to immediately
-    assistant_message = app_chat_messages.create!(
-      role: "assistant",
-      content: " ",
-      user: message.user,
-      status: "executing",
-      iteration_count: 0,
-      loop_messages: [],
-      tool_calls: [],
-      thinking_status: "Initializing Overskill AI...",
-      is_code_generation: false
-    )
-    
-    Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for AI generation"
-
-    # Trigger job unless explicitly told not to (e.g., when controller handles it)
-    unless skip_job_trigger
-      Rails.logger.info "[App] Triggering V5 orchestrator for message ##{message.id}"
-      ProcessAppUpdateJobV4.perform_later(message) # handles all versions
-    end
-    
-    # Update status
-    update!(status: "generating") unless generating?
-  end
-  
-  
-  # AI Model selection for A/B testing
-  AI_MODELS = {
-    'gpt-5' => 'GPT-5 (Fast & Efficient)',
-    'claude-sonnet-4' => 'Claude Sonnet 4 (Advanced Reasoning)'
-  }.freeze
-  
-  def ai_model_name
-    AI_MODELS[ai_model] || AI_MODELS['gpt-5']
-  end
-  
-  def using_claude?
-    ai_model == 'claude-sonnet-4'
-  end
-  
-  def using_gpt5?
-    ai_model == 'gpt-5' || ai_model.nil?
-  end
-  
-  # Badge and referral system
-  def hide_badge!
-    update!(show_overskill_badge: false)
-  end
-  
-  def show_badge!
-    update!(show_overskill_badge: true)
-  end
-  
-  def remix_url
-    base_url = ENV.fetch('BASE_URL', 'https://overskill.app')
-    "#{base_url}/remix?template=#{obfuscated_id}"
-  end
-  
-  # Generate obfuscated ID for sharing
-  def obfuscated_id
-    # Use a simple base64 encoding with ID padding for now
-    # You can replace this with hashids or another obfuscation method
-    Base64.urlsafe_encode64("app-#{id}").gsub('=', '')
-  end
-  
-  def self.find_by_obfuscated_id(obfuscated)
-    # Decode the obfuscated ID
-    decoded = Base64.urlsafe_decode64(obfuscated + '==')
-    id = decoded.gsub('app-', '').to_i
-    find_by(id: id)
-  rescue
-    nil
   end
 
   private
