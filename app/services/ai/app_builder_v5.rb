@@ -3410,18 +3410,19 @@ module Ai
     
     # Broadcast preview frame update when app is deployed
     def broadcast_preview_frame_update
-    return unless @app&.preview_url.present?
-    
-    Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
-    
-    # Broadcast to the app editor channel to update the preview frame
-    Turbo::StreamsChannel.broadcast_replace_to(
-      "app_#{@app.id}_editor",
-      target: "preview_frame",
-      partial: "account/app_editors/preview_frame",
-      locals: { app: @app }
-    )
-  rescue => e
-    Rails.logger.warn "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+      return unless @app&.preview_url.present?
+      
+      Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
+      
+      # Broadcast to the app editor channel to update the preview frame
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}_editor",
+        target: "preview_frame",
+        partial: "account/app_editors/preview_frame",
+        locals: { app: @app }
+      )
+    rescue => e
+      Rails.logger.warn "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+    end
   end
 end
