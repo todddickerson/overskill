@@ -54,7 +54,8 @@ class App < ApplicationRecord
   before_validation :generate_subdomain
   after_create :create_default_env_vars
   after_create :initiate_ai_generation, if: :should_auto_generate?
-  after_create :generate_app_logo, :generate_app_name
+  after_create :generate_app_name
+  after_create_commit :generate_app_logo
   # 🚅 add callbacks above.
 
   # Delegate to team's database config for hybrid architecture
@@ -109,7 +110,7 @@ class App < ApplicationRecord
   end
 
   def generate_app_logo
-    GenerateAppLogoJob.perform_later(id)
+    GenerateAppLogoJob.set(wait: 2.seconds).perform_later(id)
   end
 
   def generate_app_name

@@ -37,8 +37,18 @@ module Ai
         # Check if search pattern matches (with ellipsis support)
         unless pattern_matches?(target_content)
           Rails.logger.warn "[LineReplaceService] Pattern mismatch in #{file.path}"
-          Rails.logger.warn "[LineReplaceService] Expected pattern: #{@search_pattern[0..200]}..."
-          Rails.logger.warn "[LineReplaceService] Actual content: #{target_content[0..200]}..."
+          Rails.logger.warn "[LineReplaceService] Expected pattern (#{@search_pattern.bytesize} bytes): #{@search_pattern[0..200].inspect}"
+          Rails.logger.warn "[LineReplaceService] Actual content (#{target_content.bytesize} bytes): #{target_content[0..200].inspect}"
+          
+          # Log first difference for debugging
+          min_len = [@search_pattern.length, target_content.length].min
+          first_diff_index = (0...min_len).find { |i| @search_pattern[i] != target_content[i] }
+          if first_diff_index
+            Rails.logger.warn "[LineReplaceService] First difference at position #{first_diff_index}: expected #{@search_pattern[first_diff_index].inspect}, got #{target_content[first_diff_index].inspect}"
+          elsif @search_pattern.length != target_content.length
+            Rails.logger.warn "[LineReplaceService] Length mismatch: pattern is #{@search_pattern.length} chars, content is #{target_content.length} chars"
+          end
+          
           return error_result("Search pattern does not match target lines")
         end
         
@@ -92,9 +102,30 @@ module Ai
       if @search_pattern.include?('...')
         return ellipsis_pattern_matches?(target_content)
       else
-        # Exact match for simple patterns
-        normalized_pattern = @search_pattern.strip
-        normalized_target = target_content.strip
+        # Normalize whitespace while preserving indentation structure
+        # Remove leading/trailing newlines but keep spaces for indentation
+        normalized_pattern = @search_pattern.gsub(/\A\n+|\n+\z/, '').rstrip
+        normalized_target = target_content.gsub(/\A\n+|\n+\z/, '').rstrip
+        
+        # If patterns still don't match, try one more normalization:
+        # Compare without leading whitespace on first line
+        if normalized_pattern != normalized_target
+          # Remove only leading spaces from the first line of both
+          pattern_lines = normalized_pattern.lines
+          target_lines = normalized_target.lines
+          
+          if pattern_lines.size == target_lines.size && pattern_lines.size > 0
+            # Check if only the first line differs by leading whitespace
+            pattern_first = pattern_lines[0].lstrip
+            target_first = target_lines[0].lstrip
+            
+            if pattern_first == target_first && pattern_lines[1..-1] == target_lines[1..-1]
+              Rails.logger.info "[LineReplaceService] Pattern matched after normalizing first line indentation"
+              return true
+            end
+          end
+        end
+        
         normalized_pattern == normalized_target
       end
     end
