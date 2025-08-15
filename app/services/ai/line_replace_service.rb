@@ -123,7 +123,10 @@ module Ai
       new_lines = @lines.dup
       
       # Replace the target lines
-      replacement_lines = @replacement.lines
+      # Ensure replacement ends with newline if not already present
+      replacement_with_newline = @replacement
+      replacement_with_newline += "\n" unless replacement_with_newline.end_with?("\n")
+      replacement_lines = replacement_with_newline.lines
       
       # Calculate the correct range for replacement
       start_index = @first_line - 1
