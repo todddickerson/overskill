@@ -91,6 +91,7 @@ module Ai
         Rails.logger.error "[V5_CRITICAL] AppBuilderV5 execute! failed: #{e.message}"
         Rails.logger.error e.backtrace.first(10).join("\n")
         handle_error(e)
+        return # CRITICAL: Don't continue to finalize_app_generation after error
       end
     end
     
@@ -167,6 +168,7 @@ module Ai
       rescue => e
         Rails.logger.error "[V5_SIMPLE] Error in simple flow: #{e.message}"
         add_loop_message("Error during generation: #{e.message}", type: 'error')
+        @completion_status = :failed  # Mark as failed to prevent deployment
         raise e
       end
     end
@@ -644,8 +646,15 @@ module Ai
     def finalize_app_generation
       Rails.logger.info "[V5_FINALIZE] Starting finalization, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
       
-      # Always try to deploy if we have files
-      if app.app_files.count > 0
+      # Check if generation actually completed successfully
+      if @completion_status == :failed || @completion_status == :error
+        Rails.logger.warn "[V5_FINALIZE] Skipping deployment due to failed generation status: #{@completion_status}"
+        app.update!(status: 'failed')
+        return
+      end
+      
+      # Only deploy if we have files AND generation completed successfully
+      if app.app_files.count > 0 && @completion_status != :failed
         # Deploy the app
         update_thinking_status("Phase 6/6: Deploying")
         deploy_result = deploy_app
@@ -2461,6 +2470,8 @@ module Ai
       puts "\n❌ AppBuilderV5 Error: #{error.message}"
       puts error.backtrace.first(5).join("\n")
       
+      # Mark generation as failed to prevent any deployment attempts
+      @completion_status = :failed
       app.update!(status: 'failed')
       
       # Preserve the conversation_flow explicitly
