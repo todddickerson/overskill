@@ -1091,6 +1091,7 @@ module Ai
       when 'os-view', 'os-read'
         read_file(tool_args['file_path'])
       when 'os-line-replace'
+        Rails.logger.info "[V5_TOOL] Processing os-line-replace with args: #{tool_args.inspect}"
         replace_file_content(tool_args)
       when 'os-delete'
         delete_file(tool_args['file_path'])
@@ -1240,6 +1241,7 @@ module Ai
           when 'os-view', 'os-read'
             read_file(tool_args['file_path'])
           when 'os-line-replace'
+            Rails.logger.info "[V5_TOOL_PROCESS] Processing os-line-replace in process_tool_calls"
             replace_file_content(tool_args)
           when 'os-delete'
             delete_file(tool_args['file_path'])
@@ -1396,8 +1398,14 @@ module Ai
     end
     
     def replace_file_content(args)
+      Rails.logger.info "[V5_LINE_REPLACE] Starting replacement for #{args['file_path']}"
+      Rails.logger.info "[V5_LINE_REPLACE] Lines #{args['first_replaced_line']}-#{args['last_replaced_line']}"
+      
       file = @app.app_files.find_by(path: args['file_path'])
-      return { error: "File not found: #{args['file_path']}" } unless file
+      unless file
+        Rails.logger.error "[V5_LINE_REPLACE] File not found: #{args['file_path']}"
+        return { error: "File not found: #{args['file_path']}" }
+      end
       
       # Use LineReplaceService for proper validation and replacement
       if defined?(Ai::LineReplaceService)
@@ -1410,8 +1418,10 @@ module Ai
         )
         
         if result[:success]
+          Rails.logger.info "[V5_LINE_REPLACE] Success for #{args['file_path']}"
           { success: true, path: args['file_path'] }
         else
+          Rails.logger.error "[V5_LINE_REPLACE] Failed: #{result[:message]}"
           { error: result[:message] || "Line replacement failed" }
         end
       else
