@@ -731,17 +731,34 @@ module Ai
       if import_errors.any?
         Rails.logger.warn "[V5_DEPLOY] Import validation failed: #{import_errors.join('; ')}"
         
-        # Give AI one chance to fix the import errors
-        fix_success = send_import_errors_to_ai(import_errors)
+        # First attempt: Fix imports automatically
+        auto_fix_success = auto_fix_imports(import_errors)
         
-        if !fix_success
-          return { success: false, error: "Import validation failed: #{import_errors.first}" }
+        if auto_fix_success
+          Rails.logger.info "[V5_DEPLOY] Successfully auto-fixed import errors"
+          # Re-validate after auto fix
+          import_errors = validate_imports
+          if import_errors.empty?
+            Rails.logger.info "[V5_DEPLOY] All import errors resolved automatically"
+          else
+            Rails.logger.warn "[V5_DEPLOY] Some import errors remain after auto-fix: #{import_errors.join('; ')}"
+          end
         end
         
-        # Re-validate after AI fix
-        import_errors = validate_imports
+        # If auto-fix didn't resolve all errors, try AI as fallback
         if import_errors.any?
-          return { success: false, error: "Import validation still failing after fix attempt: #{import_errors.first}" }
+          Rails.logger.info "[V5_DEPLOY] Falling back to AI import fixing"
+          ai_fix_success = send_import_errors_to_ai(import_errors)
+          
+          if !ai_fix_success
+            return { success: false, error: "Import validation failed: #{import_errors.first}" }
+          end
+          
+          # Re-validate after AI fix
+          import_errors = validate_imports
+          if import_errors.any?
+            return { success: false, error: "Import validation still failing after fix attempt: #{import_errors.first}" }
+          end
         end
       end
       
@@ -861,17 +878,170 @@ module Ai
       errors
     end
     
+    # Automatically fix import errors without AI intervention
+    def auto_fix_imports(errors)
+      Rails.logger.info "[V5_AUTO_FIX] Attempting to automatically fix #{errors.count} import errors"
+      
+      success_count = 0
+      
+      errors.each do |error|
+        begin
+          # Parse the error: "src/components/FeaturesSection.tsx: Missing imports for Badge, Button"
+          file_path = error.split(":").first.strip
+          missing_components = error.split("Missing imports for ").last.split(", ").map(&:strip)
+          
+          # Find the app file
+          app_file = app.app_files.find_by(path: file_path)
+          unless app_file
+            Rails.logger.warn "[V5_AUTO_FIX] Could not find app file: #{file_path}"
+            next
+          end
+          
+          original_content = app_file.content
+          updated_content = original_content.dup
+          
+          # Find the import section (after React import, before other code)
+          react_import_match = updated_content.match(/(import React[^;]+;)/)
+          unless react_import_match
+            Rails.logger.warn "[V5_AUTO_FIX] Could not find React import in #{file_path}"
+            next
+          end
+          
+          react_import_line = react_import_match[1]
+          
+          # Generate import statements for missing components
+          new_imports = missing_components.map do |component|
+            generate_import_statement_for_component(component)
+          end.join("\n")
+          
+          # Insert new imports after React import
+          updated_content = updated_content.sub(
+            react_import_line,
+            "#{react_import_line}\n#{new_imports}"
+          )
+          
+          # Update the file
+          app_file.update!(content: updated_content)
+          @agent_state[:modified_files][file_path] = {
+            original_content: original_content,
+            new_content: updated_content,
+            timestamp: Time.current
+          }
+          
+          Rails.logger.info "[V5_AUTO_FIX] Fixed imports in #{file_path}: #{missing_components.join(', ')}"
+          success_count += 1
+          
+        rescue => e
+          Rails.logger.error "[V5_AUTO_FIX] Error fixing imports in #{file_path}: #{e.message}"
+          Rails.logger.error "[V5_AUTO_FIX] Backtrace: #{e.backtrace&.first(3)&.join("\n")}"
+        end
+      end
+      
+      if success_count > 0
+        Rails.logger.info "[V5_AUTO_FIX] Successfully fixed imports in #{success_count}/#{errors.count} files"
+        # Update assistant message with auto-fix status  
+        if @assistant_message
+          current_content = @assistant_message.content || ''
+          auto_fix_note = "\n\n✅ Auto-fixed #{success_count} import error#{success_count == 1 ? '' : 's'}"
+          @assistant_message.update!(content: current_content + auto_fix_note)
+        end
+        return true
+      else
+        Rails.logger.warn "[V5_AUTO_FIX] Failed to automatically fix any import errors"
+        return false
+      end
+    end
+    
+    # Generate exact import statement for a missing component
+    def generate_import_statement_for_component(component)
+      case component
+      # shadcn/ui components
+      when 'Badge'
+        "import { Badge } from '@/components/ui/badge';"
+      when 'Button'  
+        "import { Button } from '@/components/ui/button';"
+      when 'Card'
+        "import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';"
+      when 'Dialog'
+        "import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';"
+      when 'Sheet'
+        "import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';"
+      when 'Tabs'
+        "import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';"
+      when 'Input'
+        "import { Input } from '@/components/ui/input';"
+      when 'Label'
+        "import { Label } from '@/components/ui/label';"
+      when 'Select'
+        "import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';"
+      when 'Textarea'
+        "import { Textarea } from '@/components/ui/textarea';"
+      when 'Checkbox'
+        "import { Checkbox } from '@/components/ui/checkbox';"
+      when 'Avatar'
+        "import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';"
+      when 'Alert'
+        "import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';"
+      when 'Toast'
+        "import { Toast } from '@/components/ui/toast';"
+      # Lucide React icons - check if it's a known icon
+      when /^[A-Z][a-zA-Z]+$/ # CapitalCase pattern for icons
+        if is_lucide_icon?(component)
+          "import { #{component} } from 'lucide-react';"
+        else
+          # Default to shadcn component with lowercase path
+          component_path = component.gsub(/([A-Z])/, '-\\1').downcase.sub(/^-/, '')
+          "import { #{component} } from '@/components/ui/#{component_path}';"
+        end
+      else
+        # Default fallback
+        "import { #{component} } from '@/components/ui/#{component.downcase}';"
+      end
+    end
+    
+    # Check if component is a valid Lucide React icon
+    def is_lucide_icon?(component)
+      # Common Lucide icons that we know exist
+      common_icons = %w[Menu X ChevronDown ChevronUp ChevronLeft ChevronRight ArrowLeft ArrowRight 
+                       ArrowUp ArrowDown Check Plus Minus Edit Trash Save Download Upload Share Copy
+                       Search Filter Calendar Clock User Users Settings Bell Home Star Heart
+                       Mail Phone Globe Shield Lock CreditCard DollarSign Zap Crown Rocket Award
+                       Trophy TrendingUp TrendingDown BarChart LineChart PieChart Play Pause Volume
+                       Camera Image Video File Folder Cloud Upload2 Download2 ExternalLink
+                       Github Twitter Linkedin Facebook Instagram Youtube MapPin]
+      
+      common_icons.include?(component)
+    end
+    
     # Send import errors to AI for fixing
     def send_import_errors_to_ai(errors)
       Rails.logger.info "[V5_IMPORT_FIX] Sending import errors to AI for fixing"
       
-      # Create a detailed error message for the AI with import guidance
-      error_message = "Fix these missing imports:\n" + errors.map { |e| "• #{e}" }.join("\n") + "\n\n" +
-        "IMPORT GUIDANCE:\n" +
-        "• UI Components (Button, Card, etc.) → import from '@/components/ui/[component]'\n" +
-        "• Icons → import from '@/lib/common-icons' or 'lucide-react'\n" +
-        "• Use os-line-replace tool to add the missing imports to the top of each file\n" +
-        "• Follow the existing import patterns in the file"
+      # Create a detailed error message for the AI with specific import fixes
+      error_message = "CRITICAL: Fix these missing imports immediately using os-line-replace tool:\n\n"
+      
+      errors.each do |error|
+        file_path = error.split(":").first
+        missing_components = error.split("Missing imports for ").last.split(", ")
+        
+        error_message += "**File: #{file_path}**\n"
+        missing_components.each do |component|
+          import_statement = generate_import_statement_for_component(component.strip)
+          error_message += "• Add: `#{import_statement}`\n"
+        end
+        error_message += "\n"
+      end
+      
+      error_message += "**EXACT INSTRUCTIONS:**\n" +
+        "1. Use os-line-replace tool for each file\n" +
+        "2. Find the existing import section (after React import)\n" +
+        "3. Add the missing import statements in the exact format shown above\n" +
+        "4. Place UI component imports before custom component imports\n" +
+        "5. CRITICAL: Use the EXACT import statements provided - do not modify them\n\n" +
+        "**Example os-line-replace usage:**\n" +
+        "```\n" +
+        "os-line-replace path/to/file.tsx \"import React from 'react';\" \"import React from 'react';\nimport { Badge } from '@/components/ui/badge';\"\n" +
+        "```"
       
       # Create a user message in the chat
       fix_message = app.app_chat_messages.create!(
