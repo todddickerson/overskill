@@ -877,19 +877,42 @@ module Ai
         status: 'sent'
       )
       
-      # Let AI process the fix
-      result = process_with_tools(error_message)
+      # Create assistant message for the fix attempt
+      fix_assistant_message = app.app_chat_messages.create!(
+        user: @chat_message.user,
+        team: app.team,
+        role: 'assistant',
+        content: '',
+        status: 'executing'
+      )
       
-      # Check if AI made any file changes
-      if result[:tool_calls] && result[:tool_calls].any? { |tc| tc[:name].start_with?('os-') }
-        Rails.logger.info "[V5_IMPORT_FIX] AI attempted to fix imports"
-        return true
-      else
-        Rails.logger.warn "[V5_IMPORT_FIX] AI did not make any file changes"
-        return false
+      # Store current assistant message and replace it temporarily
+      original_assistant_message = @assistant_message
+      @assistant_message = fix_assistant_message
+      
+      begin
+        # Let AI process the fix using the standard flow
+        response = call_ai_with_context(error_message)
+        
+        # Check if AI made any file changes by looking at generated_files
+        files_changed = @agent_state[:generated_files].count > 0
+        
+        if files_changed
+          Rails.logger.info "[V5_IMPORT_FIX] AI fixed #{@agent_state[:generated_files].count} files"
+          fix_assistant_message.update!(status: 'complete', content: "Fixed missing imports in #{@agent_state[:generated_files].count} files")
+          return true
+        else
+          Rails.logger.warn "[V5_IMPORT_FIX] AI did not make any file changes"
+          fix_assistant_message.update!(status: 'failed', content: "Could not fix the import errors automatically")
+          return false
+        end
+      ensure
+        # Restore original assistant message
+        @assistant_message = original_assistant_message
       end
     rescue => e
       Rails.logger.error "[V5_IMPORT_FIX] Error sending to AI: #{e.message}"
+      fix_assistant_message&.update!(status: 'failed', content: "Error: #{e.message}")
       return false
     end
     
