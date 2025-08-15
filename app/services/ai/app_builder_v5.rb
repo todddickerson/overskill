@@ -3411,21 +3411,21 @@ module Ai
     
     # Broadcast preview frame update when app is deployed
     def broadcast_preview_frame_update
-      return unless @app&.preview_url.present?
+      return unless app&.preview_url.present?
       
-      Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
+      Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{app.id}"
       
       # Broadcast to the app channel that users are subscribed to
       Turbo::StreamsChannel.broadcast_replace_to(
-        "app_#{@app.id}",
+        "app_#{app.id}",
         target: "preview_frame",
         partial: "account/app_editors/preview_frame",
-        locals: { app: @app }
+        locals: { app: app }
       )
       
       # Also broadcast a refresh action to the chat channel for better UX
       Turbo::StreamsChannel.broadcast_action_to(
-        "app_#{@app.id}_chat",
+        "app_#{app.id}_chat",
         action: "refresh",
         target: "preview_frame"
       )
