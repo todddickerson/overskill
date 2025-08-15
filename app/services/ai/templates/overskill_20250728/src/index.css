@@ -102,14 +102,18 @@ All colors MUST be HSL.
   .overskill-badge {
     @apply fixed bottom-4 right-4 z-50;
     @apply bg-primary text-primary-foreground;
-    @apply px-4 py-2 rounded-full;
-    @apply shadow-lg hover:shadow-xl transition-shadow;
+    @apply px-3 py-2 rounded-full;
+    @apply shadow-lg hover:shadow-xl transition-all;
     @apply text-sm font-medium;
     @apply cursor-pointer;
     @apply flex items-center gap-2;
   }
   
   .overskill-badge:hover {
-    @apply scale-105 transition-transform;
+    @apply scale-105;
+  }
+  
+  .overskill-logo {
+    @apply w-5 h-5 rounded-sm;
   }
 }

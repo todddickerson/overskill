@@ -62,6 +62,7 @@ if defined?(Api::V1::ApplicationController)
           :featured_until,
           :launch_date,
           :ai_model,
+          :show_overskill_badge,
           # 🚅 super scaffolding will insert new fields above this line.
           *permitted_arrays,
           # 🚅 super scaffolding will insert new arrays above this line.

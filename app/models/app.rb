@@ -1,3 +1,5 @@
+require 'timeout'
+
 class App < ApplicationRecord
   include AutoPreview
   # 🚅 add concerns above.
@@ -111,7 +113,53 @@ class App < ApplicationRecord
   end
 
   def generate_app_name
-    GenerateAppNameJob.set(wait: 3.seconds).perform_later(id) # too fast otherwise
+    Rails.logger.info "[App] Generating app name inline for app ##{id}"
+    
+    # Add a small delay to prevent conflicts with other callbacks
+    sleep(0.5) 
+    
+    begin
+      # Use timeout to ensure we don't wait too long
+      Timeout.timeout(2) do
+        # Skip if app already has a good name (not default/generic)
+        if name_generated_at.present?
+          Rails.logger.info "[App] Skipping name generation for app #{id} - already generated name: '#{name}'"
+          return
+        end
+
+        service = Ai::AppNamerService.new(self)
+        result = service.generate_name!
+
+        if result[:success]
+          update(name_generated_at: Time.current)
+          Rails.logger.info "[App] Successfully generated name for app: #{result[:new_name]}"
+          
+          # Broadcast the updated navigation to refresh the app name
+          broadcast_navigation_update
+        else
+          Rails.logger.error "[App] Failed to generate name for app #{id}: #{result[:error]}"
+        end
+      end
+    rescue Timeout::Error
+      Rails.logger.warn "[App] Name generation timed out after 2 seconds for app #{id}"
+    rescue => e
+      Rails.logger.error "[App] Exception in inline name generation: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+    end
+  end
+
+  private
+
+  def broadcast_navigation_update
+    # Broadcast to all users who might be viewing this app's editor
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "app_#{id}",
+      target: "app_navigation_#{id}",
+      partial: "account/app_editors/app_navigation",
+      locals: { app: self }
+    )
+  rescue => e
+    Rails.logger.error "[App] Failed to broadcast navigation update: #{e.message}"
   end
 
   def visitor_count
@@ -230,6 +278,36 @@ class App < ApplicationRecord
   
   def using_gpt5?
     ai_model == 'gpt-5' || ai_model.nil?
+  end
+  
+  # Badge and referral system
+  def hide_badge!
+    update!(show_overskill_badge: false)
+  end
+  
+  def show_badge!
+    update!(show_overskill_badge: true)
+  end
+  
+  def remix_url
+    base_url = ENV.fetch('BASE_URL', 'https://overskill.app')
+    "#{base_url}/remix?template=#{obfuscated_id}"
+  end
+  
+  # Generate obfuscated ID for sharing
+  def obfuscated_id
+    # Use a simple base64 encoding with ID padding for now
+    # You can replace this with hashids or another obfuscation method
+    Base64.urlsafe_encode64("app-#{id}").gsub('=', '')
+  end
+  
+  def self.find_by_obfuscated_id(obfuscated)
+    # Decode the obfuscated ID
+    decoded = Base64.urlsafe_decode64(obfuscated + '==')
+    id = decoded.gsub('app-', '').to_i
+    find_by(id: id)
+  rescue
+    nil
   end
 
   private

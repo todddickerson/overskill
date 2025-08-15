@@ -482,6 +482,8 @@ module Deployment
             supabaseAnonKey: typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzYmd3aXhsa2x2Z2VveHZqbXRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzgyMTAsImV4cCI6MjA2OTMxNDIxMH0.0K9JFMA0K90yOtvnYSYBCroS2Htg1iaICjcevNVCWKM',
             appId: typeof APP_ID !== 'undefined' ? APP_ID : '#{@app.id}',
             environment: typeof ENVIRONMENT !== 'undefined' ? ENVIRONMENT : 'preview',
+            showOverskillBadge: #{@app.show_overskill_badge.nil? ? 'true' : @app.show_overskill_badge},
+            remixUrl: '#{@app.remix_url}',
             customVars: {}
           };
           

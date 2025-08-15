@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_14_115717) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_15_125544) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -480,6 +480,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_115717) do
     t.string "subdomain", null: false
     t.datetime "last_deployed_at"
     t.datetime "published_at"
+    t.boolean "show_overskill_badge", default: true, null: false
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
