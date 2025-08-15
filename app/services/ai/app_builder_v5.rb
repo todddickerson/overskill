@@ -710,6 +710,9 @@ module Ai
     end
     
     def deploy_app
+      # Ensure postcss.config.js exists with proper ES module format
+      ensure_postcss_config
+      
       # Build the app first
       builder = Deployment::ExternalViteBuilder.new(app)
       build_result = builder.build_for_preview
@@ -739,6 +742,21 @@ module Ai
     rescue => e
       Rails.logger.error "[V5_DEPLOY] Error: #{e.message}"
       { success: false, error: e.message }
+    end
+    
+    # Ensure postcss.config.js exists with proper ES module format
+    # This prevents parent project's postcss.config.js from interfering
+    def ensure_postcss_config
+      postcss_file = app.app_files.find_or_initialize_by(path: 'postcss.config.js')
+      
+      # Only update if it doesn't exist or has wrong format
+      if postcss_file.new_record? || postcss_file.content.include?('module.exports')
+        Rails.logger.info "[V5_BUILD_FIX] Creating/fixing postcss.config.js with ES module format"
+        postcss_file.update!(
+          content: "export default { plugins: {} };",
+          team: app.team
+        )
+      end
     end
     
     def call_ai_with_context(prompt)
