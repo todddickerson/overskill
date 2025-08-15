@@ -2253,6 +2253,9 @@ module Ai
       base_prompt = @prompt_service.generate_prompt(include_context: false)
       context_data = build_current_context_data
       
+      # Add component requirements analysis to context
+      context_data = add_component_requirements_to_context(context_data)
+      
       # Use GranularCachedPromptBuilder for file-level caching
       builder_class = use_granular ? Ai::Prompts::GranularCachedPromptBuilder : Ai::Prompts::CachedPromptBuilder
       
@@ -2294,6 +2297,49 @@ module Ai
       # Enable when we have substantial template content to cache
       template_size = get_template_files_for_caching.sum { |f| f.content&.length || 0 }
       template_size > 10_000  # Use array format for 10K+ chars of template content
+    end
+    
+    # Add component requirements analysis to context
+    def add_component_requirements_to_context(context_data)
+      # Analyze the user's request to determine required components
+      requirements = ComponentRequirementsAnalyzer.analyze(
+        @chat_message.content,
+        @app.app_files.pluck(:path)
+      )
+      
+      # Add requirements to context as a helpful guide
+      requirements_text = <<~REQUIREMENTS
+        
+        ## Component Requirements Analysis
+        Based on the user's request, you will likely need these components:
+        
+        **App Type Detected**: #{requirements[:app_type] || 'general'}
+        
+        **Required Icons** (all from lucide-react):
+        #{requirements[:required_icons].join(', ')}
+        
+        **Required shadcn/ui Components**:
+        #{requirements[:required_shadcn].join(', ')}
+        
+        **Suggested Section Components**:
+        #{requirements[:required_sections].join(', ')}
+        
+        **Recommended Import Template**:
+        ```typescript
+        #{requirements[:import_template]}
+        ```
+        
+        IMPORTANT: Use these imports as a starting point. Only use icons from the approved whitelist in the prompt.
+      REQUIREMENTS
+      
+      # Append to context data
+      if context_data.is_a?(String)
+        context_data + requirements_text
+      elsif context_data.is_a?(Array)
+        context_data + [requirements_text]
+      else
+        context_data
+      end
     end
     
     # Get template files for caching (long-form data goes first)

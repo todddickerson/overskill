@@ -126,25 +126,64 @@ When generating apps, ensure:
    - For landing pages, replace default "/" route with <Route path="/" element={<Index />} />
    - Keep authentication routes intact unless specifically changing auth flow
 
-### CRITICAL Import Requirements
-**NEVER use a component without importing it first!**
-1. Before using ANY component in JSX, verify it's imported at the top of the file
-2. For shadcn/ui components, ALWAYS add the import:
-   ```typescript
-   import { Button } from "@/components/ui/button"
-   import { Card, CardContent, CardHeader } from "@/components/ui/card"
-   import { Badge } from "@/components/ui/badge"
-   ```
-3. For custom components:
-   ```typescript
-   import { ComponentName } from "@/components/ComponentName"
-   ```
-4. For React hooks and utilities:
-   ```typescript
-   import { useState, useEffect } from "react"
-   ```
-5. When creating new components, list ALL required imports FIRST before writing the component
-6. If you receive "Fix these missing imports" message, immediately add the missing imports to the specified files
+### CRITICAL Import Requirements - Template-Based Approach
+**MANDATORY: Determine ALL required imports BEFORE writing ANY code!**
+
+#### Import Strategy
+1. **ANALYZE FIRST**: Before creating any component, determine what icons, UI components, and utilities will be needed
+2. **USE COMMON IMPORTS**: Import from @/templates/shared/core/common-icons.ts for frequently used icons
+3. **BATCH IMPORTS**: Group related imports together at the top of EVERY file
+
+#### Approved Icon Whitelist (from lucide-react)
+**ONLY use these icons - importing non-existent icons WILL break the app:**
+- Navigation: Menu, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight
+- Actions: Check, Plus, Minus, Edit, Trash, Save, Download, Upload, Share, Copy
+- Status: Info, AlertCircle, CheckCircle, XCircle, HelpCircle
+- Objects: User, Users, Home, Settings, Search, Filter, Calendar, Clock, Mail, Phone, MapPin, Globe
+- Business: Shield, Lock, Unlock, Key, CreditCard, DollarSign, ShoppingCart, Package, Gift
+- Media: Image, Camera, Video, Mic, Volume, Play, Pause
+- Tech: Code, Terminal, Cpu, Database, Cloud, Wifi
+- Social: Github, Twitter, Linkedin, Facebook
+- Premium: Zap, Crown, Star, Heart, ThumbsUp, TrendingUp, Rocket, Target, Award, Trophy
+- Loading: Loader, Loader2, RefreshCw
+
+**NEVER import icons not in this list!**
+
+#### Standard Import Templates by App Type
+```typescript
+// Landing/SaaS Pages
+import { Menu, X, ChevronDown, ArrowRight, Check, Star, Zap, Crown, Shield, Lock } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+// Dashboard Pages  
+import { Menu, X, Home, User, Users, Settings, Bell, Search, Filter, TrendingUp } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Form Pages
+import { Check, X, AlertCircle, Info, Upload } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useForm } from 'react-hook-form';
+```
+
+#### Import Rules
+1. **ALWAYS import React hooks first**: `import React, { useState, useEffect } from 'react';`
+2. **Then import icons in batches**: Group 5-10 icons per import line
+3. **Then import shadcn/ui components**: Each component gets its own import
+4. **Then import custom components**: From @/components/...
+5. **Finally import utilities**: From @/lib/... or @/utils/...
+
+#### Handling Import Errors
+If you receive "Fix these missing imports" message:
+1. Check if the icon is in the approved whitelist above
+2. If not in whitelist, use a similar approved icon instead
+3. Add the correct import immediately
+4. Never use an icon without importing it first
  
 ## Debugging Guidelines
 Use debugging tools FIRST before examining or modifying code:
