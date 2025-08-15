@@ -232,8 +232,6 @@ class App < ApplicationRecord
     "#{base_url}/remix?template=#{obfuscated_id}"
   end
 
-  private
-
   def broadcast_navigation_update
     # Broadcast to all users who might be viewing this app's editor
     Turbo::StreamsChannel.broadcast_replace_to(

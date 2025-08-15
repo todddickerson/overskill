@@ -83,7 +83,7 @@ module Ai
     end
     
     def extract_target_content
-      target_lines = @lines[(@first_line - 1)...@last_line]
+      target_lines = @lines[(@first_line - 1)..(@last_line - 1)]
       target_lines.join
     end
     
@@ -125,8 +125,12 @@ module Ai
       # Replace the target lines
       replacement_lines = @replacement.lines
       
+      # Calculate the correct range for replacement
+      start_index = @first_line - 1
+      num_lines_to_replace = @last_line - @first_line + 1
+      
       # Remove old lines and insert new ones
-      new_lines[@first_line - 1, @last_line - @first_line + 1] = replacement_lines
+      new_lines[start_index, num_lines_to_replace] = replacement_lines
       
       new_lines.join
     end
