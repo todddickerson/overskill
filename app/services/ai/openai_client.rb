@@ -14,19 +14,18 @@ module Ai
       }
     end
 
-    def generate_image(prompt, size: "1024x1024", quality: "standard", style: "vivid")
+    def generate_image(prompt, size: "1024x1024", quality: "standard", style: nil)
       # Use latest GPT-4o image generation model (gpt-image-1)
       body = {
         model: "gpt-image-1",
         prompt: prompt,
         n: 1,
         size: size,
-        quality: quality,
-        style: style
+        quality: quality
       }
 
       Rails.logger.info "[AI] Generating image with gpt-image-1: #{prompt[0..100]}" if ENV["VERBOSE_AI_LOGGING"] == "true"
-      Rails.logger.info "[AI] Parameters: size=#{size}, quality=#{quality}, style=#{style}" if ENV["VERBOSE_AI_LOGGING"] == "true"
+      Rails.logger.info "[AI] Parameters: size=#{size}, quality=#{quality}" if ENV["VERBOSE_AI_LOGGING"] == "true"
 
       response = self.class.post("/images/generations", @options.merge(body: body.to_json))
 
@@ -63,7 +62,7 @@ module Ai
       prompt = build_logo_prompt(app_name, app_description)
       
       # Generate with square dimensions suitable for app logos
-      generate_image(prompt, size: "1024x1024", quality: "standard", style: "vivid")
+      generate_image(prompt, size: "1024x1024", quality: "standard")
     end
 
     private

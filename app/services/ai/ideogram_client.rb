@@ -16,8 +16,8 @@ module Ai
       endpoint = "/v1/#{model}/generate"
 
       headers = {
-        "Api-Key" => @api_key
-        # Note: Content-Type will be set automatically by HTTParty for multipart
+        "Api-Key" => @api_key,
+        "Content-Type" => "application/json"
       }
 
       # Build multipart form data as per Ideogram v3 API specs
@@ -38,8 +38,8 @@ module Ai
       response = self.class.post(
         File.join(@base_url, endpoint),
         headers: headers,
-        body: body,  # HTTParty will handle multipart encoding
-        timeout: 120  # Increased timeout for v3 API
+        body: body.to_json,
+        timeout: 120
       )
 
       if response.success?

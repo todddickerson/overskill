@@ -107,7 +107,11 @@ module Ai
           context << ""
           context << "**#{file.path}** (#{file.file_type})"
           context << "```#{get_file_extension(file.path)}"
-          context << file.content.to_s.strip
+          # Add line numbers for consistent display with os-view/os-read
+          numbered_content = file.content.to_s.lines.map.with_index(1) do |line, num|
+            "#{num.to_s.rjust(4)}: #{line}"
+          end.join
+          context << numbered_content.rstrip
           context << "```"
           context << ""
         end
@@ -126,7 +130,11 @@ module Ai
         context << "## #{category}: #{file_path}"
         context << ""
         context << "```#{get_file_extension(file_path)}"
-        context << content.strip
+        # Add line numbers for consistent display with os-view/os-read
+        numbered_content = content.lines.map.with_index(1) do |line, num|
+          "#{num.to_s.rjust(4)}: #{line}"
+        end.join
+        context << numbered_content.rstrip
         context << "```"
         context << ""
       else

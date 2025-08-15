@@ -159,18 +159,10 @@ module Ai
                 else 'standard'
                 end
 
-      # Map style options - gpt-image-1 supports 'natural' and 'vivid'  
-      style = case options[:style]
-              when 'natural', 'realistic' then 'natural'
-              when 'vivid', 'dramatic', 'design' then 'vivid'
-              else 'vivid'  # Default to vivid for more dramatic results
-              end
-
       result = @openai_client.generate_image(
         prompt,
         size: openai_size,
-        quality: quality,
-        style: style
+        quality: quality
       )
 
       if result[:success]

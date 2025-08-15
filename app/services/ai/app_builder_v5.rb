@@ -45,6 +45,7 @@ module Ai
         history: [],
         errors: [],
         generated_files: [],
+        modified_files: {},  # Track which files have been modified
         verification_results: []
       }
       
@@ -1172,20 +1173,37 @@ module Ai
         when 'os-view', 'os-read'
           if result[:content]
             lines_read = result[:content].lines.count
-            "File contents retrieved:\n#{result[:content]}\n\n" \
+            # Add line numbers to content for AI reference
+            numbered_content = result[:content].lines.map.with_index(1) do |line, num|
+              "#{num.to_s.rjust(4)}: #{line}"
+            end.join
+            "File contents retrieved:\n#{numbered_content}\n" \
             "📄 File: #{tool_args['file_path']}\n" \
             "• Lines: #{lines_read}\n" \
-            "• Status: Successfully read"
+            "• Status: Successfully read with line numbers"
           else
             "File read successfully"
           end
         when 'os-line-replace'
           lines_replaced = (tool_args['last_replaced_line'].to_i - tool_args['first_replaced_line'].to_i + 1)
           new_lines = tool_args['replace'].lines.count
-          "✅ File content replaced successfully: #{result[:path]}\n" \
-          "• Lines replaced: #{tool_args['first_replaced_line']}-#{tool_args['last_replaced_line']} (#{lines_replaced} lines)\n" \
-          "• New content: #{new_lines} lines inserted\n" \
-          "• Status: Changes saved to disk"
+          
+          message = "✅ File content replaced successfully: #{result[:path]}\n" \
+            "• Lines replaced: #{tool_args['first_replaced_line']}-#{tool_args['last_replaced_line']} (#{lines_replaced} lines)\n" \
+            "• New content: #{new_lines} lines inserted\n"
+          
+          # Add warning if fuzzy match was used
+          if result[:fuzzy_match_used]
+            message += "• Note: Fuzzy pattern matching was used (exact match failed)\n"
+          end
+          
+          # Add warning if file was previously modified
+          if @agent_state[:modified_files][result[:path]] && @agent_state[:modified_files].size > 1
+            message += "• ⚠️ File has been modified multiple times - use os-view to see current state\n"
+          end
+          
+          message += "• Status: Changes saved to disk"
+          message
         when 'os-delete'
           "✅ File deleted successfully: #{result[:path]}\n" \
           "• Status: File removed from project"
@@ -1353,6 +1371,7 @@ module Ai
       end
       
       file = @app.app_files.find_or_initialize_by(path: path)
+      is_update = file.persisted? && file.content != content
       file.content = content
       file.file_type = determine_file_type(path)
       file.team = @app.team  # Ensure team is set
@@ -1362,6 +1381,11 @@ module Ai
       rescue ActiveRecord::RecordInvalid => e
         Rails.logger.error "[V5_ERROR] Failed to save file #{path}: #{e.message}"
         return { error: "Failed to save file #{path}: #{e.message}" }
+      end
+      
+      # Track modifications
+      if is_update
+        @agent_state[:modified_files][path] = Time.current
       end
       
       @agent_state[:generated_files] << file unless @agent_state[:generated_files].include?(file)
@@ -1419,10 +1443,33 @@ module Ai
         
         if result[:success]
           Rails.logger.info "[V5_LINE_REPLACE] Success for #{args['file_path']}"
-          { success: true, path: args['file_path'] }
+          # Track that this file has been modified
+          @agent_state[:modified_files][args['file_path']] = Time.current
+          { success: true, path: args['file_path'], file_modified: true }
         else
-          Rails.logger.error "[V5_LINE_REPLACE] Failed: #{result[:message]}"
-          { error: result[:message] || "Line replacement failed" }
+          Rails.logger.warn "[V5_LINE_REPLACE] Exact match failed, trying fuzzy replacement"
+          
+          # Try fuzzy replacement as fallback
+          if defined?(Ai::FuzzyReplaceService) && args['search'].present?
+            fuzzy_result = Ai::FuzzyReplaceService.replace(
+              file,
+              args['search'],
+              args['replace']
+            )
+            
+            if fuzzy_result[:success]
+              Rails.logger.info "[V5_LINE_REPLACE] Fuzzy replacement succeeded: #{fuzzy_result[:message]}"
+              # Track that this file has been modified
+              @agent_state[:modified_files][args['file_path']] = Time.current
+              { success: true, path: args['file_path'], file_modified: true, fuzzy_match_used: true }
+            else
+              Rails.logger.error "[V5_LINE_REPLACE] Both exact and fuzzy replacement failed"
+              { error: result[:message] || "Line replacement failed" }
+            end
+          else
+            Rails.logger.error "[V5_LINE_REPLACE] Failed: #{result[:message]}"
+            { error: result[:message] || "Line replacement failed" }
+          end
         end
       else
         # Fallback to improved basic implementation
@@ -1469,7 +1516,9 @@ module Ai
         file.content += "\n" unless file.content.end_with?("\n")
         file.save!
         
-        { success: true, path: args['file_path'] }
+        # Track that this file has been modified
+        @agent_state[:modified_files][args['file_path']] = Time.current
+        { success: true, path: args['file_path'], file_modified: true }
       end
     end
     
@@ -1722,7 +1771,7 @@ module Ai
         options: {
           # OpenAI gpt-image-1 options (primary provider)
           quality: model == 'flux.dev' ? 'hd' : 'standard',
-          style: 'vivid',
+          # style removed: OpenAI images API no longer accepts 'style'
           
           # Ideogram options (fallback provider)
           rendering_speed: model == 'flux.dev' ? 'DEFAULT' : 'TURBO',
@@ -3347,10 +3396,9 @@ module Ai
     def complexity_limit_reached?(state)
       state[:generated_files].count > 100
     end
-  end
-  
-  # Broadcast preview frame update when app is deployed
-  def broadcast_preview_frame_update
+    
+    # Broadcast preview frame update when app is deployed
+    def broadcast_preview_frame_update
     return unless @app&.preview_url.present?
     
     Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"

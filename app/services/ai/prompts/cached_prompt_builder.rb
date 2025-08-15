@@ -114,12 +114,17 @@ module Ai
       def format_template_files
         @template_files.map.with_index do |file, index|
           # Use recommended document structure from docs
+          # Add line numbers for consistent display with os-view/os-read
+          numbered_content = file.content.to_s.lines.map.with_index(1) do |line, num|
+            "#{num.to_s.rjust(4)}: #{line}"
+          end.join.rstrip
+          
           <<~DOC
           <document index="#{index + 1}">
             <source>#{file.path}</source>
             <document_content>
             ```#{detect_language(file.path)}
-            #{file.content}
+            #{numbered_content}
             ```
             </document_content>
           </document>
