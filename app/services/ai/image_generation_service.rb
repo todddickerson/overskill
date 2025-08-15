@@ -17,7 +17,11 @@ module Ai
 
     # Main image generation method with provider fallback
     def generate_image(prompt:, width: 512, height: 512, model: 'flux.schnell', target_path: nil, options: {})
-      # Validate dimensions
+      # Auto-adjust dimensions to valid multiples of 32
+      width = adjust_to_multiple_of_32(width)
+      height = adjust_to_multiple_of_32(height)
+      
+      # Validate dimensions after adjustment
       validation_result = validate_dimensions(width, height)
       return validation_result if validation_result[:error]
 
@@ -102,7 +106,22 @@ module Ai
 
     private
 
-
+    # Adjust dimension to nearest multiple of 32
+    def adjust_to_multiple_of_32(dimension)
+      # Round to nearest multiple of 32
+      rounded = (dimension.to_f / 32).round * 32
+      
+      # Ensure minimum of 512 and maximum of 1920
+      rounded = 512 if rounded < 512
+      rounded = 1920 if rounded > 1920
+      
+      # Log adjustment if changed
+      if rounded != dimension
+        Rails.logger.info "[ImageGen] Adjusted dimension from #{dimension} to #{rounded} (multiple of 32)"
+      end
+      
+      rounded
+    end
 
     def validate_dimensions(width, height)
       if width < 512 || height < 512 || width > 1920 || height > 1920
