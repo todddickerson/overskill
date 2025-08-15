@@ -1,6 +1,8 @@
 module Ai
   class GenerationError < StandardError; end
   
+  # DEPRECATED: Use AppBuilderV5 for new development
+  # V4 is kept for backward compatibility only
   class AppBuilderV4
     MAX_RETRIES = 2
     

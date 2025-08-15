@@ -1,4 +1,7 @@
 module Ai
+  # DEPRECATED: This service is used by V4/V4Enhanced only.
+  # V5 uses templates directly from templates/overskill_20250728
+  # Do not use for new development.
   class SharedTemplateService
     def initialize(app)
       @app = app

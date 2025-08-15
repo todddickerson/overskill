@@ -1,4 +1,5 @@
-# ProcessAppUpdateJobV4 - Uses the V4 orchestrator (Vite + TypeScript builds)
+# ProcessAppUpdateJobV4 - Named V4 but actually uses V5 orchestrator (Vite + TypeScript builds)
+# TODO: Rename to ProcessAppUpdateJobV5 when convenient
 class ProcessAppUpdateJobV4 < ApplicationJob
   queue_as :ai_processing
   
@@ -47,16 +48,15 @@ class ProcessAppUpdateJobV4 < ApplicationJob
       raise ArgumentError, "Expected AppChatMessage or ID, got #{message_or_id.class}"
     end
     
-    Rails.logger.info "[ProcessAppUpdateJobV4] Starting V4 orchestrator for message ##{message.id} (app ##{message.app.id})"
+    Rails.logger.info "[ProcessAppUpdateJobV4] Starting V5 orchestrator for message ##{message.id} (app ##{message.app.id})"
     
-    # Use enhanced V4 with visual feedback by default
-    use_v5 = true # New version based on Lovable leaked Agent prompts
+    # Use V5 orchestrator (job is named V4 for historical reasons)
     orchestrator = Ai::AppBuilderV5.new(message)
     
-    # V4 has built-in retry logic (MAX_RETRIES = 2)
+    # V5 has built-in retry logic
     orchestrator.execute!
     
-    Rails.logger.info "[ProcessAppUpdateJobV4] Successfully processed message ##{message.id} with V4 orchestrator"
+    Rails.logger.info "[ProcessAppUpdateJobV4] Successfully processed message ##{message.id} with V5 orchestrator"
   rescue ActiveRecord::RecordNotFound => e
     Rails.logger.error "[ProcessAppUpdateJobV4] Message not found: #{e.message}"
     raise # Let job retry logic handle it

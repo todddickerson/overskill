@@ -865,8 +865,13 @@ module Ai
     def send_import_errors_to_ai(errors)
       Rails.logger.info "[V5_IMPORT_FIX] Sending import errors to AI for fixing"
       
-      # Create a concise error message for the AI
-      error_message = "Fix these missing imports:\n" + errors.map { |e| "• #{e}" }.join("\n")
+      # Create a detailed error message for the AI with import guidance
+      error_message = "Fix these missing imports:\n" + errors.map { |e| "• #{e}" }.join("\n") + "\n\n" +
+        "IMPORT GUIDANCE:\n" +
+        "• UI Components (Button, Card, etc.) → import from '@/components/ui/[component]'\n" +
+        "• Icons → import from '@/lib/common-icons' or 'lucide-react'\n" +
+        "• Use os-line-replace tool to add the missing imports to the top of each file\n" +
+        "• Follow the existing import patterns in the file"
       
       # Create a user message in the chat
       fix_message = app.app_chat_messages.create!(
@@ -891,18 +896,27 @@ module Ai
       @assistant_message = fix_assistant_message
       
       begin
+        # Store initial state to detect changes
+        initial_files_count = @agent_state[:generated_files].count
+        initial_modified_files = @agent_state[:modified_files].dup
+        
         # Let AI process the fix using the standard flow
         response = call_ai_with_context(error_message)
         
-        # Check if AI made any file changes by looking at generated_files
-        files_changed = @agent_state[:generated_files].count > 0
+        # Check if AI made any file changes
+        files_added = @agent_state[:generated_files].count > initial_files_count
+        files_modified = @agent_state[:modified_files].keys != initial_modified_files.keys
+        files_changed = files_added || files_modified
         
         if files_changed
-          Rails.logger.info "[V5_IMPORT_FIX] AI fixed #{@agent_state[:generated_files].count} files"
-          fix_assistant_message.update!(status: 'complete', content: "Fixed missing imports in #{@agent_state[:generated_files].count} files")
+          changes_summary = "Added #{@agent_state[:generated_files].count - initial_files_count} files, modified #{@agent_state[:modified_files].keys.size - initial_modified_files.keys.size} files"
+          Rails.logger.info "[V5_IMPORT_FIX] AI successfully made changes: #{changes_summary}"
+          fix_assistant_message.update!(status: 'complete', content: "Fixed missing imports: #{changes_summary}")
           return true
         else
-          Rails.logger.warn "[V5_IMPORT_FIX] AI did not make any file changes"
+          Rails.logger.warn "[V5_IMPORT_FIX] AI did not make any file changes (initial_files: #{initial_files_count}, current_files: #{@agent_state[:generated_files].count})"
+          Rails.logger.warn "[V5_IMPORT_FIX] Initial modified files: #{initial_modified_files.keys.join(', ')}"
+          Rails.logger.warn "[V5_IMPORT_FIX] Current modified files: #{@agent_state[:modified_files].keys.join(', ')}"
           fix_assistant_message.update!(status: 'failed', content: "Could not fix the import errors automatically")
           return false
         end

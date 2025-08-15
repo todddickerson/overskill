@@ -1,4 +1,6 @@
 # Enhanced V4 App Builder with improved chat UX feedback - FIXED VERSION
+# DEPRECATED: Use AppBuilderV5 for new development
+# V4Enhanced is kept for backward compatibility only
 module Ai
   class AppBuilderV4Enhanced
     include Rails.application.routes.url_helpers
