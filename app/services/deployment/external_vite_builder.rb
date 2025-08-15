@@ -452,10 +452,24 @@ module Deployment
         Rails.logger.info "  Asset: #{asset[:path]} (#{asset[:content].bytesize} bytes)"
       end
       
+      # Get app version info for health checks
+      app_version_id = @app.app_versions.last&.id || 'unknown'
+      app_version_number = @app.app_versions.last&.version_number || '1.0.0'
+      
       # Hybrid Worker code with asset serving
       worker_code = <<~JAVASCRIPT
         // App ID: #{@app.id} | Built: #{Time.current.iso8601} | Mode: hybrid
         // Architecture: CSS embedded, JS assets served with correct MIME types
+        
+        // Deployment metadata
+        const DEPLOYMENT_INFO = {
+          appId: '#{@app.id}',
+          versionId: '#{app_version_id}',
+          versionNumber: '#{app_version_number}',
+          deployedAt: '#{Time.current.iso8601}',
+          buildMode: 'hybrid',
+          assetCount: #{external_assets.count}
+        };
         
         // HTML with embedded CSS and external JS references
         const HTML_CONTENT = `#{escaped_html}`;
@@ -520,6 +534,35 @@ module Deployment
             return new Response('JavaScript asset not found: ' + url.pathname + '\\nAvailable: ' + Object.keys(ASSETS).join(', '), { 
               status: 404,
               headers: { 'Content-Type': 'text/plain' }
+            });
+          }
+          
+          // Handle health check endpoint for deployment verification
+          if (url.pathname === '/_health' || url.pathname === '/api/health') {
+            return new Response(JSON.stringify({
+              status: 'healthy',
+              deployment: DEPLOYMENT_INFO,
+              timestamp: new Date().toISOString(),
+              config: {
+                appId: config.appId,
+                environment: config.environment,
+                hasSupabase: !!config.supabaseUrl
+              }
+            }), {
+              headers: { 
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+              }
+            });
+          }
+          
+          // Handle deployment info endpoint
+          if (url.pathname === '/_deployment' || url.pathname === '/api/deployment') {
+            return new Response(JSON.stringify(DEPLOYMENT_INFO), {
+              headers: { 
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+              }
             });
           }
           

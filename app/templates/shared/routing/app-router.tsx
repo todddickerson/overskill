@@ -5,9 +5,11 @@ import Login from '../auth/login';
 import SignUp from '../auth/signup';
 import ForgotPassword from '../auth/forgot-password';
 
-// Import your app-specific pages here
+// {{AI_IMPORTS_START}} - AI will add page imports here
+// IMPORTANT: Import pages from '../pages/' directory
 // Example: import Dashboard from '../pages/Dashboard';
-// Example: import Home from '../pages/Home';
+// Example: import Index from '../pages/Index';  // For landing pages
+// {{AI_IMPORTS_END}}
 
 export default function AppRouter() {
   return (
@@ -31,9 +33,12 @@ export default function AppRouter() {
           } 
         />
         
-        {/* App-specific routes will be added here by AI generation */}
+        {/* {{AI_ROUTES_START}} - AI will add app-specific routes here */}
+        {/* IMPORTANT: For landing pages, add: <Route path="/" element={<Index />} /> */}
+        {/* For apps with main functionality, add your routes here */}
+        {/* {{AI_ROUTES_END}} */}
         
-        {/* Default redirects */}
+        {/* Default redirects - AI should update these based on app type */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

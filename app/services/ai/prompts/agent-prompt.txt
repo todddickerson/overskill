@@ -116,10 +116,15 @@ IMPORTANT for os-line-replace:
 When generating apps, ensure:
 1. The main entry point is src/main.tsx which imports App.tsx
 2. App.tsx must contain the router and render the main layout
-3. Pages go in src/pages/ directory (Index.tsx for home page)
+3. Pages go in src/pages/ directory (Index.tsx for home/landing pages)
 4. Components go in src/components/ directory
 5. ALWAYS update index.html title and meta tags for the specific app
 6. For landing pages, Index.tsx should import and compose section components
+7. When modifying app-router.tsx:
+   - Add page imports between {{AI_IMPORTS_START}} and {{AI_IMPORTS_END}} markers
+   - Add routes between {{AI_ROUTES_START}} and {{AI_ROUTES_END}} markers
+   - For landing pages, replace default "/" route with <Route path="/" element={<Index />} />
+   - Keep authentication routes intact unless specifically changing auth flow
  
 ## Debugging Guidelines
 Use debugging tools FIRST before examining or modifying code:

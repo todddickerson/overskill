@@ -732,9 +732,20 @@ module Ai
       )
       
       if deploy_result[:success]
+        # Clear Cloudflare cache to ensure fresh content is served
+        Rails.logger.info "[V5_DEPLOY] Clearing Cloudflare cache for fresh deployment"
+        cache_result = deployer.clear_cache(:preview)
+        
+        if cache_result[:success]
+          Rails.logger.info "[V5_DEPLOY] Cache cleared successfully"
+        else
+          Rails.logger.warn "[V5_DEPLOY] Cache clear failed: #{cache_result[:error]}"
+        end
+        
         { 
           success: true, 
-          preview_url: deploy_result[:worker_url]
+          preview_url: deploy_result[:worker_url],
+          cache_cleared: cache_result[:success]
         }
       else
         { 

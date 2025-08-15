@@ -103,6 +103,50 @@ module Deployment
       { success: false, error: e.message }
     end
     
+    # Clear Cloudflare cache for a worker
+    def clear_cache(deployment_type = :preview)
+      return { success: false, error: "Zone ID not configured" } unless ENV['CLOUDFLARE_ZONE_ID'].present?
+      
+      worker_name = generate_worker_name(deployment_type)
+      zone_id = ENV['CLOUDFLARE_ZONE_ID']
+      
+      Rails.logger.info "[CloudflareWorkersDeployer] Clearing cache for #{worker_name}"
+      
+      # Get the hostname for this deployment
+      hostname = case deployment_type
+      when :preview
+        "preview-#{@app.id}.overskillproject.com"
+      when :production
+        "app-#{@app.id}.overskillproject.com"
+      else
+        "#{worker_name}.overskillproject.com"
+      end
+      
+      # Purge cache for specific files or patterns
+      response = self.class.post(
+        "/zones/#{zone_id}/purge_cache",
+        body: {
+          files: [
+            "https://#{hostname}/",
+            "https://#{hostname}/index.html",
+            "https://#{hostname}/assets/*"
+          ]
+        }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      
+      if response.success?
+        Rails.logger.info "[CloudflareWorkersDeployer] Cache cleared successfully for #{hostname}"
+        { success: true, message: "Cache cleared for #{hostname}" }
+      else
+        Rails.logger.error "[CloudflareWorkersDeployer] Failed to clear cache: #{response.body}"
+        { success: false, error: "Failed to clear cache: #{response['errors']&.first&.dig('message') || response.body}" }
+      end
+    rescue => e
+      Rails.logger.error "[CloudflareWorkersDeployer] Cache clear error: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
     private
     
     def generate_worker_name(deployment_type)
