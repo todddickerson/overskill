@@ -116,7 +116,7 @@ class App < ApplicationRecord
     Rails.logger.info "[App] Generating app name inline for app ##{id}"
     
     # Add a small delay to prevent conflicts with other callbacks
-    sleep(0.5) 
+    sleep(0.1) 
     
     begin
       # Use timeout to ensure we don't wait too long
@@ -230,22 +230,6 @@ class App < ApplicationRecord
   def remix_url
     base_url = ENV.fetch('BASE_URL', 'https://overskill.app')
     "#{base_url}/remix?template=#{obfuscated_id}"
-  end
-  
-  # Generate obfuscated ID for sharing
-  def obfuscated_id
-    # Use a simple base64 encoding with ID padding for now
-    # You can replace this with hashids or another obfuscation method
-    Base64.urlsafe_encode64("app-#{id}").gsub('=', '')
-  end
-  
-  def self.find_by_obfuscated_id(obfuscated)
-    # Decode the obfuscated ID
-    decoded = Base64.urlsafe_decode64(obfuscated + '==')
-    id = decoded.gsub('app-', '').to_i
-    find_by(id: id)
-  rescue
-    nil
   end
 
   private

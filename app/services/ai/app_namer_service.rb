@@ -8,7 +8,7 @@ module Ai
     MAX_RETRIES = 2
     
     # Model preferences for naming (lightweight and fast)
-    NAMING_MODEL_PREFERENCE = 'gpt-4o'
+    NAMING_MODEL_PREFERENCE = 'gpt-4o-mini'
     
     attr_reader :app, :prompt, :client_info
     
