@@ -3702,6 +3702,30 @@ module Ai
       has_todo_component && state[:iteration] >= 3
     end
     
+    # Broadcast preview frame update when app is deployed
+    def broadcast_preview_frame_update
+      return unless @app&.preview_url.present?
+      
+      Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
+      
+      # Broadcast to the app channel that users are subscribed to
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}",
+        target: "preview_frame",
+        partial: "account/app_editors/preview_frame",
+        locals: { app: @app }
+      )
+      
+      # Also broadcast a refresh action to the chat channel for better UX
+      Turbo::StreamsChannel.broadcast_action_to(
+        "app_#{@app.id}_chat",
+        action: "refresh",
+        target: "preview_frame"
+      )
+    rescue => e
+      Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+    end
+    
     private
     
     def determine_feature_tools(state)
@@ -3798,28 +3822,5 @@ module Ai
       state[:generated_files].count > 100
     end
     
-    # Broadcast preview frame update when app is deployed
-    def broadcast_preview_frame_update
-      return unless @app&.preview_url.present?
-      
-      Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
-      
-      # Broadcast to the app channel that users are subscribed to
-      Turbo::StreamsChannel.broadcast_replace_to(
-        "app_#{@app.id}",
-        target: "preview_frame",
-        partial: "account/app_editors/preview_frame",
-        locals: { app: @app }
-      )
-      
-      # Also broadcast a refresh action to the chat channel for better UX
-      Turbo::StreamsChannel.broadcast_action_to(
-        "app_#{@app.id}_chat",
-        action: "refresh",
-        target: "preview_frame"
-      )
-    rescue => e
-      Rails.logger.warn "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
-    end
   end
 end

@@ -103,9 +103,12 @@ module Deployment
       { success: false, error: e.message }
     end
     
-    # Clear Cloudflare cache for a worker
+    # Clear Cloudflare cache for a worker (non-blocking - deployment continues even if cache clear fails)
     def clear_cache(deployment_type = :preview)
-      return { success: false, error: "Zone ID not configured" } unless ENV['CLOUDFLARE_ZONE_ID'].present?
+      unless ENV['CLOUDFLARE_ZONE_ID'].present?
+        Rails.logger.warn "[CloudflareWorkersDeployer] Zone ID not configured - skipping cache clear"
+        return { success: true, message: "Cache clear skipped - no zone ID configured" }
+      end
       
       worker_name = generate_worker_name(deployment_type)
       zone_id = ENV['CLOUDFLARE_ZONE_ID']
@@ -122,29 +125,29 @@ module Deployment
         "#{worker_name}.overskillproject.com"
       end
       
-      # Purge cache for specific files or patterns
-      response = self.class.post(
-        "/zones/#{zone_id}/purge_cache",
-        body: {
-          files: [
-            "https://#{hostname}/",
-            "https://#{hostname}/index.html",
-            "https://#{hostname}/assets/*"
-          ]
-        }.to_json,
-        headers: { 'Content-Type' => 'application/json' }
-      )
-      
-      if response.success?
-        Rails.logger.info "[CloudflareWorkersDeployer] Cache cleared successfully for #{hostname}"
-        { success: true, message: "Cache cleared for #{hostname}" }
-      else
-        Rails.logger.error "[CloudflareWorkersDeployer] Failed to clear cache: #{response.body}"
-        { success: false, error: "Failed to clear cache: #{response['errors']&.first&.dig('message') || response.body}" }
+      # Try cache clear but don't fail deployment if it doesn't work
+      begin
+        # Use purge_everything for broader compatibility (requires different permissions)
+        response = self.class.post(
+          "/zones/#{zone_id}/purge_cache",
+          body: { purge_everything: true }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+        
+        if response.success?
+          Rails.logger.info "[CloudflareWorkersDeployer] Cache cleared successfully for #{hostname}"
+          { success: true, message: "Cache cleared for #{hostname}" }
+        else
+          error_msg = response['errors']&.first&.dig('message') || 'Unknown error'
+          Rails.logger.warn "[CloudflareWorkersDeployer] Cache clear failed (non-blocking): #{error_msg}"
+          # Return success anyway - cache clear is non-critical
+          { success: true, message: "Deployment succeeded, cache clear failed (#{error_msg})" }
+        end
+      rescue => e
+        Rails.logger.warn "[CloudflareWorkersDeployer] Cache clear failed (non-blocking): #{e.message}"
+        # Return success anyway - cache clear is non-critical  
+        { success: true, message: "Deployment succeeded, cache clear failed (#{e.message})" }
       end
-    rescue => e
-      Rails.logger.error "[CloudflareWorkersDeployer] Cache clear error: #{e.message}"
-      { success: false, error: e.message }
     end
     
     private
