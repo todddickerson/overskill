@@ -170,12 +170,13 @@ module Ai
         if deploy_result[:success]
           # Phase 3: Complete
           update_thinking_status("Complete!")
-          
-          if is_continuation
-            add_loop_message("App updated successfully. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
-          else
-            add_loop_message("App generation complete. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
-          end
+
+          # Note; adds debugging logs in chat
+          # if is_continuation
+          #   add_loop_message("App updated successfully. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
+          # else
+          #   add_loop_message("App generation complete. Preview is ready at: #{deploy_result[:preview_url]}", type: 'status')
+          # end
           
           # Mark completion
           @completion_status = :complete

@@ -330,12 +330,7 @@ module Ai
         
         # Return enhanced response with R2 URL and usage instructions
         response = "Image generated successfully!\n\n"
-        response += "Path: #{target_path}\n"
-        response += "R2 URL: #{result[:url]}\n\n"
-        response += "IMPORTANT: Use the R2 URL in your HTML/CSS, not the local path:\n"
-        response += "Example HTML: <img src=\"#{result[:url]}\" alt=\"Generated image\" />\n"
-        response += "Example CSS: background-image: url('#{result[:url]}');\n\n"
-        response += "The image is hosted on Cloudflare R2 for optimal performance."
+        response += "Recommended to use the full image URL reference in your code."
         
         { 
           success: true, 
