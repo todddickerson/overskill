@@ -12,62 +12,76 @@ module Deployment
       
       execute_build do |temp_dir|
         # Fast build with minimal optimization
-        build_with_mode(temp_dir, 'development')
+        built_files = build_with_mode(temp_dir, 'development')
+        
+        # Return the actual built files instead of wrapped code
+        built_files
       end
     end
     
     def build_for_preview_with_r2
       Rails.logger.info "[ExternalViteBuilder] Starting preview build with R2 asset offloading for app ##{@app.id}"
       
-      # First, upload app file assets to R2 before building
-      r2_service = Deployment::R2AssetService.new(@app)
-      
-      # Create file hash from app files for R2 upload (in expected format)
-      app_files_hash = {}
-      @app.app_files.each do |file|
-        # R2AssetService expects this format
-        app_files_hash[file.path] = {
-          content: file.content,
-          binary: false,  # Assume text files for now
-          content_type: detect_content_type(file.path)
+      begin
+        # Run the actual Vite build and get built files
+        build_result = build_for_preview
+        return build_result unless build_result[:success]
+        
+        # The build_for_preview returns the actual built files as a hash
+        built_files = build_result[:built_code]
+        
+        # Separate large assets from code files  
+        code_files = {}
+        large_assets = {}
+        
+        built_files.each do |path, content|
+          # Images and media go to R2 if >50KB
+          if path.match?(/\.(jpg|jpeg|png|gif|webp|mp4|webm|pdf|zip)$/i) && content.bytesize > 50_000
+            large_assets[path] = content
+          else
+            # Everything else stays in Worker (HTML, JS, CSS, small images)
+            code_files[path] = content
+          end
+        end
+        
+        # Upload large assets to R2
+        r2_asset_urls = {}
+        if large_assets.any?
+          r2_service = Deployment::R2AssetService.new(@app)
+          
+          # Format for R2AssetService
+          assets_for_upload = {}
+          large_assets.each do |path, content|
+            assets_for_upload[path] = {
+              content: content,
+              binary: true,
+              content_type: detect_content_type(path)
+            }
+          end
+          
+          r2_result = r2_service.upload_assets(assets_for_upload)
+          r2_asset_urls = r2_result[:asset_urls] || {}
+          
+          Rails.logger.info "[ExternalViteBuilder] Uploaded #{large_assets.count} large assets to R2"
+        end
+        
+        Rails.logger.info "[ExternalViteBuilder] Build complete: #{code_files.count} code files, #{large_assets.count} R2 assets"
+        
+        {
+          success: true,
+          built_code: code_files,
+          r2_asset_urls: r2_asset_urls,
+          size_stats: {
+            code_files: code_files.count,
+            r2_assets: large_assets.count,
+            total_code_size: code_files.values.sum(&:bytesize),
+            total_r2_size: large_assets.values.sum(&:bytesize)
+          }
         }
+      rescue => e
+        Rails.logger.error "[ExternalViteBuilder] R2 build failed: #{e.message}"
+        { success: false, error: e.message }
       end
-      
-      r2_result = r2_service.upload_assets(app_files_hash)
-      Rails.logger.info "[ExternalViteBuilder] Uploaded #{r2_result[:stats][:uploaded_count]} assets to R2"
-      
-      # Now build the app (this returns a JavaScript string)
-      build_result = build_for_preview
-      return build_result unless build_result[:success]
-      
-      # ExternalViteBuilder returns built_code as a string, not a hash
-      # We need to create the file structure for the Worker
-      code_files = {
-        'index.js' => build_result[:built_code],  # The main built JavaScript
-        'index.html' => get_index_html_content   # Get the HTML file
-      }
-      
-      # Calculate size stats
-      original_app_size = app_files_hash.values.sum { |file_data| file_data[:content].bytesize }
-      optimized_size = code_files.values.sum(&:bytesize)
-      size_savings = original_app_size - optimized_size
-      
-      Rails.logger.info "[ExternalViteBuilder] Worker optimized: #{(optimized_size / 1024.0 / 1024.0).round(2)} MB (saved #{(size_savings / 1024.0 / 1024.0).round(2)} MB)"
-      
-      {
-        success: true,
-        built_code: code_files,
-        r2_asset_urls: r2_result[:asset_urls] || {},
-        size_stats: {
-          original_size: original_app_size,
-          optimized_size: optimized_size,
-          size_savings: size_savings,
-          r2_assets_count: r2_result[:stats][:uploaded_count]
-        }
-      }
-    rescue => e
-      Rails.logger.error "[ExternalViteBuilder] R2 build failed: #{e.message}"
-      { success: false, error: e.message }
     end
     
     def get_index_html_content
@@ -143,7 +157,7 @@ module Deployment
           success: true,
           built_code: built_code,
           build_time: Time.current - start_time,
-          output_size: built_code.bytesize,
+          output_size: built_code.is_a?(Hash) ? built_code.values.sum(&:bytesize) : built_code.bytesize,
           temp_dir: @temp_dir
         }
       rescue => e
@@ -378,27 +392,24 @@ module Deployment
         raise "Build output directory not found: #{dist_dir}"
       end
       
-      # Read HTML first to understand the structure
-      html_file = dist_dir.join('index.html')
-      unless File.exist?(html_file)
-        raise "HTML file not found in build output: #{html_file}"
+      # Collect all built files from dist/
+      built_files = {}
+      
+      Dir.glob(dist_dir.join('**/*')).each do |file_path|
+        next if File.directory?(file_path)
+        
+        # Get relative path from dist/
+        relative_path = file_path.sub(dist_dir.to_s + '/', '')
+        content = File.read(file_path)
+        built_files[relative_path] = content
+        
+        Rails.logger.info "[ExternalViteBuilder] Built file: #{relative_path} (#{(content.bytesize / 1024.0).round(1)} KB)"
       end
       
-      html_content = File.read(html_file)
-      Rails.logger.info "[ExternalViteBuilder] HTML file found: #{html_content.bytesize} bytes"
+      Rails.logger.info "[ExternalViteBuilder] Build successful. Total files: #{built_files.count}"
       
-      # Parse the HTML to find all asset references
-      assets = extract_asset_references(html_content, dist_dir)
-      Rails.logger.info "[ExternalViteBuilder] Found #{assets.length} assets to embed"
-      
-      # Create hybrid HTML with CSS embedded and JS external
-      hybrid_html = create_hybrid_html_with_external_js(html_content, assets)
-      
-      Rails.logger.info "[ExternalViteBuilder] Build successful. Hybrid HTML size: #{hybrid_html.bytesize} bytes"
-      Rails.logger.info "[ExternalViteBuilder] External assets: #{@external_assets&.count || 0} files"
-      
-      # Wrap in Worker-compatible format with asset serving
-      wrap_for_worker_deployment_hybrid(hybrid_html, @external_assets || [])
+      # Return the actual built files
+      built_files
     end
 
     private

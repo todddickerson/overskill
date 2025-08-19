@@ -119,7 +119,7 @@ module Ai
       context << ""
       
       # Group files by directory for better organization
-      files_by_dir = app.app_files.order(:path).group_by { |f| File.dirname(f.path) }
+      files_by_dir = app.app_files.order(:path).group_by { |f| ::File.dirname(f.path) }
       
       files_by_dir.each do |dir, files|
         context << "### #{dir == '.' ? 'Root' : dir}/"
@@ -145,8 +145,8 @@ module Ai
     def add_file_to_context(context, file_path, category)
       full_path = TEMPLATE_PATH.join(file_path)
       
-      if File.exist?(full_path)
-        content = File.read(full_path)
+      if ::File.exist?(full_path)
+        content = ::File.read(full_path)
         context << "## #{category}: #{file_path}"
         context << ""
         context << "```#{get_file_extension(file_path)}"
@@ -186,7 +186,7 @@ module Ai
     end
     
     def get_file_extension(file_path)
-      case File.extname(file_path).downcase
+      case ::File.extname(file_path).downcase
       when '.tsx', '.ts'
         'typescript'
       when '.jsx', '.js'  
