@@ -31,6 +31,18 @@ module Ai
           # Update app name
           old_name = @app.name
           @app.update!(name: generated_name)
+
+          # Regenerate subdomain to reflect new name (safe for published apps)
+          begin
+            subdomain_result = @app.regenerate_subdomain_from_name!(redeploy_if_published: true)
+            if subdomain_result[:success]
+              Rails.logger.info "[AppNamer] Updated subdomain to '#{@app.subdomain}' after renaming"
+            else
+              Rails.logger.warn "[AppNamer] Failed to update subdomain after renaming: #{subdomain_result[:error]}"
+            end
+          rescue => e
+            Rails.logger.warn "[AppNamer] Exception when updating subdomain after renaming: #{e.message}"
+          end
           
           Rails.logger.info "[AppNamer] Successfully renamed app ##{@app.id}: '#{old_name}' → '#{generated_name}'"
           

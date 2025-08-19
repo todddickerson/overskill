@@ -109,6 +109,57 @@ class App < ApplicationRecord
     service.update_subdomain(new_subdomain)
   end
 
+  # Regenerate subdomain based on current name.
+  # - Ensures uniqueness using same rules as initial generation
+  # - If the app is already published and redeploy_if_published is true, uses
+  #   production deployment service to migrate to the new subdomain safely
+  # - Returns a result hash: {success:, subdomain:, error:}
+  def regenerate_subdomain_from_name!(redeploy_if_published: true)
+    base = name&.parameterize
+    return {success: false, error: "Name is blank"} unless base.present?
+
+    # Sanitize and trim to valid subdomain
+    candidate = base.downcase
+      .gsub(/[^a-z0-9\-]/, '-')
+      .gsub(/-+/, '-')
+      .gsub(/^-|-$/, '')
+      .slice(0, 63)
+
+    # Ensure uniqueness against other apps
+    if App.where(subdomain: candidate).where.not(id: id).exists?
+      5.times do
+        random_suffix = SecureRandom.alphanumeric(4).downcase
+        truncated_base = candidate.slice(0, 58)
+        candidate_with_suffix = "#{truncated_base}-#{random_suffix}"
+        unless App.where(subdomain: candidate_with_suffix).where.not(id: id).exists?
+          candidate = candidate_with_suffix
+          break
+        end
+      end
+
+      if App.where(subdomain: candidate).where.not(id: id).exists?
+        timestamp = Time.current.to_i.to_s.last(6)
+        random_part = SecureRandom.alphanumeric(3).downcase
+        truncated_base = candidate.slice(0, 52)
+        candidate = "#{truncated_base}-#{timestamp}#{random_part}"
+      end
+    end
+
+    # No-op if unchanged
+    return {success: true, subdomain: subdomain} if candidate == subdomain
+
+    if published? && redeploy_if_published
+      result = update_subdomain!(candidate)
+      return result.merge(subdomain: candidate) if result.is_a?(Hash)
+      {success: true, subdomain: candidate}
+    else
+      update!(subdomain: candidate)
+      {success: true, subdomain: candidate}
+    end
+  rescue => e
+    {success: false, error: e.message}
+  end
+
   def generate_app_logo
     GenerateAppLogoJob.set(wait: 2.seconds).perform_later(id)
   end
@@ -248,6 +299,7 @@ class App < ApplicationRecord
   def visitor_count
     # For now, return a simulated count based on app activity
     # This will be replaced with real analytics when Ahoy integration is complete
+    # TODO: Implement real analytics
     base_count = (created_at.to_i / 1000) % 1000
     activity_multiplier = [app_versions.count * 5, app_chat_messages.count * 2].sum
     [base_count + activity_multiplier, 0].max

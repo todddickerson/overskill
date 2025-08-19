@@ -820,12 +820,31 @@ module Ai
       ts_types = %w[HTMLDivElement HTMLButtonElement HTMLInputElement HTMLTextAreaElement 
                     HTMLTableElement HTMLTableSectionElement HTMLTableRowElement HTMLTableCellElement
                     HTMLTableCaptionElement HTMLHeadingElement HTMLParagraphElement HTMLSpanElement
-                    HTMLAnchorElement HTMLImageElement HTMLFormElement HTMLSelectElement]
+                    HTMLAnchorElement HTMLImageElement HTMLFormElement HTMLSelectElement
+                    HTMLUListElement HTMLLIElement HTMLOListElement HTMLElement KeyboardEvent
+                    VariantProps BadgeProps ButtonProps CalendarProps CommandDialogProps
+                    SheetContentProps ToasterProps TextareaProps ToastProps ToastActionElement
+                    UseEmblaCarouselType CarouselApi UseCarouselParameters CarouselOptions
+                    CarouselPlugin CarouselProps ChartConfig PaginationLinkProps TName TFieldValues]
       
       # Common internal/context values that are defined in same file
       internal_refs = %w[Comp FormField FormFieldContextValue FormItemContextValue ChartContextProps
                          ChartStyle CarouselContextProps DialogPortal SheetPortal DrawerPortal
-                         AlertDialogPortal TFieldValues]
+                         AlertDialogPortal TFieldValues ResizablePanelGroup ResizableHandle
+                         CommandDialog Skeleton Badge BrowserRouter Toaster]
+      
+      # Common words from comments/strings that aren't components
+      common_words = %w[This We Helper Adds Tailwind Adjust Increases Random Initialize RLS Error
+                       Go Home Background Hero Offer Creation Platform Main That Convert Subheadline
+                       Transform Build CTA Buttons Start Your Free Trial Watch Demo Social Conversion
+                       Decorative Our Maximize See SOC Share OfferLab Handle Everything You Need More
+                       Powerful Hover Simple Choose All Most Popular No Cancel We The Marketing ROI
+                       Highly Loved Rating Author Trust Average Happy Ready Headline Join Schedule
+                       Bottom In Mobile Brand Create Product Company Resources Legal Sign Desktop
+                       Navigation Features Pricing Reviews OverSkill Branding Get URL Earn
+                       SIDEBAR_COOKIE_NAME SIDEBAR_COOKIE_MAX_AGE SIDEBAR_WIDTH SIDEBAR_WIDTH_MOBILE
+                       SIDEBAR_WIDTH_ICON SIDEBAR_KEYBOARD_SHORTCUT CSS_SELECTOR THEMES
+                       MOBILE_BREAKPOINT Icon]
       
       app.app_files.where("path LIKE '%.tsx' OR path LIKE '%.jsx'").each do |file|
         next if file.path.include?('test') || file.path.include?('spec')
@@ -834,6 +853,37 @@ module Ai
         
         # Find all JSX component usage (CapitalCase tags)
         used_components = content.scan(/<([A-Z]\w+)/).flatten.uniq
+        
+        # ENHANCED: Also find components used as values (not in JSX)
+        # Only in specific patterns to avoid false positives:
+        # 1. Object property: { icon: Component }
+        # 2. Array literal: [Component, OtherComponent]  
+        # 3. Function argument: doSomething(Component)
+        value_components = []
+        
+        # Pattern 1: Object property with colon (e.g., { icon: Zap })
+        # Must be CamelCase (capital followed by lowercase)
+        value_components.concat(content.scan(/:\s*([A-Z][a-z]\w*)(?=\s*[,}])/).flatten)
+        
+        # Pattern 2: Array of components (e.g., [Zap, Target])
+        value_components.concat(content.scan(/\[\s*([A-Z][a-z]\w*)(?:\s*,\s*[A-Z][a-z]\w*)*\s*\]/).flatten)
+        
+        # Pattern 3: Function arguments that look like components
+        value_components.concat(content.scan(/\(\s*([A-Z][a-z]\w*)\s*\)/).flatten)
+        
+        value_components.uniq!
+        
+        # Find local variables that hold components dynamically
+        # e.g., const Icon = feature.icon or const Comp = items[0]
+        dynamic_vars = content.scan(/const\s+(\w+)\s*=\s*\w+\.\w+/).flatten
+        dynamic_vars += content.scan(/const\s+(\w+)\s*=\s*\w+\[/).flatten
+        dynamic_vars += content.scan(/let\s+(\w+)\s*=\s*\w+\.\w+/).flatten
+        
+        # Combine all potential component references
+        all_potential_components = (used_components + value_components).uniq
+        
+        # Remove dynamic variables from the check (they're not imports)
+        all_potential_components.reject! { |comp| dynamic_vars.include?(comp) }
         
         # Find all imports
         imported_components = []
@@ -853,8 +903,8 @@ module Ai
           imported_components << import[0]
         end
         
-        # Find missing components
-        missing = used_components - imported_components - html_elements - react_builtins - ts_types - internal_refs
+        # Find missing components (use all potential components, not just JSX)
+        missing = all_potential_components - imported_components - html_elements - react_builtins - ts_types - internal_refs - common_words
         
         # Check for components that might be from destructured namespace imports
         missing.reject! do |comp|
@@ -1001,14 +1051,27 @@ module Ai
     
     # Check if component is a valid Lucide React icon
     def is_lucide_icon?(component)
-      # Common Lucide icons that we know exist
-      common_icons = %w[Menu X ChevronDown ChevronUp ChevronLeft ChevronRight ArrowLeft ArrowRight 
-                       ArrowUp ArrowDown Check Plus Minus Edit Trash Save Download Upload Share Copy
-                       Search Filter Calendar Clock User Users Settings Bell Home Star Heart
-                       Mail Phone Globe Shield Lock CreditCard DollarSign Zap Crown Rocket Award
-                       Trophy TrendingUp TrendingDown BarChart LineChart PieChart Play Pause Volume
-                       Camera Image Video File Folder Cloud Upload2 Download2 ExternalLink
-                       Github Twitter Linkedin Facebook Instagram Youtube MapPin]
+      # Comprehensive list of Lucide React icons (commonly used)
+      common_icons = %w[
+        Menu X ChevronDown ChevronUp ChevronLeft ChevronRight ArrowLeft ArrowRight 
+        ArrowUp ArrowDown Check Plus Minus Edit Trash Save Download Upload Share Copy
+        Search Filter Calendar Clock User Users Settings Bell Home Star Heart
+        Mail Phone Globe Shield Lock CreditCard DollarSign Zap Crown Rocket Award
+        Trophy TrendingUp TrendingDown BarChart LineChart PieChart Play Pause Volume
+        Camera Image Video File Folder Cloud Upload2 Download2 ExternalLink
+        Github Twitter Linkedin Facebook Instagram Youtube MapPin
+        Target Sparkles Sun Moon CloudRain CloudSnow Wind Droplet Thermometer
+        Activity Airplay Anchor Aperture Archive BarChart2 Bold Book Box Briefcase
+        Compass Code Coffee Command Crosshair Disc Divide Feather Grid Hexagon
+        Layers Layout LifeBuoy Map Maximize Minimize Move Navigation Package Package2
+        PenTool Percent Power Sliders Square Terminal Tool Type Umbrella Underline
+        Unlock Cpu Monitor Smartphone Tablet Watch Headphones Speaker Printer Mouse
+        Keyboard HardDrive AlertCircle Info CheckCircle XCircle AlertTriangle
+        HelpCircle Loader RefreshCw RotateCw Send LogIn LogOut UserPlus UserMinus
+        UserCheck UserX ShoppingCart ShoppingBag Gift Bookmark Tag Hash AtSign Link
+        Paperclip Mic SkipForward SkipBack Repeat Shuffle Music Film Radio Tv Wifi
+        Battery Bluetooth Cast Database Server Eye EyeOff ThumbsUp MessageCircle
+      ]
       
       common_icons.include?(component)
     end
@@ -3725,9 +3788,7 @@ module Ai
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
     end
-    
-    private
-    
+       
     def determine_feature_tools(state)
       # Tools for implementing app-specific features
       [
