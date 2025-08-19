@@ -488,7 +488,7 @@ module Ai
       end
       
       def determine_file_type(path)
-        ext = File.extname(path).downcase.delete(".")
+        ext = ::File.extname(path).downcase.delete(".")
         case ext
         when "html", "htm" then "html"
         when "js", "jsx" then "js"

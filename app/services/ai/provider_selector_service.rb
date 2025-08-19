@@ -24,7 +24,7 @@ module Ai
       recent_test_file = Rails.root.join('log', 'tool_calling_tests', 'latest_result.json')
       if File.exist?(recent_test_file)
         begin
-          result = JSON.parse(File.read(recent_test_file))
+          result = JSON.parse(::File.read(recent_test_file))
           return result['success'] && result['timestamp'] > 7.days.ago.to_i
         rescue JSON::ParserError
           return false

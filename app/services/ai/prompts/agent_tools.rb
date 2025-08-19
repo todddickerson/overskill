@@ -54,8 +54,8 @@ module Ai
       private
 
       def load_template
-        template_path = File.join(File.dirname(__FILE__), "agent-tools.json")
-        File.read(template_path)
+        template_path = ::File.join(::File.dirname(__FILE__), "agent-tools.json")
+        ::File.read(template_path)
       rescue Errno::ENOENT => e
         Rails.logger.error "Agent tools template not found: #{e.message}"
         raise "Agent tools template file not found at #{template_path}"

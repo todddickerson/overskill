@@ -347,7 +347,7 @@ module Ai
     end
 
     def detect_image_content_type(path)
-      extension = File.extname(path).downcase
+      extension = ::File.extname(path).downcase
       case extension
       when '.png' then 'image/png'
       when '.jpg', '.jpeg' then 'image/jpeg'

@@ -111,11 +111,11 @@ module Ai
           export_path = service.export_to_files(Rails.root.join("tmp", "example_export"))
           puts "Exported to: #{export_path}"
           
-          files = Dir.glob(File.join(export_path, "*"))
+          files = Dir.glob(::File.join(export_path, "*"))
           puts "Created files:"
           files.each do |file|
             size = File.size(file)
-            puts "  - #{File.basename(file)} (#{size} bytes)"
+            puts "  - #{::File.basename(file)} (#{size} bytes)"
           end
         rescue => e
           puts "Export failed: #{e.message}"

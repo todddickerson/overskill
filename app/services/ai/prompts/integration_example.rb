@@ -131,7 +131,7 @@ module Ai
           
           export_path = prompt_service.export_to_files
           
-          send_file File.join(export_path, "prompt.txt"), 
+          send_file ::File.join(export_path, "prompt.txt"), 
                    disposition: 'attachment',
                    filename: "#{platform}_agent_prompt.txt"
         end

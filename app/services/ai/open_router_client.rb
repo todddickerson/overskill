@@ -361,7 +361,7 @@ module Ai
 
     def generate_app(prompt, framework: "react", app_type: nil)
       # Load the generated app standards
-      standards = File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
+      standards = ::File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
       
       # Build comprehensive prompt with tech stack requirements
       full_prompt = <<~PROMPT
@@ -1051,7 +1051,7 @@ module Ai
     # Get AI standards content for prompt caching
     def get_ai_standards_content
       @ai_standards ||= begin
-        File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
+        ::File.read(Rails.root.join('AI_GENERATED_APP_STANDARDS.md')) rescue ""
       end
     end
     

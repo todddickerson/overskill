@@ -222,7 +222,7 @@ module Ai
     end
     
     def get_file_extension(file_path)
-      ext = File.extname(file_path).downcase
+      ext = ::File.extname(file_path).downcase
       case ext
       when '.tsx', '.ts' then 'typescript'
       when '.js', '.jsx' then 'javascript'  

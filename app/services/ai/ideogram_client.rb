@@ -36,7 +36,7 @@ module Ai
       Rails.logger.info "[Ideogram] Parameters: #{body.except(:prompt)}"
 
       response = self.class.post(
-        File.join(@base_url, endpoint),
+        ::File.join(@base_url, endpoint),
         headers: headers,
         body: body.to_json,
         timeout: 120

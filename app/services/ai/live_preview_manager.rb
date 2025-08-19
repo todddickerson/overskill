@@ -277,7 +277,7 @@ module Ai
       
       {
         version: 3,
-        file: File.basename(file_path),
+        file: ::File.basename(file_path),
         sources: [file_path],
         names: [],
         mappings: 'AAAA' # Simplified mapping
@@ -294,7 +294,7 @@ module Ai
       }
       
       updated_components.each do |component|
-        component_name = File.basename(component[:path], '.*')
+        component_name = ::File.basename(component[:path], '.*')
         
         hot_update[:components][component_name] = {
           path: component[:path],

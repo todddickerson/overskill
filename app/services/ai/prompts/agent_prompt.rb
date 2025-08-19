@@ -43,8 +43,8 @@ module Ai
       private
 
       def load_template
-        template_path = File.join(File.dirname(__FILE__), "agent-prompt.txt")
-        File.read(template_path)
+        template_path = ::File.join(::File.dirname(__FILE__), "agent-prompt.txt")
+        ::File.read(template_path)
       rescue Errno::ENOENT => e
         Rails.logger.error "Agent prompt template not found: #{e.message}"
         raise "Agent prompt template file not found at #{template_path}"

@@ -939,7 +939,7 @@ module Ai
       standards_path = Rails.root.join('AI_APP_STANDARDS.md')
       
       if File.exist?(standards_path)
-        @standards_full = File.read(standards_path)
+        @standards_full = ::File.read(standards_path)
         Rails.logger.info "[V3-Unified] Loaded standards: #{@standards_full.length} bytes"
       else
         @standards_full = "Follow React CDN best practices with Tailwind CSS"
@@ -1118,7 +1118,7 @@ module Ai
     end
     
     def determine_file_type(path)
-      ext = File.extname(path).downcase.delete(".")
+      ext = ::File.extname(path).downcase.delete(".")
       case ext
       when "html", "htm" then "html"
       when "js", "jsx" then "js"

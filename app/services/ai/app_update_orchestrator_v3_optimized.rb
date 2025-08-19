@@ -127,7 +127,7 @@ module Ai
       standards_path = Rails.root.join('AI_APP_STANDARDS.md')
       
       if File.exist?(standards_path)
-        @standards_full = File.read(standards_path)
+        @standards_full = ::File.read(standards_path)
         Rails.logger.info "[V3-Optimized] Loaded standards: #{@standards_full.length} bytes"
         
         # Create condensed version for reference

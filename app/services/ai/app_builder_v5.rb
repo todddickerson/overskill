@@ -3065,7 +3065,7 @@ module Ai
       return "None yet" if files.empty?
       
       # Group by file type for better organization
-      grouped = files.group_by { |f| File.extname(f.path) }
+      grouped = files.group_by { |f| ::File.extname(f.path) }
       
       result = []
       grouped.each do |ext, group|

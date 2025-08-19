@@ -155,9 +155,9 @@ module Ai
         
         config = generate_config
         
-        File.write(File.join(base_path, "prompt.txt"), config[:prompt])
-        File.write(File.join(base_path, "tools.json"), JSON.pretty_generate(config[:tools]))
-        File.write(File.join(base_path, "metadata.json"), JSON.pretty_generate(config[:metadata]))
+        ::File.write(::File.join(base_path, "prompt.txt"), config[:prompt])
+        ::File.write(::File.join(base_path, "tools.json"), JSON.pretty_generate(config[:tools]))
+        ::File.write(::File.join(base_path, "metadata.json"), JSON.pretty_generate(config[:metadata]))
         
         Rails.logger.info "Agent configuration exported to #{base_path}"
         base_path
@@ -278,7 +278,7 @@ module Ai
       end
       
       def detect_language(path)
-        case File.extname(path)
+        case ::File.extname(path)
         when '.ts', '.tsx'
           'typescript'
         when '.js', '.jsx'

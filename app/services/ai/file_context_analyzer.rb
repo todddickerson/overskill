@@ -69,7 +69,7 @@ module Ai
       
       files.each do |file|
         # Categorize by file extension
-        extension = File.extname(file.path).downcase.gsub('.', '')
+        extension = ::File.extname(file.path).downcase.gsub('.', '')
         extension = 'typescript' if %w[ts tsx].include?(extension)
         extension = 'javascript' if %w[js jsx].include?(extension)
         
@@ -77,7 +77,7 @@ module Ai
         structure[:by_type][extension] << file.path
         
         # Categorize by directory
-        directory = File.dirname(file.path)
+        directory = ::File.dirname(file.path)
         directory = 'root' if directory == '.'
         
         structure[:by_directory][directory] ||= []
@@ -150,7 +150,7 @@ module Ai
     end
     
     def extract_component_name(path)
-      File.basename(path, '.*')
+      ::File.basename(path, '.*')
     end
     
     def classify_component_type(content, path)

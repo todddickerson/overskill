@@ -576,7 +576,7 @@ module Ai
     
     def generate_placeholder_content(path)
       # Generate appropriate placeholder content based on file type
-      file_name = File.basename(path, '.*')
+      file_name = ::File.basename(path, '.*')
       
       case path
       when /Dashboard\.tsx$/
@@ -653,7 +653,7 @@ module Ai
       template_path = Rails.root.join('app/templates/optional', "#{component}.tsx")
       
       if File.exist?(template_path)
-        content = File.read(template_path)
+        content = ::File.read(template_path)
         target_path = determine_component_path(component)
         
         # Process template variables

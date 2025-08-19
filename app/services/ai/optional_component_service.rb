@@ -212,7 +212,7 @@ module Ai
       template_path = Rails.root.join('app', 'templates', 'optional', component_info[:template_source])
       
       if File.exist?(template_path)
-        template_content = File.read(template_path)
+        template_content = ::File.read(template_path)
         processed_content = process_component_template(template_content)
         
         @app.app_files.create!(

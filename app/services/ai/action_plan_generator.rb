@@ -575,7 +575,7 @@ module Ai
     end
     
     def extract_component_name(path)
-      File.basename(path, '.*')
+      ::File.basename(path, '.*')
     end
     
     def summarize_file_content(content)

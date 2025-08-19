@@ -80,7 +80,7 @@ module Ai
       begin
         standards_path = Rails.root.join('AI_APP_STANDARDS.md')
         if File.exist?(standards_path)
-          standards_content = File.read(standards_path)
+          standards_content = ::File.read(standards_path)
           @redis.setex(cache_key, STANDARDS_TTL, standards_content)
           Rails.logger.info "[ContextCacheService] Cached AI standards (#{standards_content.length} chars)"
           return standards_content
