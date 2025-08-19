@@ -87,7 +87,7 @@
               
             <% when 'status' %>
               <%# Status update %>
-              <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+              <div class="hidden flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
                 <i class="fas fa-info-circle"></i>
                 <span><%= flow_item['content'] %></span>
               </div>
@@ -207,6 +207,19 @@
         <%= render "account/app_editors/unified_version_card", 
             message: message, 
             next_version_number: nil %>
+      <% end %>
+
+      <%# 1. Thinking Status - Shows when agent is processing %>
+      <% if message.thinking_status.present? && message.loop_messages.sum { |msg| msg.to_s.length } > 300 %>
+        <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+          <i class="fas fa-brain text-blue-500 animate-pulse"></i>
+          <span class="thinking-text"><%= message.thinking_status %></span>
+          <% if message.thought_for_seconds.present? %>
+            <span class="text-xs text-gray-500">
+              (Thought for <%= pluralize(message.thought_for_seconds, 'second') %>)
+            </span>
+          <% end %>
+        </div>
       <% end %>
       
       <%# Status indicator for completed/failed messages %>

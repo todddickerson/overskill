@@ -436,9 +436,7 @@ module Ai
       # Placeholder - would need integration with analytics service
       { success: true, content: "Analytics feature coming soon" }
     end
-    
-    private
-    
+        
     def apply_line_filter(content, lines)
       return content if lines.blank?
       

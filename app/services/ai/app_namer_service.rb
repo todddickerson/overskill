@@ -8,7 +8,7 @@ module Ai
     MAX_RETRIES = 2
     
     # Model preferences for naming (lightweight and fast)
-    NAMING_MODEL_PREFERENCE = 'gpt-4o-mini'
+    NAMING_MODEL_PREFERENCE = 'gpt-4o'
     
     attr_reader :app, :prompt, :client_info
     
@@ -81,10 +81,7 @@ module Ai
     def extract_app_prompt
       # Get the most descriptive prompt available
       prompts = [
-        @app.prompt,
-        @app.description,
-        @app.app_chat_messages.where(role: 'user').last&.content,
-        @app.app_generations.last&.prompt
+        @app.prompt
       ].compact
       
       # Use the longest, most descriptive prompt
@@ -138,7 +135,7 @@ module Ai
       app_type = determine_app_type
       
       prompt = <<~PROMPT
-        Name this #{app_type} application based on its purpose:
+        Name this application our user is building.
         
         App Description: "#{@prompt}"
         
@@ -148,13 +145,6 @@ module Ai
         - Professional sounding
         - Memorable and brandable
         - No generic words like "App", "Tool", "System"
-        
-        Examples of good names:
-        - Todo app → "TaskFlow"
-        - Budget tracker → "ExpenseWise"
-        - Recipe manager → "ChefBook"
-        - Time tracker → "TimeSync"
-        - Note taking → "ThinkPad"
         
         Generate ONE perfect name:
       PROMPT

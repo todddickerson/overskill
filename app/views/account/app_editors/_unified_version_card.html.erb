@@ -44,7 +44,7 @@
         <!-- Version Number Badge -->
         <% unless is_in_progress %>
           <span class="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
-            v<%= version.version_number %>
+            <%= version.version_number %>
           </span>
         <% end %>
         
@@ -70,7 +70,7 @@
     <% elsif is_completed_generation %>
       <span class="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-800 
                    text-green-800 dark:text-green-200 rounded-full font-medium">
-        v<%= version.version_number %>
+        <%= version.version_number %>
       </span>
     <% end %>
   </div>
@@ -131,7 +131,7 @@
           <div class="w-2 h-2 bg-green-500 rounded-full"></div>
           <span class="text-sm font-medium text-green-900 dark:text-green-100">Version Complete</span>
           <span class="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 rounded-full">
-            v<span data-version-progress-target="finalVersion"></span>
+            <span data-version-progress-target="finalVersion"></span>
           </span>
         </div>
         
