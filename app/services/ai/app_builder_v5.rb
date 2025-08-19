@@ -1,4 +1,8 @@
 # AppBuilderV5 - Agent Loop Implementation with Lovable-style architecture
+require_relative 'context_manager'
+require_relative 'agent_decision_engine'
+require_relative 'termination_evaluator'
+
 module Ai
   class AppBuilderV5
     include Rails.application.routes.url_helpers
@@ -39,9 +43,9 @@ module Ai
       # Debug: check if prompt service works
       Rails.logger.debug "[V5_DEBUG] Prompt service initialized"
       Rails.logger.debug "[V5_DEBUG] Agent variables: #{agent_variables.keys.join(', ')}"
-      @context_manager = ContextManager.new(app)
-      @decision_engine = AgentDecisionEngine.new
-      @termination_evaluator = TerminationEvaluator.new
+      @context_manager = Ai::ContextManager.new(app)
+      @decision_engine = Ai::AgentDecisionEngine.new
+      @termination_evaluator = Ai::TerminationEvaluator.new
       
       # Initialize file change tracker for granular caching
       @file_tracker = FileChangeTracker.new(@app.id)
@@ -4049,94 +4053,7 @@ module Ai
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast incremental message update: #{e.message}"
     end
-  end
-  
-  # Supporting classes for the agent loop
-  
-  # TODO: Consider adding goal tracking as tool calls in the future
-  # This would allow Claude to explicitly set and complete goals as needed  
-  
-  # TODO: Move these classes to their own files
-  
-  class ContextManager
-    def initialize(app)
-      @app = app
-      @context = {}
-      @implementation_plan = nil
-    end
-    
-    def add_context(data)
-      @context.merge!(data)
-    end
-    
-    def set_implementation_plan(plan)
-      @implementation_plan = plan
-    end
-    
-    def update_from_result(result)
-      @context[:last_result] = result
-      @context[:last_action] = result[:action]
-    end
-    
-    def completeness_score
-      # Calculate how complete our context is
-      score = 0
-      score += 25 if @context[:requirements]
-      score += 25 if @implementation_plan
-      score += 25 if @context[:last_result]
-      score += 25 if @app.app_files.any?
-      score
-    end
-  end
-  
-  class AgentDecisionEngine
-    def determine_next_action(state)
-      # Improved decision logic that considers goals progress
-      if state[:iteration] == 1
-        { type: :plan_implementation, description: "Create initial plan" }
-      elsif state[:errors].any?
-        { 
-          type: :debug_issues, 
-          description: "Fix errors",
-          issues: state[:errors]
-        }
-      elsif !has_app_specific_features?(state) 
-        # Check if we need to implement the actual app features
-        { 
-          type: :execute_tools, 
-          description: "Implement app-specific features",
-          tools: determine_feature_tools(state)
-        }
-      elsif needs_verification?(state)
-        { type: :verify_changes, description: "Verify generated code" }
-      elsif all_goals_near_complete?(state)
-        { type: :complete_task, description: "Finalize generation" }
-      else
-        { 
-          type: :execute_tools, 
-          description: "Continue implementation",
-          tools: determine_next_tools(state)
-        }
-      end
-    end
-    
-    def has_app_specific_features?(state)
-      # Check if app-specific features have been implemented
-      # Look for signs that the todo app functionality exists
-      return false unless state[:files_generated] > 0
-      
-      # Check if we have key todo app files
-      files = state[:generated_files] || []
-      file_paths = files.map { |f| f.respond_to?(:path) ? f.path : f.to_s }
-      
-      # Look for key indicators that todo features are implemented
-      has_todo_component = file_paths.any? { |p| p.include?('Todo') || p.include?('todo') }
-      has_task_component = file_paths.any? { |p| p.include?('Task') || p.include?('task') }
-      
-      # Need both todo-related files AND sufficient implementation
-      has_todo_component && state[:iteration] >= 3
-    end
-    
+
     # Broadcast preview frame update when app is deployed
     def broadcast_preview_frame_update
       return unless @app&.preview_url.present?
@@ -4203,117 +4120,10 @@ module Ai
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast deployment progress: #{e.message}"
     end
-    
-    # Broadcast message update for incremental tool call progress
-    def broadcast_message_update
-      return unless @assistant_message && @app
-      
-      Rails.logger.info "[V5_BROADCAST] Broadcasting incremental message update for message #{@assistant_message.id}"
-      
-      # Broadcast the updated message to the chat channel for real-time tool progress
-      Turbo::StreamsChannel.broadcast_replace_to(
-        "app_#{@app.id}_chat",
-        target: "app_chat_message_#{@assistant_message.id}",
-        partial: "account/app_editors/agent_reply_v5",
-        locals: { message: @assistant_message, app: @app }
-      )
-    rescue => e
-      Rails.logger.error "[V5_BROADCAST] Failed to broadcast incremental message update: #{e.message}"
-    end
-       
-    def determine_feature_tools(state)
-      # Tools for implementing app-specific features
-      [
-        { type: :implement_features, description: 'Implement app-specific functionality' }
-      ]
-    end
-    
-    def determine_initial_tools(state)
-      [
-        { type: :generate_file, file_path: 'package.json', description: 'Create package.json' },
-        { type: :generate_file, file_path: 'src/App.tsx', description: 'Create main App component' },
-        { type: :generate_file, file_path: 'src/main.tsx', description: 'Create entry point' }
-      ]
-    end
-    
-    def determine_next_tools(state)
-      # Determine what tools to run next based on state
-      []
-    end
-    
-    def needs_verification?(state)
-      state[:iteration] > 1 && state[:iteration] % 3 == 0
-    end
-    
-    def all_goals_near_complete?(state)
-      state[:goals].count <= 1
-    end
   end
   
-  class TerminationEvaluator
-    def should_terminate?(state, result)
-      # Multiple termination conditions
-      return true if all_goals_satisfied?(state)
-      return true if stagnation_detected?(state)
-      return true if error_threshold_exceeded?(state)
-      return true if complexity_limit_reached?(state)
-      
-      false
-    end
-    
-    private
-    
-    def all_goals_satisfied?(state)
-      # Check if all goals are completed
-      return false unless state[:goals].is_a?(Array) && state[:completed_goals].is_a?(Array)
-      
-      # All goals are satisfied when completed_goals contains all goals
-      state[:goals].all? { |goal| state[:completed_goals].include?(goal) }
-    end
-    
-    def stagnation_detected?(state)
-      return false if state[:iteration] < 4
-      
-      # Check if making progress
-      recent_history = state[:history].last(4)
-      return false if recent_history.count < 4
-      
-      # Multiple stagnation indicators
-      
-      # 1. Same action type repeated and failing
-      actions = recent_history.map { |h| h[:action][:type] }
-      verifications = recent_history.map { |h| h[:verification][:success] }
-      
-      if actions.uniq.size == 1 && verifications.none?
-        Rails.logger.warn "[V5_STAGNATION] Same action #{actions.first} failing repeatedly"
-        return true
-      end
-      
-      # 2. No goal progress in recent iterations (with nil safety)
-      goal_progress_history = recent_history.map { |h| h&.dig(:goals_progress, :completed) }.compact
-      if goal_progress_history.size > 1 && goal_progress_history.uniq.size == 1
-        Rails.logger.warn "[V5_STAGNATION] No goal progress in last #{recent_history.count} iterations"
-        return true
-      end
-      
-      # 3. Verification confidence consistently low (with nil safety)
-      confidence_scores = recent_history.map { |h| h&.dig(:verification, :confidence) || 0 }.compact
-      avg_confidence = confidence_scores.any? ? confidence_scores.sum / confidence_scores.count.to_f : 0
-      if avg_confidence < 0.3
-        Rails.logger.warn "[V5_STAGNATION] Low confidence trend: #{avg_confidence.round(2)}"
-        return true
-      end
-      
-      false
-    end
-    
-    def error_threshold_exceeded?(state)
-      state[:errors].count > 10
-    end
-    
-    def complexity_limit_reached?(state)
-      state[:generated_files].count > 100
-    end
-    
-  end
+  # Supporting classes have been extracted to separate files:
+  # - app/services/ai/context_manager.rb
+  # - app/services/ai/agent_decision_engine.rb  
+  # - app/services/ai/termination_evaluator.rb
 end
