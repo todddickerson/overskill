@@ -137,8 +137,10 @@
               <span class="text-sm text-gray-900" data-publish-modal-target="productionUrl">
                 <% if app.deployment_url.present? %>
                   <%= URI.parse(app.deployment_url).host %>
+                <% elsif app.published_url.present? %>
+                  <%= URI.parse(app.published_url).host %>
                 <% else %>
-                  <%= app.name.downcase.gsub(/[^a-z0-9\-]/, '-').gsub(/-+/, '-').gsub(/^-|-$/, '') %>.overskill.app
+                  <%= "#{app.subdomain}.#{ENV['APP_BASE_DOMAIN'] || 'overskill.com'}" %>
                 <% end %>
               </span>
             </div>

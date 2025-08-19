@@ -188,13 +188,17 @@ export default class extends Controller {
   
   async copyPreviewUrl(event) {
     event.preventDefault()
-    const url = `https://${this.previewUrlTarget.textContent}`
+    const hostname = this.previewUrlTarget.textContent.trim()
+    const url = `https://${hostname}`
     await this.copyToClipboard(url, event.currentTarget)
   }
   
   async copyProductionUrl(event) {
     event.preventDefault()
-    const url = `https://${this.productionUrlTarget.textContent}`
+    const hostname = this.productionUrlTarget.textContent.trim()
+    // Remove any "(not published yet)" text if present
+    const cleanHostname = hostname.replace(/\s*\(.*?\)\s*/, '').trim()
+    const url = `https://${cleanHostname}`
     await this.copyToClipboard(url, event.currentTarget)
   }
   
@@ -217,10 +221,21 @@ export default class extends Controller {
   openInNewTab(event) {
     event.preventDefault()
     // Use the published URL which is either production (if published) or preview (if not)
-    const url = this.publishedUrl || `https://${this.previewUrlTarget.textContent}`
+    let url = this.publishedUrl
     
-    // Ensure the URL has proper protocol
-    const finalUrl = url.startsWith('http') ? url : `https://${url}`
+    if (!url) {
+      // Fallback to building URL from the displayed hostname
+      const hostname = this.hasProductionUrlTarget && this.productionUrlTarget.textContent.trim() !== '' 
+        ? this.productionUrlTarget.textContent.trim()
+        : this.previewUrlTarget.textContent.trim()
+      
+      // Remove any "(not published yet)" text if present
+      const cleanHostname = hostname.replace(/\s*\(.*?\)\s*/, '').trim()
+      url = `https://${cleanHostname}`
+    }
+    
+    // Ensure the URL has proper protocol and no extra spaces
+    const finalUrl = url.trim().startsWith('http') ? url.trim() : `https://${url.trim()}`
     window.open(finalUrl, '_blank')
   }
   
