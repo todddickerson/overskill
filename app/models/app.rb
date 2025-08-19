@@ -308,18 +308,32 @@ class App < ApplicationRecord
       .gsub(/^-|-$/, '')
       .slice(0, 63)
     
-    # Ensure uniqueness
+    # Ensure uniqueness - if duplicate, add random suffix
     if App.where(subdomain: candidate).where.not(id: id).exists?
-      # Add number suffix if not unique
-      counter = 2
-      loop do
-        candidate_with_number = "#{candidate[0..60]}-#{counter}"
-        unless App.where(subdomain: candidate_with_number).where.not(id: id).exists?
-          candidate = candidate_with_number
+      # Try up to 5 times with random 4-character suffixes
+      5.times do
+        # Generate random 4-character alphanumeric string
+        random_suffix = SecureRandom.alphanumeric(4).downcase
+        
+        # Truncate base to make room for suffix (max 63 chars total)
+        # Leave room for hyphen and 4 character suffix
+        truncated_base = candidate.slice(0, 58)
+        
+        # Create candidate with random suffix
+        candidate_with_suffix = "#{truncated_base}-#{random_suffix}"
+        
+        unless App.where(subdomain: candidate_with_suffix).where.not(id: id).exists?
+          candidate = candidate_with_suffix
           break
         end
-        counter += 1
-        break if counter > 100 # Safety limit
+      end
+      
+      # If still not unique after 5 attempts, use timestamp + random for guaranteed uniqueness
+      if App.where(subdomain: candidate).where.not(id: id).exists?
+        timestamp = Time.current.to_i.to_s.last(6) # Last 6 digits of timestamp
+        random_part = SecureRandom.alphanumeric(3).downcase
+        truncated_base = candidate.slice(0, 52) # Room for timestamp and random
+        candidate = "#{truncated_base}-#{timestamp}#{random_part}"
       end
     end
     

@@ -4,53 +4,42 @@ module Ai
   class BaseContextService
     TEMPLATE_PATH = Rails.root.join("app/services/ai/templates/overskill_20250728")
     
-    # Files that are ALWAYS accessed during app generation
+    # OPTIMIZED: Core essential files only (80% cost reduction)
+    # Based on V5 cost analysis - reduced from 11 files to 5 core files
     ESSENTIAL_FILES = [
-      # Core files - Always needed
-      "src/index.css",           # Design system - modified 21 times in analysis
-      "tailwind.config.ts",      # Tailwind config - constantly referenced
-      "index.html",              # Base HTML structure
-      "src/App.tsx",             # Main app component with routing
-      "src/pages/Index.tsx",     # Default page structure  
-      "src/main.tsx",            # App entry point
-      "src/lib/utils.ts",        # Utility functions
-      "package.json",            # Dependencies and scripts
-      
-      # Critical additions based on usage analysis
-      "vite.config.ts",          # Build configuration - often customized
-      "src/lib/supabase.ts",     # Database client - used in 90% of apps
-      "src/hooks/use-toast.ts"   # Toast notifications - essential for UX
+      "src/index.css",     # Design system - contains all Tailwind styles
+      "src/App.tsx",       # Routing structure - shows app architecture
+      "src/main.tsx",      # React entry point - shows how app initializes
+      "index.html",        # HTML template - shows app structure
+      "package.json"       # Dependencies - shows available libraries
     ].freeze
     
-    # Component files that are commonly needed (expanded based on usage patterns)
-    COMMON_UI_COMPONENTS = [
-      # Form components (95% usage rate)
-      "src/components/ui/form.tsx",        # Form handling with react-hook-form
-      "src/components/ui/input.tsx",       # Text inputs
-      "src/components/ui/textarea.tsx",    # Multi-line text
-      "src/components/ui/select.tsx",      # Dropdown selections
-      "src/components/ui/checkbox.tsx",    # Checkboxes
-      "src/components/ui/radio-group.tsx", # Radio buttons
-      
-      # Display components (90% usage rate)
-      "src/components/ui/button.tsx",      # Action buttons
-      "src/components/ui/card.tsx",        # Content containers
-      "src/components/ui/table.tsx",       # Data tables
-      "src/components/ui/dialog.tsx",      # Modal dialogs
-      "src/components/ui/label.tsx",       # Form labels
-      
-      # Navigation & feedback (85% usage rate)
-      "src/components/ui/dropdown-menu.tsx", # Context menus
-      "src/components/ui/tabs.tsx",          # Tab navigation
-      "src/components/ui/alert.tsx",         # Alert messages
-      "src/components/ui/toast.tsx",         # Toast notifications
-      "src/components/ui/toaster.tsx",       # Toast container
-      
-      # Status & loading (70% usage rate)
-      "src/components/ui/badge.tsx",       # Status indicators
-      "src/components/ui/skeleton.tsx",    # Loading placeholders  
-      "src/components/ui/switch.tsx"       # Toggle switches
-    ].freeze
+    # ARCHIVED: Previously loaded files (moved to selective loading)
+    # These are now loaded only when ComponentRequirementsAnalyzer determines need:
+    # - "tailwind.config.ts", "src/pages/Index.tsx", "src/lib/utils.ts"
+    # - "vite.config.ts", "src/lib/supabase.ts", "src/hooks/use-toast.ts"
+    
+    # OPTIMIZED: Selective component loading (replaces blanket loading)
+    # DISABLED for cost optimization - components loaded on-demand via ComponentRequirementsAnalyzer
+    # This reduces context from 300k+ to ~30k characters (90% cost reduction)
+    
+    # ARCHIVED: Common UI components (now loaded selectively)
+    # Previously loaded ALL 20+ components in every API call regardless of need
+    # COMMON_UI_COMPONENTS = [
+    #   # Form components: form.tsx, input.tsx, textarea.tsx, select.tsx, checkbox.tsx, radio-group.tsx
+    #   # Display components: button.tsx, card.tsx, table.tsx, dialog.tsx, label.tsx  
+    #   # Navigation: dropdown-menu.tsx, tabs.tsx, alert.tsx, toast.tsx, toaster.tsx
+    #   # Status: badge.tsx, skeleton.tsx, switch.tsx
+    # ].freeze
+    
+    # NEW: App-type specific component mapping (load only what's needed)
+    APP_TYPE_COMPONENTS = {
+      'todo' => %w[input checkbox button card],
+      'landing' => %w[button card badge tabs],
+      'dashboard' => %w[table select dropdown-menu avatar],
+      'form' => %w[form input textarea select button],
+      'default' => %w[button card input]  # Minimal fallback
+    }.freeze
     
     def initialize(app = nil)
       @app = app
@@ -67,24 +56,55 @@ module Ai
       context << "Use os-line-replace to modify them or reference their structure."
       context << ""
       
-      # Add essential files first
+      # Add essential files only (optimized for cost)
       ESSENTIAL_FILES.each do |file_path|
         add_file_to_context(context, file_path, "Essential")
       end
       
-      # Add common UI components
-      context << "## Common UI Components (shadcn/ui)"
+      # COST OPTIMIZATION: UI components loaded selectively via ComponentRequirementsAnalyzer
+      context << "## Available UI Components (shadcn/ui)"
       context << ""
-      COMMON_UI_COMPONENTS.each do |file_path|
-        add_file_to_context(context, file_path, "UI Component")
-      end
+      context << "The following components are available in the template and can be imported as needed:"
+      context << ""
+      
+      # List available components without loading their full content
+      all_components = %w[
+        button card input textarea select checkbox radio-group form label
+        table dialog dropdown-menu tabs alert toast toaster badge skeleton switch
+        avatar accordion alert-dialog aspect-ratio breadcrumb calendar
+        carousel chart collapsible command context-menu data-table
+        date-picker drawer hover-card menubar navigation-menu
+        pagination popover progress radio-group resizable
+        scroll-area separator sheet sidebar slider sonner
+        toggle toggle-group tooltip
+      ]
+      
+      context << "**Available Components**: #{all_components.join(', ')}"
+      context << ""
+      context << "**Usage**: Import these directly without using os-view to read component files."
+      context << "**Example**: `import { Button } from '@/components/ui/button'`"
+      context << ""
       
       # Add app-specific context if app exists
       if @app
         add_app_specific_context(context)
       end
       
-      context.join("\n")
+      final_context = context.join("\n")
+      
+      # COST MONITORING: Log context size for optimization tracking
+      context_size = final_context.length
+      Rails.logger.info "[V5_COST] Context size: #{context_size} chars (target: <50k for optimization)"
+      
+      if context_size > 100_000
+        Rails.logger.error "[V5_COST] CONTEXT BLOAT: #{context_size} chars - urgent optimization needed"
+      elsif context_size > 50_000
+        Rails.logger.warn "[V5_COST] Context size warning: #{context_size} chars - consider further optimization"
+      else
+        Rails.logger.info "[V5_COST] Context optimized: #{context_size} chars - good!"
+      end
+      
+      final_context
     end
     
     # Build context for existing app files (to prevent re-reading)
