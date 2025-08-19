@@ -220,14 +220,13 @@ module Deployment
       
       secrets = gather_all_secrets
       
-      # Cloudflare API requires setting secrets individually via PATCH
-      # Set each secret one by one
+      # Cloudflare API requires setting secrets individually via PUT
+      # The endpoint is /workers/scripts/{script_name}/secrets/{secret_name}
       secrets.each do |key, value|
         begin
-          response = self.class.patch(
-            "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
+          response = self.class.put(
+            "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets/#{key}",
             body: {
-              name: key,
               text: value.to_s,
               type: 'secret_text'
             }.to_json,
