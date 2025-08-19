@@ -1544,6 +1544,8 @@ module Ai
         edit_image(tool_args)
       when 'web_search'
         web_search(tool_args)
+      when 'os-fetch-webpage'
+        fetch_webpage_content(tool_args)
       when 'read_project_analytics'
         read_project_analytics(tool_args)
       else
@@ -1711,6 +1713,8 @@ module Ai
           edit_image(tool_args)
         when 'web_search'
           web_search(tool_args)
+        when 'os-fetch-webpage'
+          fetch_webpage_content(tool_args)
         when 'read_project_analytics'
           read_project_analytics(tool_args)
         when 'write_files', 'create_files'
@@ -2268,6 +2272,46 @@ module Ai
     end
     
 
+    
+    def fetch_webpage_content(args)
+      # Use the WebContentTool to fetch and extract webpage content
+      url = args['url']
+      use_cache = args.fetch('use_cache', true)
+      
+      if url.blank?
+        return { success: false, error: "URL parameter is required" }
+      end
+      
+      Rails.logger.info "[V5_TOOL] Fetching webpage content from: #{url}"
+      
+      begin
+        # Use the web content tool
+        tool = Ai::Tools::WebContentTool.new(@app)
+        result = tool.execute(args)
+        
+        if result[:success]
+          Rails.logger.info "[V5_TOOL] Successfully fetched content from #{url}"
+          { 
+            success: true, 
+            content: result[:content]
+          }
+        else
+          Rails.logger.error "[V5_TOOL] Failed to fetch webpage: #{result[:error]}"
+          { 
+            success: false, 
+            error: result[:error],
+            content: "Failed to fetch webpage: #{result[:error]}"
+          }
+        end
+      rescue => e
+        Rails.logger.error "[V5_TOOL] Error fetching webpage: #{e.message}"
+        { 
+          success: false, 
+          error: e.message,
+          content: "Error fetching webpage: #{e.message}"
+        }
+      end
+    end
     
     def web_search(args)
       # SERPAPI-backed web search with safe fallbacks for test/dev

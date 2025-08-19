@@ -384,11 +384,14 @@ GEM
       activesupport (>= 6.1)
     groupdate (6.7.0)
       activesupport (>= 7.1)
+    guess_html_encoding (0.0.11)
     hashdiff (1.2.0)
     hashids (1.0.6)
     hashie (5.0.0)
     heapy (0.2.0)
       thor
+    html_to_plain_text (1.0.5)
+      nokogiri (>= 1.4.0)
     htmlentities (4.3.4)
     http (5.3.1)
       addressable (~> 2.8)
@@ -703,6 +706,9 @@ GEM
       faraday (>= 1)
       faraday-multipart (>= 1)
     ruby-progressbar (1.13.0)
+    ruby-readability (0.7.2)
+      guess_html_encoding (>= 0.0.4)
+      nokogiri (>= 1.6.0)
     ruby-statistics (4.1.0)
     ruby-vips (2.2.4)
       ffi (~> 1.12)
@@ -884,6 +890,7 @@ DEPENDENCIES
   friendly_id (~> 5.5)
   git (~> 1.18)
   groupdate
+  html_to_plain_text
   httparty
   invisible_captcha
   jbuilder
@@ -915,6 +922,7 @@ DEPENDENCIES
   rouge (~> 4.1)
   rqrcode
   ruby-openai
+  ruby-readability
   ruby-vips
   secure_headers
   selenium-webdriver

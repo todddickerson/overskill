@@ -151,6 +151,8 @@ gem 'omniauth-github'
 gem "ruby-openai" # OpenAI API client for AI generation
 gem "tiktoken_ruby" # Token counting for AI APIs
 gem "httparty" # HTTP client for API calls
+gem "ruby-readability" # Extract readable content from web pages
+gem "html_to_plain_text" # Convert HTML to clean plain text for LLM processing
 
 # Search & Database
 gem "pg_search" # PostgreSQL full-text search

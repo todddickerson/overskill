@@ -356,6 +356,28 @@
       }
     },
     {
+      "description": "Fetch and extract clean content from a specific webpage URL for analysis.\n\nThis tool fetches the full content of a webpage, extracts the main article/content (removing ads, navigation, etc.), and returns it in a clean format optimized for LLM processing.\n\nWhen to use:\n- When you need to read the FULL content of a specific webpage (not just search snippets)\n- When analyzing documentation, articles, or technical specifications from a known URL\n- When the user provides a specific URL they want you to read and analyze\n- When you need more context than what web_search provides in snippets\n- After using web_search to find relevant pages and you need to read one in detail\n\nDifference from web_search:\n- web_search: Finds multiple relevant pages and returns snippets/summaries\n- os-fetch-webpage: Reads the COMPLETE content of a single specific URL\n\nThe tool will:\n1. Fetch the webpage content\n2. Extract the main article/content area\n3. Remove ads, navigation, sidebars, etc.\n4. Convert to clean plain text\n5. Return formatted content ready for analysis\n\nNote: Content may be truncated if extremely long (>100k characters)",
+      "name": "os-fetch-webpage",
+      "parameters": {
+        "properties": {
+          "url": {
+            "description": "The complete URL of the webpage to fetch",
+            "example": "https://docs.example.com/api/authentication",
+            "type": "string"
+          },
+          "use_cache": {
+            "description": "Whether to use cached content if available (default: true)",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      }
+    },
+    {
       "description": "Read the analytics for the production build of the project between two dates, with a given granularity. The granularity can be 'hourly' or 'daily'. The start and end dates must be in the format YYYY-MM-DD.\nThe start and end dates should be in RFC3339 format or date only format (YYYY-MM-DD).\n\nWhen to use this tool:\n- When the user is asking for usage of their app\n- When users want to improve their productions apps",
       "name": "read_project_analytics",
       "parameters": {
