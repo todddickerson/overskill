@@ -92,10 +92,13 @@ module Ai
     
     def replace_file_content(args)
       file_path = args['file_path'] || args[:file_path]
-      search_pattern = args['search_pattern'] || args[:search_pattern]
-      first_line = args['first_line'] || args[:first_line]
-      last_line = args['last_line'] || args[:last_line]
-      replacement = args['replacement'] || args[:replacement]
+      # Handle both naming conventions for search pattern
+      search_pattern = args['search_pattern'] || args['search'] || args[:search_pattern] || args[:search]
+      # Handle both naming conventions for line numbers
+      first_line = args['first_line'] || args['first_replaced_line'] || args[:first_line] || args[:first_replaced_line]
+      last_line = args['last_line'] || args['last_replaced_line'] || args[:last_line] || args[:last_replaced_line]
+      # Handle both naming conventions for replacement
+      replacement = args['replacement'] || args['replace'] || args[:replacement] || args[:replace]
       
       # Find the file
       file = @app.app_files.find_by(path: file_path)
