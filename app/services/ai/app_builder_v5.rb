@@ -682,7 +682,31 @@ module Ai
           )
           
           # Broadcast preview frame update to editor
-          broadcast_preview_frame_update
+          # Broadcast preview frame update when app is deployed
+          begin
+            if @app&.preview_url.present?
+            
+              Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
+              
+              # Broadcast to the app channel that users are subscribed to
+              Turbo::StreamsChannel.broadcast_replace_to(
+                "app_#{@app.id}",
+                target: "preview_frame",
+                partial: "account/app_editors/preview_frame",
+                locals: { app: @app }
+              )
+              
+              # Also broadcast a refresh action to the chat channel for better UX
+              Turbo::StreamsChannel.broadcast_action_to(
+                "app_#{@app.id}_chat",
+                action: "refresh",
+                target: "preview_frame"
+              )
+            end
+          rescue => e
+            Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+          end
+          
           
           # Create AppVersion for the generated code
           app_version = create_app_version_for_generation
@@ -806,9 +830,39 @@ module Ai
           Rails.logger.warn "[V5_DEPLOY] Cache clear failed: #{cache_result[:error]}"
         end
         
+        # Update app with preview URL so preview frame can display it
+        preview_url = deploy_result[:worker_url]
+        @app.update!(preview_url: preview_url, status: 'generated')
+        Rails.logger.info "[V5_DEPLOY] Updated app preview_url: #{preview_url}"
+        
+        # Broadcast preview frame update when app is deployed
+        begin
+          if @app&.preview_url.present?
+          
+            Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
+            
+            # Broadcast to the app channel that users are subscribed to
+            Turbo::StreamsChannel.broadcast_replace_to(
+              "app_#{@app.id}",
+              target: "preview_frame",
+              partial: "account/app_editors/preview_frame",
+              locals: { app: @app }
+            )
+            
+            # Also broadcast a refresh action to the chat channel for better UX
+            Turbo::StreamsChannel.broadcast_action_to(
+              "app_#{@app.id}_chat",
+              action: "refresh",
+              target: "preview_frame"
+            )
+          end
+        rescue => e
+          Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+        end
+        
         { 
           success: true, 
-          preview_url: deploy_result[:worker_url],
+          preview_url: preview_url,
           cache_cleared: cache_result[:success]
         }
       else

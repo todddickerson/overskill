@@ -29,6 +29,7 @@ module Ai
       
       app_file = @app.app_files.find_or_initialize_by(path: file_path)
       app_file.content = content
+      app_file.team = @app.team  # Ensure team is set for new files
       
       if app_file.save
         @logger.info "[AiToolService] File written: #{file_path} (#{content.length} chars)"

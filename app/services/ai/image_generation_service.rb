@@ -275,15 +275,19 @@ module Ai
     end
 
     def determine_openai_size(width, height)
-      # OpenAI DALL-E 3 supports specific sizes only
+      # OpenAI gpt-image-1 supports specific sizes only:
+      # '1024x1024', '1024x1536', '1536x1024', and 'auto'
       aspect_ratio = width.to_f / height.to_f
 
-      if aspect_ratio > 1.5
-        "1792x1024"  # Wide image
-      elsif aspect_ratio < 0.67
-        "1024x1792"  # Tall image
+      if aspect_ratio > 1.3
+        "1536x1024"  # Wide/landscape image (3:2 ratio)
+      elsif aspect_ratio < 0.75
+        "1024x1536"  # Tall/portrait image (2:3 ratio)
+      elsif aspect_ratio.between?(0.95, 1.05)
+        "1024x1024"  # Square or near-square (1:1 ratio)
       else
-        "1024x1024"  # Square or near-square
+        # For in-between aspect ratios, let OpenAI decide
+        "auto"
       end
     end
 
