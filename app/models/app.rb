@@ -2,6 +2,7 @@ require 'timeout'
 
 class App < ApplicationRecord
   include AutoPreview
+  include TemplateConfig
   # 🚅 add concerns above.
 
   # 🚅 add attribute accessors above.
@@ -52,6 +53,7 @@ class App < ApplicationRecord
   # 🚅 add validations above.
 
   before_validation :generate_subdomain
+  after_create :copy_template_files
   after_create :create_default_env_vars
   after_create :initiate_ai_generation, if: :should_auto_generate?
   after_create :generate_app_name
@@ -392,6 +394,60 @@ class App < ApplicationRecord
     self.subdomain = candidate
   end
 
+  def copy_template_files
+    template_dir = current_template_path
+    
+    unless Dir.exist?(template_dir)
+      Rails.logger.warn "[App] Template directory not found: #{template_dir}"
+      return
+    end
+    
+    files_copied = 0
+    
+    Dir.glob(::File.join(template_dir, "**/*")).each do |file_path|
+      next unless ::File.file?(file_path)
+      
+      relative_path = file_path.sub("#{template_dir}/", '')
+      content = ::File.read(file_path)
+      
+      # Skip empty files
+      next if content.blank?
+      
+      # Create AppFile for each template file
+      app_files.create!(
+        path: relative_path,
+        content: content,
+        team: team,
+        file_type: determine_app_file_type(relative_path)
+      )
+      
+      files_copied += 1
+    end
+    
+    Rails.logger.info "[App] Copied #{files_copied} template files from #{current_template_version} for app ##{id}"
+    
+    # Also track which template version was used
+    update_column(:template_version_used, current_template_version) if respond_to?(:template_version_used)
+  rescue => e
+    Rails.logger.error "[App] Failed to copy template files: #{e.message}"
+    Rails.logger.error e.backtrace.first(5).join("\n")
+  end
+  
+  def determine_app_file_type(path)
+    case ::File.extname(path).downcase
+    when '.tsx', '.ts' then 'typescript'
+    when '.jsx', '.js' then 'javascript'
+    when '.css' then 'css'
+    when '.html' then 'html'
+    when '.json' then 'json'
+    when '.md' then 'markdown'
+    when '.yml', '.yaml' then 'yaml'
+    when '.svg' then 'svg'
+    when '.png', '.jpg', '.jpeg', '.gif' then 'image'
+    else 'text'
+    end
+  end
+  
   def create_default_env_vars
     AppEnvVar.create_defaults_for_app(self)
   end

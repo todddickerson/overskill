@@ -57,20 +57,17 @@ module Ai
         verification_results: []
       }
       
-      # Load template files before starting
-      initialize_template_files
+      # Template files are now copied on app creation (in App model after_create)
+      # Just track existing files as already generated
+      initialize_existing_files
     end
     
-    def initialize_template_files
-      # Create template version and load files if they don't exist
-      template_version = get_or_create_template_version
-      if template_version
-        Rails.logger.info "[V5_TEMPLATE] Loaded template v1.0.0 with #{template_version.app_version_files.count} files"
-        # Track template files as already generated
-        template_version.app_version_files.includes(:app_file).each do |version_file|
-          @agent_state[:generated_files] << version_file.app_file
-        end
+    def initialize_existing_files
+      # Track all existing app files (including those copied from template)
+      @app.app_files.each do |file|
+        @agent_state[:generated_files] << file
       end
+      Rails.logger.info "[V5_INIT] Tracking #{@agent_state[:generated_files].count} existing files"
     end
     
     def execute!
@@ -1345,7 +1342,7 @@ module Ai
             temperature: 0.7,
             max_tokens: 48000,
             helicone_session: helicone_session,
-            extended_thinking: true,
+            extended_thinking: false, # Testing costs around thinking vs non TODO: evaluate more
             thinking_budget: 16000
           )
         rescue => e
@@ -3803,68 +3800,21 @@ module Ai
       Rails.logger.info "[V5_FLOW] Saved conversation_flow, new size: #{@assistant_message.conversation_flow.size}"
     end
     
+    # Template version methods are deprecated - templates are now copied on app creation
+    # Keeping minimal stubs for backwards compatibility
     def get_or_create_template_version
-      # Cache the template version
-      @template_version ||= begin
-        # Look for v1.0.0 template version for this app
-        version = @app.app_versions.find_by(version_number: 'v1.0.0')
-        
-        # If not found, create it from template files
-        if version.nil? && template_files_exist?
-          version = create_template_version_from_files
-        end
-        
-        version
-      end
+      Rails.logger.warn "[V5_DEPRECATED] get_or_create_template_version called - templates are now copied on app creation"
+      nil
     end
     
     def template_files_exist?
-      template_dir = Rails.root.join("app/services/ai/templates/overskill_20250728")
-      Dir.exist?(template_dir) && Dir.glob(::File.join(template_dir, "**/*")).any? { |f| ::File.file?(f) }
+      Rails.logger.warn "[V5_DEPRECATED] template_files_exist called - templates are now copied on app creation"
+      true # Always return true since files are copied on creation
     end
     
     def create_template_version_from_files
-      template_dir = Rails.root.join("app/services/ai/templates/overskill_20250728")
-      
-      version = @app.app_versions.create!(
-        version_number: 'v1.0.0',
-        team: @app.team,
-        user: @chat_message.user,
-        changelog: 'Initial template version from overskill_20250728',
-        deployed: false,
-        external_commit: false
-      )
-      
-      # Load all template files into AppFiles and AppVersionFiles
-      Dir.glob(::File.join(template_dir, "**/*")).each do |file_path|
-        next unless ::File.file?(file_path)
-        
-        relative_path = file_path.sub("#{template_dir}/", '')
-        content = ::File.read(file_path)
-        
-        # Skip empty files
-        next if content.blank?
-        
-        # Create or find AppFile
-        app_file = @app.app_files.find_or_create_by!(path: relative_path) do |f|
-          f.content = content
-          f.team = @app.team
-          f.file_type = determine_file_type(relative_path)
-        end
-        
-        # Update content if file exists
-        app_file.update!(content: content) if app_file.content != content
-        
-        # Create AppVersionFile to track this file in v1.0.0
-        version.app_version_files.create!(
-          app_file: app_file,
-          action: 'created',
-          content: content
-        )
-      end
-      
-      Rails.logger.info "[V5_TEMPLATE] Created AppVersion v1.0.0 with #{version.app_version_files.count} files"
-      version
+      Rails.logger.warn "[V5_DEPRECATED] create_template_version_from_files called - templates are now copied on app creation"
+      nil
     end
     
     def log_claude_event(event_type, details = {})

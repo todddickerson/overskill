@@ -1,8 +1,8 @@
 module Ai
-  # Service to build base context with essential template files
-  # Prevents Claude from constantly re-reading core files via os-view
+  # Service to build base context with essential app files
+  # Shows the actual files that exist in the app (copied from template)
   class BaseContextService
-    TEMPLATE_PATH = Rails.root.join("app/services/ai/templates/overskill_20250728")
+    include TemplateConfig
     
     # OPTIMIZED: Core essential files only (80% cost reduction)
     # Based on V5 cost analysis - reduced from 11 files to 5 core files
@@ -51,20 +51,21 @@ module Ai
       
       context << "# useful-context"
       context << ""
-      context << "Below are the essential base template files for this React + TypeScript + Tailwind project."
-      context << "These files are already available in the app - use os-line-replace to modify them."
+      context << "Below are the essential files in this React + TypeScript + Tailwind app."
+      context << "These files already exist in the app - use os-line-replace to modify them."
       context << "DO NOT use os-view to read them again as they are shown below."
       context << ""
       
-      # Add essential files from the app if they exist, otherwise from template
-      ESSENTIAL_FILES.each do |file_path|
-        if @app && (app_file = @app.app_files.find_by(path: file_path))
-          # Show the actual app file content
-          add_app_file_to_context(context, app_file, "Essential")
-        else
-          # Fallback to template file
-          add_file_to_context(context, file_path, "Essential")
+      # Only show files that actually exist in the app
+      # Template files were already copied when the app was created
+      if @app
+        ESSENTIAL_FILES.each do |file_path|
+          if (app_file = @app.app_files.find_by(path: file_path))
+            add_app_file_to_context(context, app_file, "Essential")
+          end
         end
+      else
+        context << "NOTE: No app context available yet."
       end
       
       # COST OPTIMIZATION: UI components loaded selectively via ComponentRequirementsAnalyzer
@@ -162,24 +163,11 @@ module Ai
       context << ""
     end
     
+    # This method is now deprecated since we only show actual app files
+    # Keeping it for backwards compatibility but it shouldn't be used
     def add_file_to_context(context, file_path, category)
-      full_path = TEMPLATE_PATH.join(file_path)
-      
-      if ::File.exist?(full_path)
-        content = ::File.read(full_path)
-        context << "## #{category}: #{file_path}"
-        context << ""
-        context << "```#{get_file_extension(file_path)}"
-        # Add line numbers for consistent display with os-view/os-read
-        numbered_content = content.lines.map.with_index(1) do |line, num|
-          "#{num.to_s.rjust(4)}: #{line}"
-        end.join
-        context << numbered_content.rstrip
-        context << "```"
-        context << ""
-      else
-        Rails.logger.warn "[BaseContext] Template file not found: #{file_path}"
-      end
+      Rails.logger.warn "[BaseContext] Deprecated: add_file_to_context called for #{file_path}"
+      # No longer reading from template directory
     end
     
     def add_app_specific_context(context)
