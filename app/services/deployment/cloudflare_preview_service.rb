@@ -34,15 +34,44 @@ class Deployment::CloudflarePreviewService
     # Ensure database tables exist before building
     ensure_database_tables_exist!
     
-    # Build app with Vite first
-    Rails.logger.info "[CloudflarePreview] Building app #{@app.id} with Vite"
-    build_service = Deployment::ViteBuildService.new(@app)
-    build_result = build_service.build_app!
+    # Build app with Vite first (with self-healing for TypeScript errors)
+    Rails.logger.info "[CloudflarePreview] Building app #{@app.id} with self-healing build service"
+    
+    # Use self-healing build service if enabled
+    if ENV['ENABLE_SELF_HEALING_BUILD'] != 'false'
+      build_service = Deployment::SelfHealingBuildService.new(@app)
+      build_result = build_service.build_with_retry!
+      
+      if build_result[:self_healed]
+        Rails.logger.info "[CloudflarePreview] Build self-healed with #{build_result[:fixes_applied].count} fixes"
+      end
+    else
+      build_service = Deployment::ViteBuildService.new(@app)
+      build_result = build_service.build_app!
+    end
     
     return { success: false, error: "Build failed: #{build_result[:error]}" } unless build_result[:success]
     
-    # Upload worker script with built files
-    worker_script = generate_worker_script_with_built_files(build_result[:files])
+    # Upload assets to R2 and get URLs
+    Rails.logger.info "[CloudflarePreview] Uploading assets to R2 for app #{@app.id}"
+    r2_service = Deployment::R2AssetService.new(@app)
+    r2_result = r2_service.upload_assets(build_result[:files])
+    asset_urls = r2_result[:asset_urls]
+    
+    Rails.logger.info "[CloudflarePreview] Uploaded #{r2_result[:stats][:uploaded_count]} assets to R2"
+    
+    # Separate code files from asset files
+    code_files = {}
+    build_result[:files].each do |path, file_data|
+      unless asset_urls.key?(path)
+        code_files[path] = file_data
+      end
+    end
+    
+    Rails.logger.info "[CloudflarePreview] Worker will contain #{code_files.keys.size} code files"
+    
+    # Generate worker script with code files and asset URLs
+    worker_script = generate_worker_script_with_r2_assets(code_files, asset_urls)
     upload_response = upload_worker(worker_name, worker_script)
     
     # Set environment variables
@@ -317,6 +346,175 @@ class Deployment::CloudflarePreviewService
     { success: false, error: e.message }
   end
 
+  def generate_worker_script_with_r2_assets(code_files, asset_urls)
+    # Worker script that serves code files and redirects to R2 for assets
+    env_vars_js = build_env_vars_for_app(:preview).to_json
+    asset_urls_js = asset_urls.to_json
+    
+    <<~JAVASCRIPT
+      // Environment variables embedded at build time
+      const ENV_VARS = #{env_vars_js};
+      
+      // Asset URLs in R2
+      const ASSET_URLS = #{asset_urls_js};
+
+      addEventListener('fetch', event => {
+        event.respondWith(handleRequest(event.request))
+      })
+
+      async function handleRequest(request) {
+        const url = new URL(request.url)
+        const pathname = url.pathname
+        const env = ENV_VARS
+        
+        // Handle API routes that need secret env vars
+        if (pathname.startsWith('/api/')) {
+          return handleApiRequest(request, env)
+        }
+        
+        // Clean path for lookups
+        const cleanPath = pathname.startsWith('/') ? pathname.slice(1) : pathname
+        
+        // Check if this is an asset in R2
+        if (ASSET_URLS[cleanPath]) {
+          // Redirect to R2 URL with permanent cache
+          return Response.redirect(ASSET_URLS[cleanPath], 301)
+        }
+        
+        // Try to serve code files (JS, CSS from build)
+        if (pathname !== '/' && pathname !== '/index.html') {
+          const file = getBuiltFile(cleanPath)
+          if (file) {
+            return serveBuiltFile(cleanPath)
+          }
+        }
+        
+        // For all other routes, serve index.html for React Router
+        const indexHtml = getBuiltFile('index.html')
+        if (indexHtml) {
+          // Inject environment variables into HTML
+          const publicEnvVars = getPublicEnvVars(env)
+          const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`
+          
+          // Add version meta tags
+          const versionMeta = `
+            <meta name="overskill-app-id" content="${env.APP_ID}">
+            <meta name="overskill-app-name" content="${env.APP_NAME}">
+            <meta name="overskill-environment" content="${env.ENVIRONMENT}">
+            <meta name="overskill-deployed-at" content="${env.DEPLOYED_AT || new Date().toISOString()}">
+            <meta name="overskill-build-id" content="${env.BUILD_ID || 'unknown'}">
+            <meta name="overskill-version" content="${Date.now()}">
+          `
+          
+          // Inject into HTML
+          let modifiedHtml = indexHtml.content
+          if (indexHtml.content.includes('</head>')) {
+            modifiedHtml = indexHtml.content.replace('</head>', versionMeta + envScript + '</head>')
+          } else if (indexHtml.content.includes('<body>')) {
+            modifiedHtml = indexHtml.content.replace('<body>', '<body>' + versionMeta + envScript)
+          } else {
+            modifiedHtml = versionMeta + envScript + indexHtml.content
+          }
+          
+          return new Response(modifiedHtml, {
+            headers: {
+              'Content-Type': 'text/html',
+              'X-Frame-Options': 'ALLOWALL',
+              'Cache-Control': 'no-cache'
+            }
+          })
+        }
+        
+        return new Response('File not found', { status: 404 })
+      }
+      
+      function getBuiltFile(path) {
+        const files = #{built_files_as_json(code_files)}
+        return files[path]
+      }
+
+      async function serveBuiltFile(path) {
+        try {
+          const files = #{built_files_as_json(code_files)}
+          const file = files[path]
+          
+          if (!file) {
+            return new Response('File not found', { status: 404 })
+          }
+          
+          let content = file.content
+          
+          // Handle binary files (shouldn't be many left after R2 offload)
+          if (file.binary) {
+            const binaryString = atob(content)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            content = bytes
+          }
+          
+          return new Response(content, {
+            headers: {
+              'Content-Type': file.content_type,
+              'Cache-Control': 'public, max-age=86400', // 1 day for code files
+              'Access-Control-Allow-Origin': '*',
+              'X-Frame-Options': 'ALLOWALL'
+            }
+          })
+        } catch (error) {
+          return new Response('Internal Server Error', { status: 500 })
+        }
+      }
+
+      // Get only public environment variables (safe for client)
+      function getPublicEnvVars(env) {
+        const publicVars = {}
+        const publicKeys = ['APP_ID', 'ENVIRONMENT', 'API_BASE_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY']
+        
+        for (const key in env) {
+          if (publicKeys.includes(key) || key.startsWith('PUBLIC_') || key.startsWith('VITE_')) {
+            publicVars[key] = env[key]
+          }
+        }
+        
+        return publicVars
+      }
+      
+      // Handle API requests with access to secret env vars
+      async function handleApiRequest(request, env) {
+        const url = new URL(request.url)
+        const path = url.pathname
+        
+        // Proxy to Supabase with service key
+        if (path.startsWith('/api/supabase')) {
+          const supabaseUrl = env.SUPABASE_URL
+          const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY
+          
+          if (!supabaseUrl || !supabaseKey) {
+            return new Response(JSON.stringify({ error: 'Database not configured' }), { 
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            })
+          }
+          
+          const targetUrl = supabaseUrl + path.replace('/api/supabase', '')
+          const proxyRequest = new Request(targetUrl, request)
+          proxyRequest.headers.set('apikey', supabaseKey)
+          proxyRequest.headers.set('Authorization', `Bearer ${supabaseKey}`)
+          
+          return fetch(proxyRequest)
+        }
+        
+        return new Response(JSON.stringify({ error: 'API endpoint not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+    JAVASCRIPT
+  end
+  
+  # Keep the old method for backward compatibility but mark as deprecated
   def generate_worker_script_with_built_files(built_files)
     # Worker script that serves pre-built Vite files
     # Include environment variables directly in script for simplicity

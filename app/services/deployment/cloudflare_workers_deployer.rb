@@ -28,13 +28,23 @@ module Deployment
       end
     end
     
-    def deploy_with_secrets(built_code:, deployment_type: :preview)
+    def deploy_with_secrets(built_code:, deployment_type: :preview, r2_asset_urls: {})
       worker_name = generate_worker_name(deployment_type)
       
       Rails.logger.info "[CloudflareWorkersDeployer] Deploying to #{worker_name}"
       
+      # Generate Worker script from built code and R2 URLs
+      worker_script = generate_worker_script(built_code, r2_asset_urls)
+      worker_size_mb = (worker_script.bytesize / 1024.0 / 1024.0).round(2)
+      
+      Rails.logger.info "[CloudflareWorkersDeployer] Worker script size: #{worker_size_mb} MB"
+      
+      if worker_script.bytesize > 10 * 1024 * 1024  # 10MB limit
+        return { success: false, error: "Worker script too large: #{worker_size_mb} MB" }
+      end
+      
       # 1. Deploy the Worker script
-      deploy_worker(worker_name, built_code)
+      deploy_worker(worker_name, worker_script)
       
       # 2. Set environment variables and secrets (skip if API token lacks permissions)
       begin
@@ -225,6 +235,163 @@ module Deployment
       handle_api_response(response, "set secrets for #{worker_name}")
     end
     
+    def generate_worker_script(built_code, r2_asset_urls = {})
+      # Handle both string (legacy) and hash (new) formats
+      if built_code.is_a?(String)
+        return built_code  # Already a Worker script
+      end
+      
+      # Generate Worker script from file hash
+      code_files_json = JSON.generate(built_code)
+      asset_urls_json = JSON.generate(r2_asset_urls)
+      
+      <<~JAVASCRIPT
+        // Code files embedded in Worker
+        const CODE_FILES = #{code_files_json};
+        
+        // Asset URLs in R2
+        const ASSET_URLS = #{asset_urls_json};
+        
+        addEventListener('fetch', event => {
+          event.respondWith(handleRequest(event.request, event))
+        })
+        
+        async function handleRequest(request, event) {
+          const env = event.env || {}
+            const url = new URL(request.url);
+            const pathname = url.pathname;
+            
+            // Handle API routes
+            if (pathname.startsWith('/api/')) {
+              return handleApiRequest(request, env);
+            }
+            
+            // Clean path for lookups
+            const cleanPath = pathname === '/' ? 'index.html' : pathname.slice(1);
+            
+            // Check if this is an asset in R2
+            if (ASSET_URLS[cleanPath]) {
+              return Response.redirect(ASSET_URLS[cleanPath], 301);
+            }
+            
+            // Check if this is a code file
+            if (CODE_FILES[cleanPath]) {
+              const content = CODE_FILES[cleanPath];
+              const contentType = getContentType(cleanPath);
+              
+              // Special handling for index.html
+              if (cleanPath === 'index.html') {
+                const publicEnvVars = getPublicEnvVars(env);
+                const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`;
+                
+                let modifiedHtml = content;
+                if (content.includes('</head>')) {
+                  modifiedHtml = content.replace('</head>', envScript + '</head>');
+                } else {
+                  modifiedHtml = envScript + content;
+                }
+                
+                return new Response(modifiedHtml, {
+                  headers: {
+                    'Content-Type': contentType,
+                    'Cache-Control': 'no-cache',
+                    'X-Frame-Options': 'ALLOWALL'
+                  }
+                });
+              }
+              
+              // Serve other code files
+              return new Response(content, {
+                headers: {
+                  'Content-Type': contentType,
+                  'Cache-Control': 'public, max-age=86400',
+                  'Access-Control-Allow-Origin': '*'
+                }
+              });
+            }
+            
+            // For all other routes, serve index.html (SPA routing)
+            const indexHtml = CODE_FILES['index.html'];
+            if (indexHtml) {
+              const publicEnvVars = getPublicEnvVars(env);
+              const envScript = `<script>window.ENV = ${JSON.stringify(publicEnvVars)};</script>`;
+              
+              let modifiedHtml = indexHtml;
+              if (indexHtml.includes('</head>')) {
+                modifiedHtml = indexHtml.replace('</head>', envScript + '</head>');
+              } else {
+                modifiedHtml = envScript + indexHtml;
+              }
+              
+              return new Response(modifiedHtml, {
+                headers: {
+                  'Content-Type': 'text/html',
+                  'Cache-Control': 'no-cache',
+                  'X-Frame-Options': 'ALLOWALL'
+                }
+              });
+            }
+            
+            return new Response('Not found', { status: 404 });
+        }
+        
+        function getContentType(path) {
+          const ext = path.split('.').pop().toLowerCase();
+          const types = {
+            'html': 'text/html',
+            'js': 'application/javascript',
+            'mjs': 'application/javascript',
+            'css': 'text/css',
+            'json': 'application/json'
+          };
+          return types[ext] || 'text/plain';
+        }
+        
+        function getPublicEnvVars(env) {
+          const publicVars = {};
+          const publicKeys = ['APP_ID', 'ENVIRONMENT', 'API_BASE_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+          
+          for (const key in env) {
+            if (publicKeys.includes(key) || key.startsWith('PUBLIC_') || key.startsWith('VITE_')) {
+              publicVars[key] = env[key];
+            }
+          }
+          
+          return publicVars;
+        }
+        
+        async function handleApiRequest(request, env) {
+          const url = new URL(request.url);
+          const path = url.pathname;
+          
+          // Proxy to Supabase
+          if (path.startsWith('/api/supabase')) {
+            const supabaseUrl = env.SUPABASE_URL;
+            const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+            
+            if (!supabaseUrl || !supabaseKey) {
+              return new Response(JSON.stringify({ error: 'Database not configured' }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+            
+            const targetUrl = supabaseUrl + path.replace('/api/supabase', '');
+            const proxyRequest = new Request(targetUrl, request);
+            proxyRequest.headers.set('apikey', supabaseKey);
+            proxyRequest.headers.set('Authorization', `Bearer ${supabaseKey}`);
+            
+            return fetch(proxyRequest);
+          }
+          
+          return new Response(JSON.stringify({ error: 'API endpoint not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      JAVASCRIPT
+    end
+    
     def gather_all_secrets
       secrets = {}
       
@@ -267,12 +434,12 @@ module Deployment
     end
     
     def configure_worker_routes(worker_name, deployment_type)
-      # Configure subdomain based on deployment type
+      # Configure subdomain based on deployment type using app.subdomain (slug)
       subdomain = case deployment_type
-                  when :preview
-                    "preview-#{@app.id}"
+                  when :preview, :staging
+                    "preview--#{@app.subdomain}"  # Use app slug: preview--pageforge
                   when :production
-                    "app-#{@app.id}"
+                    @app.subdomain  # Use app slug: pageforge
                   else
                     "#{deployment_type}-#{@app.id}"
                   end

@@ -16,6 +16,89 @@ module Deployment
       end
     end
     
+    def build_for_preview_with_r2
+      Rails.logger.info "[ExternalViteBuilder] Starting preview build with R2 asset offloading for app ##{@app.id}"
+      
+      # First, upload app file assets to R2 before building
+      r2_service = Deployment::R2AssetService.new(@app)
+      
+      # Create file hash from app files for R2 upload (in expected format)
+      app_files_hash = {}
+      @app.app_files.each do |file|
+        # R2AssetService expects this format
+        app_files_hash[file.path] = {
+          content: file.content,
+          binary: false,  # Assume text files for now
+          content_type: detect_content_type(file.path)
+        }
+      end
+      
+      r2_result = r2_service.upload_assets(app_files_hash)
+      Rails.logger.info "[ExternalViteBuilder] Uploaded #{r2_result[:stats][:uploaded_count]} assets to R2"
+      
+      # Now build the app (this returns a JavaScript string)
+      build_result = build_for_preview
+      return build_result unless build_result[:success]
+      
+      # ExternalViteBuilder returns built_code as a string, not a hash
+      # We need to create the file structure for the Worker
+      code_files = {
+        'index.js' => build_result[:built_code],  # The main built JavaScript
+        'index.html' => get_index_html_content   # Get the HTML file
+      }
+      
+      # Calculate size stats
+      original_app_size = app_files_hash.values.sum { |file_data| file_data[:content].bytesize }
+      optimized_size = code_files.values.sum(&:bytesize)
+      size_savings = original_app_size - optimized_size
+      
+      Rails.logger.info "[ExternalViteBuilder] Worker optimized: #{(optimized_size / 1024.0 / 1024.0).round(2)} MB (saved #{(size_savings / 1024.0 / 1024.0).round(2)} MB)"
+      
+      {
+        success: true,
+        built_code: code_files,
+        r2_asset_urls: r2_result[:asset_urls] || {},
+        size_stats: {
+          original_size: original_app_size,
+          optimized_size: optimized_size,
+          size_savings: size_savings,
+          r2_assets_count: r2_result[:stats][:uploaded_count]
+        }
+      }
+    rescue => e
+      Rails.logger.error "[ExternalViteBuilder] R2 build failed: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
+    def get_index_html_content
+      # Get the index.html from app files and fix script references
+      index_file = @app.app_files.find_by(path: 'index.html')
+      html_content = index_file&.content || default_html_template
+      
+      # Replace development script references with built script
+      # Change /src/main.tsx to /index.js for the Worker
+      html_content = html_content.gsub('/src/main.tsx', '/index.js')
+      
+      html_content
+    end
+    
+    def default_html_template
+      <<~HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>App</title>
+        </head>
+        <body>
+          <div id="root"></div>
+          <script type="module" src="/index.js"></script>
+        </body>
+        </html>
+      HTML
+    end
+    
     def build_for_preview_with_context(build_context = {})
       Rails.logger.info "[ExternalViteBuilder] Starting incremental preview build for app ##{@app.id}"
       Rails.logger.info "[ExternalViteBuilder] Build context: #{build_context.inspect}"
@@ -636,6 +719,23 @@ module Deployment
       end
     rescue => e
       Rails.logger.warn "[ExternalViteBuilder] Failed to cleanup temp directory: #{e.message}"
+    end
+    
+    def detect_content_type(path)
+      ext = File.extname(path).downcase
+      case ext
+      when '.html' then 'text/html'
+      when '.js', '.mjs' then 'application/javascript'
+      when '.css' then 'text/css'
+      when '.json' then 'application/json'
+      when '.jpg', '.jpeg' then 'image/jpeg'
+      when '.png' then 'image/png'
+      when '.gif' then 'image/gif'
+      when '.svg' then 'image/svg+xml'
+      when '.woff' then 'font/woff'
+      when '.woff2' then 'font/woff2'
+      else 'text/plain'
+      end
     end
   end
 end

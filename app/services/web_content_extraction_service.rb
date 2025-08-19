@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
-require 'faraday'
+require 'httparty'
 require 'nokogiri'
 require 'readability'
 require 'html_to_plain_text'
 
 class WebContentExtractionService
+  include HTTParty
   include ActiveSupport::Benchmarkable
   
   # Maximum content length to prevent memory issues
@@ -15,8 +16,11 @@ class WebContentExtractionService
   # User agent to identify as a legitimate bot
   USER_AGENT = 'Mozilla/5.0 (compatible; OverskillBot/1.0; AI Content Extraction)'
   
+  # HTTParty configuration
+  default_timeout 20
+  headers('User-Agent' => USER_AGENT)
+  
   def initialize
-    @http_client = build_http_client
     @logger = Rails.logger
     @security_filter = Security::PromptInjectionFilter.new if defined?(Security::PromptInjectionFilter)
   end
@@ -87,39 +91,52 @@ class WebContentExtractionService
 
   private
 
-  def build_http_client
-    Faraday.new do |faraday|
-      faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2
-      faraday.request :timeout, read: 20, open: 10
-      faraday.response :follow_redirects, limit: 5
-      
-      # Use Net::HTTP adapter (default, reliable)
-      faraday.adapter :net_http
-      
-      # Add response size limit middleware
-      faraday.use :response_size_limiter, max_size: MAX_RESPONSE_SIZE
-    end
-  end
-
   def fetch_page_content(url)
-    response = @http_client.get(url) do |req|
-      req.headers['User-Agent'] = USER_AGENT
-      req.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      req.headers['Accept-Language'] = 'en-US,en;q=0.9'
-      req.headers['Accept-Encoding'] = 'gzip, deflate'
-      req.headers['DNT'] = '1'
+    # HTTParty GET with retry logic
+    attempts = 0
+    max_attempts = 3
+    
+    begin
+      attempts += 1
+      
+      response = self.class.get(url, {
+        headers: {
+          'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language' => 'en-US,en;q=0.9',
+          'Accept-Encoding' => 'gzip, deflate',
+          'DNT' => '1'
+        },
+        timeout: 20
+      })
+      
+      return nil unless response.success?
+      
+      # Check response size
+      if response.body && response.body.bytesize > MAX_RESPONSE_SIZE
+        @logger.warn "[WebContent] Response too large: #{response.body.bytesize} bytes (max: #{MAX_RESPONSE_SIZE})"
+        return nil
+      end
+      
+      # Check content type
+      content_type = response.headers['content-type'] || ''
+      unless content_type.include?('text/html') || content_type.include?('application/xhtml')
+        @logger.warn "[WebContent] Non-HTML content type: #{content_type} for #{url}"
+        return nil
+      end
+      
+      response.body
+      
+    rescue HTTParty::Error, Net::TimeoutError, SocketError => e
+      if attempts < max_attempts
+        sleep_time = 0.5 * (2 ** (attempts - 1)) # Exponential backoff
+        @logger.info "[WebContent] Retrying #{url} in #{sleep_time}s (attempt #{attempts}/#{max_attempts})"
+        sleep(sleep_time)
+        retry
+      else
+        @logger.error "[WebContent] Failed to fetch #{url} after #{max_attempts} attempts: #{e.message}"
+        return nil
+      end
     end
-    
-    return nil unless response.success?
-    
-    # Check content type
-    content_type = response.headers['content-type'] || ''
-    unless content_type.include?('text/html') || content_type.include?('application/xhtml')
-      @logger.warn "[WebContent] Non-HTML content type: #{content_type} for #{url}"
-      return nil
-    end
-    
-    response.body
   end
 
   def extract_readable_text(html_content, url)
@@ -259,18 +276,3 @@ class WebContentExtractionService
   end
 end
 
-# Faraday middleware to limit response size
-class Faraday::Response::SizeLimiter < Faraday::Middleware
-  def initialize(app, options = {})
-    super(app)
-    @max_size = options[:max_size] || 5_000_000
-  end
-
-  def on_complete(env)
-    if env.body && env.body.bytesize > @max_size
-      raise Faraday::Error, "Response too large: #{env.body.bytesize} bytes (max: #{@max_size})"
-    end
-  end
-end
-
-Faraday::Response.register_middleware(response_size_limiter: Faraday::Response::SizeLimiter)

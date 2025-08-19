@@ -7,17 +7,34 @@ class DeployAppJob < ApplicationJob
     # Update status to deploying
     app.update!(status: 'generating')
     
-    # Use the new preview service
-    service = Deployment::CloudflarePreviewService.new(app)
+    # Use the R2-optimized deployment pipeline (same as AppBuilderV5)
+    Rails.logger.info "[DeployAppJob] Starting R2-optimized deployment for app #{app.id} (#{environment})"
     
-    # Deploy based on environment
-    result = case environment
-    when "staging"
-      service.deploy_staging!
-    when "production"
-      service.deploy_production!
+    # Build with R2 asset optimization
+    builder = Deployment::ExternalViteBuilder.new(app)
+    build_result = builder.build_for_preview_with_r2
+    
+    unless build_result[:success]
+      result = { success: false, error: "Build failed: #{build_result[:error]}" }
     else
-      { success: false, error: "Invalid environment: #{environment}" }
+      Rails.logger.info "[DeployAppJob] Build completed: #{build_result[:size_stats][:r2_assets_count]} assets to R2"
+      
+      # Deploy to Cloudflare with R2 assets
+      deployer = Deployment::CloudflareWorkersDeployer.new(app)
+      deployment_type = environment == "production" ? :production : :staging
+      
+      result = deployer.deploy_with_secrets(
+        built_code: build_result[:built_code],
+        r2_asset_urls: build_result[:r2_asset_urls],
+        deployment_type: deployment_type
+      )
+      
+      # Log deployment stats
+      if result[:success]
+        Rails.logger.info "[DeployAppJob] Deployment successful: #{result[:deployment_url]}"
+        Rails.logger.info "[DeployAppJob] Worker size: #{result[:worker_size_mb] || 'unknown'} MB"
+        Rails.logger.info "[DeployAppJob] R2 assets: #{result[:r2_assets_count] || 0}"
+      end
     end
     
     if result[:success]

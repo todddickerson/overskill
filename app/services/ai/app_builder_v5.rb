@@ -777,18 +777,21 @@ module Ai
         end
       end
       
-      # Build the app first
+      # Build the app with R2 asset optimization
       builder = Deployment::ExternalViteBuilder.new(app)
-      build_result = builder.build_for_preview
+      build_result = builder.build_for_preview_with_r2
       
       unless build_result[:success]
         return { success: false, error: build_result[:error] }
       end
       
-      # Deploy to Cloudflare
+      Rails.logger.info "[V5_DEPLOY] Build completed with R2 optimization: #{build_result[:size_stats][:r2_assets_count]} assets uploaded"
+      
+      # Deploy to Cloudflare with R2 asset URLs
       deployer = Deployment::CloudflareWorkersDeployer.new(app)
       deploy_result = deployer.deploy_with_secrets(
         built_code: build_result[:built_code],
+        r2_asset_urls: build_result[:r2_asset_urls],
         deployment_type: :preview
       )
       

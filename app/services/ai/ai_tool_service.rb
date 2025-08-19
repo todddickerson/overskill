@@ -17,7 +17,6 @@ module Ai
       @perplexity_service = PerplexityContentService.new
       @image_service = Ai::ImageGenerationService.new
       @search_service = Ai::SmartSearchService.new(app)
-      @line_replace_service = Ai::LineReplaceService.new(app)
     end
     
     # ========================
@@ -92,7 +91,19 @@ module Ai
     end
     
     def replace_file_content(args)
-      @line_replace_service.execute(args)
+      file_path = args['file_path'] || args[:file_path]
+      search_pattern = args['search_pattern'] || args[:search_pattern]
+      first_line = args['first_line'] || args[:first_line]
+      last_line = args['last_line'] || args[:last_line]
+      replacement = args['replacement'] || args[:replacement]
+      
+      # Find the file
+      file = @app.app_files.find_by(path: file_path)
+      return { success: false, error: "File not found: #{file_path}" } unless file
+      
+      # Use the class method instead of instance
+      result = Ai::LineReplaceService.replace_lines(file, search_pattern, first_line, last_line, replacement)
+      result
     rescue StandardError => e
       @logger.error "[AiToolService] Error in line replace: #{e.message}"
       { success: false, error: e.message }
@@ -290,18 +301,34 @@ module Ai
       return { success: false, error: "Prompt is required" } if prompt.blank?
       return { success: false, error: "Target path is required" } if target_path.blank?
       
-      result = @image_service.generate_and_save(
+      # Note: generate_and_save_image now returns R2 URLs
+      result = @image_service.generate_and_save_image(
         prompt: prompt,
         target_path: target_path,
         width: width,
         height: height,
-        model: model,
-        app: @app
+        model: model
       )
       
       if result[:success]
-        @logger.info "[AiToolService] Image generated: #{target_path}"
-        { success: true, content: "Image generated and saved to #{target_path}" }
+        @logger.info "[AiToolService] Image generated and uploaded to R2: #{target_path} -> #{result[:url]}"
+        
+        # Return enhanced response with R2 URL and usage instructions
+        response = "Image generated successfully!\n\n"
+        response += "Path: #{target_path}\n"
+        response += "R2 URL: #{result[:url]}\n\n"
+        response += "IMPORTANT: Use the R2 URL in your HTML/CSS, not the local path:\n"
+        response += "Example HTML: <img src=\"#{result[:url]}\" alt=\"Generated image\" />\n"
+        response += "Example CSS: background-image: url('#{result[:url]}');\n\n"
+        response += "The image is hosted on Cloudflare R2 for optimal performance."
+        
+        { 
+          success: true, 
+          content: response,
+          url: result[:url],
+          path: target_path,
+          storage_method: 'r2'
+        }
       else
         { success: false, error: result[:error] }
       end

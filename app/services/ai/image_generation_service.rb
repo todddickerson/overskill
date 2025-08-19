@@ -75,8 +75,19 @@ module Ai
       )
 
       if result[:success] && result[:image_data]
-        save_image_to_app_files(target_path, result[:image_data])
-        result.merge(path: target_path)
+        # Upload to R2 immediately instead of embedding in app files
+        r2_url = upload_image_to_r2(target_path, result[:image_data])
+        
+        # Save reference to the R2 URL in app files (not the actual image)
+        save_image_reference_to_app_files(target_path, r2_url, result[:image_data])
+        
+        # Return with R2 URL and usage instructions for AI
+        result.merge(
+          path: target_path,
+          url: r2_url,
+          usage_instruction: "Use this URL in your HTML/CSS: #{r2_url}",
+          storage_method: 'r2'
+        )
       else
         result
       end
@@ -174,8 +185,8 @@ module Ai
 
       # Map quality options - gpt-image-1 supports 'standard' and 'hd'
       quality = case options[:quality]
-                when 'high', 'hd', 'quality' then 'hd'
-                else 'standard'
+                when 'high', 'hd', 'quality' then 'high'
+                else 'auto'
                 end
 
       result = @openai_client.generate_image(
@@ -306,7 +317,52 @@ module Ai
       nil
     end
 
+    def upload_image_to_r2(target_path, image_content)
+      # Upload image to R2 and return the public URL
+      begin
+        r2_service = Deployment::R2AssetService.new(@app)
+        url = r2_service.upload_file(target_path, image_content, content_type: detect_image_content_type(target_path))
+        Rails.logger.info "[ImageGen] Uploaded image to R2: #{target_path} -> #{url}"
+        url
+      rescue => e
+        Rails.logger.error "[ImageGen] Failed to upload to R2, falling back to embedded storage: #{e.message}"
+        # Fallback: return a data URL if R2 fails
+        content_type = detect_image_content_type(target_path)
+        "data:#{content_type};base64,#{Base64.encode64(image_content).gsub("\n", '')}"
+      end
+    end
+
+    def save_image_reference_to_app_files(target_path, r2_url, image_content)
+      # Save a reference to the R2 URL in app files (not the actual image)
+      file = @app.app_files.find_or_initialize_by(path: target_path)
+      
+      # Store a placeholder HTML comment with the R2 URL
+      # This makes it clear the image is hosted externally
+      file.content = "<!-- Image hosted on R2: #{r2_url} -->\n<!-- Size: #{image_content.bytesize} bytes -->\n<!-- Generated: #{Time.current.iso8601} -->"
+      file.file_type = 'image_reference'
+      file.team = @app.team
+      
+      file.save!
+      Rails.logger.info "[ImageGen] Saved R2 image reference: #{target_path} -> #{r2_url}"
+    end
+
+    def detect_image_content_type(path)
+      extension = File.extname(path).downcase
+      case extension
+      when '.png' then 'image/png'
+      when '.jpg', '.jpeg' then 'image/jpeg'
+      when '.gif' then 'image/gif'
+      when '.webp' then 'image/webp'
+      when '.svg' then 'image/svg+xml'
+      else 'image/png' # Default to PNG
+      end
+    end
+
+    # Deprecated: Old method for backward compatibility
     def save_image_to_app_files(target_path, image_content)
+      # This method is deprecated - use save_image_reference_to_app_files instead
+      Rails.logger.warn "[ImageGen] Using deprecated save_image_to_app_files method"
+      
       # Save image as AppFile with binary content
       file = @app.app_files.find_or_initialize_by(path: target_path)
 
@@ -314,16 +370,9 @@ module Ai
       file.content = Base64.encode64(image_content)
       file.file_type = determine_file_type(target_path)
       file.team = @app.team
-      # Skip metadata assignment as AppFile doesn't have this column
-      # file.metadata = {
-      #   'binary' => true,
-      #   'encoding' => 'base64',
-      #   'original_size' => image_content.bytesize,
-      #   'generated_at' => Time.current.iso8601
-      # }
 
       file.save!
-      Rails.logger.info "[ImageGen] Saved image file: #{target_path} (#{image_content.bytesize} bytes)"
+      Rails.logger.info "[ImageGen] Saved embedded image file: #{target_path} (#{image_content.bytesize} bytes)"
     end
 
     def determine_file_type(path)

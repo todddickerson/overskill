@@ -111,6 +111,9 @@ gem "rack-cors"
 # Easy and automatic inline CSS for mailers
 gem "premailer-rails"
 
+# AWS SDK for S3 (used for R2 storage)
+gem "aws-sdk-s3"
+
 # Use Ruby hashes as readonly datasources for ActiveRecord-like models.
 gem "active_hash"
 
