@@ -2296,20 +2296,27 @@ module Ai
       end
 
       begin
-        require 'google_search_results'
+        require 'serpapi'
+
+        # Initialize client with defaults
+        client = SerpApi::Client.new(
+          engine: engine,
+          api_key: serpapi_key,
+          async: false,
+          persistent: true,
+          timeout: 15,
+          symbolize_names: true
+        )
 
         # Main web search (organic results)
         search_params = {
-          engine: engine,
           q: query,
           num: num_results,
-          api_key: serpapi_key,
           safe: 'active',
           hl: 'en'
         }
 
-        search = GoogleSearchResults.new(search_params)
-        raw = search.get_hash
+        raw = client.search(search_params)
 
         organic = (raw[:organic_results] || raw['organic_results'] || []).first(num_results)
         mapped_results = organic.map do |r|
@@ -2334,10 +2341,9 @@ module Ai
             engine: 'google_images',
             q: query,
             num: image_links.to_i,
-            api_key: serpapi_key,
             safe: 'active'
           }
-          images_raw = GoogleSearchResults.new(images_params).get_hash
+          images_raw = client.search(images_params)
           images_results = images_raw[:images_results] || images_raw['images_results'] || []
           images = images_results.first(image_links.to_i).map do |im|
             {
@@ -2372,6 +2378,40 @@ module Ai
         # Graceful fallback on errors
         web_search_mock_response(query, num_results, category).merge(note: 'SerpAPI error, returned mock results')
       end
+    end
+
+    def web_search_mock_response(query, num_results, category)
+      mock_results = [
+        {
+          title: "#{query} - Documentation",
+          url: "https://example.com/docs/#{query.to_s.parameterize}",
+          snippet: "Official documentation for #{query}. Learn how to implement and use #{query} effectively.",
+          category: category || "documentation"
+        },
+        {
+          title: "#{query} Tutorial - Getting Started",
+          url: "https://tutorial-site.com/#{query.to_s.parameterize}",
+          snippet: "Step-by-step tutorial covering #{query} basics and advanced techniques.",
+          category: category || "tutorial"
+        },
+        {
+          title: "#{query} GitHub Repository",
+          url: "https://github.com/example/#{query.to_s.parameterize}",
+          snippet: "Open source implementation of #{query} with examples and community contributions.",
+          category: "github"
+        }
+      ].first(num_results)
+
+      {
+        success: true,
+        provider: 'mock',
+        engine: 'google',
+        query: query,
+        results: mock_results,
+        images: [],
+        total_results: mock_results.count,
+        category: category
+      }
     end
     
     def read_project_analytics(args)
