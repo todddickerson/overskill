@@ -96,7 +96,13 @@ export default class extends Controller {
     }
   }
   
-  async restoreSpecificVersion(versionId) {
+  async restoreSpecificVersion(event) {
+    const versionId = event.currentTarget.dataset.versionId
+    if (!versionId) {
+      console.error("No version ID found for restore")
+      return
+    }
+    
     try {
       const response = await fetch(`/account/app_versions/${versionId}/restore`, {
         method: 'POST',

@@ -204,72 +204,9 @@
       
       <%# 4. App Version Card - Only shows if code was generated %>
       <% if message.is_code_generation && message.app_version.present? %>
-        <% version = message.app_version %>
-        <div class="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 
-                    dark:from-green-900/20 dark:to-blue-900/20 
-                    border border-green-200 dark:border-green-700 rounded-lg
-                    shadow-sm hover:shadow-md transition-shadow duration-200">
-          
-          <%# Version Header %>
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h4 class="font-medium text-gray-900 dark:text-gray-100">
-                <%= version.formatted_display_name || "App Version #{version.version_number}" %>
-              </h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                <%= version.changelog || "AI Generated based on your requirements" %>
-              </p>
-            </div>
-            
-            <span class="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-800 
-                         text-green-800 dark:text-green-200 rounded-full font-medium">
-              v<%= version.version_number %>
-            </span>
-          </div>
-          
-          <%# Action Buttons %>
-          <div class="flex items-center space-x-2">
-            <%= link_to preview_account_app_version_path(version.app, version),
-                class: "inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200",
-                target: "_blank",
-                title: "Click to Preview App Version (+Tooltip popover)",
-                data: { turbo: false } do %>
-              <i class="fas fa-external-link-alt mr-1.5"></i>
-              Preview
-            <% end %>
-            
-            <button class="inline-flex items-center px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
-                    data-action="click->version#restore"
-                    data-version-id="<%= version.id %>"
-                    title: "Restore this version">
-              <i class="fas fa-undo mr-1.5"></i>
-              Restore
-            </button>
-            
-            <button class="inline-flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg transition-colors duration-200"
-                    data-action="click->code-modal#open"
-                    data-version-id="<%= version.id %>"
-                    title: "View code changes modal">
-              <i class="fas fa-code mr-1.5"></i>
-              View Code
-            </button>
-            
-            <button class="inline-flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg transition-colors duration-200"
-                    data-action="click->bookmark#toggle"
-                    data-version-id="<%= version.id %>"
-                    title: "'Favorite' App version for later search">
-              <i class="<%= version.bookmarked? ? 'fas text-yellow-500' : 'far' %> fa-bookmark"></i>
-              <% unless version.bookmarked? %>
-                <span class="ml-1">Bookmark</span>
-              <% end %>
-            </button>
-          </div>
-          
-          <%# Hover hint for version card actions %>
-          <div class="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
-            Hover to see card version buttons • Options to "Restore" → open restore modal • View Code → open code changes modal • Bookmark → "Favorite" for later
-          </div>
-        </div>
+        <%= render "account/app_editors/unified_version_card", 
+            message: message, 
+            next_version_number: nil %>
       <% end %>
       
       <%# Status indicator for completed/failed messages %>
