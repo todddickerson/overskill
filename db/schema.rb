@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_15_125544) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_19_144515) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -764,6 +764,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_15_125544) do
     t.index ["tangible_thing_id"], name: "index_tangible_things_assignments_on_tangible_thing_id"
   end
 
+  create_table "security_logs", force: :cascade do |t|
+    t.bigint "user_id"
+    t.bigint "app_id"
+    t.string "event_type", null: false
+    t.jsonb "details", default: {}, null: false
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id"], name: "index_security_logs_on_app_id"
+    t.index ["created_at"], name: "index_security_logs_on_created_at"
+    t.index ["details"], name: "index_security_logs_on_details", using: :gin
+    t.index ["event_type"], name: "index_security_logs_on_event_type"
+    t.index ["user_id", "created_at"], name: "index_security_logs_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_security_logs_on_user_id"
+  end
+
   create_table "team_database_configs", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.string "database_mode", default: "managed", null: false
@@ -1013,6 +1030,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_15_125544) do
   add_foreign_key "scaffolding_completely_concrete_tangible_things", "scaffolding_absolutely_abstract_creative_concepts", column: "absolutely_abstract_creative_concept_id"
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "memberships"
   add_foreign_key "scaffolding_completely_concrete_tangible_things_assignments", "scaffolding_completely_concrete_tangible_things", column: "tangible_thing_id"
+  add_foreign_key "security_logs", "apps"
+  add_foreign_key "security_logs", "users"
   add_foreign_key "team_database_configs", "teams"
   add_foreign_key "user_shard_mappings", "database_shards"
   add_foreign_key "user_shard_mappings", "users"

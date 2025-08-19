@@ -378,6 +378,7 @@ GEM
       rchardet (~> 1.8)
     globalid (1.2.1)
       activesupport (>= 6.1)
+    google_search_results (2.2.0)
     groupdate (6.7.0)
       activesupport (>= 7.1)
     hashdiff (1.2.0)
@@ -866,6 +867,7 @@ DEPENDENCIES
   foreman
   friendly_id (~> 5.5)
   git (~> 1.18)
+  google_search_results
   groupdate
   httparty
   invisible_captcha

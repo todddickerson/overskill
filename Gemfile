@@ -156,6 +156,7 @@ gem "httparty" # HTTP client for API calls
 gem "pg_search" # PostgreSQL full-text search
 gem "counter_culture" # Efficient counter caches
 gem "friendly_id", "~> 5.5" # SEO-friendly URLs
+gem "google_search_results" # SerpAPI client for web search
 
 # Background Processing
 gem "sidekiq-cron" # Scheduled jobs

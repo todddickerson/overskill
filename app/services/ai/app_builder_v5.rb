@@ -16,6 +16,9 @@ module Ai
       @iteration_count = 0
       @completion_status = :active
       
+      # Initialize security filter
+      @security_filter = Security::PromptInjectionFilter.new
+      
       # Create assistant reply message for V5 UI
       @assistant_message = create_assistant_message
       
@@ -323,7 +326,14 @@ module Ai
       
       # Capture Claude's conversational response (with thinking blocks for continuity)
       if response[:content].present?
-        add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+        # Validate output for security issues
+        if !@security_filter.validate_output(response[:content])
+          Rails.logger.warn "[SECURITY] Suspicious output detected, filtering response"
+          filtered_content = @security_filter.filter_response(response[:content])
+          add_loop_message(filtered_content, type: 'content', thinking_blocks: response[:thinking_blocks])
+        else
+          add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+        end
       end
       
       @context_manager.add_context(response)
@@ -2260,45 +2270,108 @@ module Ai
 
     
     def web_search(args)
-      # For V5, return placeholder search results
-      # In production, this would integrate with search API (Google, Bing, etc.)
-      
+      # SERPAPI-backed web search with safe fallbacks for test/dev
       query = args['query']
       num_results = args['numResults'] || 5
-      links = args['links'] || 0
       image_links = args['imageLinks'] || 0
       category = args['category']
-      
-      # Mock search results
-      mock_results = [
-        {
-          title: "#{query} - Documentation",
-          url: "https://example.com/docs/#{query.parameterize}",
-          snippet: "Official documentation for #{query}. Learn how to implement and use #{query} effectively.",
-          category: category || "documentation"
-        },
-        {
-          title: "#{query} Tutorial - Getting Started",
-          url: "https://tutorial-site.com/#{query.parameterize}",
-          snippet: "Step-by-step tutorial covering #{query} basics and advanced techniques.",
-          category: category || "tutorial"
-        },
-        {
-          title: "#{query} GitHub Repository",
-          url: "https://github.com/example/#{query.parameterize}",
-          snippet: "Open source implementation of #{query} with examples and community contributions.",
-          category: "github"
+      engine = (args['engine'] || 'google').to_s
+
+      if query.blank?
+        return { success: false, error: "Missing required 'query'" }
+      end
+
+      # Prefer ENV, fallback to credentials if present
+      serpapi_key = ENV['SERPAPI_KEY']
+      serpapi_key ||= Rails.application.credentials.dig(:serpapi_key) rescue nil
+
+      # For CI/tests or when key missing, return deterministic mock results
+      if Rails.env.test? && ENV['SERPAPI_TEST_LIVE'] != '1'
+        return web_search_mock_response(query, num_results, category)
+      end
+
+      if serpapi_key.blank?
+        Rails.logger.warn "[WebSearch] SERPAPI_KEY missing. Returning mock results."
+        return web_search_mock_response(query, num_results, category)
+      end
+
+      begin
+        require 'google_search_results'
+
+        # Main web search (organic results)
+        search_params = {
+          engine: engine,
+          q: query,
+          num: num_results,
+          api_key: serpapi_key,
+          safe: 'active',
+          hl: 'en'
         }
-      ].first(num_results)
-      
-      {
-        success: true,
-        query: query,
-        results: mock_results,
-        total_results: mock_results.count,
-        category: category,
-        note: "Placeholder implementation - requires search API integration"
-      }
+
+        search = GoogleSearchResults.new(search_params)
+        raw = search.get_hash
+
+        organic = (raw[:organic_results] || raw['organic_results'] || []).first(num_results)
+        mapped_results = organic.map do |r|
+          {
+            title: r[:title] || r['title'],
+            url: r[:link] || r['link'],
+            display_url: r[:displayed_link] || r['displayed_link'],
+            snippet: r[:snippet] || r['snippet'],
+            position: r[:position] || r['position'],
+            sitelinks: begin
+              sl = r[:sitelinks] || r['sitelinks'] || r[:sitelinks_inline] || r['sitelinks_inline']
+              Array(sl).map { |slr| { title: slr[:title] || slr['title'], url: slr[:link] || slr['link'] } }
+            rescue
+              []
+            end
+          }
+        end
+
+        images = []
+        if image_links.to_i > 0
+          images_params = {
+            engine: 'google_images',
+            q: query,
+            num: image_links.to_i,
+            api_key: serpapi_key,
+            safe: 'active'
+          }
+          images_raw = GoogleSearchResults.new(images_params).get_hash
+          images_results = images_raw[:images_results] || images_raw['images_results'] || []
+          images = images_results.first(image_links.to_i).map do |im|
+            {
+              title: im[:title] || im['title'],
+              source: im[:source] || im['source'],
+              thumbnail: im[:thumbnail] || im['thumbnail'],
+              original: im[:original] || im['original'],
+              link: im[:link] || im['link']
+            }
+          end
+        end
+
+        total_results = begin
+          info = raw[:search_information] || raw['search_information']
+          info && (info[:total_results] || info['total_results'])
+        rescue
+          nil
+        end
+
+        {
+          success: true,
+          provider: 'serpapi',
+          engine: engine,
+          query: query,
+          category: category,
+          results: mapped_results,
+          images: images,
+          total_results: total_results || mapped_results.length
+        }
+      rescue => e
+        Rails.logger.error "[WebSearch] SERPAPI error: #{e.class} #{e.message}"
+        # Graceful fallback on errors
+        web_search_mock_response(query, num_results, category).merge(note: 'SerpAPI error, returned mock results')
+      end
     end
     
     def read_project_analytics(args)
@@ -2380,8 +2453,32 @@ module Ai
       end
       
       # Add current user message
-      # Append instruction to update all files unless in discussion-only mode
+      # First check for security issues
       user_content = @chat_message.content
+      
+      # Security check for prompt injection
+      if @security_filter.detect_injection?(user_content)
+        Rails.logger.warn "[SECURITY] Prompt injection detected for user #{@chat_message.user_id}"
+        
+        # Record the attempt
+        if @chat_message.user
+          @security_filter.record_injection_attempt(
+            @chat_message.user,
+            @app,
+            user_content
+          )
+        end
+        
+        # Check if user should be rate limited
+        if @chat_message.user && @security_filter.should_rate_limit?(@chat_message.user, @app)
+          raise Security::PromptInjectionFilter::InjectionAttemptDetected,
+                "Too many injection attempts. Please contact support if you believe this is an error."
+        end
+        
+        # Sanitize the input
+        user_content = @security_filter.sanitize_input(user_content)
+        Rails.logger.info "[SECURITY] Input sanitized after injection detection"
+      end
       
       # Check if this is a discussion-only message (questions, clarifications, etc.)
       discussion_patterns = [
