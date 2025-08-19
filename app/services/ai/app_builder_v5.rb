@@ -1742,6 +1742,14 @@ module Ai
       # Clear pending tools at start to batch this group together
       @pending_tool_calls = []
       
+      # Create a line offset tracker for this batch of tool calls
+      # This handles the case where multiple line-replace operations on the same file
+      # need adjusted line numbers after each replacement changes the file size
+      # The tracker maintains separate offsets for EACH file being modified
+      line_offset_tracker = Ai::LineOffsetTracker.new
+      @tool_service.line_offset_tracker = line_offset_tracker if @tool_service
+      Rails.logger.info "[V5_TOOLS] Created LineOffsetTracker for batch of #{tool_calls.size} tool calls"
+      
       tool_calls.each do |tool_call|
         tool_name = tool_call['function']['name']
         tool_args = JSON.parse(tool_call['function']['arguments'])
@@ -1881,6 +1889,12 @@ module Ai
       
       # Flush all pending tool calls as a batch to conversation_flow
       flush_pending_tool_calls
+      
+      # Clear the line offset tracker after processing this batch
+      if @tool_service && line_offset_tracker
+        Rails.logger.info "[V5_TOOLS] Clearing LineOffsetTracker after batch completion"
+        @tool_service.line_offset_tracker = nil
+      end
       
       results
     end

@@ -6,6 +6,7 @@ module Ai
   # Each tool method returns a standardized response hash with :success and :content/:error keys
   class AiToolService
     attr_reader :app, :logger
+    attr_accessor :line_offset_tracker
     
     def initialize(app, options = {})
       @app = app
@@ -17,6 +18,9 @@ module Ai
       @perplexity_service = PerplexityContentService.new
       @image_service = Ai::ImageGenerationService.new(app)  # Pass app context for image generation
       @search_service = Ai::SmartSearchService.new(app)
+      
+      # Line offset tracker for handling sequential line replacements
+      @line_offset_tracker = nil # Will be set when processing batches of tool calls
     end
     
     # ========================
@@ -101,9 +105,24 @@ module Ai
       # Handle both naming conventions for replacement
       replacement = args['replacement'] || args['replace'] || args[:replacement] || args[:replace]
       
+      # Convert to integers if they're strings
+      first_line = first_line.to_i
+      last_line = last_line.to_i
+      
       # Find the file
       file = @app.app_files.find_by(path: file_path)
       return { success: false, error: "File not found: #{file_path}" } unless file
+      
+      # Apply line offset adjustments if tracker is available
+      original_first = first_line
+      original_last = last_line
+      
+      if @line_offset_tracker && @line_offset_tracker.tracking?(file_path)
+        adjusted_first, adjusted_last = @line_offset_tracker.adjust_line_range(file_path, first_line, last_line)
+        @logger.info "[AiToolService] Line numbers adjusted for #{file_path}: #{first_line}-#{last_line} -> #{adjusted_first}-#{adjusted_last}"
+        first_line = adjusted_first
+        last_line = adjusted_last
+      end
       
       # Log the operation details for debugging
       @logger.info "[AiToolService] Attempting line-replace on #{file_path} lines #{first_line}-#{last_line}"
@@ -113,6 +132,13 @@ module Ai
       
       if result[:success]
         @logger.info "[AiToolService] Successfully replaced lines in #{file_path}"
+        
+        # Record the replacement in the tracker if available
+        if @line_offset_tracker
+          # Calculate how many lines the replacement has
+          replacement_lines = replacement.lines.count
+          @line_offset_tracker.record_replacement(file_path, original_first, original_last, replacement_lines)
+        end
       else
         @logger.warn "[AiToolService] Line-replace failed for #{file_path}: #{result[:error]}"
       end
