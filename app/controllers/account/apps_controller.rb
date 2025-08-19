@@ -238,11 +238,14 @@ class Account::AppsController < Account::ApplicationController
   def deployment_info
     # Get deployment URLs and visitor info
     preview_url = @app.preview_url
-    production_url = @app.published_url || @app.deployment_url
+    production_url = @app.production_url  # Actual production URL
+    published_url = @app.published_url    # Smart URL (production if published, otherwise preview)
     
     render json: {
       preview_url: preview_url,
       production_url: production_url,
+      published_url: published_url,  # The correct URL to use for "View Live Site"
+      is_published: @app.published?,
       visitor_count: @app.visitor_count,
       daily_visitors: @app.daily_visitors,
       deployment_status: @app.deployment_status,

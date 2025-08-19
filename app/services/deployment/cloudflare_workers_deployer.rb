@@ -220,19 +220,31 @@ module Deployment
       
       secrets = gather_all_secrets
       
-      # Cloudflare API requires setting secrets one at a time or in batch
-      # Using batch update for efficiency
-      secrets_array = secrets.map do |key, value|
-        { name: key, text: value.to_s, type: 'secret_text' }
+      # Cloudflare API requires setting secrets individually via PATCH
+      # Set each secret one by one
+      secrets.each do |key, value|
+        begin
+          response = self.class.patch(
+            "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
+            body: {
+              name: key,
+              text: value.to_s,
+              type: 'secret_text'
+            }.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+          
+          if response.success?
+            Rails.logger.debug "[CloudflareWorkersDeployer] Set secret #{key} for #{worker_name}"
+          else
+            Rails.logger.warn "[CloudflareWorkersDeployer] Failed to set secret #{key}: #{response.body}"
+          end
+        rescue => e
+          Rails.logger.error "[CloudflareWorkersDeployer] Error setting secret #{key}: #{e.message}"
+        end
       end
       
-      response = self.class.put(
-        "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
-        body: secrets_array.to_json,
-        headers: { 'Content-Type' => 'application/json' }
-      )
-      
-      handle_api_response(response, "set secrets for #{worker_name}")
+      Rails.logger.info "[CloudflareWorkersDeployer] Finished setting #{secrets.count} secrets for #{worker_name}"
     end
     
     def generate_worker_script(built_code, r2_asset_urls = {})

@@ -4,6 +4,8 @@ export default class extends Controller {
   static targets = ["modal", "content", "previewUrl", "productionUrl", "visitorCount", "updateButton", "todayVisitors", "visitorChart", "totalVersions", "lastUpdated", "deployStatus", "deployButton"]
   static values = { appId: String }
   
+  publishedUrl = null  // Store the correct URL for "View Live Site"
+  
   connect() {
     console.log('PublishModalController connected', this.element)
     console.log('App ID value:', this.appIdValue)
@@ -55,14 +57,23 @@ export default class extends Controller {
   }
   
   updateUrls(data) {
+    // Store the published URL for "View Live Site" button
+    this.publishedUrl = data.published_url || data.preview_url
+    
     if (this.hasPreviewUrlTarget && data.preview_url) {
       const url = new URL(data.preview_url)
       this.previewUrlTarget.textContent = url.hostname
     }
     
-    if (this.hasProductionUrlTarget && data.production_url) {
-      const url = new URL(data.production_url)
-      this.productionUrlTarget.textContent = url.hostname
+    if (this.hasProductionUrlTarget) {
+      if (data.production_url) {
+        const url = new URL(data.production_url)
+        this.productionUrlTarget.textContent = url.hostname
+      } else if (data.is_published === false && data.preview_url) {
+        // If not published yet, show preview URL as the production URL placeholder
+        const url = new URL(data.preview_url)
+        this.productionUrlTarget.textContent = `${url.hostname} (not published yet)`
+      }
     }
   }
   
@@ -205,8 +216,12 @@ export default class extends Controller {
   
   openInNewTab(event) {
     event.preventDefault()
-    const url = `https://${this.productionUrlTarget.textContent}`
-    window.open(url, '_blank')
+    // Use the published URL which is either production (if published) or preview (if not)
+    const url = this.publishedUrl || `https://${this.previewUrlTarget.textContent}`
+    
+    // Ensure the URL has proper protocol
+    const finalUrl = url.startsWith('http') ? url : `https://${url}`
+    window.open(finalUrl, '_blank')
   }
   
   async deployProduction(event) {
