@@ -431,5 +431,48 @@
         ],
         "type": "object"
       }
+    },
+    {
+      "description": "Rename the current app with a new name and automatically generate a URL-safe subdomain slug.\n\nUse this tool when:\n- The user asks to rename the app\n- You need to give the app a more descriptive or appropriate name\n- The app name should reflect its functionality or purpose\n- During initial app setup to set a proper name\n\nThe subdomain will be automatically generated from the name (e.g., 'My Cool App' becomes 'my-cool-app').\nNote: The subdomain must be unique across the platform.",
+      "name": "rename-app",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "The new display name for the app",
+            "example": "Elite Roofing Solutions",
+            "type": "string"
+          },
+          "subdomain": {
+            "description": "Optional: Custom subdomain slug. If not provided, will be generated from name",
+            "example": "elite-roofing",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "description": "Generate a new AI-powered logo for the app based on its name and description.\n\nUse this tool when:\n- The user asks for a new logo\n- The app needs a visual identity\n- During initial app setup after naming\n- The app's purpose has changed significantly\n\nThe logo will be generated as a modern, minimalist app icon suitable for web and mobile.\nIt will be automatically saved and set as the app's logo.",
+      "name": "generate-new-app-logo",
+      "parameters": {
+        "properties": {
+          "style": {
+            "description": "Optional: Style preference for the logo",
+            "enum": ["modern", "minimalist", "playful", "professional", "bold", "elegant"],
+            "example": "modern",
+            "type": "string"
+          },
+          "colors": {
+            "description": "Optional: Preferred color scheme",
+            "example": "blue and white",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
     }
   ]

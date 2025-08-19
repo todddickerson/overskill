@@ -145,9 +145,23 @@ module Ai
           update_thinking_status("Thinking...")
         end
         
-        # Just send the raw user message - system prompt has all instructions
-        # No need for prompt wrapper since agent-prompt.txt explains everything
-        response = call_ai_with_context(@chat_message.content)
+        # Enhance the user message with additional instructions for first-time app generation
+        user_message = if is_continuation
+          # For continuations, just use the raw message
+          @chat_message.content
+        else
+          # For initial app generation, add instructions to name the app and generate a logo
+          enhanced_message = @chat_message.content + "\n\n"
+          enhanced_message += "IMPORTANT: As part of creating this app:\n"
+          enhanced_message += "1. Use the 'rename-app' tool to give the app an appropriate name based on its purpose\n"
+          enhanced_message += "2. After naming, use the 'generate-new-app-logo' tool to create a logo that matches the app's theme\n"
+          enhanced_message += "3. Choose a logo style that fits the app's purpose (modern, professional, playful, etc.)\n"
+          enhanced_message += "\nThese should be done early in the generation process, after understanding the app's requirements."
+          enhanced_message
+        end
+        
+        # Send the (potentially enhanced) message to Claude
+        response = call_ai_with_context(user_message)
         
         # Claude's response (with tool calls) is already handled by execute_tool_calling_cycle
         Rails.logger.info "[V5_SIMPLE] Claude completed work"
@@ -1616,6 +1630,10 @@ module Ai
         @tool_service.perplexity_research(tool_args)
       when 'read_project_analytics'
         @tool_service.read_project_analytics(tool_args)
+      when 'rename-app'
+        @tool_service.rename_app(tool_args)
+      when 'generate-new-app-logo'
+        @tool_service.generate_app_logo(tool_args)
       else
         { error: "Unknown tool: #{tool_name}" }
       end
@@ -1789,6 +1807,10 @@ module Ai
             @tool_service.perplexity_research(tool_args)
           when 'read_project_analytics'
             @tool_service.read_project_analytics(tool_args)
+          when 'rename-app'
+            @tool_service.rename_app(tool_args)
+          when 'generate-new-app-logo'
+            @tool_service.generate_app_logo(tool_args)
           when 'write_files', 'create_files'
             # Proper implementation for batch file operations
             process_batch_file_operation(tool_name, tool_args)

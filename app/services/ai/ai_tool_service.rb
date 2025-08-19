@@ -105,11 +105,22 @@ module Ai
       file = @app.app_files.find_by(path: file_path)
       return { success: false, error: "File not found: #{file_path}" } unless file
       
+      # Log the operation details for debugging
+      @logger.info "[AiToolService] Attempting line-replace on #{file_path} lines #{first_line}-#{last_line}"
+      
       # Use the class method instead of instance
       result = Ai::LineReplaceService.replace_lines(file, search_pattern, first_line, last_line, replacement)
+      
+      if result[:success]
+        @logger.info "[AiToolService] Successfully replaced lines in #{file_path}"
+      else
+        @logger.warn "[AiToolService] Line-replace failed for #{file_path}: #{result[:error]}"
+      end
+      
       result
     rescue StandardError => e
-      @logger.error "[AiToolService] Error in line replace: #{e.message}"
+      @logger.error "[AiToolService] Error in line replace for #{file_path}: #{e.message}"
+      @logger.error e.backtrace.first(5).join("\n")
       { success: false, error: e.message }
     end
     
@@ -509,6 +520,139 @@ module Ai
       lines << (result[:content] || result[:research_report])
       
       lines.join("\n")
+    end
+    
+    # ========================
+    # App Management Tools
+    # ========================
+    
+    def rename_app(args)
+      new_name = args['name'] || args[:name]
+      custom_subdomain = args['subdomain'] || args[:subdomain]
+      
+      return { success: false, error: "Name is required" } if new_name.blank?
+      
+      begin
+        old_name = @app.name
+        old_subdomain = @app.subdomain
+        
+        # Update the app name
+        @app.update!(name: new_name)
+        
+        # Use existing App model method to handle subdomain generation
+        if custom_subdomain.present?
+          # If custom subdomain provided, use update_subdomain! method
+          result = @app.update_subdomain!(custom_subdomain)
+          unless result[:success]
+            return { success: false, error: "Failed to update subdomain: #{result[:error]}" }
+          end
+          final_subdomain = result[:subdomain] || custom_subdomain
+        else
+          # Otherwise regenerate from name using existing model method
+          result = @app.regenerate_subdomain_from_name!(redeploy_if_published: false)
+          unless result[:success]
+            return { success: false, error: "Failed to generate subdomain: #{result[:error]}" }
+          end
+          final_subdomain = result[:subdomain]
+        end
+        
+        @logger.info "[AiToolService] App renamed from '#{old_name}' to '#{new_name}' (subdomain: #{old_subdomain} -> #{final_subdomain})"
+        
+        { 
+          success: true, 
+          content: "App successfully renamed to '#{new_name}' with subdomain '#{final_subdomain}'",
+          old_name: old_name,
+          new_name: new_name,
+          old_subdomain: old_subdomain,
+          new_subdomain: final_subdomain,
+          preview_url: "https://preview--#{final_subdomain}.overskill.com",
+          production_url: "https://#{final_subdomain}.overskill.com"
+        }
+      rescue => e
+        @logger.error "[AiToolService] Failed to rename app: #{e.message}"
+        { success: false, error: "Failed to rename app: #{e.message}" }
+      end
+    end
+    
+    def generate_app_logo(args)
+      style = args['style'] || args[:style] || 'modern'
+      colors = args['colors'] || args[:colors]
+      
+      begin
+        # Build a custom prompt if style or colors are specified
+        if style != 'modern' || colors.present?
+          # Build custom logo prompt
+          prompt_parts = [
+            "Create a #{style} app icon logo",
+            "for #{@app.name}",
+            "transparent background",
+            "no text",
+            "simple geometric shapes",
+            "high contrast"
+          ]
+          
+          # Add color preference if specified
+          prompt_parts << colors if colors.present?
+          
+          # Add style-specific elements
+          case style
+          when 'minimalist'
+            prompt_parts << "ultra simple" << "clean lines"
+          when 'playful'
+            prompt_parts << "fun" << "rounded shapes" << "bright colors"
+          when 'professional'
+            prompt_parts << "corporate" << "serious" << "trustworthy"
+          when 'bold'
+            prompt_parts << "strong" << "impactful" << "thick lines"
+          when 'elegant'
+            prompt_parts << "sophisticated" << "refined" << "premium feel"
+          else # modern
+            prompt_parts << "contemporary" << "tech-forward" << "innovative"
+          end
+          
+          custom_prompt = prompt_parts.join(", ")
+        else
+          custom_prompt = nil
+        end
+        
+        # Use the existing LogoGeneratorService
+        logo_service = Ai::LogoGeneratorService.new(@app)
+        
+        if custom_prompt
+          # Regenerate with custom prompt
+          result = logo_service.regenerate_logo(custom_prompt)
+        else
+          # Generate with default behavior
+          result = logo_service.generate_logo
+        end
+        
+        if result[:success]
+          # Mark logo as generated
+          @app.update!(logo_generated_at: Time.current)
+          
+          @logger.info "[AiToolService] Logo generated for app '#{@app.name}'"
+          
+          # Broadcast navigation update to refresh logo in UI
+          Turbo::StreamsChannel.broadcast_replace_to(
+            "app_#{@app.id}",
+            target: "app_navigation_#{@app.id}",
+            partial: "account/app_editors/app_navigation",
+            locals: { app: @app }
+          )
+          
+          { 
+            success: true, 
+            content: "Logo successfully generated for '#{@app.name}'",
+            style: style,
+            prompt_used: custom_prompt || "Default logo generation"
+          }
+        else
+          { success: false, error: result[:error] }
+        end
+      rescue => e
+        @logger.error "[AiToolService] Failed to generate logo: #{e.message}"
+        { success: false, error: "Failed to generate logo: #{e.message}" }
+      end
     end
   end
 end

@@ -52,13 +52,19 @@ module Ai
       context << "# useful-context"
       context << ""
       context << "Below are the essential base template files for this React + TypeScript + Tailwind project."
-      context << "These files are already available - DO NOT use os-view to read them again."
-      context << "Use os-line-replace to modify them or reference their structure."
+      context << "These files are already available in the app - use os-line-replace to modify them."
+      context << "DO NOT use os-view to read them again as they are shown below."
       context << ""
       
-      # Add essential files only (optimized for cost)
+      # Add essential files from the app if they exist, otherwise from template
       ESSENTIAL_FILES.each do |file_path|
-        add_file_to_context(context, file_path, "Essential")
+        if @app && (app_file = @app.app_files.find_by(path: file_path))
+          # Show the actual app file content
+          add_app_file_to_context(context, app_file, "Essential")
+        else
+          # Fallback to template file
+          add_file_to_context(context, file_path, "Essential")
+        end
       end
       
       # COST OPTIMIZATION: UI components loaded selectively via ComponentRequirementsAnalyzer
@@ -113,9 +119,10 @@ module Ai
       
       context = []
       context << ""
-      context << "## Existing App Files"
+      context << "## Existing App Files (ACTUALLY IN THE APP)"
       context << ""
-      context << "The following files already exist in this app - reference them directly:"
+      context << "The following files ACTUALLY EXIST in this app and can be modified with os-line-replace:"
+      context << "IMPORTANT: Only these files can be modified with os-line-replace. Template files shown above are for reference only."
       context << ""
       
       # Group files by directory for better organization
@@ -141,6 +148,19 @@ module Ai
     end
     
     private
+    
+    def add_app_file_to_context(context, app_file, category)
+      context << "## #{category}: #{app_file.path}"
+      context << ""
+      context << "```#{get_file_extension(app_file.path)}"
+      # Add line numbers for consistent display with os-view/os-read
+      numbered_content = app_file.content.to_s.lines.map.with_index(1) do |line, num|
+        "#{num.to_s.rjust(4)}: #{line}"
+      end.join
+      context << numbered_content.rstrip
+      context << "```"
+      context << ""
+    end
     
     def add_file_to_context(context, file_path, category)
       full_path = TEMPLATE_PATH.join(file_path)
