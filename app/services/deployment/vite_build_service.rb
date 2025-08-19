@@ -83,7 +83,7 @@ class Deployment::ViteBuildService
         "devDependencies" => {
           "@types/react" => "^18.2.66",
           "@types/react-dom" => "^18.2.22",
-          "@vitejs/plugin-react" => "^4.2.1",
+          "@vitejs/plugin-react-swc" => "^3.11.0",
           "typescript" => "^5.2.2",
           "vite" => "^5.2.0"
         }
@@ -103,7 +103,7 @@ class Deployment::ViteBuildService
     unless File.exist?(vite_config_path)
       vite_config = <<~TS
         import { defineConfig } from 'vite'
-        import react from '@vitejs/plugin-react'
+        import react from '@vitejs/plugin-react-swc'
 
         // https://vitejs.dev/config/
         export default defineConfig({

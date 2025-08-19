@@ -10,7 +10,7 @@ module Ai
           "Authorization" => "Bearer #{@api_key}",
           "Content-Type" => "application/json"
         },
-        timeout: 60 # 1 minute timeout for image generation
+        timeout: 240 # 4 minutes timeout for image generation (2025 best practice)
       }
     end
 

@@ -78,7 +78,7 @@ module Ai
       'typescript' => ['typescript', '@types/react', '@types/react-dom', '@types/node'],
       
       # Build Tools (for Pro Mode)
-      'vite' => ['vite', '@vitejs/plugin-react'],
+      'vite' => ['vite', '@vitejs/plugin-react-swc'],
       'webpack' => ['webpack', 'webpack-cli', '@babel/core', '@babel/preset-react'],
       'parcel' => ['parcel'],
       
@@ -96,7 +96,7 @@ module Ai
       },
       'devDependencies' => {
         'vite' => '^5.0.0',
-        '@vitejs/plugin-react' => '^4.0.0',
+        '@vitejs/plugin-react-swc' => '^3.11.0',
         'typescript' => '^5.0.0',
         '@types/react' => '^18.2.0',
         '@types/react-dom' => '^18.2.0',
@@ -430,7 +430,7 @@ module Ai
         'react-dom' => '^18.2.0',
         'typescript' => '^5.0.0',
         'vite' => '^5.0.0',
-        '@vitejs/plugin-react' => '^4.0.0',
+        '@vitejs/plugin-react-swc' => '^3.11.0',
         'tailwindcss' => '^3.3.0',
         'react-router-dom' => '^6.8.0',
         'axios' => '^1.6.0',

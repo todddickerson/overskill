@@ -2026,7 +2026,7 @@ module Ai
     
     def replace_file_content(args)
       Rails.logger.info "[V5_LINE_REPLACE] Starting replacement for #{args['file_path']}"
-      Rails.logger.info "[V5_LINE_REPLACE] Lines #{args['first_replaced_line']}-#{args['last_replaced_line']}"
+      Rails.logger.info "[V5_LINE_REPLACE] Original lines #{args['first_replaced_line']}-#{args['last_replaced_line']}"
       
       file = @app.app_files.find_by(path: args['file_path'])
       unless file
@@ -2034,18 +2034,48 @@ module Ai
         return { error: "File not found: #{args['file_path']}" }
       end
       
+      # Adjust line numbers using the offset tracker if available
+      first_line = args['first_replaced_line'].to_i
+      last_line = args['last_replaced_line'].to_i
+      
+      if @tool_service&.line_offset_tracker
+        adjusted_first, adjusted_last = @tool_service.line_offset_tracker.adjust_line_range(
+          args['file_path'], 
+          first_line, 
+          last_line
+        )
+        
+        if adjusted_first != first_line || adjusted_last != last_line
+          Rails.logger.info "[V5_LINE_REPLACE] Adjusted lines #{first_line}-#{last_line} → #{adjusted_first}-#{adjusted_last}"
+          first_line = adjusted_first
+          last_line = adjusted_last
+        end
+      end
+      
       # Use LineReplaceService for proper validation and replacement
       if defined?(Ai::LineReplaceService)
         result = Ai::LineReplaceService.replace_lines(
           file,
           args['search'],
-          args['first_replaced_line'].to_i,
-          args['last_replaced_line'].to_i,
+          first_line,
+          last_line,
           args['replace']
         )
         
         if result[:success]
           Rails.logger.info "[V5_LINE_REPLACE] Success for #{args['file_path']}"
+          
+          # Record the replacement in the offset tracker
+          if @tool_service&.line_offset_tracker
+            replacement_lines = args['replace'].lines.count
+            @tool_service.line_offset_tracker.record_replacement(
+              args['file_path'],
+              args['first_replaced_line'].to_i,  # Use original line numbers for tracking
+              args['last_replaced_line'].to_i,
+              replacement_lines
+            )
+          end
+          
           # Track that this file has been modified
           @agent_state[:modified_files][args['file_path']] = Time.current
           { success: true, path: args['file_path'], file_modified: true }

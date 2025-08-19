@@ -233,7 +233,7 @@ module Deployment
         devDependencies: {
           "@types/react": "^18.2.0",
           "@types/react-dom": "^18.2.0",
-          "@vitejs/plugin-react": "^4.2.0",
+          "@vitejs/plugin-react-swc": "^3.11.0",
           typescript: "^5.3.0",
           vite: "^5.0.0",
           tailwindcss: "^3.4.0",
