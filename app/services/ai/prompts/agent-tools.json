@@ -324,7 +324,7 @@
       }
     },
     {
-      "description": "Performs a web search and returns relevant results with text content.\nUse this to find current information, documentation, or any web-based content.\nYou can optionally ask for links or image links to be returned as well.\nYou can also optionally specify a category of search results to return.\nValid categories are (you must use the exact string):\n- \"news\"\n- \"linkedin profile\"\n- \"pdf\"\n- \"github\"\n- \"personal site\"\n- \"financial report\"\n\nThere are no other categories. If you don't specify a category, the search will be general.\n\nWhen to use?\n- When you don't have any information about what the user is asking for.\n- When you need to find current information, documentation, or any web-based content.\n- When you need to find specific technical information, etc.\n- When you need to find information about a specific person, company, or organization.\n- When you need to find information about a specific event, product, or service.\n\nWhen you need to find real (not AI generated) images about a specific person, company, or organization.",
+      "description": "Performs a web search using SerpAPI and returns multiple relevant results with text snippets.\n\n**WHEN TO USE web_search:**\n- Finding multiple relevant pages across the web (discovery phase)\n- Getting quick overview of a topic from multiple sources\n- Finding specific types of content (news, GitHub, LinkedIn profiles, PDFs)\n- When you need breadth over depth (multiple perspectives)\n- Finding real images about people, companies, or organizations\n- Quick fact-finding from search result snippets\n\n**ADVANTAGES:**\n- Fast and inexpensive (SerpAPI pricing)\n- Returns multiple results (typically 5-10)\n- Good for discovery and exploration\n- Includes metadata (titles, URLs, snippets)\n\n**LIMITATIONS:**\n- Only returns ~200 character snippets per result\n- Cannot read full page content\n- May miss detailed information within pages\n\n**COST:** Low - SerpAPI credits only",
       "name": "web_search",
       "parameters": {
         "properties": {
@@ -356,7 +356,7 @@
       }
     },
     {
-      "description": "Fetch and extract clean content from a specific webpage URL for analysis.\n\nThis tool fetches the full content of a webpage, extracts the main article/content (removing ads, navigation, etc.), and returns it in a clean format optimized for LLM processing.\n\nWhen to use:\n- When you need to read the FULL content of a specific webpage (not just search snippets)\n- When analyzing documentation, articles, or technical specifications from a known URL\n- When the user provides a specific URL they want you to read and analyze\n- When you need more context than what web_search provides in snippets\n- After using web_search to find relevant pages and you need to read one in detail\n\nDifference from web_search:\n- web_search: Finds multiple relevant pages and returns snippets/summaries\n- os-fetch-webpage: Reads the COMPLETE content of a single specific URL\n\nThe tool will:\n1. Fetch the webpage content\n2. Extract the main article/content area\n3. Remove ads, navigation, sidebars, etc.\n4. Convert to clean plain text\n5. Return formatted content ready for analysis\n\nNote: Content may be truncated if extremely long (>100k characters)",
+      "description": "Fetch and extract clean content from a specific webpage URL using traditional scraping.\n\n**WHEN TO USE os-fetch-webpage:**\n- Reading COMPLETE content from a specific URL (after finding it with web_search)\n- Extracting full documentation, articles, or technical specifications\n- When user provides a specific URL to analyze\n- When you need the exact page content without AI interpretation\n- Following up on search results for deep reading\n\n**ADVANTAGES:**\n- Gets complete page content (up to 100k chars)\n- Preserves exact text without AI modification\n- Uses readability algorithm to extract main content\n- Very low cost (bandwidth only)\n- 1-hour Redis cache for repeat requests\n\n**LIMITATIONS:**\n- Only works with single URLs (not topics)\n- May fail on JavaScript-heavy sites\n- Cannot synthesize information from multiple sources\n- No automatic citations or source verification\n\n**COST:** Minimal - bandwidth and processing only\n\n**PROCESS:**\n1. Fetches webpage HTML\n2. Extracts main article using readability algorithm\n3. Removes ads, navigation, sidebars\n4. Converts to clean plain text\n5. Returns up to 100k characters",
       "name": "os-fetch-webpage",
       "parameters": {
         "properties": {
@@ -373,6 +373,38 @@
         },
         "required": [
           "url"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "description": "AI-powered web research using Perplexity for comprehensive, real-time information synthesis.\n\n**WHEN TO USE perplexity-research:**\n- Researching topics (not specific URLs) that need current information\n- When you need AI-synthesized insights from multiple sources\n- Fact-checking statements with automatic citations\n- Deep research requiring chain-of-thought reasoning\n- When dealing with complex questions needing multiple perspectives\n- Getting around-the-clock updated information (real-time web access)\n\n**ADVANTAGES:**\n- AI synthesizes information from 20+ sources automatically\n- Provides citations with every response\n- Real-time, current information (not limited by training cutoff)\n- Can handle research questions, not just URLs\n- Multiple AI models for different needs (sonar, sonar-pro, deep-research)\n- Bypasses many anti-scraping protections\n\n**LIMITATIONS:**\n- HIGH COST WARNING: 30-40x more expensive than direct scraping\n- Each query retrieves ~20 citations, multiplying token costs\n- Can cost $0.10+ per query vs $0.003 for traditional methods\n- AI interpretation may alter original content meaning\n- Not suitable for high-volume operations\n\n**COST:** High - $3-10 per million tokens + hidden citation costs\n\n**AVAILABLE MODES:**\n- 'quick': Fast facts with sonar model ($3/$15 per M tokens)\n- 'research': Comprehensive research with sonar-pro ($3/$15 per M tokens)\n- 'deep': Multi-query deep research ($10/$40 per M tokens)\n- 'fact_check': Verify statements with citations\n\n**USE CASES:**\n1. Research complex topics: 'How do modern LLMs handle context windows?'\n2. Fact-check claims: 'Is GPT-5 really 10x faster than GPT-4?'\n3. Current events: 'Latest developments in AI regulation 2025'\n4. Multi-source synthesis: 'Compare React vs Vue performance in 2025'",
+      "name": "perplexity-research",
+      "parameters": {
+        "properties": {
+          "query": {
+            "description": "Topic, question, URL, or statement to research",
+            "example": "Latest React 19 performance improvements",
+            "type": "string"
+          },
+          "mode": {
+            "description": "Research mode: 'quick' (fast facts), 'research' (comprehensive), 'deep' (multi-query), 'fact_check' (verify claims)",
+            "example": "research",
+            "type": "string"
+          },
+          "max_tokens": {
+            "description": "Maximum response tokens (default: 2000, max: 4000 for deep mode)",
+            "example": 2000,
+            "type": "number"
+          },
+          "use_cache": {
+            "description": "Use cached results if available (default: true)",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "query"
         ],
         "type": "object"
       }

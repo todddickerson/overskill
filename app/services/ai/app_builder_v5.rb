@@ -19,6 +19,11 @@ module Ai
       # Initialize security filter
       @security_filter = Security::PromptInjectionFilter.new
       
+      # Initialize centralized tool service for cleaner architecture
+      # All tool implementations are now in AiToolService for better maintainability
+      # See app/services/ai/ai_tool_service.rb for tool implementations
+      @tool_service = Ai::AiToolService.new(@app, logger: Rails.logger, user: chat_message.user)
+      
       # Create assistant reply message for V5 UI
       @assistant_message = create_assistant_message
       
@@ -1512,42 +1517,48 @@ module Ai
       
       # Don't flush here - let the caller handle batching
       
+      # Execute tool through centralized tool service
+      # All tool implementations are in app/services/ai/ai_tool_service.rb
+      # This delegation pattern keeps AppBuilderV5 focused on orchestration
       result = case tool_name
       when 'os-write'
-        write_file(tool_args['file_path'], tool_args['content'])
+        @tool_service.write_file(tool_args['file_path'], tool_args['content'])
       when 'os-view', 'os-read'
-        read_file(tool_args['file_path'])
+        @tool_service.read_file(tool_args['file_path'], tool_args['lines'])
       when 'os-line-replace'
         Rails.logger.info "[V5_TOOL] Processing os-line-replace with args: #{tool_args.inspect}"
-        replace_file_content(tool_args)
+        @tool_service.replace_file_content(tool_args)
       when 'os-delete'
-        delete_file(tool_args['file_path'])
+        @tool_service.delete_file(tool_args['file_path'])
       when 'os-add-dependency'
-        add_dependency(tool_args['package'])
+        @tool_service.add_dependency(tool_args['package'])
       when 'os-remove-dependency'
-        remove_dependency(tool_args['package'])
+        @tool_service.remove_dependency(tool_args['package'])
       when 'os-rename'
-        rename_file(tool_args['old_path'], tool_args['new_path'])
+        @tool_service.rename_file(tool_args['old_path'], tool_args['new_path'])
       when 'os-search-files'
-        search_files(tool_args)
+        @tool_service.search_files(tool_args)
       when 'os-download-to-repo'
-        download_to_repo(tool_args['source_url'], tool_args['target_path'])
+        @tool_service.download_to_repo(tool_args['source_url'], tool_args['target_path'])
       when 'os-fetch-website'
-        fetch_website(tool_args['url'], tool_args['formats'])
+        @tool_service.fetch_website(tool_args['url'], tool_args['formats'])
       when 'os-read-console-logs'
-        read_console_logs(tool_args['search'])
+        @tool_service.read_console_logs(tool_args['search'])
       when 'os-read-network-requests'
-        read_network_requests(tool_args['search'])
+        @tool_service.read_network_requests(tool_args['search'])
       when 'generate_image'
-        generate_image(tool_args)
+        @tool_service.generate_image(tool_args)
       when 'edit_image'
-        edit_image(tool_args)
+        @tool_service.edit_image(tool_args)
       when 'web_search'
-        web_search(tool_args)
+        @tool_service.web_search(tool_args)
       when 'os-fetch-webpage'
-        fetch_webpage_content(tool_args)
+        @tool_service.fetch_webpage(tool_args['url'], tool_args['use_cache'])
+      when 'perplexity-research'
+        # NEW: Perplexity AI-powered research tool
+        @tool_service.perplexity_research(tool_args)
       when 'read_project_analytics'
-        read_project_analytics(tool_args)
+        @tool_service.read_project_analytics(tool_args)
       else
         { error: "Unknown tool: #{tool_name}" }
       end
@@ -1679,47 +1690,51 @@ module Ai
         # Update UI with tool execution
         add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
         
-        # Execute with proper error handling
+        # Execute with proper error handling through centralized tool service
+        # All tool implementations are in app/services/ai/ai_tool_service.rb
         result = begin
           case tool_name
           when 'os-write'
-            write_file(tool_args['file_path'], tool_args['content'])
+            @tool_service.write_file(tool_args['file_path'], tool_args['content'])
           when 'os-view', 'os-read'
-            read_file(tool_args['file_path'])
+            @tool_service.read_file(tool_args['file_path'], tool_args['lines'])
           when 'os-line-replace'
             Rails.logger.info "[V5_TOOL_PROCESS] Processing os-line-replace in process_tool_calls"
-            replace_file_content(tool_args)
+            @tool_service.replace_file_content(tool_args)
           when 'os-delete'
-            delete_file(tool_args['file_path'])
+            @tool_service.delete_file(tool_args['file_path'])
           when 'os-add-dependency'
-            add_dependency(tool_args['package'])
+            @tool_service.add_dependency(tool_args['package'])
           when 'os-remove-dependency'
-            remove_dependency(tool_args['package'])
+            @tool_service.remove_dependency(tool_args['package'])
           when 'os-rename'
-          rename_file(tool_args['old_path'], tool_args['new_path'])
-        when 'os-search-files'
-          search_files(tool_args)
-        when 'os-download-to-repo'
-          download_to_repo(tool_args['source_url'], tool_args['target_path'])
-        when 'os-fetch-website'
-          fetch_website(tool_args['url'], tool_args['formats'])
-        when 'os-read-console-logs'
-          read_console_logs(tool_args['search'])
-        when 'os-read-network-requests'
-          read_network_requests(tool_args['search'])
-        when 'generate_image'
-          generate_image(tool_args)
-        when 'edit_image'
-          edit_image(tool_args)
-        when 'web_search'
-          web_search(tool_args)
-        when 'os-fetch-webpage'
-          fetch_webpage_content(tool_args)
-        when 'read_project_analytics'
-          read_project_analytics(tool_args)
-        when 'write_files', 'create_files'
-          # Proper implementation for batch file operations
-          process_batch_file_operation(tool_name, tool_args)
+            @tool_service.rename_file(tool_args['old_path'], tool_args['new_path'])
+          when 'os-search-files'
+            @tool_service.search_files(tool_args)
+          when 'os-download-to-repo'
+            @tool_service.download_to_repo(tool_args['source_url'], tool_args['target_path'])
+          when 'os-fetch-website'
+            @tool_service.fetch_website(tool_args['url'], tool_args['formats'])
+          when 'os-read-console-logs'
+            @tool_service.read_console_logs(tool_args['search'])
+          when 'os-read-network-requests'
+            @tool_service.read_network_requests(tool_args['search'])
+          when 'generate_image'
+            @tool_service.generate_image(tool_args)
+          when 'edit_image'
+            @tool_service.edit_image(tool_args)
+          when 'web_search'
+            @tool_service.web_search(tool_args)
+          when 'os-fetch-webpage'
+            @tool_service.fetch_webpage(tool_args['url'], tool_args['use_cache'])
+          when 'perplexity-research'
+            # NEW: Perplexity AI-powered research tool
+            @tool_service.perplexity_research(tool_args)
+          when 'read_project_analytics'
+            @tool_service.read_project_analytics(tool_args)
+          when 'write_files', 'create_files'
+            # Proper implementation for batch file operations
+            process_batch_file_operation(tool_name, tool_args)
           else
             Rails.logger.error "=" * 60
             Rails.logger.error "❌ UNKNOWN TOOL: #{tool_name}"
