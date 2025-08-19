@@ -45,7 +45,7 @@ module Ai
       @error_handler = EnhancedErrorHandler.new
       
       # Initialize Anthropic client for prompt caching
-      @anthropic_client = AnthropicClient.new if ENV["ANTHROPIC_API_KEY"]
+      @anthropic_client = AnthropicClient.instance if ENV["ANTHROPIC_API_KEY"]
       
       # Initialize GPT-5 client for OpenAI models
       # GPT-5 released August 7, 2025 - use direct OpenAI API

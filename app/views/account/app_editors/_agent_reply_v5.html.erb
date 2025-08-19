@@ -29,6 +29,116 @@
         </div>
       <% end %>
       
+      <%# Deployment Progress Bar - Shows during deployment %>
+      <%# 
+        NOTE: Deployment attributes are dynamically added to message objects during broadcasting
+        via define_singleton_method in AppBuilderV5#broadcast_deployment_progress and 
+        DeployAppJob#broadcast_deployment_progress. We use respond_to? to safely check
+        if these methods exist before calling them to avoid NoMethodError.
+        
+        Dynamic attributes include:
+        - deployment_status, deployment_progress, deployment_phase
+        - deployment_type, deployment_steps, deployment_eta  
+        - deployment_url, deployment_error
+      %>
+      <% deployment_status = message.respond_to?(:deployment_status) ? message.deployment_status : nil %>
+      <% if deployment_status.present? && deployment_status == 'deploying' %>
+        <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg" data-turbo-permanent>
+          <div class="flex items-center space-x-2 mb-2">
+            <i class="fas fa-rocket text-blue-600 dark:text-blue-400 animate-pulse"></i>
+            <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
+              Deploying to <%= message.respond_to?(:deployment_type) ? message.deployment_type : 'preview' %>...
+            </span>
+          </div>
+          
+          <%# Progress bar %>
+          <div class="relative">
+            <% progress = message.respond_to?(:deployment_progress) ? message.deployment_progress : 0 %>
+            <% progress ||= 0 %>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs text-blue-600 dark:text-blue-400">
+                <%= message.respond_to?(:deployment_phase) ? message.deployment_phase : 'Initializing' %>
+              </span>
+              <span class="text-xs text-blue-500 dark:text-blue-400">
+                <%= progress %>%
+              </span>
+            </div>
+            <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
+              <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500 ease-out relative"
+                   style="width: <%= progress %>%"
+                   data-controller="progress-bar"
+                   data-progress-bar-value="<%= progress %>">
+                <div class="absolute inset-0 bg-white/30 animate-pulse"></div>
+              </div>
+            </div>
+            
+            <%# Deployment steps indicator %>
+            <% deployment_steps = message.respond_to?(:deployment_steps) ? message.deployment_steps : nil %>
+            <% if deployment_steps.present? %>
+              <div class="mt-2 text-xs space-y-1">
+                <% deployment_steps.each do |step| %>
+                  <div class="flex items-center space-x-2">
+                    <% if step['completed'] %>
+                      <i class="fas fa-check-circle text-green-500"></i>
+                    <% elsif step['current'] %>
+                      <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                    <% else %>
+                      <i class="far fa-circle text-gray-400"></i>
+                    <% end %>
+                    <span class="<%= step['current'] ? 'text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400' %>">
+                      <%= step['name'] %>
+                    </span>
+                    <% if step['duration'] %>
+                      <span class="text-gray-500">(<%= step['duration'] %>s)</span>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+          
+          <%# Estimated time remaining %>
+          <% deployment_eta = message.respond_to?(:deployment_eta) ? message.deployment_eta : nil %>
+          <% if deployment_eta.present? %>
+            <div class="mt-2 text-xs text-blue-600 dark:text-blue-400">
+              Estimated time remaining: <%= deployment_eta %> seconds
+            </div>
+          <% end %>
+        </div>
+      <% elsif deployment_status == 'deployed' %>
+        <%# Deployment success message %>
+        <div class="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+          <div class="flex items-center space-x-2">
+            <i class="fas fa-check-circle text-green-600 dark:text-green-400"></i>
+            <span class="text-sm font-medium text-green-700 dark:text-green-300">
+              Successfully deployed to <%= message.respond_to?(:deployment_type) ? message.deployment_type : 'preview' %>
+            </span>
+            <% deployment_url = message.respond_to?(:deployment_url) ? message.deployment_url : nil %>
+            <% if deployment_url.present? %>
+              <a href="<%= deployment_url %>" target="_blank" class="text-xs text-green-600 hover:text-green-700 underline">
+                View site →
+              </a>
+            <% end %>
+          </div>
+        </div>
+      <% elsif deployment_status == 'failed' %>
+        <%# Deployment failure message %>
+        <div class="mb-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+          <div class="flex items-center space-x-2">
+            <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+            <span class="text-sm font-medium text-red-700 dark:text-red-300">
+              Deployment failed
+            </span>
+            <% deployment_error = message.respond_to?(:deployment_error) ? message.deployment_error : nil %>
+            <% if deployment_error.present? %>
+              <span class="text-xs text-red-600 dark:text-red-400">
+                - <%= deployment_error %>
+              </span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+      
       <%# 2. Conversation Flow - Interleaved messages and tool calls %>
       <% if message.conversation_flow.present? && message.conversation_flow.any? %>
         <div class="space-y-3 mb-3">

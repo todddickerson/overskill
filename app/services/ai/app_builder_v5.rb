@@ -205,8 +205,17 @@ module Ai
       
       Rails.logger.info "[V5_SIMPLE] Deploying app with #{total_files} total files (#{new_files} new/modified)"
       
-      # Deploy using existing deploy_app method
-      deploy_app
+      # Queue deployment job for async processing
+      # This ensures proper version tracking, broadcasts, and error handling
+      job = DeployAppJob.perform_later(@app.id, "preview")
+      Rails.logger.info "[V5_SIMPLE] Queued deployment job #{job.job_id} for preview"
+      
+      # Update app status to indicate deployment is in progress
+      @app.update!(status: 'generating')
+      
+      # Return success since deployment is now handled asynchronously
+      # The UI will update via ActionCable broadcasts from DeployAppJob
+      { success: true, message: "Deployment queued", job_id: job.job_id }
     rescue => e
       Rails.logger.error "[V5_SIMPLE] Deployment error: #{e.message}"
       { success: false, error: e.message }
@@ -673,6 +682,12 @@ module Ai
     def finalize_app_generation
       Rails.logger.info "[V5_FINALIZE] Starting finalization, conversation_flow size: #{@assistant_message.conversation_flow&.size}"
       
+      # Check if this is an update to an existing app with modified files
+      is_app_update = @agent_state[:modified_files].any?
+      if is_app_update
+        Rails.logger.info "[V5_FINALIZE] This is an app update with #{@agent_state[:modified_files].count} modified files"
+      end
+      
       # Check if generation actually completed successfully
       if @completion_status == :failed || @completion_status == :error
         Rails.logger.warn "[V5_FINALIZE] Skipping deployment due to failed generation status: #{@completion_status}"
@@ -682,43 +697,25 @@ module Ai
       
       # Only deploy if we have files AND generation completed successfully
       if app.app_files.count > 0 && @completion_status != :failed
-        # Deploy the app
-        update_thinking_status("Phase 6/6: Deploying")
+        # Queue deployment job for async processing
+        update_thinking_status("Phase 6/6: Queueing deployment")
+        
+        # Queue deployment for both new apps and updates
+        if is_app_update
+          Rails.logger.info "[V5_FINALIZE] Queueing deployment for app update"
+        else
+          Rails.logger.info "[V5_FINALIZE] Queueing deployment for new app generation"
+        end
+        
         deploy_result = deploy_app
         
         if deploy_result[:success]
-          app.update!(
-            status: 'ready',
-            preview_url: deploy_result[:preview_url],
-            deployed_at: Time.current
-          )
+          # Status will be updated by DeployAppJob when deployment completes
+          # For now, keep it as 'generating' to show deployment is in progress
+          Rails.logger.info "[V5_FINALIZE] Deployment queued with job ID: #{deploy_result[:job_id]}"
           
-          # Broadcast preview frame update to editor
-          # Broadcast preview frame update when app is deployed
-          begin
-            if @app&.preview_url.present?
-            
-              Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
-              
-              # Broadcast to the app channel that users are subscribed to
-              Turbo::StreamsChannel.broadcast_replace_to(
-                "app_#{@app.id}",
-                target: "preview_frame",
-                partial: "account/app_editors/preview_frame",
-                locals: { app: @app }
-              )
-              
-              # Also broadcast a refresh action to the chat channel for better UX
-              Turbo::StreamsChannel.broadcast_action_to(
-                "app_#{@app.id}_chat",
-                action: "refresh",
-                target: "preview_frame"
-              )
-            end
-          rescue => e
-            Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
-          end
-          
+          # Broadcasting will be handled by DeployAppJob when deployment completes
+          Rails.logger.info "[V5_FINALIZE] Preview frame will update when deployment completes"
           
           # Create AppVersion for the generated code
           app_version = create_app_version_for_generation
@@ -728,8 +725,12 @@ module Ai
           # Preserve the conversation_flow explicitly
           preserved_flow = @assistant_message.conversation_flow || []
           
-          # Update message content with success message
-          @assistant_message.content = "✨ Your app has been successfully generated and deployed!\n\n🔗 **Preview URL**: #{app.preview_url}\n\n📦 **Version**: #{app_version.version_number}\n📁 **Files Created**: #{app_version.app_version_files.count}\n\nThe app is now live and ready for testing."
+          # Update message content with success message (deployment is in progress)
+          if is_app_update
+            @assistant_message.content = "✨ Your app has been updated successfully!\n\n📦 **Version**: #{app_version.version_number}\n📁 **Files Modified**: #{@agent_state[:modified_files].count}\n\n🚀 **Deployment Status**: In progress...\n\nThe preview will refresh automatically once deployment completes."
+          else
+            @assistant_message.content = "✨ Your app has been generated successfully!\n\n📦 **Version**: #{app_version.version_number}\n📁 **Files Created**: #{app_version.app_version_files.count}\n\n🚀 **Deployment Status**: In progress...\n\nThe preview will be available once deployment completes."
+          end
           @assistant_message.conversation_flow = preserved_flow
           
           # Finalize with app_version (sets is_code_generation=true and associates version)
@@ -773,7 +774,49 @@ module Ai
       end
     end
     
+    # Queue deployment via DeployAppJob instead of synchronous deployment
     def deploy_app
+      Rails.logger.info "[V5_DEPLOY] Queueing deployment job for app #{@app.id}"
+      
+      # Broadcast initial deployment progress
+      broadcast_deployment_progress(
+        status: 'deploying',
+        progress: 0,
+        phase: 'Queuing deployment...',
+        deployment_type: 'preview',
+        deployment_steps: [
+          { name: 'Build app', current: false, completed: false },
+          { name: 'Deploy to Cloudflare', current: false, completed: false },
+          { name: 'Configure routes', current: false, completed: false },
+          { name: 'Setup environment', current: false, completed: false }
+        ]
+      )
+      
+      # Queue the deployment job for async processing
+      job = DeployAppJob.perform_later(@app.id, "preview")
+      
+      Rails.logger.info "[V5_DEPLOY] Deployment job queued: #{job.job_id}"
+      
+      # Return success since deployment is now async
+      # The UI will update via ActionCable broadcasts from DeployAppJob
+      {
+        success: true,
+        message: "Deployment queued",
+        job_id: job.job_id,
+        preview_url: @app.preview_url # Return existing URL if available
+      }
+    rescue => e
+      Rails.logger.error "[V5_DEPLOY] Failed to queue deployment: #{e.message}"
+      # Broadcast deployment failure
+      broadcast_deployment_progress(
+        status: 'failed',
+        deployment_error: e.message
+      )
+      { success: false, error: e.message }
+    end
+    
+    # Original synchronous deployment method (kept for reference/fallback)
+    def deploy_app_sync
       # Ensure postcss.config.js exists with proper ES module format
       ensure_postcss_config
       
@@ -1509,13 +1552,15 @@ module Ai
       # Clear pending tools at start to batch this group together
       @pending_tool_calls = []
       
-      # Execute ALL tool calls and collect results
-      tool_calls.each do |tool_call|
+      Rails.logger.info "[V5_TOOLS] Executing #{tool_calls.size} tools with incremental UI updates"
+      
+      # Execute ALL tool calls and collect results with incremental UI updates
+      tool_calls.each_with_index do |tool_call, index|
         tool_name = tool_call['function']['name']
         tool_args = JSON.parse(tool_call['function']['arguments'])
         tool_id = tool_call['id']
         
-        Rails.logger.info "[V5_TOOLS] Executing #{tool_name} with args: #{tool_args.keys.join(', ')}"
+        Rails.logger.info "[V5_TOOLS] Executing #{tool_name} (#{index + 1}/#{tool_calls.size}) with args: #{tool_args.keys.join(', ')}"
         
         # Execute the tool with proper error handling
         result = begin
@@ -1558,9 +1603,16 @@ module Ai
         end
         
         tool_results << tool_result_block
+        
+        # 🔥 INCREMENTAL UI UPDATE: Flush tools incrementally for better UX
+        if should_flush_incrementally?(index, tool_calls.size)
+          Rails.logger.info "[V5_TOOLS] Flushing #{@pending_tool_calls.size} tools to UI (#{index + 1}/#{tool_calls.size} completed)"
+          flush_pending_tool_calls
+          broadcast_message_update  # Trigger real-time UI update
+        end
       end
       
-      # Flush all pending tool calls as a batch to conversation_flow
+      # Flush any remaining pending tool calls (safety net)
       flush_pending_tool_calls
       
       # CRITICAL: Return array of tool_result blocks (they must come first in content array)
@@ -3602,7 +3654,20 @@ module Ai
             # Log what we're comparing
             Rails.logger.debug "[V5_FLOW_UPDATE] Checking tool: name=#{tool['name']} vs #{tool_name}, file=#{tool['file_path']} vs #{file_path}"
             
-            if tool['name'] == tool_name && tool['file_path'] == file_path
+            # Handle matching logic for tools with and without file_path
+            name_matches = tool['name'] == tool_name
+            
+            # For tools like rename-app that don't have file_path, match on name only
+            # For file-based tools, require both name and file_path to match
+            file_matches = if file_path.nil? && tool['file_path'].nil?
+                             true  # Both are nil, this is a non-file-based tool like rename-app
+                           elsif file_path.nil? || tool['file_path'].nil?
+                             false # One is nil, the other isn't - no match
+                           else
+                             tool['file_path'] == file_path # Both present, compare them
+                           end
+            
+            if name_matches && file_matches
               Rails.logger.info "[V5_FLOW_UPDATE] Found match! Updating from #{tool['status']} to #{new_status}"
               tool['status'] = new_status
               found_and_updated = true
@@ -4046,6 +4111,85 @@ module Ai
       )
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+    end
+    
+    # Broadcast deployment progress updates to the chat message
+    def broadcast_deployment_progress(options = {})
+      return unless @message
+      
+      Rails.logger.info "[V5_BROADCAST] Broadcasting deployment progress for message #{@message.id}: #{options[:phase] || options[:status]}"
+      
+      # Update the message with deployment progress data
+      deployment_data = {
+        deployment_status: options[:status],
+        deployment_progress: options[:progress],
+        deployment_phase: options[:phase],
+        deployment_type: options[:deployment_type],
+        deployment_steps: options[:deployment_steps],
+        deployment_eta: options[:deployment_eta],
+        deployment_url: options[:deployment_url],
+        deployment_error: options[:deployment_error]
+      }.compact
+      
+      # IMPORTANT: Dynamically add deployment attributes to message object for view rendering
+      # These methods are checked with respond_to? in _agent_reply_v5.html.erb to avoid NoMethodError
+      # when deployment is not active. Non-persistent, just for broadcasting.
+      deployment_data.each { |key, value| @message.define_singleton_method(key) { value } }
+      
+      # Broadcast the updated message to the chat channel
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}_chat",
+        target: "app_chat_message_#{@message.id}",
+        partial: "account/app_editors/agent_reply_v5",
+        locals: { message: @message, app: @app }
+      )
+      
+      # Also broadcast generic deployment update for any other listeners
+      ActionCable.server.broadcast(
+        "app_#{@app.id}_deployment",
+        deployment_data.merge(
+          message_id: @message.id,
+          timestamp: Time.current.iso8601
+        )
+      )
+    rescue => e
+      Rails.logger.error "[V5_BROADCAST] Failed to broadcast deployment progress: #{e.message}"
+    end
+    
+    # Broadcast message update for incremental tool call progress
+    def broadcast_message_update
+      return unless @assistant_message && @app
+      
+      Rails.logger.info "[V5_BROADCAST] Broadcasting incremental message update for message #{@assistant_message.id}"
+      
+      # Broadcast the updated message to the chat channel for real-time tool progress
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}_chat",
+        target: "app_chat_message_#{@assistant_message.id}",
+        partial: "account/app_editors/agent_reply_v5",
+        locals: { message: @assistant_message, app: @app }
+      )
+    rescue => e
+      Rails.logger.error "[V5_BROADCAST] Failed to broadcast incremental message update: #{e.message}"
+    end
+    
+    # Determine when to flush tool calls incrementally for better UX
+    def should_flush_incrementally?(index, total_tools)
+      # Strategy: Show progress frequently for better UX while avoiding spam
+      case total_tools
+      when 1..2
+        # For 1-2 tools, flush immediately after each
+        true
+      when 3..5
+        # For 3-5 tools, flush after first tool, then every 2 tools
+        index == 0 || (index + 1) % 2 == 0 || index == total_tools - 1
+      when 6..10
+        # For 6-10 tools, flush after first tool, then every 3 tools  
+        index == 0 || (index + 1) % 3 == 0 || index == total_tools - 1
+      else
+        # For 11+ tools, flush after first, then every 4 tools (more batching for performance)
+        index == 0 || (index + 1) % 4 == 0 || index == total_tools - 1
+      end
     end
        
     def determine_feature_tools(state)
