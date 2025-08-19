@@ -2380,7 +2380,26 @@ module Ai
       end
       
       # Add current user message
-      messages << { role: 'user', content: @chat_message.content }
+      # Append instruction to update all files unless in discussion-only mode
+      user_content = @chat_message.content
+      
+      # Check if this is a discussion-only message (questions, clarifications, etc.)
+      discussion_patterns = [
+        /^(what|why|how|when|where|who|can|could|should|would|will|is|are|do|does|did)/i,
+        /\?$/,  # Ends with question mark
+        /(explain|describe|tell me|clarify|help me understand)/i,
+        /(what do you think|any suggestions|recommendations)/i
+      ]
+      
+      is_discussion = discussion_patterns.any? { |pattern| user_content.match?(pattern) }
+      
+      # If not a discussion and appears to be a change request, append the instruction
+      if !is_discussion && user_content.match?(/\b(add|create|update|modify|change|fix|implement|build|make|remove|delete|refactor)\b/i)
+        user_content = "#{user_content}\n\nUpdate all necessary files in one response."
+        Rails.logger.info "[V5_PROMPT] Appended batch update instruction to user prompt"
+      end
+      
+      messages << { role: 'user', content: user_content }
       
       # CRITICAL FIX: Add conversation history from previous iterations within this message
       if @iteration_count > 1
