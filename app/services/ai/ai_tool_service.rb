@@ -15,7 +15,7 @@ module Ai
       # Initialize dependent services
       @web_content_service = WebContentExtractionService.new
       @perplexity_service = PerplexityContentService.new
-      @image_service = Ai::ImageGenerationService.new
+      @image_service = Ai::ImageGenerationService.new(app)  # Pass app context for image generation
       @search_service = Ai::SmartSearchService.new(app)
     end
     
