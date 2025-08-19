@@ -109,7 +109,7 @@
       }
     },
     {
-      "description": "Download a file from a URL and save it to the repository.\n\nThis tool is useful for:\n- Downloading images, assets, or other files from URLs. Download images in the src/assets folder and import them as ES6 modules.\n- Saving external resources directly to the project\n- Migrating files from external sources to the repository\n\nThe file will be downloaded and saved at the specified path in the repository, ready to be used in the project.",
+      "description": "Download a file from a URL and save it to the repository.\n\nThis tool is useful for:\n- Downloading images, assets, or other files from URLs. Save images using paths like 'public/images/logo.png' then reference with assetResolver.resolve('images/logo.png')\n- Saving external resources directly to the project\n- Migrating files from external sources to the repository\n\nThe file will be downloaded and saved at the specified path in the repository, ready to be used with the R2 asset resolver.",
       "name": "os-download-to-repo",
       "parameters": {
         "properties": {
@@ -258,7 +258,7 @@
       }
     },
     {
-      "description": "Generates an image based on a text prompt and saves it to the specified file path. Use the best models for large images that are really important. Make sure that you consider aspect ratio given the location of the image on the page when selecting dimensions.\n\nFor small images (less than 1000px), use flux.schnell, it's much faster and really good! This should be your default model.\nWhen you generate large images like a fullscreen image, use flux.dev. The maximum resolution is 1920x1920.\nOnce generated, you need to import the images in code as ES6 imports.\n\nPrompting tips:\n- Mentioning the aspect ratio in the prompt will help the model generate the image with the correct dimensions. For example: \"A 16:9 aspect ratio image of a sunset over a calm ocean.\"\n- Use the \"Ultra high resolution\" suffix to your prompts to maximize image quality.\n- If you for example are generating a hero image, mention it in the prompt. Example: \"A hero image of a sunset over a calm ocean.\"\n\nExample:\nimport heroImage from \"@/assets/hero-image.jpg\";\n\nImportant: Dimensions must be between 512 and 1920 pixels and multiples of 32.",
+      "description": "Generates an image based on a text prompt and saves it to the specified file path. Images are automatically uploaded to R2 bucket. Use the best models for large images that are really important.\n\nFor small images (less than 1000px), use flux.schnell, it's much faster and really good! This should be your default model.\nWhen you generate large images like a fullscreen image, use flux.dev. The maximum resolution is 1920x1920.\nOnce generated, use assetResolver.resolve() or LazyImage component to display.\n\nPrompting tips:\n- Mentioning the aspect ratio in the prompt will help the model generate the image with the correct dimensions.\n- Use the \"Ultra high resolution\" suffix to your prompts to maximize image quality.\n\nExample usage:\nconst heroUrl = assetResolver.resolve('images/hero-image.jpg');\n// or\n<LazyImage src=\"images/hero-image.jpg\" alt=\"Hero\" />\n\nImportant: Dimensions must be between 512 and 1920 pixels and multiples of 32.",
       "name": "generate_image",
       "parameters": {
         "properties": {

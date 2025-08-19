@@ -1,0 +1,265 @@
+# R2 Asset Management Instructions for Claude
+
+## Asset Strategy Overview
+OverSkill uses Cloudflare R2 buckets for asset storage. ALL generated apps automatically get assets uploaded to R2 during deployment. You must use the R2 asset resolver system instead of traditional @/assets/ imports.
+
+## Critical Rules for Asset Management
+
+### ❌ NEVER Use These Patterns:
+```javascript
+// WRONG - Don't use @/assets/ imports
+import heroImage from "@/assets/hero.jpg";
+import logo from "@/assets/logo.png";
+
+// WRONG - Don't use relative paths
+<img src="./assets/image.jpg" />
+<img src="/public/images/logo.png" />
+
+// WRONG - Don't use direct URL hardcoding
+<img src="https://example.com/image.jpg" />
+```
+
+### ✅ ALWAYS Use These Patterns:
+```javascript
+// CORRECT - Use assetResolver for images
+import assetResolver from './assetResolver';
+
+// For static imports in components
+const heroUrl = assetResolver.resolve('images/hero.jpg');
+
+// For JSX attributes
+<img src={assetResolver.resolve('images/logo.png')} alt="Logo" />
+
+// For React hooks (recommended for most cases)
+import { useAssetUrl } from './assetResolver';
+
+const Logo = () => {
+  const logoUrl = useAssetUrl('images/logo.png');
+  return <img src={logoUrl} alt="Logo" />;
+};
+
+// For lazy loading (recommended for performance)
+import LazyImage from './LazyImage';
+
+const Hero = () => (
+  <LazyImage 
+    src="images/hero-bg.jpg" 
+    alt="Hero background"
+    className="w-full h-screen object-cover"
+  />
+);
+```
+
+## Asset Path Conventions
+
+### Standard Asset Paths:
+- Images: `images/filename.ext` (not `assets/images/`)
+- Icons: `icons/filename.ext`
+- Fonts: `fonts/filename.ext`
+- Videos: `videos/filename.ext`
+- Documents: `documents/filename.ext`
+
+### Examples:
+```javascript
+// Hero images
+assetResolver.resolve('images/hero-background.jpg')
+
+// Logos and branding  
+assetResolver.resolve('images/logo.svg')
+
+// Profile pictures
+assetResolver.resolve('images/profile-placeholder.png')
+
+// Icons (if not using Lucide React)
+assetResolver.resolve('icons/custom-icon.svg')
+
+// Custom fonts
+assetResolver.resolve('fonts/custom-font.woff2')
+```
+
+## Required Files for Every App
+
+When creating a new app, ALWAYS include these files in the src/ directory:
+
+### 1. assetResolver.js
+```javascript
+// Copy from template - handles R2 vs local asset resolution
+```
+
+### 2. useAsset.js  
+```javascript
+// React hooks for asset loading with error handling
+```
+
+### 3. LazyImage.jsx
+```javascript
+// Optimized lazy loading image component
+```
+
+## Component Patterns
+
+### Standard Image Component:
+```jsx
+import { useAssetUrl } from './assetResolver';
+
+const ProductImage = ({ imagePath, alt }) => {
+  const imageUrl = useAssetUrl(`images/${imagePath}`);
+  
+  return (
+    <img 
+      src={imageUrl} 
+      alt={alt}
+      className="w-full h-auto rounded-lg"
+    />
+  );
+};
+```
+
+### Hero Section with Background:
+```jsx
+import { BackgroundImage } from './LazyImage';
+
+const HeroSection = () => (
+  <BackgroundImage 
+    src="images/hero-bg.jpg"
+    className="min-h-screen flex items-center justify-center"
+  >
+    <div className="text-center text-white">
+      <h1>Welcome</h1>
+    </div>
+  </BackgroundImage>
+);
+```
+
+### Avatar with Fallback:
+```jsx
+import { useAsset } from './useAsset';
+
+const Avatar = ({ userImage }) => {
+  const { url, loading, error } = useAsset(
+    userImage || 'images/default-avatar.png',
+    { fallback: assetResolver.resolve('images/default-avatar.png') }
+  );
+  
+  return (
+    <div className="w-12 h-12 rounded-full overflow-hidden">
+      {loading && <div className="bg-gray-200 animate-pulse w-full h-full" />}
+      {url && <img src={url} alt="Avatar" className="w-full h-full object-cover" />}
+    </div>
+  );
+};
+```
+
+## Generated Image Handling
+
+When using the imagegen tool:
+
+1. **Generate images** using the tool as normal
+2. **The tool automatically uploads to R2** and returns the R2 URL
+3. **Use the returned URL directly** in your code:
+
+```javascript
+// After imagegen generates and uploads to R2
+const generatedImageUrl = "https://pub.overskill.com/app-123/production/images/hero.jpg";
+
+// Use it in your component
+<img src={generatedImageUrl} alt="Generated hero image" />
+
+// Or save the path for use with resolver
+const heroPath = "images/hero.jpg"; // Just the path part
+<img src={assetResolver.resolve(heroPath)} alt="Hero" />
+```
+
+## CSS and Styling
+
+### For CSS custom properties:
+```css
+/* Define CSS variables for common assets */
+:root {
+  --hero-bg: url('{{ HERO_BG_URL }}');
+  --logo-url: url('{{ LOGO_URL }}');
+}
+
+.hero-section {
+  background-image: var(--hero-bg);
+}
+```
+
+### For Tailwind arbitrary values:
+```jsx
+// Use with resolved URLs
+const bgUrl = assetResolver.resolve('images/pattern.png');
+<div className={`bg-[url(${bgUrl})]`} />
+```
+
+## Performance Optimization
+
+### Critical Assets (Above-the-fold):
+```jsx
+import { useCriticalAssets } from './useAsset';
+
+const App = () => {
+  // Preload critical assets immediately
+  useCriticalAssets([
+    'images/logo.svg',
+    'images/hero-bg.jpg',
+    'fonts/main-font.woff2'
+  ]);
+  
+  return <AppContent />;
+};
+```
+
+### Lazy Loading (Below-the-fold):
+```jsx
+import LazyImage from './LazyImage';
+
+const Gallery = () => (
+  <div className="grid grid-cols-3 gap-4">
+    {images.map(img => (
+      <LazyImage 
+        key={img.id}
+        src={`images/gallery/${img.filename}`}
+        alt={img.alt}
+        className="aspect-square object-cover rounded-lg"
+      />
+    ))}
+  </div>
+);
+```
+
+## Environment Configuration
+
+The asset resolver automatically handles:
+- **Development**: Uses local assets from public folder
+- **Production**: Uses R2 bucket URLs (`https://pub.overskill.com/app-{id}/production/`)
+
+No configuration needed in your components - it just works!
+
+## Error Handling
+
+Always provide fallbacks for images:
+```jsx
+const ProfileImage = ({ userId }) => {
+  const { url, loading, error } = useAsset(
+    `images/profiles/${userId}.jpg`,
+    { 
+      fallback: assetResolver.resolve('images/default-profile.png'),
+      onError: (err) => console.warn('Profile image failed:', err)
+    }
+  );
+  
+  return <img src={url || '/default-avatar.png'} alt="Profile" />;
+};
+```
+
+## Summary
+
+1. **NEVER** use `@/assets/` imports
+2. **ALWAYS** use `assetResolver.resolve()` or the provided hooks
+3. **ALWAYS** include the asset resolver files in new apps
+4. **Use lazy loading** for performance
+5. **Provide fallbacks** for error handling
+6. **Follow path conventions**: `images/`, `icons/`, `fonts/`, etc.
+
+This system ensures your assets work perfectly in both development and production with optimal performance and error handling.

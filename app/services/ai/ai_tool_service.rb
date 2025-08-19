@@ -31,12 +31,22 @@ module Ai
       return { success: false, error: "File path cannot be blank" } if file_path.blank?
       return { success: false, error: "Content cannot be blank" } if content.blank?
       
+      # Transform content to use R2 asset resolver if needed
+      r2_integration = R2AssetIntegrationService.new(@app)
+      transformed_content = r2_integration.transform_file_content(content, file_path)
+      
       app_file = @app.app_files.find_or_initialize_by(path: file_path)
-      app_file.content = content
+      app_file.content = transformed_content
       app_file.team = @app.team  # Ensure team is set for new files
       
       if app_file.save
         @logger.info "[AiToolService] File written: #{file_path} (#{content.length} chars)"
+        
+        # Log if R2 transformations were applied
+        if transformed_content != content
+          @logger.info "[AiToolService] Applied R2 asset transformations to #{file_path}"
+        end
+        
         { success: true, content: "File #{file_path} written successfully" }
       else
         { success: false, error: app_file.errors.full_messages.join(", ") }

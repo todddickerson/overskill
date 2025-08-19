@@ -697,6 +697,17 @@ module Ai
       
       # Only deploy if we have files AND generation completed successfully
       if app.app_files.count > 0 && @completion_status != :failed
+        # Setup R2 asset resolver integration before deployment
+        update_thinking_status("Setting up asset management...")
+        begin
+          r2_integration = R2AssetIntegrationService.new(app)
+          r2_integration.setup_complete_integration
+          Rails.logger.info "[V5_FINALIZE] R2 asset integration completed"
+        rescue => e
+          Rails.logger.error "[V5_FINALIZE] R2 asset integration failed: #{e.message}"
+          # Continue with deployment even if R2 setup fails
+        end
+        
         # Queue deployment job for async processing
         update_thinking_status("Phase 6/6: Queueing deployment")
         
@@ -4002,6 +4013,42 @@ module Ai
       else :high
       end
     end
+
+    # Determine when to flush tool calls incrementally for better UX
+    def should_flush_incrementally?(index, total_tools)
+      # Strategy: Show progress frequently for better UX while avoiding spam
+      case total_tools
+      when 1..2
+        # For 1-2 tools, flush immediately after each
+        true
+      when 3..5
+        # For 3-5 tools, flush after first tool, then every 2 tools
+        index == 0 || (index + 1) % 2 == 0 || index == total_tools - 1
+      when 6..10
+        # For 6-10 tools, flush after first tool, then every 3 tools  
+        index == 0 || (index + 1) % 3 == 0 || index == total_tools - 1
+      else
+        # For 11+ tools, flush after first, then every 4 tools (more batching for performance)
+        index == 0 || (index + 1) % 4 == 0 || index == total_tools - 1
+      end
+    end
+
+    # Broadcast message update for incremental tool call progress
+    def broadcast_message_update
+      return unless @assistant_message && @app
+      
+      Rails.logger.info "[V5_BROADCAST] Broadcasting incremental message update for message #{@assistant_message.id}"
+      
+      # Broadcast the updated message to the chat channel for real-time tool progress
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}_chat",
+        target: "app_chat_message_#{@assistant_message.id}",
+        partial: "account/app_editors/agent_reply_v5",
+        locals: { message: @assistant_message, app: @app }
+      )
+    rescue => e
+      Rails.logger.error "[V5_BROADCAST] Failed to broadcast incremental message update: #{e.message}"
+    end
   end
   
   # Supporting classes for the agent loop
@@ -4009,6 +4056,7 @@ module Ai
   # TODO: Consider adding goal tracking as tool calls in the future
   # This would allow Claude to explicitly set and complete goals as needed  
   
+  # TODO: Move these classes to their own files
   
   class ContextManager
     def initialize(app)
@@ -4171,25 +4219,6 @@ module Ai
       )
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast incremental message update: #{e.message}"
-    end
-    
-    # Determine when to flush tool calls incrementally for better UX
-    def should_flush_incrementally?(index, total_tools)
-      # Strategy: Show progress frequently for better UX while avoiding spam
-      case total_tools
-      when 1..2
-        # For 1-2 tools, flush immediately after each
-        true
-      when 3..5
-        # For 3-5 tools, flush after first tool, then every 2 tools
-        index == 0 || (index + 1) % 2 == 0 || index == total_tools - 1
-      when 6..10
-        # For 6-10 tools, flush after first tool, then every 3 tools  
-        index == 0 || (index + 1) % 3 == 0 || index == total_tools - 1
-      else
-        # For 11+ tools, flush after first, then every 4 tools (more batching for performance)
-        index == 0 || (index + 1) % 4 == 0 || index == total_tools - 1
-      end
     end
        
     def determine_feature_tools(state)
