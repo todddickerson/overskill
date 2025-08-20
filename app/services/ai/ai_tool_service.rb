@@ -556,6 +556,8 @@ module Ai
     # ========================
     
     def rename_app(args)
+      @logger.info "[AiToolService] Renaming app with args: #{args.inspect}"
+
       new_name = args['name'] || args[:name]
       custom_subdomain = args['subdomain'] || args[:subdomain]
       

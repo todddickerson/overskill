@@ -587,9 +587,823 @@ class ToolExecutionControlService
 end
 ```
 
+## Parallel Background Tool Execution Strategy
+
+### Background Job Architecture for Tool Calls
+
+#### Core Concept: Async Tool Execution Pipeline
+Instead of executing tools synchronously within the LLM conversation flow, tools are dispatched to background jobs for parallel execution. The LLM conversation pauses while waiting for results, with automatic timeout handling for stuck operations.
+
+#### 4.1 Tool Execution Job Architecture
+
+```ruby
+# app/jobs/tool_execution_job.rb
+class ToolExecutionJob < ApplicationJob
+  queue_as :tool_execution
+  sidekiq_options retry: 2, dead: false
+  
+  def perform(app_chat_message_id, tool_call_batch_id, tool_call, tool_index)
+    message = AppChatMessage.find(app_chat_message_id)
+    batch = ToolCallBatch.find(tool_call_batch_id)
+    
+    # Update status to executing
+    batch.tool_executions.find_by(tool_index: tool_index).update!(
+      status: 'executing',
+      started_at: Time.current
+    )
+    
+    # Execute with timeout wrapper
+    result = Timeout.timeout(tool_timeout_seconds(tool_call)) do
+      execute_tool_with_streaming(message, tool_call, tool_index)
+    end
+    
+    # Store result and mark complete
+    batch.tool_executions.find_by(tool_index: tool_index).update!(
+      status: 'completed',
+      completed_at: Time.current,
+      result: result.to_json,
+      success: result[:success]
+    )
+    
+    # Check if all tools in batch are complete
+    if batch.all_tools_complete?
+      ResumeLLMConversationJob.perform_later(app_chat_message_id, tool_call_batch_id)
+    end
+    
+  rescue Timeout::Error => e
+    handle_timeout(batch, tool_index, e)
+  rescue => e
+    handle_error(batch, tool_index, e)
+  end
+  
+  private
+  
+  def tool_timeout_seconds(tool_call)
+    case tool_call['function']['name']
+    when 'generate_image'
+      240 # 4 minutes for image generation
+    when 'web_search'
+      30  # 30 seconds for web search
+    when 'os-write', 'os-line-replace'
+      10  # 10 seconds for file operations
+    else
+      60  # Default 1 minute timeout
+    end
+  end
+  
+  def handle_timeout(batch, tool_index, error)
+    batch.tool_executions.find_by(tool_index: tool_index).update!(
+      status: 'timeout',
+      completed_at: Time.current,
+      error: "Tool execution timed out after #{tool_timeout_seconds} seconds",
+      success: false
+    )
+    
+    # Broadcast timeout to websocket
+    ActionCable.server.broadcast("tool_execution_#{batch.app_chat_message_id}", {
+      action: 'tool_timeout',
+      tool_index: tool_index,
+      error: error.message
+    })
+  end
+end
+```
+
+#### 4.2 Tool Call Batch Management
+
+```ruby
+# app/models/tool_call_batch.rb
+class ToolCallBatch < ApplicationRecord
+  belongs_to :app_chat_message
+  has_many :tool_executions, dependent: :destroy
+  
+  enum status: {
+    pending: 'pending',
+    executing: 'executing',
+    completed: 'completed',
+    timeout: 'timeout',
+    failed: 'failed'
+  }
+  
+  MAX_WAIT_TIME = 5.minutes
+  
+  def all_tools_complete?
+    tool_executions.all? { |te| te.completed? || te.timeout? || te.failed? }
+  end
+  
+  def successful_tools
+    tool_executions.where(success: true)
+  end
+  
+  def timeout_if_stuck!
+    return unless executing?
+    return unless created_at < MAX_WAIT_TIME.ago
+    
+    # Mark any still-executing tools as timeout
+    tool_executions.executing.update_all(
+      status: 'timeout',
+      completed_at: Time.current,
+      error: "Tool execution exceeded maximum wait time of #{MAX_WAIT_TIME.inspect}"
+    )
+    
+    update!(status: 'timeout')
+    
+    # Resume LLM conversation with partial results
+    ResumeLLMConversationJob.perform_later(app_chat_message_id, id)
+  end
+end
+
+# app/models/tool_execution.rb
+class ToolExecution < ApplicationRecord
+  belongs_to :tool_call_batch
+  
+  enum status: {
+    pending: 'pending',
+    executing: 'executing',
+    completed: 'completed',
+    timeout: 'timeout',
+    failed: 'failed'
+  }
+  
+  def execution_time
+    return nil unless started_at && completed_at
+    completed_at - started_at
+  end
+end
+```
+
+#### 4.3 LLM Conversation Pause/Resume Mechanism
+
+```ruby
+# app/services/ai/tool_execution_dispatcher.rb
+class ToolExecutionDispatcher
+  def initialize(app_chat_message)
+    @message = app_chat_message
+  end
+  
+  def dispatch_tool_calls(tool_calls)
+    return [] if tool_calls.empty?
+    
+    # Create batch for tracking
+    batch = ToolCallBatch.create!(
+      app_chat_message: @message,
+      status: 'pending',
+      total_tools: tool_calls.size
+    )
+    
+    # Create execution records
+    tool_calls.each_with_index do |tool_call, index|
+      batch.tool_executions.create!(
+        tool_index: index,
+        tool_name: tool_call['function']['name'],
+        tool_args: tool_call['function']['arguments'],
+        status: 'pending'
+      )
+    end
+    
+    # Dispatch to background jobs for parallel execution
+    tool_calls.each_with_index do |tool_call, index|
+      ToolExecutionJob.perform_later(@message.id, batch.id, tool_call, index)
+    end
+    
+    # Update batch status
+    batch.update!(status: 'executing')
+    
+    # Broadcast execution started
+    broadcast_batch_started(batch)
+    
+    # Schedule timeout check
+    ToolExecutionTimeoutJob.set(wait: ToolCallBatch::MAX_WAIT_TIME)
+      .perform_later(batch.id)
+    
+    batch
+  end
+  
+  private
+  
+  def broadcast_batch_started(batch)
+    ActionCable.server.broadcast("tool_execution_#{@message.id}", {
+      action: 'batch_execution_started',
+      batch_id: batch.id,
+      total_tools: batch.total_tools,
+      estimated_completion: estimate_completion_time(batch)
+    })
+  end
+end
+```
+
+#### 4.4 Resume LLM Conversation Job
+
+```ruby
+# app/jobs/resume_llm_conversation_job.rb
+class ResumeLLMConversationJob < ApplicationJob
+  queue_as :critical
+  
+  def perform(app_chat_message_id, tool_call_batch_id)
+    message = AppChatMessage.find(app_chat_message_id)
+    batch = ToolCallBatch.find(tool_call_batch_id)
+    
+    # Collect results from completed tools
+    tool_results = collect_tool_results(batch)
+    
+    # Update message with tool results
+    message.update!(
+      tool_results: tool_results,
+      status: 'resuming_conversation'
+    )
+    
+    # Resume LLM conversation with results
+    AppBuilderV5.new(message).resume_with_tool_results(tool_results, batch)
+    
+  rescue => e
+    Rails.logger.error "Failed to resume LLM conversation: #{e.message}"
+    message.update!(status: 'error', error: e.message)
+  end
+  
+  private
+  
+  def collect_tool_results(batch)
+    batch.tool_executions.map do |execution|
+      if execution.completed? && execution.success?
+        {
+          tool_index: execution.tool_index,
+          tool_name: execution.tool_name,
+          result: JSON.parse(execution.result),
+          execution_time: execution.execution_time
+        }
+      else
+        {
+          tool_index: execution.tool_index,
+          tool_name: execution.tool_name,
+          error: execution.error || "Tool execution #{execution.status}",
+          status: execution.status
+        }
+      end
+    end
+  end
+end
+```
+
+#### 4.5 Timeout Monitoring Job
+
+```ruby
+# app/jobs/tool_execution_timeout_job.rb
+class ToolExecutionTimeoutJob < ApplicationJob
+  queue_as :default
+  
+  def perform(tool_call_batch_id)
+    batch = ToolCallBatch.find(tool_call_batch_id)
+    
+    # Check if batch is still executing
+    return unless batch.executing?
+    
+    # Check for stuck executions
+    batch.timeout_if_stuck!
+    
+    # Broadcast timeout status
+    if batch.timeout?
+      ActionCable.server.broadcast("tool_execution_#{batch.app_chat_message_id}", {
+        action: 'batch_timeout',
+        batch_id: batch.id,
+        message: 'Some tools exceeded maximum execution time'
+      })
+    end
+  end
+end
+```
+
+#### 4.6 Enhanced AppBuilderV5 Integration
+
+```ruby
+# Modification to app/services/ai/app_builder_v5.rb
+class AppBuilderV5
+  def execute_and_format_tool_results(tool_calls)
+    # Check if parallel execution is enabled
+    if Rails.configuration.parallel_tool_execution
+      execute_tools_in_parallel(tool_calls)
+    else
+      execute_tools_synchronously(tool_calls)
+    end
+  end
+  
+  private
+  
+  def execute_tools_in_parallel(tool_calls)
+    # Dispatch tools to background jobs
+    dispatcher = ToolExecutionDispatcher.new(@app_chat_message)
+    batch = dispatcher.dispatch_tool_calls(tool_calls)
+    
+    # Update conversation state to paused
+    @app_chat_message.update!(
+      conversation_state: 'paused_for_tools',
+      tool_batch_id: batch.id
+    )
+    
+    # Return placeholder indicating async execution
+    {
+      status: 'executing_async',
+      batch_id: batch.id,
+      message: "Executing #{tool_calls.size} tools in parallel..."
+    }
+  end
+  
+  def resume_with_tool_results(tool_results, batch)
+    # Update conversation with tool results
+    @conversation_flow.assistant('tool_results', {
+      results: tool_results,
+      batch_summary: generate_batch_summary(batch)
+    })
+    
+    # Continue LLM conversation with results
+    continue_conversation_with_results(tool_results)
+  end
+  
+  def continue_conversation_with_results(tool_results)
+    # Format results for LLM
+    formatted_results = format_tool_results_for_llm(tool_results)
+    
+    # Add to conversation
+    messages = @messages + [{
+      role: "tool",
+      content: formatted_results
+    }]
+    
+    # Continue with next LLM call
+    response = make_api_call_with_retry(messages)
+    process_llm_response(response)
+  end
+  
+  def format_tool_results_for_llm(tool_results)
+    tool_results.map do |result|
+      if result[:error]
+        "Tool '#{result[:tool_name]}' failed: #{result[:error]}"
+      else
+        "Tool '#{result[:tool_name]}' completed successfully:\n#{result[:result].to_json}"
+      end
+    end.join("\n\n")
+  end
+end
+```
+
+### Configuration and Feature Flags
+
+```ruby
+# config/application.rb
+config.parallel_tool_execution = ENV.fetch('PARALLEL_TOOL_EXECUTION', 'true') == 'true'
+config.tool_execution_max_wait = ENV.fetch('TOOL_EXECUTION_MAX_WAIT', '5').to_i.minutes
+config.tool_execution_default_timeout = ENV.fetch('TOOL_EXECUTION_DEFAULT_TIMEOUT', '60').to_i.seconds
+
+# config/sidekiq.yml
+:queues:
+  - [critical, 10]        # Resume LLM conversation jobs
+  - [tool_execution, 8]    # Parallel tool execution jobs
+  - [tool_timeout, 5]      # Timeout monitoring jobs
+  - [default, 3]
+  - [low, 1]
+
+:concurrency: 25
+:max_retries: 2
+```
+
+### Failure Recovery and Retry Strategy
+
+```ruby
+# app/services/ai/tool_failure_recovery_service.rb
+class ToolFailureRecoveryService
+  MAX_RETRIES = 2
+  
+  def initialize(tool_execution, error)
+    @execution = tool_execution
+    @error = error
+    @batch = @execution.tool_call_batch
+  end
+  
+  def handle_failure
+    if should_retry?
+      retry_execution
+    else
+      mark_as_failed
+      check_batch_completion
+    end
+  end
+  
+  private
+  
+  def should_retry?
+    @execution.retry_count < MAX_RETRIES && retryable_error?
+  end
+  
+  def retryable_error?
+    case @error
+    when Net::ReadTimeout, Timeout::Error
+      true
+    when StandardError
+      @error.message.include?('temporary') || @error.message.include?('rate limit')
+    else
+      false
+    end
+  end
+  
+  def retry_execution
+    @execution.increment!(:retry_count)
+    
+    # Re-queue with exponential backoff
+    wait_time = (2 ** @execution.retry_count).seconds
+    ToolExecutionJob.set(wait: wait_time).perform_later(
+      @batch.app_chat_message_id,
+      @batch.id,
+      @execution.tool_args,
+      @execution.tool_index
+    )
+    
+    # Broadcast retry status
+    broadcast_retry_status
+  end
+  
+  def mark_as_failed
+    @execution.update!(
+      status: 'failed',
+      completed_at: Time.current,
+      error: @error.message,
+      success: false
+    )
+    
+    # Broadcast failure
+    broadcast_failure_status
+  end
+  
+  def check_batch_completion
+    if @batch.all_tools_complete?
+      # Resume conversation even with failures
+      ResumeLLMConversationJob.perform_later(
+        @batch.app_chat_message_id,
+        @batch.id
+      )
+    end
+  end
+  
+  def broadcast_retry_status
+    ActionCable.server.broadcast("tool_execution_#{@batch.app_chat_message_id}", {
+      action: 'tool_retry',
+      tool_index: @execution.tool_index,
+      retry_count: @execution.retry_count,
+      message: "Retrying #{@execution.tool_name} (attempt #{@execution.retry_count + 1})"
+    })
+  end
+  
+  def broadcast_failure_status
+    ActionCable.server.broadcast("tool_execution_#{@batch.app_chat_message_id}", {
+      action: 'tool_failed',
+      tool_index: @execution.tool_index,
+      error: @error.message,
+      tool_name: @execution.tool_name
+    })
+  end
+end
+```
+
+### Real-time Status Broadcasting During Parallel Execution
+
+```ruby
+# app/services/ai/parallel_execution_broadcaster.rb
+class ParallelExecutionBroadcaster
+  def self.broadcast_batch_progress(batch)
+    completed = batch.tool_executions.completed.count
+    failed = batch.tool_executions.failed.count
+    executing = batch.tool_executions.executing.count
+    pending = batch.tool_executions.pending.count
+    
+    ActionCable.server.broadcast("tool_execution_#{batch.app_chat_message_id}", {
+      action: 'batch_progress',
+      batch_id: batch.id,
+      stats: {
+        completed: completed,
+        failed: failed,
+        executing: executing,
+        pending: pending,
+        total: batch.total_tools,
+        progress_percentage: (completed + failed).to_f / batch.total_tools * 100
+      },
+      estimated_completion: estimate_completion(batch),
+      elapsed_time: Time.current - batch.created_at
+    })
+  end
+  
+  def self.broadcast_tool_start(batch, tool_execution)
+    ActionCable.server.broadcast("tool_execution_#{batch.app_chat_message_id}", {
+      action: 'tool_started',
+      tool_index: tool_execution.tool_index,
+      tool_name: tool_execution.tool_name,
+      timestamp: Time.current.iso8601,
+      parallel_count: batch.tool_executions.executing.count
+    })
+  end
+  
+  def self.broadcast_tool_complete(batch, tool_execution, result)
+    ActionCable.server.broadcast("tool_execution_#{batch.app_chat_message_id}", {
+      action: 'tool_completed',
+      tool_index: tool_execution.tool_index,
+      tool_name: tool_execution.tool_name,
+      success: tool_execution.success?,
+      execution_time: tool_execution.execution_time,
+      result_summary: summarize_result(result),
+      timestamp: Time.current.iso8601
+    })
+    
+    # Also broadcast overall batch progress
+    broadcast_batch_progress(batch)
+  end
+  
+  private
+  
+  def self.estimate_completion(batch)
+    completed_rate = batch.tool_executions.completed.average(:execution_time) || 10
+    remaining = batch.tool_executions.pending.count + batch.tool_executions.executing.count
+    
+    (remaining * completed_rate).seconds.from_now
+  end
+  
+  def self.summarize_result(result)
+    case result
+    when Hash
+      if result[:files_created]
+        "Created #{result[:files_created]} files"
+      elsif result[:lines_changed]
+        "Modified #{result[:lines_changed]} lines"
+      elsif result[:image_url]
+        "Generated image successfully"
+      else
+        "Operation completed"
+      end
+    else
+      "Completed successfully"
+    end
+  end
+end
+```
+
+### Database Schema Updates
+
+```ruby
+# db/migrate/add_tool_execution_tracking.rb
+class AddToolExecutionTracking < ActiveRecord::Migration[7.0]
+  def change
+    create_table :tool_call_batches do |t|
+      t.references :app_chat_message, null: false, foreign_key: true
+      t.string :status, default: 'pending'
+      t.integer :total_tools
+      t.datetime :started_at
+      t.datetime :completed_at
+      t.integer :successful_count, default: 0
+      t.integer :failed_count, default: 0
+      t.float :total_execution_time
+      t.timestamps
+    end
+    
+    create_table :tool_executions do |t|
+      t.references :tool_call_batch, null: false, foreign_key: true
+      t.integer :tool_index
+      t.string :tool_name
+      t.json :tool_args
+      t.string :status, default: 'pending'
+      t.datetime :started_at
+      t.datetime :completed_at
+      t.json :result
+      t.text :error
+      t.boolean :success, default: false
+      t.integer :retry_count, default: 0
+      t.float :execution_time
+      t.timestamps
+    end
+    
+    add_index :tool_call_batches, :status
+    add_index :tool_call_batches, :created_at
+    add_index :tool_executions, [:tool_call_batch_id, :tool_index]
+    add_index :tool_executions, :status
+    add_index :tool_executions, [:tool_call_batch_id, :status]
+    
+    add_column :app_chat_messages, :conversation_state, :string
+    add_column :app_chat_messages, :tool_batch_id, :integer
+    add_index :app_chat_messages, :conversation_state
+  end
+end
+```
+
+### Integration with Existing Conversation Flow
+
+```ruby
+# app/services/ai/conversation_state_manager.rb
+class ConversationStateManager
+  STATES = {
+    active: 'active',
+    paused_for_tools: 'paused_for_tools',
+    resuming: 'resuming',
+    completed: 'completed',
+    error: 'error'
+  }.freeze
+  
+  def initialize(app_chat_message)
+    @message = app_chat_message
+  end
+  
+  def pause_for_tools(batch)
+    @message.update!(
+      conversation_state: STATES[:paused_for_tools],
+      tool_batch_id: batch.id
+    )
+    
+    # Broadcast pause state
+    broadcast_state_change(STATES[:paused_for_tools], {
+      batch_id: batch.id,
+      total_tools: batch.total_tools,
+      message: "Executing #{batch.total_tools} tools in parallel..."
+    })
+  end
+  
+  def resume_conversation
+    @message.update!(conversation_state: STATES[:resuming])
+    
+    broadcast_state_change(STATES[:resuming], {
+      message: "Processing tool results and continuing conversation..."
+    })
+  end
+  
+  def mark_completed
+    @message.update!(conversation_state: STATES[:completed])
+    
+    broadcast_state_change(STATES[:completed], {
+      message: "Conversation completed successfully"
+    })
+  end
+  
+  def handle_error(error)
+    @message.update!(
+      conversation_state: STATES[:error],
+      error: error.message
+    )
+    
+    broadcast_state_change(STATES[:error], {
+      error: error.message,
+      recoverable: can_recover?(error)
+    })
+  end
+  
+  private
+  
+  def broadcast_state_change(new_state, details = {})
+    ActionCable.server.broadcast("app_#{@message.app.id}_chat", {
+      action: 'conversation_state_changed',
+      message_id: @message.id,
+      old_state: @message.conversation_state_was,
+      new_state: new_state,
+      timestamp: Time.current.iso8601,
+      **details
+    })
+  end
+  
+  def can_recover?(error)
+    error.is_a?(Timeout::Error) || error.message.include?('retry')
+  end
+end
+```
+
+### Client-Side Parallel Execution Monitor
+
+```javascript
+// app/javascript/controllers/parallel_tool_monitor_controller.js
+import { Controller } from "@hotwired/stimulus"
+
+export default class extends Controller {
+  static targets = ["status", "progress", "timeline", "summary"]
+  static values = { batchId: Number }
+  
+  connect() {
+    this.toolStatuses = new Map()
+    this.startTime = Date.now()
+    this.setupWebSocket()
+  }
+  
+  setupWebSocket() {
+    // Subscribe to tool execution updates
+    this.subscription = consumer.subscriptions.create(
+      { channel: "ToolExecutionChannel", message_id: this.messageId },
+      {
+        received: (data) => this.handleUpdate(data)
+      }
+    )
+  }
+  
+  handleUpdate(data) {
+    switch(data.action) {
+      case 'batch_execution_started':
+        this.initializeBatch(data)
+        break
+      case 'tool_started':
+        this.markToolStarted(data)
+        break
+      case 'tool_completed':
+        this.markToolCompleted(data)
+        break
+      case 'tool_failed':
+        this.markToolFailed(data)
+        break
+      case 'tool_timeout':
+        this.markToolTimeout(data)
+        break
+      case 'batch_progress':
+        this.updateBatchProgress(data)
+        break
+      case 'batch_timeout':
+        this.handleBatchTimeout(data)
+        break
+    }
+  }
+  
+  initializeBatch(data) {
+    this.statusTarget.textContent = `Executing ${data.total_tools} tools in parallel...`
+    this.progressTarget.innerHTML = this.createProgressBar(0)
+    
+    // Create timeline visualization
+    this.timelineTarget.innerHTML = this.createTimeline(data.total_tools)
+  }
+  
+  markToolStarted(data) {
+    const toolElement = this.timelineTarget.querySelector(`[data-tool-index="${data.tool_index}"]`)
+    if (toolElement) {
+      toolElement.classList.add('executing')
+      toolElement.querySelector('.status').textContent = '⚡ Running'
+    }
+    
+    this.updateParallelCount(data.parallel_count)
+  }
+  
+  markToolCompleted(data) {
+    const toolElement = this.timelineTarget.querySelector(`[data-tool-index="${data.tool_index}"]`)
+    if (toolElement) {
+      toolElement.classList.remove('executing')
+      toolElement.classList.add(data.success ? 'completed' : 'failed')
+      toolElement.querySelector('.status').textContent = data.success ? '✓' : '✗'
+      toolElement.querySelector('.time').textContent = `${data.execution_time.toFixed(1)}s`
+    }
+  }
+  
+  updateBatchProgress(data) {
+    const { stats } = data
+    const progressPct = Math.round(stats.progress_percentage)
+    
+    this.progressTarget.innerHTML = this.createProgressBar(progressPct)
+    
+    this.summaryTarget.innerHTML = `
+      <div class="parallel-stats">
+        <span class="stat completed">✓ ${stats.completed}</span>
+        <span class="stat executing">⚡ ${stats.executing}</span>
+        <span class="stat pending">⏳ ${stats.pending}</span>
+        <span class="stat failed">✗ ${stats.failed}</span>
+      </div>
+      <div class="time-estimate">
+        ETA: ${this.formatTime(data.estimated_completion)}
+      </div>
+    `
+  }
+  
+  createProgressBar(percentage) {
+    return `
+      <div class="progress-bar-wrapper">
+        <div class="progress-bar" style="width: ${percentage}%">
+          <span class="progress-text">${percentage}%</span>
+        </div>
+      </div>
+    `
+  }
+  
+  createTimeline(totalTools) {
+    let html = '<div class="tool-timeline">'
+    for (let i = 0; i < totalTools; i++) {
+      html += `
+        <div class="tool-item" data-tool-index="${i}">
+          <span class="status">⏳</span>
+          <span class="time"></span>
+        </div>
+      `
+    }
+    html += '</div>'
+    return html
+  }
+  
+  updateParallelCount(count) {
+    this.element.querySelector('.parallel-indicator').textContent = 
+      `${count} tools executing in parallel`
+  }
+}
+```
+
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Week 1)
+- [ ] Create database schema for tool execution tracking
+- [ ] Implement `ToolExecutionJob` and `ToolCallBatch` models
+- [ ] Create `ToolExecutionDispatcher` service
+- [ ] Setup background job infrastructure (Sidekiq queues)
 - [ ] Create `ToolExecutionChannel` 
 - [ ] Enhance `AppBuilderV5` with streaming methods
 - [ ] Basic client-side tool progress controller
