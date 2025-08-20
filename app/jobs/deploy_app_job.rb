@@ -99,9 +99,10 @@ class DeployAppJob < ApplicationJob
       )
       
       # Deploy using Workers for Platforms
-      result = wfp_service.deploy_to_namespace(
+      result = wfp_service.deploy_app(
+        nil,  # Script content will be deployed via GitHub Actions
         environment: deployment_environment,
-        worker_code: nil  # Code will be deployed via GitHub Actions
+        metadata: { app_id: app.id, subdomain: app.obfuscated_id }
       )
       
       # Log deployment stats

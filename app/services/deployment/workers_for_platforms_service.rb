@@ -52,15 +52,25 @@ module Deployment
       namespace = self.class.namespace_for(environment)
       script_name = generate_script_name(environment)
       
-      # Upload script to dispatch namespace
-      upload_result = upload_script_to_namespace(
-        namespace: namespace,
-        script_name: script_name,
-        script_content: script_content,
-        metadata: metadata
-      )
-      
-      return upload_result unless upload_result[:success]
+      # If no script content provided (GitHub Actions will deploy), just prepare the deployment
+      if script_content.nil?
+        # Ensure namespace exists
+        namespace_result = create_namespace(namespace)
+        return namespace_result unless namespace_result[:success]
+        
+        # Return deployment info without uploading script
+        # GitHub Actions will handle the actual script upload
+      else
+        # Upload script to dispatch namespace
+        upload_result = upload_script_to_namespace(
+          namespace: namespace,
+          script_name: script_name,
+          script_content: script_content,
+          metadata: metadata
+        )
+        
+        return upload_result unless upload_result[:success]
+      end
       
       # Generate the URL based on environment
       url = generate_app_url(script_name, environment)
@@ -75,7 +85,10 @@ module Deployment
         success: true,
         namespace: namespace,
         script_name: script_name,
+        worker_name: script_name,  # For compatibility with DeployAppJob
         url: url,
+        worker_url: url,  # For compatibility with DeployAppJob
+        deployment_url: url,  # Alternative field name
         environment: environment,
         deployed_at: Time.current
       }

@@ -22,6 +22,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Utilize Context7 MCP for documentation look ups
 - Explore then Plan full MD file plans for larger projects and phases.  Have Perplexity research review your plan, consider feedback in context of our application and update plan.  Share files/etc with the MCP if it might get more relevant results.
 
+## Implementation Plans & Documentation
+<!-- Add new implementation plans here after they are committed and finalized -->
+- **WFP_IMPLEMENTATION_PLAN.md** - Workers for Platforms complete architecture (✅ Implemented)
+- **WFP_IMPLEMENTATION_STATUS.md** - Current WFP deployment status and results
+- **DOMAIN_STRATEGY.md** - Workers.dev vs custom domain analysis  
+- **CRITICAL_NEXT_STEPS.md** - Immediate action items for WFP
+<!-- Add new plans above this line -->
+
 ## Project Overview
 
 OverSkill is an AI-powered app marketplace platform built with Ruby on Rails (BulletTrain framework). It enables non-technical users to create, deploy, and monetize applications using natural language.
