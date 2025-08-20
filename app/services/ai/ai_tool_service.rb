@@ -162,9 +162,13 @@ module Ai
       if result[:success]
         @logger.info "[AiToolService] Successfully replaced lines in #{file_path}"
         
-        # Handle special case where content was already present
-        if result[:already_present]
+        # ENHANCEMENT 2: Verify actual success vs false positive
+        # Check if the result claims success but actual error occurred
+        if result[:already_present] && result[:message]&.include?("already present")
           @logger.info "[AiToolService] Content already present, no changes made"
+          return result
+        elsif result[:fuzzy_match_used]
+          @logger.info "[AiToolService] Used fuzzy matching for replacement"
           return result
         end
         
@@ -176,6 +180,18 @@ module Ai
         end
       else
         @logger.warn "[AiToolService] Line-replace failed for #{file_path}: #{result[:error]}"
+        
+        # ENHANCEMENT 2: Detect specific 'unchanged' error and provide better feedback
+        if result[:error]&.include?("unchanged") || result[:message]&.include?("unchanged")
+          @logger.error "[AiToolService] LineReplaceService reported 'unchanged' - likely duplicate detection blocked a needed syntax fix"
+          # Return enhanced error message for AI to understand
+          return {
+            success: false,
+            error: "Line replacement blocked by duplicate detection. This may be a syntax fix that was incorrectly identified as a duplicate. Consider using more surgical targeting.",
+            suggestion: "Try targeting a smaller, more specific portion of the code for replacement.",
+            original_error: result[:error] || result[:message]
+          }
+        end
         
         # Try to recover by finding the pattern in nearby lines
         if result[:error].include?("Search pattern does not match")
@@ -588,6 +604,7 @@ module Ai
       fetch_webpage(url, true)
     end
     
+    # TODO: Implement client side console log reading for preview frame
     def read_console_logs(search = nil)
       # Placeholder - would need integration with actual console logs
       { success: true, content: "Console logs not available in this context" }

@@ -26,6 +26,8 @@ module Ai
     def execute
       Rails.logger.info "[LineReplaceService] Starting line-based replacement in #{file.path}"
       Rails.logger.info "[LineReplaceService] Target lines #{@first_line}-#{@last_line}"
+      Rails.logger.info "[LineReplaceService] Search pattern (#{@search_pattern.bytesize} bytes): #{@search_pattern[0..100].inspect}#{'...' if @search_pattern.length > 100}"
+      Rails.logger.info "[LineReplaceService] Replacement (#{@replacement.bytesize} bytes): #{@replacement[0..100].inspect}#{'...' if @replacement.length > 100}"
       
       begin
         # Validate line numbers
@@ -51,13 +53,25 @@ module Ai
           Rails.logger.warn "[LineReplaceService] Expected pattern (#{@search_pattern.bytesize} bytes): #{@search_pattern[0..200].inspect}"
           Rails.logger.warn "[LineReplaceService] Actual content (#{target_content.bytesize} bytes): #{target_content[0..200].inspect}"
           
-          # Log first difference for debugging
+          # Enhanced debug logging for pattern mismatch
           min_len = [@search_pattern.length, target_content.length].min
           first_diff_index = (0...min_len).find { |i| @search_pattern[i] != target_content[i] }
           if first_diff_index
             Rails.logger.warn "[LineReplaceService] First difference at position #{first_diff_index}: expected #{@search_pattern[first_diff_index].inspect}, got #{target_content[first_diff_index].inspect}"
+            # Show context around the difference
+            context_start = [first_diff_index - 20, 0].max
+            context_end = [first_diff_index + 20, min_len].min
+            Rails.logger.warn "[LineReplaceService] Context around difference:"
+            Rails.logger.warn "[LineReplaceService]   Expected: #{@search_pattern[context_start...context_end].inspect}"
+            Rails.logger.warn "[LineReplaceService]   Actual:   #{target_content[context_start...context_end].inspect}"
           elsif @search_pattern.length != target_content.length
             Rails.logger.warn "[LineReplaceService] Length mismatch: pattern is #{@search_pattern.length} chars, content is #{target_content.length} chars"
+            # Show what's different at the end
+            if @search_pattern.length > target_content.length
+              Rails.logger.warn "[LineReplaceService] Pattern has extra: #{@search_pattern[target_content.length..-1].inspect}"
+            else
+              Rails.logger.warn "[LineReplaceService] Content has extra: #{target_content[@search_pattern.length..-1].inspect}"
+            end
           end
           
           # Check if the replacement might already be there
@@ -118,6 +132,12 @@ module Ai
       # Check if key parts of the replacement are already in the file
       # This helps prevent duplicate additions when AI retries
       return false if @replacement.blank?
+      
+      # ENHANCEMENT 1: Detect syntax fixes vs true duplicates
+      if syntax_fix_detected?
+        Rails.logger.info "[LineReplaceService] Syntax fix detected - allowing replacement even if content seems present"
+        return false
+      end
       
       # Extract meaningful content from replacement (ignore whitespace-only lines)
       replacement_key_lines = @replacement.lines.map(&:strip).reject(&:blank?)
@@ -197,6 +217,68 @@ module Ai
       ]
       
       common.include?(identifier.downcase)
+    end
+    
+    def syntax_fix_detected?
+      # ENHANCEMENT 1: Detect when replacement is a syntax fix, not a duplicate
+      # These changes should be allowed even if content seems already present
+      
+      target_content = extract_target_content
+      
+      # Pattern 1: Adding missing closing braces/brackets/parentheses
+      target_open_braces = target_content.count('{')
+      target_close_braces = target_content.count('}')
+      replacement_open_braces = @replacement.count('{')
+      replacement_close_braces = @replacement.count('}')
+      
+      # If replacement adds closing braces to balance unmatched ones
+      if target_open_braces > target_close_braces && 
+         replacement_close_braces > replacement_open_braces
+        Rails.logger.info "[LineReplaceService] Detected closing brace addition - likely syntax fix"
+        return true
+      end
+      
+      # Pattern 2: Same for parentheses
+      target_open_parens = target_content.count('(')
+      target_close_parens = target_content.count(')')
+      replacement_open_parens = @replacement.count('(')
+      replacement_close_parens = @replacement.count(')')
+      
+      if target_open_parens > target_close_parens &&
+         replacement_close_parens > replacement_open_parens
+        Rails.logger.info "[LineReplaceService] Detected closing parenthesis addition - likely syntax fix"
+        return true
+      end
+      
+      # Pattern 3: Adding missing semicolons
+      if !target_content.strip.end_with?(';') && @replacement.strip.end_with?(');', '};')
+        Rails.logger.info "[LineReplaceService] Detected semicolon addition - likely syntax fix"
+        return true
+      end
+      
+      # Pattern 4: Function call completion (like analytics.trackFormSubmit case)
+      # Target has incomplete function call, replacement completes it
+      if target_content.include?('(') && !target_content.strip.end_with?(')') &&
+         @replacement.include?('});')
+        Rails.logger.info "[LineReplaceService] Detected function call completion - likely syntax fix"
+        return true
+      end
+      
+      # Pattern 5: Small additions that are clearly syntax-related
+      # If replacement is mostly the same + small syntax additions
+      normalized_target = target_content.gsub(/\s+/, ' ').strip
+      normalized_replacement = @replacement.gsub(/\s+/, ' ').strip
+      
+      if normalized_replacement.start_with?(normalized_target) && 
+         (normalized_replacement.length - normalized_target.length) < 10
+        added_content = normalized_replacement[normalized_target.length..-1]
+        if added_content.match?(/^[;\)\}\],\s]*$/)
+          Rails.logger.info "[LineReplaceService] Detected small syntax addition: '#{added_content}'"
+          return true
+        end
+      end
+      
+      false
     end
     
     def extract_target_content

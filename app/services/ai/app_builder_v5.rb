@@ -1916,8 +1916,12 @@ module Ai
           error: result[:error]
         })
         
+        # ENHANCEMENT 2: Enhanced tool success verification
+        # Verify actual success vs false positive reporting
+        actual_success = verify_tool_success(tool_name, result, tool_args)
+        
         # Update tool status - find and update the specific tool call
-        new_status = result[:error] ? 'error' : 'complete'
+        new_status = actual_success ? 'complete' : 'error'
         
         # Clone the array to trigger change detection
         updated_tool_calls = @assistant_message.tool_calls.deep_dup
@@ -4122,6 +4126,72 @@ module Ai
       )
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
+    end
+    
+    # ENHANCEMENT 2: Verify tool success to prevent AI false positive reporting
+    def verify_tool_success(tool_name, result, tool_args)
+      # If result already indicates error, it's clearly not successful
+      return false if result[:error].present?
+      
+      # Default to success indication from result
+      base_success = result[:success] != false
+      
+      # Enhanced verification for line-replace operations
+      if tool_name == 'os-line-replace'
+        # Check for specific failure patterns that indicate blocked syntax fixes
+        if result[:message]&.include?("unchanged") || 
+           result[:error]&.include?("unchanged") ||
+           result[:error]&.include?("duplicate detection")
+          Rails.logger.warn "[V5_SUCCESS_VERIFICATION] Line-replace may have failed due to duplicate detection"
+          
+          # Additional verification: check if the file actually contains the expected content
+          file_path = tool_args['file_path']
+          replacement = tool_args['replacement'] || tool_args['replace']
+          
+          if file_path && replacement
+            file = @app.app_files.find_by(path: file_path)
+            if file && replacement.strip.present?
+              # Check if the replacement content is actually in the file
+              # This helps detect cases where LineReplaceService blocked needed changes
+              normalized_file_content = file.content.gsub(/\s+/, ' ')
+              normalized_replacement = replacement.gsub(/\s+/, ' ')
+              
+              content_actually_present = normalized_file_content.include?(normalized_replacement)
+              
+              unless content_actually_present
+                Rails.logger.error "[V5_SUCCESS_VERIFICATION] Line-replace claimed success but replacement content not found in file"
+                Rails.logger.error "[V5_SUCCESS_VERIFICATION] This indicates a false positive success - syntax fix was blocked"
+                return false
+              end
+            end
+          end
+        end
+        
+        # For line-replace, also verify success wasn't due to fuzzy matching that didn't help
+        if result[:fuzzy_match_used] && result[:message]&.include?("already replaced")
+          Rails.logger.info "[V5_SUCCESS_VERIFICATION] Line-replace used fuzzy matching - content may already be correct"
+        end
+      end
+      
+      # For write operations, verify the file was actually created/updated
+      if tool_name == 'os-write'
+        file_path = tool_args['file_path']
+        expected_content = tool_args['content']
+        
+        if file_path && expected_content.present?
+          file = @app.app_files.find_by(path: file_path)
+          if file.nil?
+            Rails.logger.error "[V5_SUCCESS_VERIFICATION] os-write claimed success but file not found: #{file_path}"
+            return false
+          elsif file.content != expected_content
+            Rails.logger.warn "[V5_SUCCESS_VERIFICATION] os-write content differs from expected - may indicate partial success"
+          end
+        end
+      end
+      
+      # Log verification result for debugging
+      Rails.logger.info "[V5_SUCCESS_VERIFICATION] #{tool_name}: base_success=#{base_success}, verified=true"
+      base_success
     end
     
     # Broadcast deployment progress updates to the chat message

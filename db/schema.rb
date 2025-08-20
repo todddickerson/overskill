@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_19_144515) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_20_151400) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -276,9 +276,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_19_144515) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_built"
+    t.string "storage_location", default: "database"
+    t.string "r2_object_key"
+    t.string "content_hash"
     t.index ["app_id", "path"], name: "index_app_files_on_app_id_and_path", unique: true
     t.index ["app_id"], name: "index_app_files_on_app_id"
+    t.index ["content_hash"], name: "index_app_files_on_content_hash"
+    t.index ["r2_object_key"], name: "index_app_files_on_r2_object_key", unique: true, where: "(r2_object_key IS NOT NULL)"
+    t.index ["storage_location"], name: "index_app_files_on_storage_location"
     t.index ["team_id"], name: "index_app_files_on_team_id"
+    t.check_constraint "content IS NOT NULL OR r2_object_key IS NOT NULL", name: "content_or_r2_key_required"
   end
 
   create_table "app_generations", force: :cascade do |t|
@@ -393,9 +400,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_19_144515) do
     t.string "action"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "r2_content_key"
     t.index ["app_file_id"], name: "index_app_version_files_on_app_file_id"
     t.index ["app_version_id", "app_file_id"], name: "index_app_version_files_on_app_version_id_and_app_file_id", unique: true
     t.index ["app_version_id"], name: "index_app_version_files_on_app_version_id"
+    t.index ["r2_content_key"], name: "index_app_version_files_on_r2_content_key", unique: true, where: "(r2_content_key IS NOT NULL)"
+    t.check_constraint "content IS NOT NULL OR r2_content_key IS NOT NULL", name: "version_content_or_r2_key_required"
   end
 
   create_table "app_versions", force: :cascade do |t|
@@ -425,14 +435,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_19_144515) do
     t.integer "ai_tokens_output", default: 0
     t.integer "ai_cost_cents", default: 0
     t.string "ai_model_used"
+    t.string "storage_strategy", default: "database"
+    t.string "r2_snapshot_key"
     t.index ["ai_cost_cents"], name: "index_app_versions_on_ai_cost_cents"
     t.index ["ai_model_used"], name: "index_app_versions_on_ai_model_used"
     t.index ["app_id"], name: "index_app_versions_on_app_id"
     t.index ["bookmarked"], name: "index_app_versions_on_bookmarked"
     t.index ["metadata"], name: "index_app_versions_on_metadata", using: :gin
+    t.index ["r2_snapshot_key"], name: "index_app_versions_on_r2_snapshot_key", unique: true, where: "(r2_snapshot_key IS NOT NULL)"
     t.index ["status"], name: "index_app_versions_on_status"
+    t.index ["storage_strategy"], name: "index_app_versions_on_storage_strategy"
     t.index ["team_id"], name: "index_app_versions_on_team_id"
     t.index ["user_id"], name: "index_app_versions_on_user_id"
+    t.check_constraint "files_snapshot IS NOT NULL OR r2_snapshot_key IS NOT NULL OR storage_strategy::text = 'database'::text", name: "snapshot_data_required"
   end
 
   create_table "apps", force: :cascade do |t|
