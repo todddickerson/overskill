@@ -31,6 +31,15 @@ module Ai
       return { success: false, error: "File path cannot be blank" } if file_path.blank?
       return { success: false, error: "Content cannot be blank" } if content.blank?
       
+      # PREVENTION: Clean up escape sequences that shouldn't be in code
+      if content && (content.include?('\\n') || content.include?('\\"'))
+        original_content = content
+        content = clean_escaped_content(content)
+        if content != original_content
+          @logger.warn "[AiToolService] Cleaned escape sequences in content for #{file_path}"
+        end
+      end
+      
       # Transform content to use R2 asset resolver if needed
       r2_integration = R2AssetIntegrationService.new(@app)
       transformed_content = r2_integration.transform_file_content(content, file_path)
@@ -114,6 +123,16 @@ module Ai
       last_line = args['last_line'] || args['last_replaced_line'] || args[:last_line] || args[:last_replaced_line]
       # Handle both naming conventions for replacement
       replacement = args['replacement'] || args['replace'] || args[:replacement] || args[:replace]
+      
+      # PREVENTION: Clean up escape sequences that shouldn't be in code
+      # This handles cases where AI might incorrectly escape newlines or quotes
+      if replacement && (replacement.include?('\\n') || replacement.include?('\\"'))
+        original_replacement = replacement
+        replacement = clean_escaped_content(replacement)
+        if replacement != original_replacement
+          @logger.warn "[AiToolService] Cleaned escape sequences in replacement for #{file_path}"
+        end
+      end
       
       # Convert to integers if they're strings
       first_line = first_line.to_i
@@ -446,9 +465,38 @@ module Ai
       if result[:success]
         @logger.info "[AiToolService] Image generated and uploaded to R2: #{target_path} -> #{result[:url]}"
         
-        # Return enhanced response with R2 URL and usage instructions
-        response = "Image generated successfully!\n\n"
-        response += "Recommended to use the full image URL reference in your code."
+        # Provide clear usage instructions with the actual R2 URL
+        response = <<~MSG
+          Image generated successfully!
+          
+          R2 URL: #{result[:url]}
+          
+          To use this image in your components:
+          
+          1. Direct img tag (simplest):
+          ```tsx
+          <img src="#{result[:url]}" alt="Description" />
+          ```
+          
+          2. With LazyImage component (recommended for performance):
+          ```tsx
+          import LazyImage from '@/LazyImage';
+          <LazyImage src="#{result[:url]}" alt="Description" className="w-full h-auto" />
+          ```
+          
+          3. As CSS background:
+          ```css
+          background-image: url('#{result[:url]}');
+          ```
+          
+          4. Using imageUrls (auto-generated after image creation):
+          ```tsx
+          import { imageUrls } from '@/imageUrls';
+          <img src={imageUrls['#{File.basename(target_path)}']} alt="Description" />
+          ```
+          
+          Note: The imageUrls.js file is automatically created with all generated image URLs.
+        MSG
         
         { 
           success: true, 
@@ -765,6 +813,40 @@ module Ai
       rescue => e
         @logger.error "[AiToolService] Failed to generate logo: #{e.message}"
         { success: false, error: "Failed to generate logo: #{e.message}" }
+      end
+    end
+    
+    private
+    
+    def clean_escaped_content(content)
+      # This method cleans up improperly escaped content that can break code
+      # Common issue: AI responses that include literal \n or \" in code
+      
+      # Don't clean if it looks like intentional JSON or string content
+      return content if content.include?('"\\n"') || content.include?("'\\n'")
+      
+      # Check if this looks like code with imports/requires
+      is_code = content.match?(/^(import |export |const |let |var |function |class |interface |type |from |require\()/m)
+      
+      if is_code
+        # For code files, literal \n should be actual newlines
+        # But we need to be careful not to break intentional escape sequences in strings
+        
+        # Split by lines to process each separately
+        lines = content.split(/(?<!\\)\\n/)
+        
+        # Process each line
+        processed_lines = lines.map do |line|
+          # Fix escaped quotes that aren't inside strings
+          # This regex looks for \" that aren't preceded by a quote start
+          line.gsub(/(?<!["'])\\\"/, '"')
+        end
+        
+        # Join with actual newlines
+        processed_lines.join("\n")
+      else
+        # For non-code content, be more conservative
+        content
       end
     end
   end

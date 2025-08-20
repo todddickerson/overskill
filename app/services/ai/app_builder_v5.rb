@@ -707,6 +707,12 @@ module Ai
           r2_integration = R2AssetIntegrationService.new(app)
           r2_integration.setup_complete_integration
           Rails.logger.info "[V5_FINALIZE] R2 asset integration completed"
+          
+          # Process all image URLs to create imageUrls.js for easy component access
+          image_extractor = Ai::ImageUrlExtractorService.new(app)
+          if image_extractor.process_all_images
+            Rails.logger.info "[V5_FINALIZE] Image URLs processed and imageUrls.js created"
+          end
         rescue => e
           Rails.logger.error "[V5_FINALIZE] R2 asset integration failed: #{e.message}"
           # Continue with deployment even if R2 setup fails
@@ -2416,6 +2422,15 @@ module Ai
         # Track the generated file in agent state
         generated_file = @app.app_files.find_by(path: target_path)
         @agent_state[:generated_files] << generated_file if generated_file && !@agent_state[:generated_files].include?(generated_file)
+        
+        # Process image URLs after generation to ensure components can reference them
+        begin
+          Rails.logger.info "[V5_IMAGE] Processing image URLs for easy component access"
+          image_extractor = Ai::ImageUrlExtractorService.new(@app)
+          image_extractor.process_all_images
+        rescue => e
+          Rails.logger.warn "[V5_IMAGE] Failed to process image URLs: #{e.message}"
+        end
         
         Rails.logger.info "[V5_IMAGE] Successfully generated and saved image: #{target_path}"
         {

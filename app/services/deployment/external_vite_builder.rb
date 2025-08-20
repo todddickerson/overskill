@@ -2,6 +2,9 @@ module Deployment
   class ExternalViteBuilder
     include ActiveSupport::Benchmarkable
     
+    # Class-level mutex to prevent concurrent chdir operations
+    BUILD_MUTEX = Mutex.new
+    
     def initialize(app)
       @app = app
       @temp_dir = nil
@@ -177,7 +180,9 @@ module Deployment
     
     def create_temp_directory
       @start_time = Time.current
-      temp_path = Rails.root.join('tmp', 'builds', "app_#{@app.id}_#{Time.current.to_i}")
+      # Include process ID and random string to ensure uniqueness even with concurrent builds
+      unique_id = "#{Process.pid}_#{SecureRandom.hex(4)}"
+      temp_path = Rails.root.join('tmp', 'builds', "app_#{@app.id}_#{Time.current.to_i}_#{unique_id}")
       FileUtils.mkdir_p(temp_path)
       Rails.logger.info "[ExternalViteBuilder] Created temp directory: #{temp_path}"
       temp_path
@@ -283,94 +288,100 @@ module Deployment
     end
     
     def build_with_mode(temp_dir, mode)
-      Dir.chdir(temp_dir) do
-        Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
-        
-        # Use full path to npm if needed, or set PATH
-        npm_path = `which npm`.strip
-        if npm_path.empty?
-          # Try common npm locations
-          npm_path = ['/usr/local/bin/npm', '/opt/homebrew/bin/npm', "#{ENV['HOME']}/.nvm/versions/node/*/bin/npm"].find { |p| Dir.glob(p).any? }
-          npm_path = Dir.glob(npm_path).first if npm_path
-        end
-        
-        if npm_path.nil? || npm_path.empty?
-          Rails.logger.error "[ExternalViteBuilder] npm not found in PATH"
-          raise "npm not found. Please ensure Node.js is installed."
-        end
-        
-        Rails.logger.info "[ExternalViteBuilder] Using npm at: #{npm_path}"
-        
-        # Install dependencies
-        install_output = `#{npm_path} install 2>&1`
-        install_result = $?.success?
-        
-        unless install_result
-          Rails.logger.error "[ExternalViteBuilder] npm install failed with exit code: #{$?.exitstatus}"
-          Rails.logger.error "[ExternalViteBuilder] npm install output: #{install_output}"
-          raise "npm install failed: #{install_output.lines.last(5).join}"
-        end
-        
-        Rails.logger.info "[ExternalViteBuilder] Dependencies installed successfully"
-        
-        Rails.logger.info "[ExternalViteBuilder] Running Vite build (#{mode} mode)..."
-        
-        # Set up environment variables for Vite build
-        vite_env = build_vite_environment_variables
-        
-        # Run the appropriate build command
-        build_command = mode == 'production' ? "#{npm_path} run build" : "#{npm_path} run build:preview"
-        
-        # Capture both stdout and stderr for better error reporting
-        require 'open3'
-        stdout, stderr, status = Open3.capture3(vite_env, build_command)
-        
-        unless status.success?
-          Rails.logger.error "[ExternalViteBuilder] Vite build failed with exit code: #{status.exitstatus}"
-          Rails.logger.error "[ExternalViteBuilder] Build stdout: #{stdout}"
-          Rails.logger.error "[ExternalViteBuilder] Build stderr: #{stderr}"
-          raise "Vite build failed: #{stderr.presence || stdout}"
-        end
-        
-        # Read the built JavaScript bundle
-        read_build_output(temp_dir)
+      # Use absolute paths instead of chdir to avoid conflicts
+      Rails.logger.info "[ExternalViteBuilder] Building in directory: #{temp_dir}"
+      Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
+      
+      # Use full path to npm if needed, or set PATH
+      npm_path = `which npm`.strip
+      if npm_path.empty?
+        # Try common npm locations
+        npm_path = ['/usr/local/bin/npm', '/opt/homebrew/bin/npm', "#{ENV['HOME']}/.nvm/versions/node/*/bin/npm"].find { |p| Dir.glob(p).any? }
+        npm_path = Dir.glob(npm_path).first if npm_path
       end
+      
+      if npm_path.nil? || npm_path.empty?
+        Rails.logger.error "[ExternalViteBuilder] npm not found in PATH"
+        raise "npm not found. Please ensure Node.js is installed."
+      end
+      
+      Rails.logger.info "[ExternalViteBuilder] Using npm at: #{npm_path}"
+      
+      # Install dependencies using --prefix to specify directory
+      install_output = `cd "#{temp_dir}" && #{npm_path} install 2>&1`
+      install_result = $?.success?
+        
+      unless install_result
+        Rails.logger.error "[ExternalViteBuilder] npm install failed with exit code: #{$?.exitstatus}"
+        Rails.logger.error "[ExternalViteBuilder] npm install output: #{install_output}"
+        raise "npm install failed: #{install_output.lines.last(5).join}"
+      end
+      
+      Rails.logger.info "[ExternalViteBuilder] Dependencies installed successfully"
+      
+      Rails.logger.info "[ExternalViteBuilder] Running Vite build (#{mode} mode)..."
+      
+      # Set up environment variables for Vite build
+      vite_env = build_vite_environment_variables
+      
+      # Run the appropriate build command with cd instead of chdir
+      build_command = mode == 'production' ? "#{npm_path} run build" : "#{npm_path} run build:preview"
+      full_command = "cd \"#{temp_dir}\" && #{build_command}"
+      
+      # Capture both stdout and stderr for better error reporting
+      require 'open3'
+      stdout, stderr, status = Open3.capture3(vite_env, full_command)
+      
+      unless status.success?
+        Rails.logger.error "[ExternalViteBuilder] Vite build failed with exit code: #{status.exitstatus}"
+        Rails.logger.error "[ExternalViteBuilder] Build stdout: #{stdout}"
+        Rails.logger.error "[ExternalViteBuilder] Build stderr: #{stderr}"
+        raise "Vite build failed: #{stderr.presence || stdout}"
+      end
+      
+      # Read the built JavaScript bundle
+      read_build_output(temp_dir)
     end
     
     def build_with_incremental_mode(temp_dir, changed_files)
       Rails.logger.info "[ExternalViteBuilder] Incremental build for #{changed_files.count} changed files"
       
-      Dir.chdir(temp_dir) do
-        Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
-        
-        # Use cached npm install if available
-        install_output = `#{npm_path} install 2>&1`
-        install_result = $?.success?
-        
-        unless install_result
-          Rails.logger.error "[ExternalViteBuilder] npm install failed: #{install_output}"
-          raise "npm install failed: #{install_output.lines.last(3).join}"
-        end
-        
-        Rails.logger.info "[ExternalViteBuilder] Running incremental Vite build..."
-        
-        # Use Vite's incremental build capabilities
-        build_command = "#{npm_path} run build:preview"
-        
-        # Capture both stdout and stderr for better error reporting
-        require 'open3'
-        stdout, stderr, status = Open3.capture3(build_command)
-        
-        unless status.success?
-          Rails.logger.error "[ExternalViteBuilder] Incremental Vite build failed with exit code: #{status.exitstatus}"
-          Rails.logger.error "[ExternalViteBuilder] Build stdout: #{stdout}"
-          Rails.logger.error "[ExternalViteBuilder] Build stderr: #{stderr}"
-          raise "Incremental Vite build failed: #{stderr.presence || stdout}"
-        end
-        
-        # Read the build output
-        read_build_output(temp_dir)
+      Rails.logger.info "[ExternalViteBuilder] Installing dependencies..."
+      
+      # Get npm path
+      npm_path = `which npm`.strip
+      if npm_path.empty?
+        npm_path = ['/usr/local/bin/npm', '/opt/homebrew/bin/npm'].find { |p| File.exist?(p) }
       end
+      
+      # Use cached npm install if available
+      install_output = `cd "#{temp_dir}" && #{npm_path} install 2>&1`
+      install_result = $?.success?
+        
+      unless install_result
+        Rails.logger.error "[ExternalViteBuilder] npm install failed: #{install_output}"
+        raise "npm install failed: #{install_output.lines.last(3).join}"
+      end
+      
+      Rails.logger.info "[ExternalViteBuilder] Running incremental Vite build..."
+      
+      # Use Vite's incremental build capabilities with cd instead of chdir
+      build_command = "#{npm_path} run build:preview"
+      full_command = "cd \"#{temp_dir}\" && #{build_command}"
+      
+      # Capture both stdout and stderr for better error reporting
+      require 'open3'
+      stdout, stderr, status = Open3.capture3(full_command)
+      
+      unless status.success?
+        Rails.logger.error "[ExternalViteBuilder] Incremental Vite build failed with exit code: #{status.exitstatus}"
+        Rails.logger.error "[ExternalViteBuilder] Build stdout: #{stdout}"
+        Rails.logger.error "[ExternalViteBuilder] Build stderr: #{stderr}"
+        raise "Incremental Vite build failed: #{stderr.presence || stdout}"
+      end
+      
+      # Read the build output
+      read_build_output(temp_dir)
     end
     
     def npm_path
