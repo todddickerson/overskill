@@ -43,22 +43,13 @@ module Deployment
         return { success: false, error: "Worker script too large: #{worker_size_mb} MB" }
       end
       
-      # 1. Deploy the Worker script
+      # 1. Deploy the Worker script with environment variables included
       deploy_worker(worker_name, worker_script)
       
-      # 2. Set environment variables and secrets (skip if API token lacks permissions)
-      begin
-        set_worker_secrets(worker_name)
-        Rails.logger.info "[CloudflareWorkersDeployer] Successfully set secrets for #{worker_name}"
-      rescue => secrets_error
-        Rails.logger.warn "[CloudflareWorkersDeployer] Could not set secrets (continuing deployment): #{secrets_error.message}"
-        # Continue deployment even if secrets fail - worker can still serve static content
-      end
-      
-      # 3. Configure routes based on deployment type
+      # 2. Configure routes based on deployment type
       worker_url = configure_worker_routes(worker_name, deployment_type)
       
-      # 4. Handle custom domain if configured (check if custom_domain method exists)
+      # 3. Handle custom domain if configured (check if custom_domain method exists)
       custom_url = if @app.respond_to?(:custom_domain) && @app.custom_domain.present? && deployment_type == :production
                      setup_custom_domain
                    else
@@ -175,18 +166,64 @@ module Deployment
     end
     
     def deploy_worker(worker_name, script_content)
-      Rails.logger.info "[CloudflareWorkersDeployer] Uploading Worker script (#{script_content.bytesize} bytes)"
+      Rails.logger.info "[CloudflareWorkersDeployer] Uploading Worker script with environment variables (#{script_content.bytesize} bytes)"
       
-      # Send JavaScript code directly for simple deployments
+      # Get all secrets/env vars for this worker
+      secrets = gather_all_secrets
+      
+      # Build bindings for environment variables
+      bindings = secrets.map do |key, value|
+        {
+          name: key,
+          text: value.to_s,
+          type: 'plain_text'
+        }
+      end
+      
+      # Create metadata with bindings
+      metadata = {
+        main_module: 'worker.js',
+        compatibility_date: '2024-01-01',
+        compatibility_flags: ['nodejs_compat'],
+        bindings: bindings
+      }
+      
+      # Use multipart form data as required by Cloudflare API
+      boundary = "----WebKitFormBoundary#{SecureRandom.hex(16)}"
+      
+      # Build multipart body
+      body_parts = []
+      
+      # Add metadata
+      body_parts << "--#{boundary}\r\n"
+      body_parts << "Content-Disposition: form-data; name=\"metadata\"\r\n\r\n"
+      body_parts << metadata.to_json
+      body_parts << "\r\n"
+      
+      # Add worker script (name must match main_module in metadata)
+      body_parts << "--#{boundary}\r\n"
+      body_parts << "Content-Disposition: form-data; name=\"worker.js\"; filename=\"worker.js\"\r\n"
+      body_parts << "Content-Type: application/javascript+module\r\n\r\n"
+      body_parts << script_content
+      body_parts << "\r\n"
+      
+      # Close boundary
+      body_parts << "--#{boundary}--\r\n"
+      
+      multipart_body = body_parts.join('')
+      
+      Rails.logger.info "[CloudflareWorkersDeployer] Deploying worker with #{bindings.count} environment variables"
+      bindings.each { |binding| Rails.logger.debug "  #{binding[:name]}: #{binding[:text][0..20]}..." }
+      
       response = self.class.put(
         "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
-        body: script_content,
+        body: multipart_body,
         headers: { 
-          'Content-Type' => 'application/javascript'
+          'Content-Type' => "multipart/form-data; boundary=#{boundary}"
         }
       )
       
-      handle_api_response(response, "deploy worker #{worker_name}")
+      handle_api_response(response, "deploy worker #{worker_name} with environment variables")
     end
     
     def delete_worker(worker_name)
@@ -270,9 +307,12 @@ module Deployment
         // Asset URLs in R2
         const ASSET_URLS = #{asset_urls_json};
         
-        addEventListener('fetch', event => {
-          event.respondWith(handleRequest(event.request, event))
-        })
+        // ES Module export for Cloudflare Workers
+        export default {
+          async fetch(request, env, ctx) {
+            return handleRequest(request, { env, ctx });
+          }
+        };
         
         async function handleRequest(request, event) {
           const env = event.env || {}

@@ -4065,6 +4065,7 @@ module Ai
 
     # Determine when to flush tool calls incrementally for better UX
     def should_flush_incrementally?(index, total_tools)
+      return false # TODO: Investigate why rename-app fails everytime, seeing if this is the issue
       # Strategy: Show progress frequently for better UX while avoiding spam
       case total_tools
       when 1..2
