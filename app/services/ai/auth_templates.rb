@@ -837,7 +837,7 @@ module Ai
             "devDependencies": {
               "@types/react": "^18.2.0",
               "@types/react-dom": "^18.2.0",
-              "@vitejs/plugin-react": "^4.0.0",
+              "@vitejs/plugin-react-swc": "^3.11.0",
               "autoprefixer": "^10.4.16",
               "postcss": "^8.4.32",
               "tailwindcss": "^3.3.6",

@@ -227,7 +227,7 @@ module Ai
             "@types/react-dom": "^18.2.0",
             "@typescript-eslint/eslint-plugin": "^6.13.0",
             "@typescript-eslint/parser": "^6.13.0",
-            "@vitejs/plugin-react": "^4.2.0",
+            "@vitejs/plugin-react-swc": "^3.11.0",
             "autoprefixer": "^10.4.16",
             "eslint": "^8.55.0",
             "eslint-plugin-react-hooks": "^4.6.0",
@@ -244,7 +244,7 @@ module Ai
     def vite_config_template
       <<~TS
         import { defineConfig } from 'vite'
-        import react from '@vitejs/plugin-react'
+        import react from '@vitejs/plugin-react-swc'
         import path from 'path'
         
         export default defineConfig({
