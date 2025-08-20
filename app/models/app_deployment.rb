@@ -87,7 +87,7 @@ class AppDeployment < ApplicationRecord
   private
 
   def self.generate_environment_url(app, environment)
-    worker_name = "overskill-#{(app.slug.presence || app.name).parameterize}-#{app.obfuscated_id}"
+    worker_name = "overskill-#{app.name.parameterize}-#{app.obfuscated_id}"
     
     case environment
     when 'preview'

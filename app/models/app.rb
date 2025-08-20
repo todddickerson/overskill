@@ -347,6 +347,175 @@ class App < ApplicationRecord
     end
   end
 
+  # =============================================================================
+  # GITHUB MIGRATION PROJECT - Repository-per-app Architecture Methods
+  # =============================================================================
+
+  # Repository status enum values
+  enum :repository_status, {
+    pending: 'pending',
+    creating: 'creating', 
+    ready: 'ready',
+    failed: 'failed'
+  }, prefix: :repository
+
+  # Enhanced deployment status (extends existing deployment_status field)
+  def deployment_environments
+    envs = {}
+    envs[:preview] = preview_url if preview_url.present?
+    envs[:staging] = staging_url if staging_url.present?
+    envs[:production] = production_url if production_url.present?
+    envs
+  end
+
+  # Check if app is using the new repository-per-app architecture
+  def using_repository_mode?
+    repository_name.present? && repository_url.present?
+  end
+
+  # Check if app was created with the old app_files architecture
+  def using_legacy_mode?
+    !using_repository_mode? && app_files.exists?
+  end
+
+  # Multi-environment deployment workflow methods
+  def can_promote_to_staging?
+    repository_ready? && preview_url.present? && deployment_status != 'failed'
+  end
+
+  def can_promote_to_production?
+    staging_deployed_at.present? && staging_url.present? && deployment_status != 'failed'
+  end
+
+  # Repository service integration
+  def github_repository_service
+    @github_repository_service ||= Deployment::GithubRepositoryService.new(self)
+  end
+
+  def cloudflare_workers_service
+    @cloudflare_workers_service ||= Deployment::CloudflareWorkersBuildService.new(self)
+  end
+
+  # Create GitHub repository via forking (ultra-fast 2-3 seconds)
+  def create_repository_via_fork!
+    result = github_repository_service.create_app_repository_via_fork
+    
+    if result[:success]
+      Rails.logger.info "[App] ✅ Repository created via fork: #{repository_url}"
+      
+      # Setup Cloudflare Worker with git integration
+      worker_result = cloudflare_workers_service.create_worker_with_git_integration(result)
+      
+      if worker_result[:success]
+        update!(
+          cloudflare_worker_name: worker_result[:worker_name],
+          preview_url: worker_result[:preview_url],
+          staging_url: worker_result[:staging_url],
+          production_url: worker_result[:production_url],
+          deployment_status: 'preview_building'
+        )
+        
+        Rails.logger.info "[App] ✅ Cloudflare Worker created with git integration"
+      end
+      
+      worker_result
+    else
+      Rails.logger.error "[App] ❌ Repository creation failed: #{result[:error]}"
+      update!(repository_status: 'failed')
+      result
+    end
+  end
+
+  # Promote app from preview to staging environment
+  def promote_to_staging!
+    return { success: false, error: 'Cannot promote to staging' } unless can_promote_to_staging?
+    
+    result = cloudflare_workers_service.promote_to_staging
+    
+    if result[:success]
+      update!(
+        deployment_status: 'staging_deployed',
+        staging_deployed_at: Time.current
+      )
+      
+      # Create deployment record
+      app_deployments.create!(
+        environment: 'staging',
+        deployment_id: result[:deployment_id],
+        deployment_url: staging_url,
+        deployed_at: Time.current
+      )
+      
+      Rails.logger.info "[App] ✅ Promoted to staging: #{staging_url}"
+    end
+    
+    result
+  end
+
+  # Promote app from staging to production environment
+  def promote_to_production!
+    return { success: false, error: 'Cannot promote to production' } unless can_promote_to_production?
+    
+    result = cloudflare_workers_service.promote_to_production
+    
+    if result[:success]
+      update!(
+        deployment_status: 'production_deployed',
+        last_deployment_at: Time.current,
+        status: 'published'  # Mark as published when deployed to production
+      )
+      
+      # Create deployment record
+      app_deployments.create!(
+        environment: 'production',
+        deployment_id: result[:deployment_id],
+        deployment_url: production_url,
+        deployed_at: Time.current
+      )
+      
+      Rails.logger.info "[App] ✅ Promoted to production: #{production_url}"
+    end
+    
+    result
+  end
+
+  # Get comprehensive deployment status across all environments
+  def get_deployment_status
+    if using_repository_mode?
+      cloudflare_workers_service.get_deployment_status
+    else
+      # Legacy mode status
+      {
+        success: true,
+        legacy_mode: true,
+        environments: {
+          preview: { url: preview_url, status: preview_url.present? ? 'deployed' : 'not_deployed' },
+          staging: { url: staging_url, status: staging_deployed_at ? 'deployed' : 'not_deployed' },
+          production: { url: production_url, status: deployment_status == 'production_deployed' ? 'deployed' : 'not_deployed' }
+        }
+      }
+    end
+  end
+
+  # Generate URLs using privacy-first obfuscated_id approach
+  def generate_worker_name
+    base_name = name.parameterize
+    "overskill-#{base_name}-#{obfuscated_id}"
+  end
+
+  def generate_repository_name
+    base_name = name.parameterize
+    "#{base_name}-#{obfuscated_id}"
+  end
+  
+  # =============================================================================
+  # END GITHUB MIGRATION PROJECT METHODS
+  # =============================================================================
+
+  # =============================================================================
+  # END OF PUBLIC METHODS
+  # =============================================================================
+  
   private
 
   def generate_subdomain
@@ -467,171 +636,6 @@ class App < ApplicationRecord
     Rails.logger.info "[App] Auto-initiating generation for new app ##{id}"
     initiate_generation!  # Default behavior is to trigger job
   end
-
-  # =============================================================================
-  # GITHUB MIGRATION PROJECT - Repository-per-app Architecture Methods
-  # =============================================================================
-
-  # Repository status enum values
-  enum repository_status: {
-    'pending' => 'pending',
-    'creating' => 'creating', 
-    'ready' => 'ready',
-    'failed' => 'failed'
-  }, _prefix: :repository
-
-  # Enhanced deployment status (extends existing deployment_status field)
-  def deployment_environments
-    envs = {}
-    envs[:preview] = preview_url if preview_url.present?
-    envs[:staging] = staging_url if staging_url.present?
-    envs[:production] = production_url if production_url.present?
-    envs
-  end
-
-  # Check if app is using the new repository-per-app architecture
-  def using_repository_mode?
-    repository_name.present? && repository_url.present?
-  end
-
-  # Check if app was created with the old app_files architecture
-  def using_legacy_mode?
-    !using_repository_mode? && app_files.exists?
-  end
-
-  # Multi-environment deployment workflow methods
-  def can_promote_to_staging?
-    repository_ready? && preview_url.present? && deployment_status != 'failed'
-  end
-
-  def can_promote_to_production?
-    staging_deployed_at.present? && staging_url.present? && deployment_status != 'failed'
-  end
-
-  # Repository service integration
-  def github_repository_service
-    @github_repository_service ||= Deployment::GitHubRepositoryService.new(self)
-  end
-
-  def cloudflare_workers_service
-    @cloudflare_workers_service ||= Deployment::CloudflareWorkersBuildService.new(self)
-  end
-
-  # Create GitHub repository via forking (ultra-fast 2-3 seconds)
-  def create_repository_via_fork!
-    result = github_repository_service.create_app_repository_via_fork
-    
-    if result[:success]
-      Rails.logger.info "[App] ✅ Repository created via fork: #{repository_url}"
-      
-      # Setup Cloudflare Worker with git integration
-      worker_result = cloudflare_workers_service.create_worker_with_git_integration(result)
-      
-      if worker_result[:success]
-        update!(
-          cloudflare_worker_name: worker_result[:worker_name],
-          preview_url: worker_result[:preview_url],
-          staging_url: worker_result[:staging_url],
-          production_url: worker_result[:production_url],
-          deployment_status: 'preview_building'
-        )
-        
-        Rails.logger.info "[App] ✅ Cloudflare Worker created with git integration"
-      end
-      
-      worker_result
-    else
-      Rails.logger.error "[App] ❌ Repository creation failed: #{result[:error]}"
-      update!(repository_status: 'failed')
-      result
-    end
-  end
-
-  # Promote app from preview to staging environment
-  def promote_to_staging!
-    return { success: false, error: 'Cannot promote to staging' } unless can_promote_to_staging?
-    
-    result = cloudflare_workers_service.promote_to_staging
-    
-    if result[:success]
-      update!(
-        deployment_status: 'staging_deployed',
-        staging_deployed_at: Time.current
-      )
-      
-      # Create deployment record
-      app_deployments.create!(
-        environment: 'staging',
-        deployment_id: result[:deployment_id],
-        deployment_url: staging_url,
-        deployed_at: Time.current
-      )
-      
-      Rails.logger.info "[App] ✅ Promoted to staging: #{staging_url}"
-    end
-    
-    result
-  end
-
-  # Promote app from staging to production environment
-  def promote_to_production!
-    return { success: false, error: 'Cannot promote to production' } unless can_promote_to_production?
-    
-    result = cloudflare_workers_service.promote_to_production
-    
-    if result[:success]
-      update!(
-        deployment_status: 'production_deployed',
-        last_deployment_at: Time.current,
-        status: 'published'  # Mark as published when deployed to production
-      )
-      
-      # Create deployment record
-      app_deployments.create!(
-        environment: 'production',
-        deployment_id: result[:deployment_id],
-        deployment_url: production_url,
-        deployed_at: Time.current
-      )
-      
-      Rails.logger.info "[App] ✅ Promoted to production: #{production_url}"
-    end
-    
-    result
-  end
-
-  # Get comprehensive deployment status across all environments
-  def get_deployment_status
-    if using_repository_mode?
-      cloudflare_workers_service.get_deployment_status
-    else
-      # Legacy mode status
-      {
-        success: true,
-        legacy_mode: true,
-        environments: {
-          preview: { url: preview_url, status: preview_url.present? ? 'deployed' : 'not_deployed' },
-          staging: { url: staging_url, status: staging_deployed_at ? 'deployed' : 'not_deployed' },
-          production: { url: production_url, status: deployment_status == 'production_deployed' ? 'deployed' : 'not_deployed' }
-        }
-      }
-    end
-  end
-
-  # Generate URLs using privacy-first obfuscated_id approach
-  def generate_worker_name
-    base_name = (slug.presence || name).parameterize
-    "overskill-#{base_name}-#{obfuscated_id}"
-  end
-
-  def generate_repository_name
-    base_name = (slug.presence || name).parameterize
-    "#{base_name}-#{obfuscated_id}"
-  end
-  
-  # =============================================================================
-  # END GITHUB MIGRATION PROJECT METHODS
-  # =============================================================================
   
   # 🚅 add methods above.
 end
