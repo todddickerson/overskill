@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_20_151400) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_20_170949) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -237,6 +237,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_20_151400) do
     t.index ["app_id"], name: "index_app_collaborators_on_app_id"
     t.index ["membership_id"], name: "index_app_collaborators_on_membership_id"
     t.index ["team_id"], name: "index_app_collaborators_on_team_id"
+  end
+
+  create_table "app_deployments", force: :cascade do |t|
+    t.bigint "app_id", null: false
+    t.string "environment", null: false
+    t.string "deployment_id"
+    t.string "deployment_url"
+    t.string "commit_sha"
+    t.text "deployment_metadata"
+    t.datetime "deployed_at"
+    t.boolean "is_rollback", default: false
+    t.string "rollback_version_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["app_id", "environment"], name: "index_app_deployments_on_app_id_and_environment"
+    t.index ["app_id"], name: "index_app_deployments_on_app_id"
+    t.index ["deployed_at"], name: "index_app_deployments_on_deployed_at"
   end
 
   create_table "app_domains", force: :cascade do |t|
@@ -496,10 +513,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_20_151400) do
     t.datetime "last_deployed_at"
     t.datetime "published_at"
     t.boolean "show_overskill_badge", default: true, null: false
+    t.string "repository_url"
+    t.string "repository_name"
+    t.integer "github_repo_id"
+    t.string "cloudflare_worker_name"
+    t.string "repository_status", default: "pending"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
+    t.index ["deployment_status"], name: "index_apps_on_deployment_status"
     t.index ["featured"], name: "index_apps_on_featured"
+    t.index ["repository_name"], name: "index_apps_on_repository_name", unique: true
+    t.index ["repository_status"], name: "index_apps_on_repository_status"
     t.index ["status"], name: "index_apps_on_status"
     t.index ["subdomain"], name: "index_apps_on_subdomain", unique: true
     t.index ["team_id"], name: "index_apps_on_team_id"
@@ -992,6 +1017,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_20_151400) do
   add_foreign_key "app_collaborators", "apps"
   add_foreign_key "app_collaborators", "memberships"
   add_foreign_key "app_collaborators", "teams"
+  add_foreign_key "app_deployments", "apps"
   add_foreign_key "app_domains", "apps"
   add_foreign_key "app_env_vars", "apps"
   add_foreign_key "app_files", "apps"
