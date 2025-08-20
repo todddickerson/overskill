@@ -42,6 +42,14 @@ class App < ApplicationRecord
   scope :featured, -> { where(featured: true).where("featured_until > ?", Time.current) }
   # 🚅 add scopes above.
 
+  # Repository status enum for GitHub migration
+  enum :repository_status, {
+    pending: 'pending',
+    creating: 'creating', 
+    ready: 'ready',
+    failed: 'failed'
+  }, prefix: :repository
+
   validates :name, presence: true
   validates :subdomain, presence: true, uniqueness: true,
     format: { 
@@ -350,14 +358,6 @@ class App < ApplicationRecord
   # =============================================================================
   # GITHUB MIGRATION PROJECT - Repository-per-app Architecture Methods
   # =============================================================================
-
-  # Repository status enum values
-  enum :repository_status, {
-    pending: 'pending',
-    creating: 'creating', 
-    ready: 'ready',
-    failed: 'failed'
-  }, prefix: :repository
 
   # Enhanced deployment status (extends existing deployment_status field)
   def deployment_environments
