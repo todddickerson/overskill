@@ -128,11 +128,13 @@ module Ai
             'process.env.VITE_USE_LOCAL_ASSETS': JSON.stringify(process.env.VITE_USE_LOCAL_ASSETS),
           },
           build: {
+            target: 'esnext',
+            minify: 'esbuild',
             rollupOptions: {
               output: {
                 manualChunks: {
-                  vendor: ['react', 'react-dom'],
-                  ui: ['@radix-ui/react-avatar', '@radix-ui/react-button', '@radix-ui/react-card']
+                  vendor: ['react', 'react-dom', 'react-router-dom'],
+                  supabase: ['@supabase/supabase-js']
                 }
               }
             }

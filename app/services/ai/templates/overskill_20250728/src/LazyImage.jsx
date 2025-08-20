@@ -28,8 +28,10 @@ const LazyImage = forwardRef(({
   const [hasIntersected, setHasIntersected] = useState(false);
   
   // Use our asset resolver hook only when image is visible
+  // If src is already a full URL (http/https), use it directly
+  const isFullUrl = src && (src.startsWith('http://') || src.startsWith('https://'));
   const { url, loading, error } = useAsset(
-    hasIntersected ? src : null, 
+    hasIntersected && !isFullUrl ? src : null, 
     { 
       preload: true,
       fallback: fallbackSrc,
@@ -37,6 +39,9 @@ const LazyImage = forwardRef(({
       onError
     }
   );
+  
+  // For full URLs, use them directly
+  const finalUrl = isFullUrl ? src : url;
 
   // Intersection Observer for lazy loading
   useEffect(() => {
@@ -107,27 +112,27 @@ const LazyImage = forwardRef(({
         </div>
       )}
       
-      {hasIntersected && loading && (
-        // Loading state
+      {hasIntersected && !isFullUrl && loading && (
+        // Loading state (only for non-direct URLs)
         LoadingComponent ? <LoadingComponent /> : <DefaultLoading />
       )}
       
-      {hasIntersected && error && (
-        // Error state
+      {hasIntersected && !isFullUrl && error && (
+        // Error state (only for non-direct URLs)
         ErrorComponent ? <ErrorComponent error={error} /> : <DefaultError />
       )}
       
-      {hasIntersected && !loading && !error && url && (
+      {hasIntersected && (isFullUrl || (!loading && !error && url)) && (
         // Actual image
         <img
-          src={url}
+          src={finalUrl}
           alt={alt}
           className={className}
           onLoad={() => {
-            console.log(`[LazyImage] Loaded: ${src} -> ${url}`);
+            console.log(`[LazyImage] Loaded: ${src} -> ${finalUrl}`);
           }}
           onError={() => {
-            console.warn(`[LazyImage] Error loading: ${src} -> ${url}`);
+            console.warn(`[LazyImage] Error loading: ${src} -> ${finalUrl}`);
           }}
         />
       )}
@@ -144,12 +149,20 @@ export default LazyImage;
  * For above-the-fold images that should load immediately
  */
 export const EagerImage = ({ src, alt = '', className = '', fallbackSrc = null, ...props }) => {
-  const { url, loading, error } = useAsset(src, { 
-    preload: true,
-    fallback: fallbackSrc
-  });
+  // Check if src is already a full URL
+  const isFullUrl = src && (src.startsWith('http://') || src.startsWith('https://'));
+  
+  const { url, loading, error } = useAsset(
+    !isFullUrl ? src : null, 
+    { 
+      preload: true,
+      fallback: fallbackSrc
+    }
+  );
+  
+  const finalUrl = isFullUrl ? src : url;
 
-  if (loading) {
+  if (!isFullUrl && loading) {
     return (
       <div className={`bg-gray-200 animate-pulse ${className}`}>
         {/* Loading placeholder */}
@@ -157,7 +170,7 @@ export const EagerImage = ({ src, alt = '', className = '', fallbackSrc = null, 
     );
   }
 
-  if (error) {
+  if (!isFullUrl && error) {
     return (
       <div className={`bg-gray-100 border border-gray-300 flex items-center justify-center ${className}`}>
         <span className="text-gray-500 text-sm">Image failed to load</span>
@@ -167,7 +180,7 @@ export const EagerImage = ({ src, alt = '', className = '', fallbackSrc = null, 
 
   return (
     <img 
-      src={url} 
+      src={finalUrl} 
       alt={alt} 
       className={className}
       {...props}
@@ -186,11 +199,19 @@ export const BackgroundImage = ({
   fallbackSrc = null,
   ...props 
 }) => {
-  const { url, loading, error } = useAsset(src, { fallback: fallbackSrc });
+  // Check if src is already a full URL
+  const isFullUrl = src && (src.startsWith('http://') || src.startsWith('https://'));
+  
+  const { url, loading, error } = useAsset(
+    !isFullUrl ? src : null, 
+    { fallback: fallbackSrc }
+  );
+  
+  const finalUrl = isFullUrl ? src : url;
 
   const backgroundStyle = {
     ...style,
-    backgroundImage: url && !loading && !error ? `url(${url})` : undefined,
+    backgroundImage: finalUrl && (!loading || isFullUrl) && !error ? `url(${finalUrl})` : undefined,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat'
@@ -198,7 +219,7 @@ export const BackgroundImage = ({
 
   return (
     <div 
-      className={`${className} ${loading ? 'bg-gray-200 animate-pulse' : ''}`}
+      className={`${className} ${!isFullUrl && loading ? 'bg-gray-200 animate-pulse' : ''}`}
       style={backgroundStyle}
       {...props}
     >
