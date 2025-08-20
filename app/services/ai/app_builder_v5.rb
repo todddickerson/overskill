@@ -23,10 +23,26 @@ module Ai
       # Initialize security filter
       @security_filter = Security::PromptInjectionFilter.new
       
+      # Initialize GitHub Migration Project services
+      @use_repository_mode = ENV['USE_REPOSITORY_MODE'] == 'true'
+      if @use_repository_mode && @app
+        @github_service = @app.github_repository_service
+        @cloudflare_service = @app.cloudflare_workers_service
+        Rails.logger.info "[V5_GITHUB] Repository mode enabled for app ##{@app.id}"
+      end
+      
       # Initialize centralized tool service for cleaner architecture
       # All tool implementations are now in AiToolService for better maintainability
       # See app/services/ai/ai_tool_service.rb for tool implementations
-      @tool_service = Ai::AiToolService.new(@app, logger: Rails.logger, user: chat_message.user)
+      tool_service_options = {
+        logger: Rails.logger, 
+        user: chat_message.user,
+        # GitHub Migration Project: Pass repository mode configuration
+        use_repository_mode: @use_repository_mode,
+        github_service: @github_service,
+        cloudflare_service: @cloudflare_service
+      }
+      @tool_service = Ai::AiToolService.new(@app, tool_service_options)
       
       # Create assistant reply message for V5 UI
       @assistant_message = create_assistant_message
@@ -82,6 +98,11 @@ module Ai
         app.update!(status: 'generating')
         update_thinking_status("Phase 1/6: Starting AI Agent")
         
+        # GitHub Migration Project: Setup repository if using repository mode
+        if @use_repository_mode && !@app.using_repository_mode?
+          setup_github_repository
+        end
+        
         # Analyze requirements (let Claude handle goal extraction naturally)
         update_thinking_status("Analyzing your requirements...")
         
@@ -101,6 +122,40 @@ module Ai
         Rails.logger.error e.backtrace.first(10).join("\n")
         handle_error(e)
         return # CRITICAL: Don't continue to finalize_app_generation after error
+      end
+    end
+
+    # =============================================================================
+    # GITHUB MIGRATION PROJECT METHODS
+    # =============================================================================
+
+    def setup_github_repository
+      Rails.logger.info "[V5_GITHUB] Setting up GitHub repository for app ##{@app.id}"
+      update_thinking_status("Creating GitHub repository...")
+      
+      begin
+        # Create repository via forking (2-3 seconds)
+        result = @app.create_repository_via_fork!
+        
+        if result[:success]
+          Rails.logger.info "[V5_GITHUB] ✅ Repository setup complete: #{@app.repository_url}"
+          update_thinking_status("Repository ready - proceeding with generation...")
+          
+          # Initialize repository tracking in agent state
+          @agent_state[:github_repository] = {
+            url: @app.repository_url,
+            name: @app.repository_name,
+            worker_name: @app.cloudflare_worker_name,
+            setup_completed: true
+          }
+        else
+          Rails.logger.error "[V5_GITHUB] ❌ Repository setup failed: #{result[:error]}"
+          raise StandardError, "Failed to create GitHub repository: #{result[:error]}"
+        end
+      rescue => e
+        Rails.logger.error "[V5_GITHUB] Repository setup exception: #{e.message}"
+        @app.update!(repository_status: 'failed')
+        raise e
       end
     end
     
@@ -198,21 +253,72 @@ module Ai
     end
     
     def deploy_preview_if_ready
+      if @use_repository_mode && @app.using_repository_mode?
+        # GitHub Migration Project: Use Cloudflare Workers Builds deployment
+        deploy_with_github_workers
+      else
+        # Legacy mode: Use existing DeployAppJob
+        deploy_with_legacy_job
+      end
+    rescue => e
+      Rails.logger.error "[V5_DEPLOY] Deployment error: #{e.message}"
+      { success: false, error: e.message }
+    end
+
+    def deploy_with_github_workers
+      Rails.logger.info "[V5_GITHUB] Deploying with Cloudflare Workers Builds"
+      
+      # Check if repository is ready
+      unless @app.repository_ready?
+        return { success: false, error: "Repository not ready for deployment" }
+      end
+      
+      # The repository already has files pushed to it by the GitHub service
+      # Cloudflare Workers Builds will automatically build and deploy from the repository
+      
+      # Get deployment status
+      deployment_result = @cloudflare_service.get_deployment_status
+      
+      if deployment_result[:success]
+        preview_url = deployment_result.dig(:environments, :preview, :url) || @app.preview_url
+        
+        # Update app status
+        @app.update!(
+          status: 'ready', 
+          deployment_status: 'preview_deployed',
+          last_deployment_at: Time.current
+        )
+        
+        Rails.logger.info "[V5_GITHUB] ✅ GitHub Workers deployment successful: #{preview_url}"
+        
+        return {
+          success: true,
+          preview_url: preview_url,
+          deployment_type: 'github_workers',
+          message: "Deployed with Cloudflare Workers Builds"
+        }
+      else
+        Rails.logger.error "[V5_GITHUB] ❌ GitHub Workers deployment failed: #{deployment_result[:error]}"
+        return { success: false, error: deployment_result[:error] }
+      end
+    end
+
+    def deploy_with_legacy_job
       # Check if we have files to deploy (either new or existing)
       total_files = @app.app_files.count
       new_files = @agent_state[:generated_files].count
       
       if total_files == 0
-        Rails.logger.warn "[V5_SIMPLE] No files to deploy"
+        Rails.logger.warn "[V5_LEGACY] No files to deploy"
         return { success: false, error: "No files to deploy" }
       end
       
-      Rails.logger.info "[V5_SIMPLE] Deploying app with #{total_files} total files (#{new_files} new/modified)"
+      Rails.logger.info "[V5_LEGACY] Deploying app with #{total_files} total files (#{new_files} new/modified)"
       
       # Queue deployment job for async processing
       # This ensures proper version tracking, broadcasts, and error handling
       job = DeployAppJob.perform_later(@app.id, "preview")
-      Rails.logger.info "[V5_SIMPLE] Queued deployment job #{job.job_id} for preview"
+      Rails.logger.info "[V5_LEGACY] Queued deployment job #{job.job_id} for preview"
       
       # Update app status to indicate deployment is in progress
       @app.update!(status: 'generating')
@@ -220,9 +326,6 @@ module Ai
       # Return success since deployment is now handled asynchronously
       # The UI will update via ActionCable broadcasts from DeployAppJob
       { success: true, message: "Deployment queued", job_id: job.job_id }
-    rescue => e
-      Rails.logger.error "[V5_SIMPLE] Deployment error: #{e.message}"
-      { success: false, error: e.message }
     end
     
     def execute_complex_decision_loop

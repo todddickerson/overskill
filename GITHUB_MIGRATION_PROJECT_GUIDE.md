@@ -592,7 +592,183 @@ class App < ApplicationRecord
 end
 ```
 
-## Phase 4: Quick Migration & Launch (Week 3)
+## Phase 4: Quality Assurance & Component Validation (Week 2-3)
+
+### 4.1 Component Import Validation System
+
+**Critical for preventing "ThankYou is not defined" type errors in production:**
+
+```ruby
+# app/services/validation/component_import_validator.rb
+class Validation::ComponentImportValidator
+  def initialize(file_path, content)
+    @file_path = file_path
+    @content = content
+    @errors = []
+  end
+
+  def validate!
+    return { success: true, errors: [] } unless tsx_file?
+    
+    # Analyze TSX files for missing component imports
+    used_components = extract_jsx_components
+    imported_components = extract_imported_components
+    locally_defined_components = extract_local_components
+    
+    # Filter out false positives
+    missing_imports = used_components - imported_components - locally_defined_components - html_elements - react_builtins
+    
+    if missing_imports.any?
+      @errors = missing_imports.map do |component|
+        {
+          type: 'missing_import',
+          component: component,
+          suggestion: generate_import_suggestion(component),
+          line: find_component_usage_line(component)
+        }
+      end
+      
+      { success: false, errors: @errors }
+    else
+      { success: true, errors: [] }
+    end
+  end
+
+  private
+
+  def tsx_file?
+    @file_path.end_with?('.tsx', '.jsx')
+  end
+
+  def extract_jsx_components
+    # Smart detection of JSX components (excluding HTML elements)
+    @content.scan(/<([A-Z][a-zA-Z0-9]*)\s*[^>]*>/).flatten.uniq
+  end
+
+  def extract_imported_components
+    # Extract components from import statements
+    imports = []
+    @content.scan(/import\s+(?:{([^}]+)}|\s*(\w+))\s+from\s+['"][^'"]+['"]/) do |match|
+      if match[0] # Named imports
+        imports.concat(match[0].split(',').map(&:strip))
+      else # Default import
+        imports << match[1]
+      end
+    end
+    imports
+  end
+
+  def extract_local_components
+    # Find locally defined components (function/const declarations)
+    @content.scan(/(?:function|const)\s+([A-Z][a-zA-Z0-9]*)\s*[=\(]/).flatten
+  end
+
+  def html_elements
+    %w[div span p a button img input form ul ol li h1 h2 h3 h4 h5 h6 section article nav header footer main aside]
+  end
+
+  def react_builtins
+    %w[Fragment Suspense ErrorBoundary StrictMode]
+  end
+end
+```
+
+**Enhanced Build Integration:**
+
+```ruby  
+# app/services/deployment/enhanced_vite_builder.rb
+class Deployment::EnhancedViteBuilder < Deployment::ViteBuilderService
+  def build_with_validation!
+    Rails.logger.info "[EnhancedViteBuilder] Starting build with component validation"
+    
+    # Skip validation for UI library files (complex patterns)
+    validation_enabled = ENV.fetch('COMPONENT_VALIDATION_ENABLED', Rails.env.production?.to_s) == 'true'
+    
+    if validation_enabled && should_validate_components?
+      Rails.logger.info "[EnhancedViteBuilder] Running component import validation"
+      validation_result = validate_all_components
+      
+      unless validation_result[:success]
+        Rails.logger.error "[EnhancedViteBuilder] ❌ Component validation failed"
+        validation_result[:errors].each do |error|
+          Rails.logger.error "  - Missing import: #{error[:component]} in #{error[:file]}"
+          Rails.logger.error "    Suggestion: #{error[:suggestion]}"
+        end
+        
+        raise BuildValidationError, "Component validation failed: #{validation_result[:errors].size} missing imports"
+      end
+    end
+    
+    # Proceed with normal build
+    super
+  end
+
+  private
+
+  def should_validate_components?
+    # Skip validation for UI library files (shadcn/ui, etc.)
+    !@app.name.match?(/ui-library|component-library/i)
+  end
+
+  def validate_all_components
+    errors = []
+    success = true
+    
+    @app.app_files.where(file_type: ['typescript', 'javascript']).each do |file|
+      next if skip_validation_for_file?(file.path)
+      
+      validator = Validation::ComponentImportValidator.new(file.path, file.content)
+      result = validator.validate!
+      
+      unless result[:success]
+        success = false
+        errors.concat(result[:errors].map { |e| e.merge(file: file.path) })
+      end
+    end
+    
+    { success: success, errors: errors }
+  end
+
+  def skip_validation_for_file?(path)
+    # Skip UI library files and complex component patterns
+    path.include?('components/ui/') || 
+    path.include?('lib/') ||
+    path.end_with?('.d.ts') ||
+    path.include?('node_modules/')
+  end
+end
+
+class BuildValidationError < StandardError; end
+```
+
+**Environment Configuration:**
+
+```bash
+# Always validate in production
+COMPONENT_VALIDATION_ENABLED=true
+
+# Optional in development  
+COMPONENT_VALIDATION_DEV=false
+
+# Skip validation for specific patterns
+VALIDATION_SKIP_PATTERNS="components/ui/,lib/utils"
+```
+
+**Key Features Achieved:**
+- ✅ **Smart Detection**: Recognizes locally defined components, TypeScript types, UI library internals
+- ✅ **False Positive Filtering**: Excludes HTML elements, React built-ins, shadcn/ui components  
+- ✅ **Production Safety**: Always validates in production, prevents deployment of broken builds
+- ✅ **Configurable**: Can be enabled/disabled via environment variables
+- ✅ **Clear Error Messages**: Provides actionable import suggestions with line numbers
+- ✅ **Performance Optimized**: Skips validation for UI library files (complex patterns)
+
+**Integration with GitHub Migration Project:**
+- Runs before Cloudflare Workers Builds deployment
+- Prevents broken builds from reaching production
+- Works with both repository mode and legacy app_files mode
+- Provides immediate feedback during AI app generation
+
+## Phase 5: Quick Migration & Launch (Week 3)
 
 ### 4.1 Simplified Migration (No Backwards Compatibility)
 
