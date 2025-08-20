@@ -308,7 +308,7 @@ module Deployment
 
     def process_html_template(content)
       content
-        .gsub('{{APP_NAME}}', @app.name)
+        .gsub('{{APP_NAME}}', CGI.escapeHTML(@app.name.to_s))
         .gsub('{{APP_ID}}', @app.id.to_s)
         .gsub('{{ENVIRONMENT}}', 'development')
     end
@@ -320,7 +320,7 @@ module Deployment
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>#{@app.name}</title>
+          <title>#{CGI.escapeHTML(@app.name.to_s)}</title>
           <script type="module" src="/main.js"></script>
         </head>
         <body>
@@ -331,14 +331,17 @@ module Deployment
     end
 
     def generate_default_main_js
+      # Escape app name for JavaScript string literal
+      escaped_name = @app.name.to_s.gsub("'", "\\'").gsub('"', '\\"')
+      
       <<~JAVASCRIPT
-        // Main entry point for #{@app.name}
+        // Main entry point for #{escaped_name}
         console.log('App loading...');
         
         // Initialize React app
         const rootElement = document.getElementById('root');
         if (rootElement) {
-          rootElement.innerHTML = '<h1>#{@app.name}</h1><p>Development build loaded successfully!</p>';
+          rootElement.innerHTML = '<h1>#{CGI.escapeHTML(@app.name.to_s)}</h1><p>Development build loaded successfully!</p>';
         }
       JAVASCRIPT
     end

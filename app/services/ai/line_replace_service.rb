@@ -102,31 +102,52 @@ module Ai
       if @search_pattern.include?('...')
         return ellipsis_pattern_matches?(target_content)
       else
-        # Normalize whitespace while preserving indentation structure
-        # Remove leading/trailing newlines but keep spaces for indentation
+        # Try multiple levels of normalization to handle AI-generated pattern mismatches
+        
+        # Level 1: Basic normalization - remove leading/trailing newlines
         normalized_pattern = @search_pattern.gsub(/\A\n+|\n+\z/, '').rstrip
         normalized_target = target_content.gsub(/\A\n+|\n+\z/, '').rstrip
         
-        # If patterns still don't match, try one more normalization:
-        # Compare without leading whitespace on first line
-        if normalized_pattern != normalized_target
-          # Remove only leading spaces from the first line of both
-          pattern_lines = normalized_pattern.lines
-          target_lines = normalized_target.lines
+        return true if normalized_pattern == normalized_target
+        
+        # Level 2: Normalize all whitespace (spaces, tabs) to single spaces within lines
+        # This handles cases where AI uses different indentation than actual file
+        space_normalized_pattern = normalized_pattern.gsub(/[ \t]+/, ' ').strip
+        space_normalized_target = normalized_target.gsub(/[ \t]+/, ' ').strip
+        
+        if space_normalized_pattern == space_normalized_target
+          Rails.logger.info "[LineReplaceService] Pattern matched after normalizing whitespace"
+          return true
+        end
+        
+        # Level 3: Compare line by line with flexible indentation
+        pattern_lines = normalized_pattern.lines.map(&:rstrip)
+        target_lines = normalized_target.lines.map(&:rstrip)
+        
+        if pattern_lines.size == target_lines.size
+          all_match = pattern_lines.zip(target_lines).all? do |pattern_line, target_line|
+            # Compare lines after stripping all leading/trailing whitespace
+            pattern_line.strip == target_line.strip
+          end
           
-          if pattern_lines.size == target_lines.size && pattern_lines.size > 0
-            # Check if only the first line differs by leading whitespace
-            pattern_first = pattern_lines[0].lstrip
-            target_first = target_lines[0].lstrip
-            
-            if pattern_first == target_first && pattern_lines[1..-1] == target_lines[1..-1]
-              Rails.logger.info "[LineReplaceService] Pattern matched after normalizing first line indentation"
-              return true
-            end
+          if all_match
+            Rails.logger.info "[LineReplaceService] Pattern matched after line-by-line normalization"
+            return true
           end
         end
         
-        normalized_pattern == normalized_target
+        # Level 4: Try comparing without any whitespace at all (last resort)
+        # This is aggressive but catches cases where spacing is completely different
+        no_space_pattern = normalized_pattern.gsub(/\s+/, '')
+        no_space_target = normalized_target.gsub(/\s+/, '')
+        
+        if no_space_pattern == no_space_target
+          Rails.logger.warn "[LineReplaceService] Pattern matched only after removing ALL whitespace - replacement may alter formatting"
+          return true
+        end
+        
+        # No match found
+        false
       end
     end
     
@@ -139,15 +160,34 @@ module Ai
       prefix = parts[0].strip
       suffix = parts[1].strip
       
-      # Check if target content starts and ends with the pattern parts
+      # Normalize target content
       normalized_target = target_content.strip
       
+      # Try exact match first
       starts_with_prefix = prefix.empty? || normalized_target.start_with?(prefix)
       ends_with_suffix = suffix.empty? || normalized_target.end_with?(suffix)
       
-      Rails.logger.info "[LineReplaceService] Ellipsis match: prefix=#{starts_with_prefix}, suffix=#{ends_with_suffix}"
+      if starts_with_prefix && ends_with_suffix
+        Rails.logger.info "[LineReplaceService] Ellipsis pattern matched exactly"
+        return true
+      end
       
-      starts_with_prefix && ends_with_suffix
+      # Try with whitespace normalization
+      # Normalize whitespace in prefix, suffix and target
+      norm_prefix = prefix.gsub(/\s+/, ' ').strip
+      norm_suffix = suffix.gsub(/\s+/, ' ').strip
+      norm_target = normalized_target.gsub(/\s+/, ' ').strip
+      
+      starts_with_norm = norm_prefix.empty? || norm_target.start_with?(norm_prefix)
+      ends_with_norm = norm_suffix.empty? || norm_target.end_with?(norm_suffix)
+      
+      if starts_with_norm && ends_with_norm
+        Rails.logger.info "[LineReplaceService] Ellipsis pattern matched after whitespace normalization"
+        return true
+      end
+      
+      Rails.logger.info "[LineReplaceService] Ellipsis match failed: prefix=#{starts_with_norm}, suffix=#{ends_with_norm}"
+      false
     end
     
     def perform_replacement

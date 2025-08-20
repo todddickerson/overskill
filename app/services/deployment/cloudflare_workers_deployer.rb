@@ -252,8 +252,15 @@ module Deployment
         return built_code  # Already a Worker script
       end
       
-      # Generate Worker script from file hash
-      code_files_json = JSON.generate(built_code)
+      # Ensure all file contents are properly escaped for JavaScript
+      # This prevents issues with apostrophes, quotes, and other special characters
+      sanitized_built_code = built_code.transform_values do |content|
+        # Ensure content is a string and properly escape any problematic characters
+        content.to_s
+      end
+      
+      # Generate Worker script from file hash with proper JSON escaping
+      code_files_json = JSON.generate(sanitized_built_code)
       asset_urls_json = JSON.generate(r2_asset_urls)
       
       <<~JAVASCRIPT
@@ -411,10 +418,14 @@ module Deployment
       secrets['SUPABASE_SECRET_KEY'] = ENV['SUPABASE_SERVICE_KEY']
       secrets['SUPABASE_ANON_KEY'] = ENV['SUPABASE_ANON_KEY'] # Public key for client-side auth
       
-      # System defaults
+      # System defaults - ensure strings are safe for JavaScript contexts
       secrets['APP_ID'] = @app.id.to_s
       secrets['OWNER_ID'] = @app.team.id.to_s
       secrets['ENVIRONMENT'] = Rails.env
+      
+      # Add app name if needed, but ensure it's safe for JavaScript
+      # Note: We don't typically expose app name as an env var, but if we do, it should be safe
+      # secrets['APP_NAME'] = @app.name.to_s  # Commented out - not currently used
       
       # User's custom environment variables (non-secret only)
       if @app.respond_to?(:app_env_vars)

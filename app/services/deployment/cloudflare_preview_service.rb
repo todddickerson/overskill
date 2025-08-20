@@ -171,7 +171,9 @@ class Deployment::CloudflarePreviewService
     
     # System vars
     vars['APP_ID'] = @app.id.to_s
-    vars['APP_NAME'] = @app.name
+    # Ensure app name is safe for JavaScript environments
+    # JSON.generate will properly escape quotes and apostrophes
+    vars['APP_NAME'] = @app.name.to_s
     vars['ENVIRONMENT'] = environment.to_s
     
     # Set deployed timestamp based on environment

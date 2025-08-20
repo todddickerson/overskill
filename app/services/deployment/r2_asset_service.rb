@@ -82,7 +82,7 @@ module Deployment
         cache_control: cache_control_for_path(path),
         metadata: {
           'app-id' => @app.id.to_s,
-          'app-name' => @app.name,
+          'app-name' => @app.name.to_s,
           'uploaded-at' => Time.current.iso8601
         }
       }

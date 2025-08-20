@@ -52,7 +52,8 @@ module Deployment
         [vars]
         # Public environment variables (safe for client)
         APP_ID = "#{@app.id}"
-        APP_NAME = "#{@app.name}"
+        # APP_NAME is escaped properly when injected via JSON in the Worker
+        APP_NAME = "#{@app.name.gsub('"', '\\"')}"
         ENVIRONMENT = "production"
         
         # Public API endpoints (not keys)
