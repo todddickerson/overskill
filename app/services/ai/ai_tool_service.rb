@@ -47,13 +47,7 @@ module Ai
       app_file = @app.app_files.find_or_initialize_by(path: file_path)
       app_file.team = @app.team  # Ensure team is set for new files
       
-      # For new files, save first to establish associations before setting content
-      # This prevents R2 storage errors when content setter tries to access app.id
-      if app_file.new_record?
-        app_file.save!  # Save without content first
-      end
-      
-      # Now set content after associations are established
+      # Set content before saving to satisfy validation
       app_file.content = transformed_content
       
       if app_file.save

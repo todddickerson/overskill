@@ -33,6 +33,7 @@ class AppFile < ApplicationRecord
 
   before_save :update_content_hash, if: :content_changed?
   before_save :update_size_bytes, if: :content_changed?
+  after_create :handle_r2_storage_for_new_records
   # 🚅 add callbacks above.
 
   # 🚅 add delegations above.
@@ -217,6 +218,9 @@ class AppFile < ApplicationRecord
   end
   
   def store_in_r2(content)
+    # Skip R2 storage for new records - will be handled after save
+    return nil if new_record? || app_id.nil?
+    
     service = Storage::R2FileStorageService.new
     result = service.store_file_content(app.id, path, content)
     self.r2_object_key = result[:object_key]
@@ -254,6 +258,22 @@ class AppFile < ApplicationRecord
     if read_attribute(:content).blank? && r2_object_key.blank?
       errors.add(:base, "Either content or R2 object key must be present")
     end
+  end
+  
+  def handle_r2_storage_for_new_records
+    # After the record is created, check if we need to store in R2
+    return unless storage_location.in?(['r2', 'hybrid'])
+    return if r2_object_key.present? # Already stored
+    
+    content_to_store = read_attribute(:content)
+    return if content_to_store.blank?
+    
+    # Now we have an ID, we can store in R2
+    service = Storage::R2FileStorageService.new
+    result = service.store_file_content(app.id, path, content_to_store)
+    
+    # Update just the R2 key without triggering callbacks
+    update_column(:r2_object_key, result[:object_key]) if result[:object_key]
   end
   
   def update_content_hash
