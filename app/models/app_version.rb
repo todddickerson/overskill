@@ -46,7 +46,6 @@ class AppVersion < ApplicationRecord
       client = Ai::OpenRouterClient.new
       response = client.chat(
         [{ role: 'user', content: prompt }],
-        model: :gemini_flash, # Use fast, cheap model for simple task
         max_tokens: 50,
         temperature: 0.3
       )
