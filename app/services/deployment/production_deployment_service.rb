@@ -145,18 +145,11 @@ module Deployment
     def build_for_production
       Rails.logger.info "[ProductionDeployment] Building production version"
       
-      # Use ExternalViteBuilder - using preview mode for now to avoid TypeScript errors
-      # TODO: Fix TypeScript errors and switch to production build
-      builder = Deployment::ExternalViteBuilder.new(@app)
-      build_result = builder.build_for_preview  # Using preview mode temporarily
-      
-      if build_result[:success]
-        Rails.logger.info "[ProductionDeployment] Build successful (#{build_result[:output_size]} bytes)"
-        { success: true, built_code: build_result[:built_code] }
-      else
-        Rails.logger.error "[ProductionDeployment] Build failed: #{build_result[:error]}"
-        { success: false, error: "Build failed: #{build_result[:error]}" }
-      end
+      # Workers for Platforms deployment - GitHub Actions handles builds
+      # No need for local building with ExternalViteBuilder anymore
+      # This method now just returns success since building happens via GitHub
+      Rails.logger.info "[ProductionDeployment] Build will be handled by GitHub Actions"
+      { success: true, built_code: nil, message: "Build handled by GitHub Actions" }
     end
     
     def deploy_production_worker(built_code)

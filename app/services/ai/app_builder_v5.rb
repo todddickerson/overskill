@@ -4122,18 +4122,34 @@ module Ai
     def loop_detected?(result)
       return false if @iteration_count < 3
       
-      # Track recent operations
+      # Track recent operations and failures
       @recent_operations ||= []
+      @failed_operations ||= {}
       
       if result[:type] == :tools_executed && result[:data]
         result[:data].each do |operation|
+          # Track failed operations to prevent retrying them
+          if operation[:status] == 'error' || operation[:status] == 'failed'
+            operation_key = "#{operation[:name]}:#{operation[:path] || 'no-path'}"
+            @failed_operations[operation_key] ||= 0
+            @failed_operations[operation_key] += 1
+            
+            # If same operation failed 3+ times, it's a loop
+            if @failed_operations[operation_key] >= 3
+              Rails.logger.error "[V5_LOOP_DETECT] Operation #{operation_key} has failed #{@failed_operations[operation_key]} times - stopping to prevent infinite retry loop"
+              add_loop_message("Operation '#{operation[:name]}' has failed multiple times. Stopping to prevent infinite retry.", type: 'error')
+              return true
+            end
+          end
+          
           next unless operation[:path]
           
           operation_key = "#{operation[:path]}:#{operation[:type] || 'write'}"
           @recent_operations << {
             key: operation_key,
             iteration: @iteration_count,
-            timestamp: Time.current
+            timestamp: Time.current,
+            status: operation[:status]
           }
         end
         
