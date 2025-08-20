@@ -747,7 +747,7 @@ module Ai
           production_url: "https://#{final_subdomain}.overskill.com"
         }
       rescue => e
-        @logger.error "[AiToolService] Failed to rename app: #{e.message}"
+        @logger.error "[AiToolService] Failed to rename app: #{e.message} #{e.backtrace.join("\n")}"
         { success: false, error: "Failed to rename app: #{e.message}" }
       end
     end

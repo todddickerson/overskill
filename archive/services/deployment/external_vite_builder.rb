@@ -152,6 +152,21 @@ module Deployment
         # Write all app files to temp directory
         write_app_files_to_disk
         
+        # Validate component imports before building (skip validation for certain UI library files)
+        if should_validate_imports?
+          validator = Validation::ComponentImportValidator.new(@app)
+          unless validator.validate!
+            # Filter out errors from UI library files which may have complex import patterns
+            real_errors = validator.errors.reject { |e| e[:file].include?('components/ui/') }
+            if real_errors.any?
+              error_messages = real_errors.map { |e| "#{e[:file]}: #{e[:message]}" }
+              raise "Component import validation failed:\n#{error_messages.join("\n")}"
+            else
+              Rails.logger.info "[ExternalViteBuilder] Skipping UI library import validation errors"
+            end
+          end
+        end
+        
         # Execute the build process
         built_code = yield(@temp_dir)
         
@@ -394,6 +409,14 @@ module Deployment
         end
         path
       end
+    end
+    
+    def should_validate_imports?
+      # Always validate in production/staging builds
+      return true if Rails.env.production? || Rails.env.staging?
+      
+      # In development, check if validation is explicitly enabled
+      ENV['VALIDATE_COMPONENT_IMPORTS'].present? || @app.status == 'generating'
     end
     
     def read_build_output(temp_dir)
