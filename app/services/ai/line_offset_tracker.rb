@@ -51,19 +51,27 @@ module Ai
       adjusted = line_number
       offsets = skip_last ? @file_offsets[file_path][0...-1] : @file_offsets[file_path]
       
-      offsets.each do |offset|
+      # Sort offsets by original_first to ensure we process them in order
+      sorted_offsets = offsets.sort_by { |o| o[:original_first] }
+      
+      sorted_offsets.each do |offset|
         # If the line is after a replacement, adjust it
         if line_number > offset[:original_last]
           adjusted += offset[:line_difference]
-        elsif line_number >= offset[:original_first]
+          @logger.debug "[LineOffsetTracker] Line #{line_number} is after replacement at #{offset[:original_first]}-#{offset[:original_last]}, adjusting by #{offset[:line_difference]}"
+        elsif line_number >= offset[:original_first] && line_number <= offset[:original_last]
           # Line is within a replaced section - this might need special handling
-          # For now, we'll adjust based on position
+          # For replacements within replaced sections, we need to be careful
           @logger.warn "[LineOffsetTracker] Line #{line_number} is within previously replaced section #{offset[:original_first]}-#{offset[:original_last]}"
+          # Keep the line as the start of the replaced section
+          adjusted = offset[:adjusted_first]
+          break # Don't apply further adjustments
         end
       end
       
       if adjusted != line_number
-        @logger.info "[LineOffsetTracker] File '#{file_path}': Adjusted line #{line_number} -> #{adjusted} (#{@file_offsets[file_path].size} previous replacements)"
+        @logger.info "[LineOffsetTracker] File '#{file_path}': Adjusted line #{line_number} -> #{adjusted} (#{sorted_offsets.size} previous replacements)"
+        @logger.debug "[LineOffsetTracker] Replacement history: #{sorted_offsets.map { |o| "L#{o[:original_first]}-#{o[:original_last]}(#{o[:line_difference] > 0 ? '+' : ''}#{o[:line_difference]})" }.join(', ')}"
       end
       
       adjusted

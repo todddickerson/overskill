@@ -31,6 +31,17 @@ module Ai
         # Validate line numbers
         return error_result("Invalid line range") unless valid_line_range?
         
+        # Check if replacement content is already present (prevent duplicates)
+        if replacement_already_present?
+          Rails.logger.info "[LineReplaceService] Replacement content already exists in file, skipping to prevent duplication"
+          return {
+            success: true,
+            message: "Content already present in file (no changes needed)",
+            already_present: true,
+            new_content: @original_content
+          }
+        end
+        
         # Extract content to replace
         target_content = extract_target_content
         
@@ -47,6 +58,17 @@ module Ai
             Rails.logger.warn "[LineReplaceService] First difference at position #{first_diff_index}: expected #{@search_pattern[first_diff_index].inspect}, got #{target_content[first_diff_index].inspect}"
           elsif @search_pattern.length != target_content.length
             Rails.logger.warn "[LineReplaceService] Length mismatch: pattern is #{@search_pattern.length} chars, content is #{target_content.length} chars"
+          end
+          
+          # Check if the replacement might already be there
+          if content_seems_already_replaced?
+            Rails.logger.info "[LineReplaceService] Content appears to already have been replaced, allowing as success"
+            return {
+              success: true,
+              message: "Content appears to already be updated",
+              fuzzy_match_used: true,
+              new_content: @original_content
+            }
           end
           
           return error_result("Search pattern does not match target lines")
@@ -90,6 +112,91 @@ module Ai
       @last_line >= @first_line && 
       @first_line <= @lines.size &&
       @last_line <= @lines.size
+    end
+    
+    def replacement_already_present?
+      # Check if key parts of the replacement are already in the file
+      # This helps prevent duplicate additions when AI retries
+      return false if @replacement.blank?
+      
+      # Extract meaningful content from replacement (ignore whitespace-only lines)
+      replacement_key_lines = @replacement.lines.map(&:strip).reject(&:blank?)
+      return false if replacement_key_lines.empty?
+      
+      # Check if at least 80% of key lines are already present
+      file_content_normalized = @original_content.downcase.gsub(/\s+/, ' ')
+      
+      present_count = replacement_key_lines.count do |line|
+        normalized_line = line.downcase.gsub(/\s+/, ' ')
+        # Skip very short lines or common patterns
+        next false if normalized_line.length < 10
+        file_content_normalized.include?(normalized_line)
+      end
+      
+      presence_ratio = present_count.to_f / replacement_key_lines.size
+      
+      if presence_ratio > 0.8
+        Rails.logger.info "[LineReplaceService] #{(presence_ratio * 100).round}% of replacement content already present"
+        return true
+      end
+      
+      false
+    end
+    
+    def content_seems_already_replaced?
+      # Check if the content at the target lines looks like it might already
+      # have been replaced (useful when line numbers are off)
+      return false if @replacement.blank?
+      
+      # Get content around the target area (with some buffer)
+      buffer_lines = 5
+      start_line = [@first_line - buffer_lines, 1].max
+      end_line = [@last_line + buffer_lines, @lines.size].min
+      
+      nearby_content = @lines[(start_line - 1)..(end_line - 1)].join.downcase
+      
+      # Check for key identifiers from the replacement
+      replacement_keywords = extract_key_identifiers(@replacement)
+      
+      if replacement_keywords.any? && replacement_keywords.all? { |kw| nearby_content.include?(kw.downcase) }
+        Rails.logger.info "[LineReplaceService] Key identifiers from replacement found near target lines"
+        return true
+      end
+      
+      false
+    end
+    
+    def extract_key_identifiers(content)
+      # Extract meaningful identifiers like class names, function names, comments
+      identifiers = []
+      
+      # CSS class names
+      identifiers.concat(content.scan(/\.[\w-]+/).map { |c| c.gsub('.', '') })
+      
+      # Variable/function names
+      identifiers.concat(content.scan(/\b(?:const|let|var|function|class)\s+(\w+)/).flatten)
+      
+      # Distinctive comments
+      identifiers.concat(content.scan(/\/\*\s*(.+?)\s*\*\//).flatten)
+      identifiers.concat(content.scan(/\/\/\s*(.+)$/).flatten)
+      
+      # Keep only reasonably unique identifiers
+      identifiers.select { |id| id.length > 5 && !common_identifier?(id) }.uniq
+    end
+    
+    def common_identifier?(identifier)
+      # List of common identifiers to ignore
+      common = %w[
+        import export default return const let var function class
+        if else for while do switch case break continue
+        true false null undefined void this super new
+        async await promise then catch finally try
+        div span button input form label select option
+        margin padding border width height display flex
+        color background font size weight style position
+      ]
+      
+      common.include?(identifier.downcase)
     end
     
     def extract_target_content

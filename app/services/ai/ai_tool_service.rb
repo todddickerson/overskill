@@ -143,6 +143,12 @@ module Ai
       if result[:success]
         @logger.info "[AiToolService] Successfully replaced lines in #{file_path}"
         
+        # Handle special case where content was already present
+        if result[:already_present]
+          @logger.info "[AiToolService] Content already present, no changes made"
+          return result
+        end
+        
         # Record the replacement in the tracker if available
         if @line_offset_tracker
           # Calculate how many lines the replacement has
@@ -151,6 +157,16 @@ module Ai
         end
       else
         @logger.warn "[AiToolService] Line-replace failed for #{file_path}: #{result[:error]}"
+        
+        # Try to recover by finding the pattern in nearby lines
+        if result[:error].include?("Search pattern does not match")
+          @logger.info "[AiToolService] Attempting to find pattern in nearby lines..."
+          recovered_result = attempt_fuzzy_line_replacement(file, search_pattern, first_line, last_line, replacement)
+          if recovered_result[:success]
+            @logger.info "[AiToolService] Successfully recovered using fuzzy matching"
+            return recovered_result
+          end
+        end
       end
       
       result
@@ -158,6 +174,72 @@ module Ai
       @logger.error "[AiToolService] Error in line replace for #{file_path}: #{e.message}"
       @logger.error e.backtrace.first(5).join("\n")
       { success: false, error: e.message }
+    end
+    
+    def attempt_fuzzy_line_replacement(file, search_pattern, original_first_line, original_last_line, replacement)
+      # Try to find the pattern within a window around the specified lines
+      window_size = 10
+      file_lines = file.content.lines
+      
+      # Normalize the search pattern for comparison
+      normalized_search = search_pattern.strip.downcase.gsub(/\s+/, ' ')
+      
+      # Search within a window
+      start_search = [original_first_line - window_size, 1].max
+      end_search = [original_last_line + window_size, file_lines.size].min
+      
+      best_match = nil
+      best_score = 0
+      
+      (start_search..end_search).each do |start_line|
+        (start_line..end_search).each do |end_line|
+          next if end_line - start_line > original_last_line - original_first_line + 5 # Don't search too large ranges
+          
+          # Extract content for this range
+          test_content = file_lines[(start_line - 1)..(end_line - 1)].join
+          normalized_test = test_content.strip.downcase.gsub(/\s+/, ' ')
+          
+          # Calculate similarity score
+          score = calculate_similarity(normalized_search, normalized_test)
+          
+          if score > best_score && score > 0.7 # Require at least 70% similarity
+            best_match = { start: start_line, end: end_line, content: test_content }
+            best_score = score
+          end
+        end
+      end
+      
+      if best_match
+        @logger.info "[AiToolService] Found fuzzy match at lines #{best_match[:start]}-#{best_match[:end]} with #{(best_score * 100).round}% similarity"
+        
+        # Try the replacement with the found lines
+        result = Ai::LineReplaceService.replace_lines(file, best_match[:content], best_match[:start], best_match[:end], replacement)
+        
+        if result[:success] && @line_offset_tracker
+          # Record the replacement with original line numbers for tracking
+          replacement_lines = replacement.lines.count
+          @line_offset_tracker.record_replacement(file.path, original_first_line, original_last_line, replacement_lines)
+        end
+        
+        result[:fuzzy_match_used] = true if result[:success]
+        result
+      else
+        @logger.warn "[AiToolService] Could not find fuzzy match for pattern"
+        { success: false, error: "Could not find pattern in file (even with fuzzy matching)" }
+      end
+    end
+    
+    def calculate_similarity(str1, str2)
+      # Simple Jaccard similarity for words
+      words1 = str1.split(/\s+/).to_set
+      words2 = str2.split(/\s+/).to_set
+      
+      return 0.0 if words1.empty? || words2.empty?
+      
+      intersection = words1 & words2
+      union = words1 | words2
+      
+      intersection.size.to_f / union.size
     end
     
     # ========================
