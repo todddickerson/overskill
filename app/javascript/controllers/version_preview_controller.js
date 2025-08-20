@@ -96,8 +96,12 @@ export default class extends Controller {
     }
   }
   
-  async restoreSpecificVersion(event) {
-    const versionId = event.currentTarget.dataset.versionId
+  async restoreSpecificVersion(versionIdOrEvent) {
+    // Handle both direct versionId string and event object
+    const versionId = typeof versionIdOrEvent === 'string' 
+      ? versionIdOrEvent 
+      : versionIdOrEvent.currentTarget?.dataset?.versionId
+      
     if (!versionId) {
       console.error("No version ID found for restore")
       return

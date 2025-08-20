@@ -76,15 +76,159 @@ class Account::AppVersionsController < Account::ApplicationController
 
   # GET /account/app_versions/:id/preview
   def preview
-    # Deploy this specific version to a preview Worker
-    service = Deployment::AppVersionPreviewService.new(@app_version)
-    result = service.deploy_version_preview!
+    app = @app_version.app
     
-    if result[:success]
-      redirect_to result[:preview_url], allow_other_host: true
-    else
-      redirect_to [:account, @app_version.app, :editor], 
-                  alert: "Failed to preview version: #{result[:error]}"
+    # For V5, we need to temporarily restore the version's files, build, and deploy
+    begin
+      Rails.logger.info "[Preview] Starting preview for version #{@app_version.version_number}"
+      
+      # Save current files state to restore later
+      original_files = app.app_files.map do |file|
+        {
+          path: file.path,
+          content: file.content,
+          file_type: file.file_type,
+          size_bytes: file.size_bytes,
+          is_entry_point: file.is_entry_point
+        }
+      end
+      
+      # Temporarily restore version's files
+      files_restored = false
+      
+      if @app_version.files_snapshot.present?
+        # V5 versions with snapshot
+        snapshot_files = JSON.parse(@app_version.files_snapshot)
+        app.app_files.destroy_all
+        
+        snapshot_files.each do |file_data|
+          app.app_files.create!(
+            team: app.team,
+            path: file_data['path'],
+            content: file_data['content'],
+            file_type: file_data['file_type'] || determine_file_type(file_data['path']),
+            size_bytes: file_data['content'].bytesize,
+            is_entry_point: (file_data['path'] == 'index.html')
+          )
+        end
+        files_restored = true
+        
+      elsif @app_version.app_version_files.any?
+        # Older versions with app_version_files
+        app.app_files.destroy_all
+        
+        @app_version.app_version_files.includes(:app_file).each do |version_file|
+          next if version_file.action == 'deleted'
+          original_file = version_file.app_file
+          
+          app.app_files.create!(
+            team: app.team,
+            path: original_file.path,
+            content: version_file.content || original_file.content,
+            file_type: original_file.file_type,
+            size_bytes: (version_file.content || original_file.content).bytesize,
+            is_entry_point: original_file.is_entry_point
+          )
+        end
+        files_restored = true
+      end
+      
+      if !files_restored
+        Rails.logger.error "[Preview] No files to preview for version #{@app_version.version_number}"
+        redirect_to [:account, app, :editor], 
+                    alert: "This version has no files to preview"
+        return
+      end
+      
+      # Build and deploy the version
+      builder = Deployment::ExternalViteBuilder.new(app)
+      build_result = builder.build_for_preview_with_r2
+      
+      if build_result[:success]
+        deployer = Deployment::CloudflareWorkersDeployer.new(app)
+        
+        # Deploy to a version-specific preview worker
+        deploy_result = deployer.deploy_with_secrets(
+          built_code: build_result[:built_code],
+          r2_asset_urls: build_result[:r2_asset_urls],
+          deployment_type: :preview,
+          worker_name_override: "version-#{@app_version.id}-#{app.id}"
+        )
+        
+        if deploy_result[:success]
+          # Restore original files
+          app.app_files.destroy_all
+          original_files.each do |file_data|
+            app.app_files.create!(
+              team: app.team,
+              path: file_data[:path],
+              content: file_data[:content],
+              file_type: file_data[:file_type],
+              size_bytes: file_data[:size_bytes],
+              is_entry_point: file_data[:is_entry_point]
+            )
+          end
+          
+          # Redirect to the preview URL
+          preview_url = deploy_result[:worker_url] || deploy_result[:deployment_url]
+          Rails.logger.info "[Preview] Successfully deployed version preview to #{preview_url}"
+          redirect_to preview_url, allow_other_host: true
+        else
+          # Restore original files
+          app.app_files.destroy_all
+          original_files.each do |file_data|
+            app.app_files.create!(
+              team: app.team,
+              path: file_data[:path],
+              content: file_data[:content],
+              file_type: file_data[:file_type],
+              size_bytes: file_data[:size_bytes],
+              is_entry_point: file_data[:is_entry_point]
+            )
+          end
+          
+          redirect_to [:account, app, :editor], 
+                      alert: "Failed to deploy preview: #{deploy_result[:error]}"
+        end
+      else
+        # Restore original files
+        app.app_files.destroy_all
+        original_files.each do |file_data|
+          app.app_files.create!(
+            team: app.team,
+            path: file_data[:path],
+            content: file_data[:content],
+            file_type: file_data[:file_type],
+            size_bytes: file_data[:size_bytes],
+            is_entry_point: file_data[:is_entry_point]
+          )
+        end
+        
+        redirect_to [:account, app, :editor], 
+                    alert: "Failed to build preview: #{build_result[:error]}"
+      end
+      
+    rescue => e
+      Rails.logger.error "[Preview] Failed to preview version: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      
+      # Try to restore original files if something went wrong
+      if defined?(original_files) && original_files
+        app.app_files.destroy_all
+        original_files.each do |file_data|
+          app.app_files.create!(
+            team: app.team,
+            path: file_data[:path],
+            content: file_data[:content],
+            file_type: file_data[:file_type],
+            size_bytes: file_data[:size_bytes],
+            is_entry_point: file_data[:is_entry_point]
+          ) rescue nil
+        end
+      end
+      
+      redirect_to [:account, app, :editor], 
+                  alert: "Failed to preview version: #{e.message}"
     end
   end
   
@@ -167,7 +311,7 @@ class Account::AppVersionsController < Account::ApplicationController
     if new_version.save
       files_restored = 0
       
-      # Restore files from files_snapshot
+      # Try to restore from files_snapshot first (V5 versions)
       if @app_version.files_snapshot.present?
         begin
           snapshot_files = JSON.parse(@app_version.files_snapshot)
@@ -199,7 +343,7 @@ class Account::AppVersionsController < Account::ApplicationController
             files_snapshot: @app_version.files_snapshot  # Copy the exact snapshot being restored
           )
           
-          Rails.logger.info "[Restore] Successfully restored #{files_restored} files"
+          Rails.logger.info "[Restore] Successfully restored #{files_restored} files from snapshot"
           
         rescue JSON::ParserError => e
           Rails.logger.error "[Restore] Failed to parse files_snapshot: #{e.message}"
@@ -208,10 +352,88 @@ class Account::AppVersionsController < Account::ApplicationController
           end
         end
         
+      elsif @app_version.app_version_files.any?
+        # Fallback for older versions that have app_version_files but no snapshot
+        Rails.logger.info "[Restore] Using app_version_files fallback for version #{@app_version.version_number}"
+        
+        # Clear existing files and restore from app_version_files
+        app.app_files.destroy_all
+        
+        # Create new files from version files
+        @app_version.app_version_files.includes(:app_file).each do |version_file|
+          original_file = version_file.app_file
+          
+          # Skip deleted files
+          next if version_file.action == 'deleted'
+          
+          # Create the app file from version file
+          app.app_files.create!(
+            team: app.team,
+            path: original_file.path,
+            content: version_file.content || original_file.content,
+            file_type: original_file.file_type,
+            size_bytes: (version_file.content || original_file.content).bytesize,
+            is_entry_point: original_file.is_entry_point
+          )
+          
+          files_restored += 1
+          Rails.logger.info "[Restore] Restored #{original_file.path} from app_version_files"
+        end
+        
+        # Create snapshot for the new version from restored files
+        snapshot_data = app.app_files.map do |file|
+          {
+            path: file.path,
+            content: file.content,
+            file_type: file.file_type
+          }
+        end
+        
+        new_version.update!(files_snapshot: snapshot_data.to_json)
+        
+        Rails.logger.info "[Restore] Successfully restored #{files_restored} files from app_version_files"
+        
       else
-        Rails.logger.warn "[Restore] No files snapshot found in version #{@app_version.version_number}"
-        return respond_to do |format|
-          format.json { render json: { success: false, error: "This version does not have a files snapshot" }, status: :unprocessable_entity }
+        # Last resort: restore from template files if this is a completely empty version
+        Rails.logger.warn "[Restore] No files found in version #{@app_version.version_number}, attempting template restore"
+        
+        # Find a version with files to use as template, or use the shared template
+        template_version = app.app_versions
+                              .where("files_snapshot IS NOT NULL")
+                              .order(created_at: :desc)
+                              .first
+        
+        if template_version&.files_snapshot.present?
+          Rails.logger.info "[Restore] Using template from version #{template_version.version_number}"
+          
+          # Clear existing files and restore from template
+          app.app_files.destroy_all
+          
+          template_files = JSON.parse(template_version.files_snapshot)
+          template_files.each do |file_data|
+            app.app_files.create!(
+              team: app.team,
+              path: file_data['path'],
+              content: file_data['content'],
+              file_type: file_data['file_type'] || determine_file_type(file_data['path']),
+              size_bytes: file_data['content'].bytesize,
+              is_entry_point: (file_data['path'] == 'index.html')
+            )
+            files_restored += 1
+          end
+          
+          # Save snapshot for the new version
+          new_version.update!(files_snapshot: template_version.files_snapshot)
+          
+          Rails.logger.info "[Restore] Restored #{files_restored} template files"
+        else
+          Rails.logger.error "[Restore] No template version available for app #{app.id}"
+          return respond_to do |format|
+            format.json { render json: { 
+              success: false, 
+              error: "This version has no files and no template is available. Please create a new app instead." 
+            }, status: :unprocessable_entity }
+          end
         end
       end
       
@@ -384,11 +606,24 @@ class Account::AppVersionsController < Account::ApplicationController
   def next_version_number(app)
     last_version = app.app_versions.order(created_at: :desc).first
     if last_version
-      parts = last_version.version_number.split(".")
+      # Handle both "v1.0.0" and "1.0.0" formats
+      version_str = last_version.version_number.gsub(/^v/, '')
+      parts = version_str.split(".")
+      
+      # Ensure we have 3 parts (major.minor.patch)
+      parts = (parts + ['0', '0', '0']).first(3)
+      
+      # Increment patch version
       parts[-1] = (parts[-1].to_i + 1).to_s
-      parts.join(".")
+      
+      # Preserve "v" prefix if the last version had it
+      if last_version.version_number.start_with?('v')
+        "v#{parts.join('.')}"
+      else
+        parts.join(".")
+      end
     else
-      "1.0.0"
+      "v1.0.0"  # Default to v-prefixed for new apps (V5 standard)
     end
   end
   

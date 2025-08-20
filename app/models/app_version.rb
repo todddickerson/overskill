@@ -65,6 +65,14 @@ class AppVersion < ApplicationRecord
     display_name.presence || generate_display_name!
   end
   
+  def has_files_data?
+    files_snapshot.present? || app_version_files.exists?
+  end
+  
+  def can_be_restored?
+    has_files_data? || app.app_versions.where("files_snapshot IS NOT NULL").exists?
+  end
+  
   def formatted_file_changes
     app_version_files.includes(:app_file).map do |version_file|
       file_name = extract_file_name(version_file.app_file.path)

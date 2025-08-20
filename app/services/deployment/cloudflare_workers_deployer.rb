@@ -28,8 +28,8 @@ module Deployment
       end
     end
     
-    def deploy_with_secrets(built_code:, deployment_type: :preview, r2_asset_urls: {})
-      worker_name = generate_worker_name(deployment_type)
+    def deploy_with_secrets(built_code:, deployment_type: :preview, r2_asset_urls: {}, worker_name_override: nil)
+      worker_name = worker_name_override || generate_worker_name(deployment_type)
       
       Rails.logger.info "[CloudflareWorkersDeployer] Deploying to #{worker_name}"
       
