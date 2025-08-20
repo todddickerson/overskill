@@ -1,30 +1,46 @@
-name = "app-{{APP_ID}}"
+# Workers for Platforms Configuration for OverSkill Apps
+# This app will be deployed to WFP dispatch namespaces, not as standalone worker
+
+name = "{{APP_ID}}"
 main = "dist/index.js"
 compatibility_date = "2024-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers for Platforms configuration
+# Apps are deployed to dispatch namespaces via GitHub Actions
 
 [env.production]
-name = "app-{{APP_ID}}"
+name = "{{APP_ID}}"
 
 [env.production.vars]
 VITE_SUPABASE_URL = "{{SUPABASE_URL}}"
 VITE_SUPABASE_ANON_KEY = "{{SUPABASE_ANON_KEY}}"
 VITE_APP_ID = "{{APP_ID}}"
 VITE_OWNER_ID = "{{OWNER_ID}}"
-VITE_ANALYTICS_ENABLED = "true"
+VITE_ENVIRONMENT = "production"
+
+[env.development]
+name = "preview-{{APP_ID}}"
 
 [env.development.vars]
 VITE_SUPABASE_URL = "{{SUPABASE_URL}}"
 VITE_SUPABASE_ANON_KEY = "{{SUPABASE_ANON_KEY}}"
 VITE_APP_ID = "{{APP_ID}}"
 VITE_OWNER_ID = "{{OWNER_ID}}"
-VITE_ANALYTICS_ENABLED = "false"
+VITE_ENVIRONMENT = "development"
 
-[site]
-bucket = "./dist"
-
+# Vite build configuration
 [build]
 command = "npm run build"
+cwd = "."
+watch_dir = ["src"]
 
-[[routes]]
-pattern = "/*"
-zone_name = "overskill.app"
+# Assets served from dist directory
+[assets]
+bucket = "./dist"
+include = ["**/*"]
+exclude = ["*.map"]
+
+# No routes needed - WFP dispatch worker handles routing
+# Apps accessed via: https://dispatch-worker.account.workers.dev/app/{{APP_ID}}
+# Or via custom domain: https://{{APP_ID}}.overskill.com

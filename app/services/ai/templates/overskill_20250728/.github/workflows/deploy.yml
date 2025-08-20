@@ -1,0 +1,54 @@
+name: Deploy to OverSkill Workers for Platforms
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build Vite application
+      run: npm run build
+      
+    - name: Deploy to Workers for Platforms (Preview)
+      if: github.event_name == 'pull_request'
+      uses: cloudflare/wrangler-action@v3
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Deploy to preview namespace using Workers for Platforms
+        command: deploy --dispatch-namespace overskill-development-preview --name preview-{{APP_ID}} --env development
+        
+    - name: Deploy to Workers for Platforms (Production)
+      if: github.ref == 'refs/heads/main'
+      uses: cloudflare/wrangler-action@v3
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Deploy to production namespace using Workers for Platforms
+        command: deploy --dispatch-namespace overskill-development-production --name {{APP_ID}} --env production
+
+    # Staging deployment (manual trigger or special branch)
+    - name: Deploy to Workers for Platforms (Staging)
+      if: github.ref == 'refs/heads/staging'
+      uses: cloudflare/wrangler-action@v3
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        command: deploy --dispatch-namespace overskill-development-staging --name staging-{{APP_ID}} --env development

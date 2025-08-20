@@ -105,6 +105,139 @@ class Ai::AiToolServiceTest < ActiveSupport::TestCase
   end
   
   # ========================
+  # On-Demand File Creation Tests
+  # ========================
+  
+  test "read_file creates file on-demand from GitHub template when not found" do
+    # Mock GitHub authentication
+    mock_authenticator = mock('GithubAppAuthenticator')
+    mock_authenticator.expects(:get_installation_token).returns('test-token')
+    Deployment::GithubAppAuthenticator.stubs(:new).returns(mock_authenticator)
+    
+    # Mock GitHub API response
+    github_response = mock('HTTParty::Response')
+    github_response.stubs(:code).returns(200)
+    github_response.stubs(:[]).with('content').returns(Base64.encode64("export default function App() { return <div>Hello</div>; }"))
+    HTTParty.stubs(:get).returns(github_response)
+    
+    result = @service.read_file("src/App.tsx")
+    
+    assert result[:success]
+    assert_includes result[:content], "export default function App"
+    
+    # Verify file was created
+    file = @app.app_files.find_by(path: "src/App.tsx")
+    assert_not_nil file
+    assert_equal "typescript", file.file_type
+  end
+  
+  test "replace_file_content creates file on-demand when not found" do
+    # Mock GitHub authentication
+    mock_authenticator = mock('GithubAppAuthenticator')
+    mock_authenticator.expects(:get_installation_token).returns('test-token')
+    Deployment::GithubAppAuthenticator.stubs(:new).returns(mock_authenticator)
+    
+    # Mock GitHub API response
+    github_response = mock('HTTParty::Response')
+    github_response.stubs(:code).returns(200)
+    github_response.stubs(:[]).with('content').returns(Base64.encode64("module.exports = {\n  content: []\n}"))
+    HTTParty.stubs(:get).returns(github_response)
+    
+    result = @service.replace_file_content(
+      "tailwind.config.js",
+      "content: []",
+      "1",
+      "2", 
+      "content: ['./src/**/*.{js,jsx,ts,tsx}']"
+    )
+    
+    assert result[:success]
+    
+    # Verify file was created
+    file = @app.app_files.find_by(path: "tailwind.config.js")
+    assert_not_nil file
+    assert_equal "javascript", file.file_type
+    assert_includes file.content, "./src/**/*.{js,jsx,ts,tsx}"
+  end
+  
+  test "on-demand creation handles GitHub API errors gracefully" do
+    # Mock GitHub authentication
+    mock_authenticator = mock('GithubAppAuthenticator')
+    mock_authenticator.expects(:get_installation_token).returns('test-token')
+    Deployment::GithubAppAuthenticator.stubs(:new).returns(mock_authenticator)
+    
+    # Mock GitHub API 404 response
+    github_response = mock('HTTParty::Response')
+    github_response.stubs(:code).returns(404)
+    HTTParty.stubs(:get).returns(github_response)
+    
+    result = @service.read_file("nonexistent.txt")
+    
+    assert_not result[:success]
+    assert_equal "File not found: nonexistent.txt", result[:error]
+  end
+  
+  test "on-demand creation handles authentication failures" do
+    # Mock GitHub authentication failure
+    mock_authenticator = mock('GithubAppAuthenticator')
+    mock_authenticator.expects(:get_installation_token).returns(nil)
+    Deployment::GithubAppAuthenticator.stubs(:new).returns(mock_authenticator)
+    
+    result = @service.read_file("src/App.tsx")
+    
+    assert_not result[:success]
+    assert_equal "File not found: src/App.tsx", result[:error]
+  end
+  
+  test "write_file handles R2 storage correctly with proper associations" do
+    # Test that AppFile is saved before content to establish app.id
+    large_content = "x" * 10000 # Content that triggers R2 storage
+    
+    result = @service.write_file("large.txt", large_content)
+    
+    assert result[:success]
+    
+    file = @app.app_files.find_by(path: "large.txt")
+    assert_not_nil file
+    assert_not_nil file.app_id
+    assert_equal @app.id, file.app_id
+    assert_equal large_content, file.content
+  end
+  
+  test "file type detection works correctly for various extensions" do
+    # Mock GitHub authentication
+    mock_authenticator = mock('GithubAppAuthenticator')
+    mock_authenticator.expects(:get_installation_token).returns('test-token')
+    Deployment::GithubAppAuthenticator.stubs(:new).returns(mock_authenticator)
+    
+    test_cases = {
+      "app.tsx" => "typescript",
+      "script.js" => "javascript", 
+      "styles.css" => "css",
+      "config.json" => "json",
+      "README.md" => "markdown",
+      "config.yaml" => "yaml",
+      "logo.svg" => "svg"
+    }
+    
+    test_cases.each do |filename, expected_type|
+      # Mock GitHub API response
+      github_response = mock('HTTParty::Response')
+      github_response.stubs(:code).returns(200)
+      github_response.stubs(:[]).with('content').returns(Base64.encode64("test content"))
+      HTTParty.stubs(:get).returns(github_response)
+      
+      result = @service.read_file(filename)
+      
+      assert result[:success], "Failed to read #{filename}"
+      
+      file = @app.app_files.find_by(path: filename)
+      assert_not_nil file, "File #{filename} was not created"
+      assert_equal expected_type, file.file_type, "Wrong file type for #{filename}"
+    end
+  end
+  
+  # ========================
   # Package Management Tests
   # ========================
   

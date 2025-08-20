@@ -43,12 +43,15 @@ class App < ApplicationRecord
   # 🚅 add scopes above.
 
   # Repository status enum for GitHub migration
-  enum :repository_status, {
-    pending: 'pending',
-    creating: 'creating', 
-    ready: 'ready',
-    failed: 'failed'
-  }, prefix: :repository
+  # Only define enum if the column exists (fixes BulletTrain roles initialization issue)
+  if column_names.include?('repository_status')
+    enum :repository_status, {
+      pending: 'pending',
+      creating: 'creating', 
+      ready: 'ready',
+      failed: 'failed'
+    }, prefix: :repository
+  end
 
   validates :name, presence: true
   validates :subdomain, presence: true, uniqueness: true,

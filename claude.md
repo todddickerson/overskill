@@ -15,11 +15,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. Updating the "Current State" section
 4. Removing completed items when no longer relevant
 
+## Tips
+- Utilize Perplexity MCP server for research or to confirm how things work
+- Utilize Desktop commander if needed for interacting with processes
+- Utilize Playwright MCP for interacting with web browser in real time, analyze screenshots to confirm actions before proceeding.
+- Utilize Context7 MCP for documentation look ups
+- Explore then Plan full MD file plans for larger projects and phases.  Have Perplexity research review your plan, consider feedback in context of our application and update plan.  Share files/etc with the MCP if it might get more relevant results.
+
 ## Project Overview
 
 OverSkill is an AI-powered app marketplace platform built with Ruby on Rails (BulletTrain framework). It enables non-technical users to create, deploy, and monetize applications using natural language.
 
-## Deployment Architecture (V4 - VITE BUILD SYSTEM) ✅ FINALIZED
+## Workers for Platforms (WFP) Architecture - January 2025
+
+### Implementation Status
+Complete implementation supporting 50,000+ apps with Workers for Platforms. See documentation:
+- **WFP_IMPLEMENTATION_PLAN.md** - Full architecture and deployment strategy
+- **WFP_IMPLEMENTATION_STATUS.md** - Current deployment status and results
+- **DOMAIN_STRATEGY.md** - Workers.dev vs custom domain analysis
+- **CRITICAL_NEXT_STEPS.md** - Immediate action items for WFP
+
+### WFP Architecture Summary
+```
+AI Generator (v5) → GitHub Repository → WFP Deployment → Dispatch Router
+```
+- **Repository-per-app**: Maintained for transparency and version control
+- **Workers for Platforms**: Unlimited app deployments via dispatch namespaces
+- **Cost**: ~$50-100/month for 1,000 apps (96% savings vs standard Workers)
+- **Namespaces**: Include Rails.env (overskill-development-preview, etc.)
+
+### Key Services
+- **Deployment::WorkersForPlatformsService** - Main WFP deployment service
+- **Deployment::GithubRepositoryService** - GitHub repo creation via forking
+- **Deployment::GithubAppAuthenticator** - GitHub App auth (ID: 1815066)
 
 ### Infrastructure Philosophy
 - **Professional Stack**: Vite + TypeScript + React Router + Cloudflare Workers
@@ -28,37 +56,6 @@ OverSkill is an AI-powered app marketplace platform built with Ruby on Rails (Bu
 - **App-Scoped Database**: `app_${APP_ID}_${table}` naming with RLS isolation
 - **Dual Build Modes**: Fast dev builds (45s) and optimized prod builds (3min)
 - **API-Only Deployment**: Pure HTTP API approach, no Wrangler CLI
-
-### Core Services (V4)
-
-#### 1. **Ai::AppBuilderV4** (Primary orchestrator) ✅ DECIDED
-- Template-based generation with shared foundation files
-- **Simple architecture ONLY** (no app type detection needed)
-- Integration with LineReplaceService and SmartSearchService
-- AI retry system (2x maximum) then human intervention
-- Token usage tracking per app_version for future billing
-- Path: `app/services/ai/app_builder_v4.rb`
-
-#### 2. **Ai::SharedTemplateService** (Template system) ✅ DECIDED
-- Core foundation files ALL apps need (auth, routing, database)
-- **Git repository storage** at `/app/templates/shared/`
-- TypeScript + React Router + Tailwind + shadcn/ui
-- App-scoped Supabase client with debugging wrapper
-- Path: `app/services/ai/shared_template_service.rb`
-
-#### 3. **Deployment::ViteBuilderService** (Build pipeline) ✅ DECIDED
-- **Cloudflare Worker builds** via API (no Docker/ECS needed)
-- **Development Mode**: Fast builds (45s) for rapid iteration
-- **Production Mode**: Full optimization with hybrid assets (3min)
-- Worker runtime executes Node.js + Vite builds
-- Path: `app/services/deployment/vite_builder_service.rb`
-
-#### 4. **Deployment::CloudflareApiClient** (API-only deployment) ✅ DECIDED
-- **Pure API approach** - no Wrangler CLI dependency
-- Worker deployment, R2 uploads, secret management via API
-- AppEnvVar integration with automatic Cloudflare sync
-- Route configuration and domain management
-- Path: `app/services/deployment/cloudflare_api_client.rb`
 
 ### Database Architecture ✅ DECIDED
 
@@ -185,69 +182,6 @@ const todos = await db.from('todos').select('*');
 - **Static Assets**: R2 for CDN performance only
 - **No Complex Services**: No KV storage, Cache API, or edge analytics
 
-### V4 Deployment Flow
-
-```ruby
-# 1. Generate app with AI (simple architecture for all)
-builder = Ai::AppBuilderV4.new(chat_message)
-
-# 2. Generate shared foundation + app-specific features  
-builder.generate_shared_foundation  # Auth, routing, app-scoped DB
-builder.generate_app_features       # Supabase-first approach
-
-# 3. Build with appropriate optimization
-case user_intent
-when /deploy|production/
-  result = ProductionOptimizedBuilder.new(app).build!  # 3min optimized
-else
-  result = FastDevelopmentBuilder.new(app).build!     # 45s fast
-end
-
-# 4. App available at:
-# Development: https://preview-{app-id}.overskill.app
-# Production: https://app-{app-id}.overskill.app
-```
-
-## Import Strategy (Template-Based Approach)
-
-### Overview
-We use a **template-based import strategy** inspired by Base44, prioritizing reliability over bundle optimization. This prevents missing import errors and ensures consistent app generation.
-
-### Key Components
-
-1. **ComponentRequirementsAnalyzer** (`app/services/ai/component_requirements_analyzer.rb`)
-   - Pre-analyzes user prompts to determine required components
-   - Detects app type (landing, saas, dashboard, todo, etc.)
-   - Maps keywords to required icons and UI components
-   - Generates import templates automatically
-
-2. **Common Icons Helper** (`src/lib/common-icons.ts` in every app)
-   - Pre-exports 50+ commonly used Lucide React icons
-   - Prevents "Missing import: Shield" type errors
-   - Usage: `import { Menu, X, Check, Shield } from '@/lib/common-icons'`
-
-3. **Strict Icon Whitelist** (in agent-prompt.txt)
-   - Only approved Lucide React icons can be used
-   - AI receives list of valid icons upfront
-   - Prevents hallucination of non-existent icons
-
-### Import Rules for AI
-- **ALWAYS** determine required imports BEFORE writing code
-- **ONLY** use icons from the approved whitelist
-- **PREFER** importing from `@/lib/common-icons` for common icons
-- **NEVER** import non-existent icons (will break the app)
-
-### Example Import Templates
-```typescript
-// Landing/SaaS Pages
-import { Menu, X, Check, Star, Zap, Crown, Shield } from '@/lib/common-icons';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
-// Dashboard Pages
-import { Home, User, Settings, TrendingUp } from '@/lib/common-icons';
-import { Select, SelectContent, SelectItem } from "@/components/ui/select";
-```
 
 ## AI Considerations
 
@@ -274,181 +208,3 @@ import { Select, SelectContent, SelectItem } from "@/components/ui/select";
   - Pricing: $1.25/$10 per 1M input/output tokens (gpt-5)
   - Features: PhD-level intelligence, unified reasoning, no temperature control
   - Note: Only supports default temperature, use max_completion_tokens instead of max_tokens
-
-### Legacy Models
-- **Claude 3.5 Sonnet**: Model ID `claude-3-5-sonnet-20241022` - Current fallback
-- **Claude 3 Opus**: Model ID `claude-3-opus-20240229` - Previous premium model
-- **Kimi-K2**: May timeout with function calling, use StructuredAppGenerator instead
-
-## AI App Generation System (V4 Enhanced - PRODUCTION READY)
-
-### 🎯 Current Implementation: V4 Enhanced (August 12, 2025)
-- **Status**: 🟢 PRODUCTION READY with real-time chat UX
-- **Configuration**: Set `APP_GENERATION_VERSION=v4_enhanced` in .env.local
-- **Fixed Issues**: Duplicate file creation, broadcasting channels, error recovery
-
-### Key Components
-- **Ai::AppBuilderV4Enhanced**: Enhanced orchestrator with 6-phase visual feedback
-- **ChatProgressBroadcasterV2**: Real-time updates via `app_#{app.id}_chat` channel
-- **Ai::SharedTemplateService**: Core foundation files (auth, routing, database wrapper)
-- **Integration Services**: LineReplaceService (90% token savings) + SmartSearchService
-- **Error Recovery**: Smart error handling with status updates and user suggestions
-
-### V4 Enhanced Generation Flow
-1. **Phase 1: Understanding Requirements** - Analyze and plan with visual feedback
-2. **Phase 2: Planning Architecture** - File structure and dependency detection  
-3. **Phase 3: Setting Up Foundation** - SharedTemplateService with progress
-4. **Phase 4: Generating Features** - AI customization with approval workflow
-5. **Phase 5: Validating & Building** - ExternalViteBuilder with live output
-6. **Phase 6: Deploying** - CloudflareWorkersDeployer with status updates
-
-### Claude 4 Conversation Loop
-```ruby
-# Claude only creates 1-2 files per API call
-def generate_with_claude_conversation(files_needed)
-  files_created = []
-  
-  files_needed.each_slice(2) do |batch|
-    response = claude_create_files(batch)
-    files_created.concat(response[:files])
-    broadcast_progress(files_created)
-  end
-end
-```
-
-### V4 Tool Integration
-- **LineReplaceService**: Surgical edits with ellipsis support (90% token savings)
-- **SmartSearchService**: Find existing components to prevent duplicates
-- **App-Scoped Database**: Automatic `app_${id}_${table}` naming
-- **Cloudflare Optimization**: Hybrid asset strategy for 1MB worker limit
-
-### Testing V4 Generation
-```ruby
-# Test V4 orchestrator
-rails console
-message = AppChatMessage.create!(content: "Build a todo app", user: user)
-builder = Ai::AppBuilderV4.new(message)
-builder.execute!
-```
-
-## DevUX and Testing Tools
-
-### Deployment Testing Suite
-Comprehensive test scripts for verifying deployed app functionality:
-
-#### Core Test Scripts (JavaScript/Node.js)
-- **`test_todo_deployment.js`** - Main deployment verification
-  - Tests app accessibility and HTTP status
-  - Analyzes HTML structure for React elements
-  - Detects TypeScript transformation errors
-  - Validates todo app content and patterns
-  - Generates comprehensive test reports
-
-- **`test_app_functionality.js`** - JavaScript/React functionality testing
-  - Tests main script loading and execution
-  - Analyzes React component patterns
-  - Checks for modern JavaScript syntax
-  - Validates environment variable injection
-  - Provides code samples and detailed analysis
-
-- **`test_app_components.js`** - Component-level testing
-  - Tests individual React component files
-  - Validates CSS and styling resources
-  - Checks for proper React hooks usage
-  - Analyzes JSX transformation quality
-
-- **`test_dev_url.js`** - Development URL testing
-  - Tests dev.overskill.app accessibility
-  - Validates development environment setup
-  - Checks for proper CNAME configuration
-
-#### Browser-based Testing
-- **`test_deployed_todo_app.html`** - Interactive browser test
-  - Live iframe testing of deployed apps
-  - Real-time JavaScript error detection
-  - Cross-origin frame testing capabilities
-  - Visual status reporting with styled interface
-  - Screenshot placeholders for manual testing
-
-#### Usage Examples
-```bash
-# Run comprehensive deployment test
-node test_todo_deployment.js
-
-# Test React functionality specifically  
-node test_app_functionality.js
-
-# Analyze all app components
-node test_app_components.js
-
-# Test development URLs
-node test_dev_url.js
-
-# Open browser-based interactive test
-open test_deployed_todo_app.html
-```
-
-#### Key Testing Patterns
-- **TypeScript Error Detection**: Specifically looks for transformation issues
-  - "Invalid regular expression flags"
-  - "missing ) after argument list" 
-  - Syntax errors in transpiled JavaScript
-  
-- **React Validation**: Checks for proper React loading
-  - useState/useEffect hooks
-  - JSX rendering
-  - Component mounting
-  - Modern JavaScript patterns
-
-- **Todo App Validation**: Verifies app-specific functionality
-  - Task management features
-  - State persistence
-  - UI interaction patterns
-  - External library integration
-
-#### Test Report Generation
-All test scripts generate detailed reports including:
-- HTTP status codes and response analysis
-- JavaScript error detection and categorization
-- React component structure validation
-- Performance and loading metrics
-- Specific recommendations for fixes
-
-These tools are essential for verifying that Cloudflare Worker deployments are functioning correctly and that TypeScript transformation is working without introducing runtime errors.
-
-### Autonomous Testing System
-Comprehensive AI generation quality monitoring and testing framework:
-
-#### Main Testing Script
-- **`test_autonomous.rb`** - CLI interface for autonomous testing
-  - `ruby test_autonomous.rb quick` - Fast GPT-5 demo (30 seconds, recommended first test)
-  - `ruby test_autonomous.rb health` - Single health check test
-  - `ruby test_autonomous.rb suite` - Full comprehensive test suite (4 app types)
-  - `ruby test_autonomous.rb status` - Show current system metrics
-  - `ruby test_autonomous.rb monitor [min]` - Continuous monitoring
-
-#### Supporting Files
-- **`lib/autonomous_testing_system.rb`** - Production testing system with metrics
-- **`gpt5_autonomous_demo.rb`** - Proven GPT-5 generation demo (100% success rate)
-
-#### Key Features
-- **Real-time Progress**: Shows files being created during generation
-- **Quality Metrics**: Success rate, generation time, pattern matching
-- **GPT-5 Integration**: Direct OpenAI API with proper temperature handling
-- **Comprehensive Scenarios**: Counter, todo, calculator, weather apps
-- **Continuous Monitoring**: Background quality assessment
-- **Detailed Reporting**: JSON logs and test reports in test_results/
-
-#### Usage for Development
-```bash
-# Quick verification GPT-5 is working
-ruby test_autonomous.rb quick
-
-# Full quality assessment
-ruby test_autonomous.rb suite
-
-# Background monitoring every hour
-ruby test_autonomous.rb monitor 60
-```
-
-This system enables rapid iteration and quality monitoring of AI app generation capabilities.

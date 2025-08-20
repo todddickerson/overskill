@@ -36,83 +36,89 @@ class DeployAppJob < ApplicationJob
       ]
     )
     
-    # Build with R2 asset optimization
-    builder = Deployment::ExternalViteBuilder.new(app)
-    build_result = builder.build_for_preview_with_r2
+    # Use new GitHub-based deployment flow (GitHub migration architecture)
+    github_service = Deployment::GithubRepositoryService.new(app)
     
-    unless build_result[:success]
-      # Broadcast build failure
+    # Sync all app files to GitHub repository
+    Rails.logger.info "[DeployAppJob] Syncing app files to GitHub repository"
+    file_structure = app.app_files.to_h { |file| [file.path, file.content] }
+    
+    sync_result = github_service.push_file_structure(file_structure)
+    
+    unless sync_result[:success]
+      # Broadcast sync failure
       broadcast_deployment_progress(app, 
         status: 'failed', 
-        deployment_error: "Build failed: #{build_result[:error]}",
+        deployment_error: "Failed to sync to GitHub: #{sync_result[:error]}",
         deployment_steps: [
-          { name: 'Build app', current: false, completed: false },
-          { name: 'Deploy to Cloudflare', current: false, completed: false },
-          { name: 'Configure routes', current: false, completed: false },
-          { name: 'Setup environment', current: false, completed: false }
+          { name: 'Sync to GitHub', current: false, completed: false },
+          { name: 'Trigger GitHub Actions', current: false, completed: false },
+          { name: 'Deploy to Workers for Platforms', current: false, completed: false },
+          { name: 'Configure routing', current: false, completed: false }
         ]
       )
-      result = { success: false, error: "Build failed: #{build_result[:error]}" }
+      result = { success: false, error: "GitHub sync failed: #{sync_result[:error]}" }
     else
-      Rails.logger.info "[DeployAppJob] Build completed: #{build_result[:size_stats][:r2_assets_count]} assets to R2"
+      Rails.logger.info "[DeployAppJob] Successfully synced #{sync_result[:files_pushed]} files to GitHub"
       
-      # Update progress: Build completed, starting deployment
+      # Update progress: GitHub sync completed, GitHub Actions will auto-deploy
       broadcast_deployment_progress(app, 
         progress: 50, 
-        phase: 'Deploying to Cloudflare...',
+        phase: 'GitHub Actions deploying to Workers for Platforms...',
         deployment_steps: [
-          { name: 'Build app', current: false, completed: true },
-          { name: 'Deploy to Cloudflare', current: true, completed: false },
-          { name: 'Configure routes', current: false, completed: false },
-          { name: 'Setup environment', current: false, completed: false }
+          { name: 'Sync to GitHub', current: false, completed: true },
+          { name: 'Trigger GitHub Actions', current: false, completed: true },
+          { name: 'Deploy to Workers for Platforms', current: true, completed: false },
+          { name: 'Configure routing', current: false, completed: false }
         ]
       )
       
-      # Deploy to Cloudflare with R2 assets
-      deployer = Deployment::CloudflareWorkersDeployer.new(app)
-      # Map environment to deployment type
-      deployment_type = case environment
-                       when "production"
-                         :production
-                       when "preview"
-                         :preview
-                       else
-                         :staging
-                       end
+      # Use Workers for Platforms service for WFP deployment
+      wfp_service = Deployment::WorkersForPlatformsService.new(app)
       
-      # Update progress: Configuring routes
+      # Map environment to deployment type
+      deployment_environment = case environment
+                              when "production"
+                                :production
+                              when "preview"
+                                :preview
+                              else
+                                :staging
+                              end
+      
+      # Update progress: Configuring WFP routing
       broadcast_deployment_progress(app, 
         progress: 75, 
-        phase: 'Configuring routes...',
+        phase: 'Configuring Workers for Platforms routing...',
         deployment_steps: [
-          { name: 'Build app', current: false, completed: true },
-          { name: 'Deploy to Cloudflare', current: false, completed: true },
-          { name: 'Configure routes', current: true, completed: false },
-          { name: 'Setup environment', current: false, completed: false }
+          { name: 'Sync to GitHub', current: false, completed: true },
+          { name: 'Trigger GitHub Actions', current: false, completed: true },
+          { name: 'Deploy to Workers for Platforms', current: false, completed: true },
+          { name: 'Configure routing', current: true, completed: false }
         ]
       )
       
-      result = deployer.deploy_with_secrets(
-        built_code: build_result[:built_code],
-        r2_asset_urls: build_result[:r2_asset_urls],
-        deployment_type: deployment_type
+      # Deploy using Workers for Platforms
+      result = wfp_service.deploy_to_namespace(
+        environment: deployment_environment,
+        worker_code: nil  # Code will be deployed via GitHub Actions
       )
       
       # Log deployment stats
       if result[:success]
-        Rails.logger.info "[DeployAppJob] Deployment successful: #{result[:deployment_url]}"
-        Rails.logger.info "[DeployAppJob] Worker size: #{result[:worker_size_mb] || 'unknown'} MB"
-        Rails.logger.info "[DeployAppJob] R2 assets: #{result[:r2_assets_count] || 0}"
+        Rails.logger.info "[DeployAppJob] WFP deployment successful: #{result[:worker_url]}"
+        Rails.logger.info "[DeployAppJob] Dispatch namespace: #{result[:namespace]}"
+        Rails.logger.info "[DeployAppJob] Worker name: #{result[:worker_name]}"
         
-        # Update progress: Setting up environment
+        # Update progress: Deployment complete
         broadcast_deployment_progress(app, 
           progress: 90, 
-          phase: 'Setting up environment...',
+          phase: 'Deployment completed via GitHub Actions!',
           deployment_steps: [
-            { name: 'Build app', current: false, completed: true },
-            { name: 'Deploy to Cloudflare', current: false, completed: true },
-            { name: 'Configure routes', current: false, completed: true },
-            { name: 'Setup environment', current: true, completed: false }
+            { name: 'Sync to GitHub', current: false, completed: true },
+            { name: 'Trigger GitHub Actions', current: false, completed: true },
+            { name: 'Deploy to Workers for Platforms', current: false, completed: true },
+            { name: 'Configure routing', current: false, completed: true }
           ]
         )
       end

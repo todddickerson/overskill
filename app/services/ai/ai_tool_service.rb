@@ -45,8 +45,16 @@ module Ai
       transformed_content = r2_integration.transform_file_content(content, file_path)
       
       app_file = @app.app_files.find_or_initialize_by(path: file_path)
-      app_file.content = transformed_content
       app_file.team = @app.team  # Ensure team is set for new files
+      
+      # For new files, save first to establish associations before setting content
+      # This prevents R2 storage errors when content setter tries to access app.id
+      if app_file.new_record?
+        app_file.save!  # Save without content first
+      end
+      
+      # Now set content after associations are established
+      app_file.content = transformed_content
       
       if app_file.save
         @logger.info "[AiToolService] File written: #{file_path} (#{content.length} chars)"
@@ -67,6 +75,17 @@ module Ai
     
     def read_file(file_path, lines = nil)
       app_file = @app.app_files.find_by(path: file_path)
+      
+      # ON-DEMAND FILE CREATION: Fetch from GitHub template repository
+      unless app_file
+        @logger.info "[AiToolService] File not found: #{file_path}, fetching from GitHub template repository"
+        
+        app_file = create_file_from_github_template(file_path)
+        
+        unless app_file
+          return { success: false, error: "File not found: #{file_path}" }
+        end
+      end
       
       if app_file
         content = app_file.content || ""
@@ -138,9 +157,20 @@ module Ai
       first_line = first_line.to_i
       last_line = last_line.to_i
       
-      # Find the file
+      # Find the file, or create it on-demand from template
       file = @app.app_files.find_by(path: file_path)
-      return { success: false, error: "File not found: #{file_path}" } unless file
+      
+      unless file
+        # ON-DEMAND FILE CREATION: Fetch from GitHub template repository when AI references it
+        @logger.info "[AiToolService] File not found: #{file_path}, attempting on-demand creation from GitHub template"
+        
+        file = create_file_from_github_template(file_path)
+        
+        unless file
+          @logger.error "[AiToolService] Failed to create file from GitHub template: #{file_path}"
+          return { success: false, error: "File not found and could not fetch from template: #{file_path}" }
+        end
+      end
       
       # Apply line offset adjustments if tracker is available
       original_first = first_line
@@ -834,6 +864,75 @@ module Ai
     end
     
     private
+    
+    def create_file_from_github_template(file_path)
+      begin
+        # Authenticate with GitHub App
+        authenticator = Deployment::GithubAppAuthenticator.new
+        token = authenticator.get_installation_token('Overskill-apps')
+        
+        unless token
+          @logger.error "[AiToolService] Failed to get GitHub installation token"
+          return nil
+        end
+        
+        # Fetch file from GitHub template repository
+        response = HTTParty.get(
+          "https://api.github.com/repos/Overskill-apps/overskill-vite-template/contents/#{file_path}",
+          headers: {
+            'Authorization' => "Bearer #{token}",
+            'Accept' => 'application/vnd.github.v3+json'
+          }
+        )
+        
+        if response.code == 200
+          # Decode base64 content from GitHub
+          content = Base64.decode64(response['content'])
+          
+          # Determine file type based on extension
+          file_type = case ::File.extname(file_path).downcase
+                     when '.tsx', '.ts' then 'typescript'
+                     when '.jsx', '.js' then 'javascript'
+                     when '.css' then 'css'
+                     when '.html' then 'html'
+                     when '.json' then 'json'
+                     when '.md' then 'markdown'
+                     when '.yml', '.yaml' then 'yaml'
+                     when '.svg' then 'svg'
+                     when '.png', '.jpg', '.jpeg', '.gif' then 'image'
+                     else 'text'
+                     end
+          
+          # Create the AppFile
+          # Build without content first to establish associations
+          app_file = @app.app_files.build(
+            path: file_path,
+            team: @app.team,
+            file_type: file_type
+          )
+          
+          # Save to establish associations
+          app_file.save!
+          
+          # Now set content after associations are established
+          app_file.content = content
+          app_file.save!
+          
+          @logger.info "[AiToolService] ✅ Created file on-demand from GitHub: #{file_path} (#{content.length} chars)"
+          app_file
+        elsif response.code == 404
+          @logger.warn "[AiToolService] File not found in GitHub template: #{file_path}"
+          nil
+        else
+          @logger.error "[AiToolService] GitHub API error: #{response.code} - #{response.message}"
+          nil
+        end
+      rescue StandardError => e
+        @logger.error "[AiToolService] Error fetching from GitHub: #{e.message}"
+        @logger.error e.backtrace.first(5).join("\n")
+        nil
+      end
+    end
     
     def clean_escaped_content(content)
       # This method cleans up improperly escaped content that can break code

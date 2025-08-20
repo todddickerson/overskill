@@ -98,10 +98,9 @@ module Ai
         app.update!(status: 'generating')
         update_thinking_status("Phase 1/6: Starting AI Agent")
         
-        # GitHub Migration Project: Setup repository if using repository mode
-        if @use_repository_mode && !@app.using_repository_mode?
-          setup_github_repository
-        end
+        # GitHub Migration Project: Repository setup moved to finalization phase
+        # This ensures we create the repository AFTER code generation completes
+        Rails.logger.info "[V5_GITHUB] Repository setup deferred to finalization phase"
         
         # Analyze requirements (let Claude handle goal extraction naturally)
         update_thinking_status("Analyzing your requirements...")
@@ -129,24 +128,31 @@ module Ai
     # GITHUB MIGRATION PROJECT METHODS
     # =============================================================================
 
-    def setup_github_repository
-      Rails.logger.info "[V5_GITHUB] Setting up GitHub repository for app ##{@app.id}"
-      update_thinking_status("Creating GitHub repository...")
+    def setup_github_repository_with_code
+      Rails.logger.info "[V5_GITHUB] Setting up GitHub repository with generated code for app ##{@app.id}"
       
       begin
-        # Create repository via forking (2-3 seconds)
+        # Create repository via forking (2-3 seconds) 
         result = @app.create_repository_via_fork!
         
         if result[:success]
           Rails.logger.info "[V5_GITHUB] ✅ Repository setup complete: #{@app.repository_url}"
-          update_thinking_status("Repository ready - proceeding with generation...")
+          
+          # Set up GitHub Actions secrets for Cloudflare Workers deployment
+          secrets_result = @github_service.setup_deployment_secrets
+          if secrets_result[:success]
+            Rails.logger.info "[V5_GITHUB] ✅ Deployment secrets configured"
+          else
+            Rails.logger.warn "[V5_GITHUB] ⚠️ Failed to configure deployment secrets: #{secrets_result[:error]}"
+          end
           
           # Initialize repository tracking in agent state
           @agent_state[:github_repository] = {
             url: @app.repository_url,
             name: @app.repository_name,
             worker_name: @app.cloudflare_worker_name,
-            setup_completed: true
+            setup_completed: true,
+            secrets_configured: secrets_result[:success]
           }
         else
           Rails.logger.error "[V5_GITHUB] ❌ Repository setup failed: #{result[:error]}"
@@ -819,6 +825,12 @@ module Ai
         rescue => e
           Rails.logger.error "[V5_FINALIZE] R2 asset integration failed: #{e.message}"
           # Continue with deployment even if R2 setup fails
+        end
+        
+        # GitHub Migration Project: Setup repository with generated code BEFORE deployment
+        if @use_repository_mode && !@app.using_repository_mode?
+          update_thinking_status("Creating GitHub repository with generated code...")
+          setup_github_repository_with_code
         end
         
         # Queue deployment job for async processing

@@ -2,15 +2,18 @@
 # Supports ultra-fast app generation via repository forking (2-3 seconds)
 # Privacy-first with app.obfuscated_id usage throughout
 
-class Deployment::GitHubRepositoryService
+class Deployment::GithubRepositoryService
   include HTTParty
   base_uri 'https://api.github.com'
 
   def initialize(app)
     @app = app
-    @github_token = ENV['GITHUB_TOKEN']
     @github_org = ENV['GITHUB_ORG']
     @template_repo = ENV['GITHUB_TEMPLATE_REPO']
+    
+    # Use GitHub App authentication instead of direct token
+    authenticator = Deployment::GithubAppAuthenticator.new
+    @github_token = authenticator.get_installation_token(@github_org)
     
     raise "Missing required environment variables" unless [@github_token, @github_org, @template_repo].all?(&:present?)
     
@@ -36,6 +39,7 @@ class Deployment::GitHubRepositoryService
       
       # Step 2: Update app record immediately (repository is ready)
       @app.update!(
+        github_repo: "Overskill-apps/#{repo_name}",  # Full GitHub repo name
         repository_url: fork_data['html_url'],
         repository_name: repo_name,
         github_repo_id: fork_data['id'],
@@ -43,6 +47,15 @@ class Deployment::GitHubRepositoryService
       )
       
       Rails.logger.info "[GitHubRepositoryService] ✅ Repository forked successfully: #{fork_data['html_url']}"
+      
+      # Step 3: Automatically add GitHub Actions workflow for automated deployment
+      Rails.logger.info "[GitHubRepositoryService] Adding GitHub Actions workflow..."
+      workflow_result = add_deployment_workflow
+      if workflow_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ GitHub Actions workflow added"
+      else
+        Rails.logger.warn "[GitHubRepositoryService] ⚠️ Failed to add workflow: #{workflow_result[:error]}"
+      end
       
       {
         success: true,
@@ -164,6 +177,76 @@ class Deployment::GitHubRepositoryService
     end
   end
 
+  # Add GitHub Actions workflow for automated deployment
+  def add_deployment_workflow
+    return { success: false, error: 'No repository created' } unless @app.repository_name
+    
+    Rails.logger.info "[GitHubRepositoryService] Adding deployment workflow to repository"
+    
+    # Load workflow template and populate with app-specific values
+    workflow_template_path = Rails.root.join('app/services/ai/templates/overskill_20250728/.github/workflows/deploy.yml')
+    
+    unless File.exist?(workflow_template_path)
+      return { success: false, error: 'Workflow template not found' }
+    end
+    
+    # Read and customize workflow content
+    workflow_content = File.read(workflow_template_path)
+    
+    # Replace placeholders with actual app values
+    customized_workflow = workflow_content.gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+    
+    # Add the workflow file to repository
+    result = update_file_in_repository(
+      path: '.github/workflows/deploy.yml',
+      content: customized_workflow,
+      message: "feat: Add automated deployment workflow for Workers for Platforms\n\n🤖 Auto-generated CI/CD pipeline\n✅ Deploys to WFP dispatch namespaces\n🔐 Uses GitHub secrets for authentication"
+    )
+    
+    if result[:success]
+      Rails.logger.info "[GitHubRepositoryService] ✅ Deployment workflow added successfully"
+      { success: true, workflow_added: true }
+    else
+      Rails.logger.error "[GitHubRepositoryService] Failed to add workflow: #{result[:error]}"
+      { success: false, error: result[:error] }
+    end
+  end
+
+  # Set up GitHub repository secrets for Cloudflare Workers deployment
+  def setup_deployment_secrets
+    return { success: false, error: 'No repository created' } unless @app.repository_name
+    
+    repo_full_name = "#{@github_org}/#{@app.repository_name}"
+    Rails.logger.info "[GitHubRepositoryService] Setting up deployment secrets for #{repo_full_name}"
+    
+    # Required secrets for GitHub Actions workflow
+    secrets = {
+      'CLOUDFLARE_API_TOKEN' => ENV['CLOUDFLARE_API_TOKEN'],
+      'CLOUDFLARE_ACCOUNT_ID' => ENV['CLOUDFLARE_ACCOUNT_ID']
+    }
+    
+    results = []
+    
+    secrets.each do |name, value|
+      next unless value.present?
+      
+      result = set_repository_secret(repo_full_name, name, value)
+      results << { name: name, success: result[:success], error: result[:error] }
+    end
+    
+    success_count = results.count { |r| r[:success] }
+    total_count = results.size
+    
+    if success_count == total_count
+      Rails.logger.info "[GitHubRepositoryService] ✅ All #{total_count} secrets configured"
+      { success: true, secrets_configured: total_count }
+    else
+      failed_secrets = results.reject { |r| r[:success] }
+      Rails.logger.error "[GitHubRepositoryService] Failed to configure secrets: #{failed_secrets.map { |s| s[:name] }.join(', ')}"
+      { success: false, failed_secrets: failed_secrets }
+    end
+  end
+
   private
 
   def fork_template_repository(new_repo_name)
@@ -181,7 +264,59 @@ class Deployment::GitHubRepositoryService
 
   def generate_unique_repo_name
     # Use obfuscated_id for privacy instead of exposing real app ID
-    base_name = (@app.slug.presence || @app.name).parameterize
+    base_name = @app.name.parameterize
     "#{base_name}-#{@app.obfuscated_id}"
+  end
+
+  # Set individual repository secret using GitHub API
+  def set_repository_secret(repo_full_name, secret_name, secret_value)
+    begin
+      # First, get the repository's public key for encryption
+      key_response = self.class.get("/repos/#{repo_full_name}/actions/secrets/public-key", 
+        headers: self.class.headers)
+      
+      unless key_response.success?
+        return { success: false, error: "Failed to get public key: #{key_response.code}" }
+      end
+      
+      public_key_data = key_response.parsed_response
+      
+      # Encrypt the secret value using sodium/libsodium (required by GitHub API)
+      require 'base64'
+      require 'rbnacl'
+      
+      # Decode the public key
+      public_key = Base64.decode64(public_key_data['key'])
+      
+      # Create a box for encryption
+      box = RbNaCl::Boxes::Sealed.from_public_key(public_key)
+      
+      # Encrypt the secret
+      encrypted_value = box.encrypt(secret_value)
+      encrypted_value_b64 = Base64.strict_encode64(encrypted_value)
+      
+      # Set the secret
+      secret_body = {
+        encrypted_value: encrypted_value_b64,
+        key_id: public_key_data['key_id']
+      }
+      
+      response = self.class.put("/repos/#{repo_full_name}/actions/secrets/#{secret_name}",
+        body: secret_body.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
+      )
+      
+      if response.success?
+        Rails.logger.info "[GitHubRepositoryService] ✅ Secret #{secret_name} configured"
+        { success: true }
+      else
+        Rails.logger.error "[GitHubRepositoryService] Failed to set secret #{secret_name}: #{response.code}"
+        { success: false, error: "GitHub API error: #{response.code}" }
+      end
+      
+    rescue => e
+      Rails.logger.error "[GitHubRepositoryService] Secret encryption error: #{e.message}"
+      { success: false, error: e.message }
+    end
   end
 end
