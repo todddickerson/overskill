@@ -364,16 +364,18 @@ module Deployment
       dispatch_url = "https://#{DISPATCH_WORKER_NAME}.#{account_subdomain}.workers.dev"
       
       # Generate both formats for migration flexibility
-      @subdomain_style_url = "https://#{script_name}.overskill.com" # Production custom domain
+      wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+      @subdomain_style_url = "https://#{script_name}.#{wfp_domain}" # Production custom domain for WFP apps
       @path_style_url = "#{dispatch_url}/app/#{script_name}" # Current workers.dev fallback
       
-      # Return subdomain style URL (overskill.com is now configured)
+      # Return subdomain style URL (WFP apps domain is configured)
       @subdomain_style_url
     end
     
     # Generate subdomain-style URL for production use
-    def generate_subdomain_style_url(script_name, custom_domain = 'overskill.com')
-      "https://#{script_name}.#{custom_domain}"
+    def generate_subdomain_style_url(script_name, custom_domain = nil)
+      domain = custom_domain || ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+      "https://#{script_name}.#{domain}"
     end
     
     def generate_script_tags(metadata)
@@ -484,8 +486,9 @@ module Deployment
         
         function parseRouting(hostname, path) {
           // Method 1: Subdomain-based routing (for custom domains)
-          // Format: {app-id}.overskill.com
-          if (hostname.includes('.overskill.com')) {
+          // Format: {app-id}.overskill.app (or configured WFP_APPS_DOMAIN)
+          const wfpDomain = '#{ENV['WFP_APPS_DOMAIN'] || 'overskill.app'}';
+          if (hostname.includes('.' + wfpDomain)) {
             const subdomain = hostname.split('.')[0];
             
             if (subdomain && subdomain !== 'overskill-dispatch' && subdomain !== 'www') {
@@ -567,14 +570,14 @@ module Deployment
             </div>
             
             <div class="route-info">
-              <h2>🌐 Subdomain-Style URLs (overskill.com)</h2>
+              <h2>🌐 Subdomain-Style URLs (overskill.app)</h2>
               <p>Each app gets its own subdomain that <em>looks</em> unique:</p>
               <ul>
-                <li><span class="code">abc123.overskill.com</span> → Production</li>
-                <li><span class="code">preview-abc123.overskill.com</span> → Preview</li>
-                <li><span class="code">staging-abc123.overskill.com</span> → Staging</li>
+                <li><span class="code">abc123.overskill.app</span> → Production</li>
+                <li><span class="code">preview-abc123.overskill.app</span> → Preview</li>
+                <li><span class="code">staging-abc123.overskill.app</span> → Staging</li>
               </ul>
-              <p><small>✨ Available with overskill.com domain</small></p>
+              <p><small>✨ Available with overskill.app domain</small></p>
             </div>
             
             <div class="route-info">
@@ -602,11 +605,12 @@ module Deployment
     end
     
     def create_dispatch_route
-      # Get overskill.com zone ID first
-      zone_id = get_zone_id('overskill.com')
+      # Get WFP apps domain zone ID first
+      wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+      zone_id = get_zone_id(wfp_domain)
       
       unless zone_id
-        puts "⚠️ Could not find overskill.com zone - custom domain route must be created manually"
+        puts "⚠️ Could not find #{wfp_domain} zone - custom domain route must be created manually"
         return true # Don't fail the deployment
       end
       
@@ -622,12 +626,14 @@ module Deployment
       )
       
       if response.success? || response.code == 409 # 409 = already exists
-        puts "✅ Custom domain route created/exists for *.overskill.com"
+        wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+        puts "✅ Custom domain route created/exists for *.#{wfp_domain}"
         true
       else
+        wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
         error_msg = response['errors']&.first&.dig('message') || 'Failed to create route'
         puts "⚠️ Route creation result: #{error_msg}"
-        puts "📋 Manual step: Add *.overskill.com custom domain in Cloudflare Dashboard"
+        puts "📋 Manual step: Add *.#{wfp_domain} custom domain in Cloudflare Dashboard"
         true # Don't fail deployment - can be done manually
       end
     end
@@ -646,17 +652,18 @@ module Deployment
     end
     
     def create_app_specific_route(script_name, environment)
-      zone_id = get_zone_id('overskill.com')
+      wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+      zone_id = get_zone_id(wfp_domain)
       return false unless zone_id
       
       # Generate route pattern based on environment
       pattern = case environment
       when :preview
-        "preview-#{script_name}.overskill.com/*"
+        "preview-#{script_name}.#{wfp_domain}/*"
       when :staging  
-        "staging-#{script_name}.overskill.com/*"
+        "staging-#{script_name}.#{wfp_domain}/*"
       else
-        "#{script_name}.overskill.com/*"
+        "#{script_name}.#{wfp_domain}/*"
       end
       
       route_data = {

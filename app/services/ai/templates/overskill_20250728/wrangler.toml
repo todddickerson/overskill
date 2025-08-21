@@ -43,4 +43,4 @@ exclude = ["*.map"]
 
 # No routes needed - WFP dispatch worker handles routing
 # Apps accessed via: https://dispatch-worker.account.workers.dev/app/{{APP_ID}}
-# Or via custom domain: https://{{APP_ID}}.overskill.com
+# Or via custom domain: https://{{APP_ID}}.overskill.app

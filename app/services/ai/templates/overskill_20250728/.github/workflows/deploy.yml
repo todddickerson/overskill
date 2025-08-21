@@ -45,7 +45,7 @@ jobs:
           -F "metadata={\"main_module\":\"worker.js\",\"compatibility_date\":\"2024-01-01\"}" \
           -F "worker.js=@dist/index.js;type=application/javascript+module"
         
-        echo "✅ Deployed to preview: https://preview-{{APP_ID}}.overskill.com"
+        echo "✅ Deployed to preview: https://preview-{{APP_ID}}.overskill.app"
         
     - name: Deploy to Workers for Platforms (Production)
       if: github.ref == 'refs/heads/main'
@@ -63,7 +63,7 @@ jobs:
           -F "metadata={\"main_module\":\"worker.js\",\"compatibility_date\":\"2024-01-01\"}" \
           -F "worker.js=@dist/index.js;type=application/javascript+module"
         
-        echo "✅ Deployed to production: https://{{APP_ID}}.overskill.com"
+        echo "✅ Deployed to production: https://{{APP_ID}}.overskill.app"
 
     # Staging deployment (manual trigger or special branch)
     - name: Deploy to Workers for Platforms (Staging)
@@ -82,4 +82,4 @@ jobs:
           -F "metadata={\"main_module\":\"worker.js\",\"compatibility_date\":\"2024-01-01\"}" \
           -F "worker.js=@dist/index.js;type=application/javascript+module"
         
-        echo "✅ Deployed to staging: https://staging-{{APP_ID}}.overskill.com"
+        echo "✅ Deployed to staging: https://staging-{{APP_ID}}.overskill.app"
