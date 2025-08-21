@@ -132,35 +132,139 @@ class Deployment::GithubRepositoryService
     end
   end
 
-  # Push multiple files as part of app generation
+  # Push multiple files as part of app generation (single atomic commit)
   def push_file_structure(file_structure)
-    Rails.logger.info "[GitHubRepositoryService] Pushing #{file_structure.size} files to repository"
+    Rails.logger.info "[GitHubRepositoryService] Pushing #{file_structure.size} files to repository as single commit"
     
-    results = []
+    # Use batch commit for all files at once (single workflow trigger)
+    result = batch_commit_files(file_structure)
     
-    file_structure.each do |path, content|
-      result = update_file_in_repository(
-        path: path,
-        content: content,
-        message: "AI: Generate #{path}"
+    if result[:success]
+      Rails.logger.info "[GitHubRepositoryService] ✅ Successfully committed #{file_structure.size} files in single commit"
+      { success: true, files_pushed: file_structure.size, commit_sha: result[:commit_sha] }
+    else
+      Rails.logger.error "[GitHubRepositoryService] ❌ Batch commit failed: #{result[:error]}"
+      { success: false, error: result[:error], files_pushed: 0 }
+    end
+  end
+  
+  # Commit multiple files atomically using GitHub Tree API
+  def batch_commit_files(file_structure, message: nil)
+    return { success: false, error: 'No repository created' } unless @app.repository_name
+    
+    repo_full_name = "#{@github_org}/#{@app.repository_name}"
+    
+    # Generate appropriate commit message
+    commit_message = message || generate_app_version_commit_message(file_structure)
+    
+    Rails.logger.info "[GitHubRepositoryService] Creating atomic commit: #{commit_message}"
+    
+    begin
+      # Get current HEAD commit
+      ref_response = self.class.get("/repos/#{repo_full_name}/git/ref/heads/main", headers: self.class.headers)
+      unless ref_response.success?
+        return { success: false, error: "Failed to get HEAD ref: #{ref_response.code}" }
+      end
+      
+      head_sha = ref_response.parsed_response.dig('object', 'sha')
+      
+      # Get current tree
+      head_commit_response = self.class.get("/repos/#{repo_full_name}/git/commits/#{head_sha}", headers: self.class.headers)
+      unless head_commit_response.success?
+        return { success: false, error: "Failed to get HEAD commit: #{head_commit_response.code}" }
+      end
+      
+      base_tree_sha = head_commit_response.parsed_response.dig('tree', 'sha')
+      
+      # Create blobs for each file
+      tree_items = []
+      file_structure.each do |path, content|
+        # Create blob
+        blob_response = self.class.post("/repos/#{repo_full_name}/git/blobs",
+          body: { content: content, encoding: 'utf-8' }.to_json,
+          headers: self.class.headers.merge('Content-Type' => 'application/json')
+        )
+        
+        unless blob_response.success?
+          return { success: false, error: "Failed to create blob for #{path}: #{blob_response.code}" }
+        end
+        
+        blob_sha = blob_response.parsed_response['sha']
+        
+        tree_items << {
+          path: path,
+          mode: '100644', # Regular file
+          type: 'blob',
+          sha: blob_sha
+        }
+      end
+      
+      # Create new tree
+      tree_response = self.class.post("/repos/#{repo_full_name}/git/trees",
+        body: { base_tree: base_tree_sha, tree: tree_items }.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
       )
       
-      results << { path: path, success: result[:success], error: result[:error] }
+      unless tree_response.success?
+        return { success: false, error: "Failed to create tree: #{tree_response.code}" }
+      end
       
-      # Small delay to avoid rate limiting
-      sleep(0.1) if file_structure.size > 10
+      new_tree_sha = tree_response.parsed_response['sha']
+      
+      # Create commit
+      commit_response = self.class.post("/repos/#{repo_full_name}/git/commits",
+        body: {
+          message: commit_message,
+          tree: new_tree_sha,
+          parents: [head_sha],
+          author: {
+            name: 'OverSkill App Builder',
+            email: 'noreply@overskill.com'
+          }
+        }.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
+      )
+      
+      unless commit_response.success?
+        return { success: false, error: "Failed to create commit: #{commit_response.code}" }
+      end
+      
+      new_commit_sha = commit_response.parsed_response['sha']
+      
+      # Update HEAD to point to new commit
+      update_ref_response = self.class.patch("/repos/#{repo_full_name}/git/refs/heads/main",
+        body: { sha: new_commit_sha }.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
+      )
+      
+      unless update_ref_response.success?
+        return { success: false, error: "Failed to update HEAD: #{update_ref_response.code}" }
+      end
+      
+      Rails.logger.info "[GitHubRepositoryService] ✅ Atomic commit created: #{new_commit_sha}"
+      { success: true, commit_sha: new_commit_sha, tree_sha: new_tree_sha }
+      
+    rescue => e
+      Rails.logger.error "[GitHubRepositoryService] Batch commit exception: #{e.message}"
+      { success: false, error: e.message }
     end
+  end
+  
+  private
+  
+  def generate_app_version_commit_message(file_structure)
+    file_count = file_structure.size
     
-    success_count = results.count { |r| r[:success] }
-    total_count = results.size
+    # Extract some key files for context
+    key_files = file_structure.keys.select { |path| 
+      path.match?(/\.(tsx|ts|jsx|js|html)$/) && !path.include?('node_modules')
+    }.first(3)
     
-    if success_count == total_count
-      Rails.logger.info "[GitHubRepositoryService] ✅ All #{total_count} files pushed successfully"
-      { success: true, files_pushed: total_count }
+    if key_files.any?
+      sample_files = key_files.map { |path| File.basename(path) }.join(', ')
+      "feat: Update app with #{file_count} files (#{sample_files})\n\n🤖 Generated by OverSkill AI App Builder\n✨ Ready for Workers for Platforms deployment"
     else
-      failed_files = results.reject { |r| r[:success] }
-      Rails.logger.error "[GitHubRepositoryService] #{failed_files.size} files failed to push"
-      { success: false, failed_files: failed_files, partial_success: success_count > 0 }
+      "feat: Update app with #{file_count} files\n\n🤖 Generated by OverSkill AI App Builder\n✨ Ready for Workers for Platforms deployment"
     end
   end
 
@@ -251,7 +355,9 @@ class Deployment::GithubRepositoryService
     workflow_content = File.read(workflow_template_path)
     
     # Replace placeholders with actual app values
-    customized_workflow = workflow_content.gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+    customized_workflow = workflow_content
+      .gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+      .gsub('{{OWNER_ID}}', @app.team.users.first&.id.to_s || '1')
     
     # Add the workflow file to repository
     result = update_file_in_repository(
