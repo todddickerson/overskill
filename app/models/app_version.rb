@@ -289,6 +289,10 @@ class AppVersion < ApplicationRecord
   end
   
   def snapshot_data_present
+    # Skip validation for new records - R2 storage happens after_create
+    return if new_record?
+    
+    # For existing records with non-database storage, ensure data is present somewhere
     if storage_strategy != 'database' && read_attribute(:files_snapshot).blank? && r2_snapshot_key.blank?
       errors.add(:base, "Either files_snapshot or R2 snapshot key must be present for non-database storage")
     end

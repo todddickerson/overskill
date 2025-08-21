@@ -13,24 +13,41 @@ class ProcessAppUpdateJobV4 < ApplicationJob
   def lock_key
     message_or_id = arguments.first
     
-    # Handle GlobalID objects from ActiveJob serialization
-    if message_or_id.respond_to?(:model_id)
-      return "process_app_update_v4:message:#{message_or_id.model_id}"
+    # Try to get the actual message ID various ways
+    message_id = case message_or_id
+    when AppChatMessage
+      message_or_id.id
+    when Integer, String
+      message_or_id.to_s
+    when GlobalID::Identification
+      # This is a GlobalID object - extract the model ID
+      begin
+        # Try to locate the object (might fail if transaction not committed)
+        obj = GlobalID::Locator.locate(message_or_id)
+        obj&.id || extract_id_from_gid(message_or_id)
+      rescue
+        extract_id_from_gid(message_or_id)
+      end
+    else
+      # Fallback - try to extract from string representation
+      extract_id_from_gid(message_or_id)
     end
     
-    case message_or_id
-    when AppChatMessage
-      "process_app_update_v4:message:#{message_or_id.id}"
-    when Integer, String
-      "process_app_update_v4:message:#{message_or_id}"
+    # Always return a valid lock key, even if we couldn't get the ID
+    message_id ? "process_app_update_v4:message:#{message_id}" : "process_app_update_v4:fallback:#{SecureRandom.hex(8)}"
+  end
+  
+  private
+  
+  def extract_id_from_gid(gid_object)
+    # Extract ID from GlobalID URI format: gid://app/Model/id
+    gid_string = gid_object.to_s
+    if gid_string =~ /gid:\/\/\w+\/AppChatMessage\/(\d+)/
+      $1
+    elsif gid_string =~ /AppChatMessage\/(\d+)/
+      $1
     else
-      # Try to extract ID from GlobalID string representation
-      if message_or_id.to_s.include?('AppChatMessage/')
-        id = message_or_id.to_s.split('AppChatMessage/').last.split('>').first
-        "process_app_update_v4:message:#{id}"
-      else
-        "process_app_update_v4:unknown:#{message_or_id.to_s}"
-      end
+      nil
     end
   end
   
@@ -69,15 +86,26 @@ class ProcessAppUpdateJobV4 < ApplicationJob
   end
   
   def perform(message_or_id, use_enhanced: true)
-    # Handle both message object and ID (for robustness with ActiveJob serialization)
+    # Handle various forms of message identification
     message = case message_or_id
     when AppChatMessage
       message_or_id
     when Integer, String
       AppChatMessage.find(message_or_id)
+    when GlobalID::Identification
+      # GlobalID from ActiveJob serialization
+      GlobalID::Locator.locate(message_or_id)
     else
-      raise ArgumentError, "Expected AppChatMessage or ID, got #{message_or_id.class}"
+      # Try to locate as GlobalID as last resort
+      begin
+        GlobalID::Locator.locate(message_or_id)
+      rescue
+        raise ArgumentError, "Expected AppChatMessage, ID, or GlobalID, got #{message_or_id.class}"
+      end
     end
+    
+    # Ensure we found a valid message
+    raise ActiveRecord::RecordNotFound, "Could not find AppChatMessage" unless message
     
     Rails.logger.info "[ProcessAppUpdateJobV4] Starting V5 orchestrator for message ##{message.id} (app ##{message.app.id})"
     
