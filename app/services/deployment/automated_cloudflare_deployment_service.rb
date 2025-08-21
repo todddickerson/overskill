@@ -1,3 +1,8 @@
+# DEPRECATED: This service is replaced by WorkersForPlatformsService
+# AutomatedCloudflareDeploymentService was used for individual Cloudflare Workers per app
+# Now using Workers for Platforms (WFP) with dispatch namespaces for unlimited apps
+# See: app/services/deployment/workers_for_platforms_service.rb
+#
 # Automated Cloudflare Deployment Service
 # Deploys static React apps from GitHub repositories to Cloudflare Workers
 # Uses Wrangler API directly - no dashboard configuration needed

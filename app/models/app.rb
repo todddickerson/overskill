@@ -4,6 +4,14 @@ class App < ApplicationRecord
   include AutoPreview
   include TemplateConfig
   # 🚅 add concerns above.
+  
+  # DEPRECATED FIELDS (January 2025)
+  # cloudflare_worker_name: No longer used with Workers for Platforms (WFP)
+  #   - WFP uses dispatch namespaces and script names instead of individual workers
+  #   - Namespaces: overskill-{rails_env}-{deployment_env} (e.g., overskill-development-preview)
+  #   - Script names: Generated using obfuscated_id for each app
+  #   - Migration pending to remove this column from database
+  #   - See: app/services/deployment/workers_for_platforms_service.rb
 
   # 🚅 add attribute accessors above.
 

@@ -1,3 +1,8 @@
+# DEPRECATED: This service is replaced by WorkersForPlatformsService
+# CloudflareWorkersBuildService was used for individual Cloudflare Workers per app
+# Now using Workers for Platforms (WFP) with dispatch namespaces for unlimited apps
+# See: app/services/deployment/workers_for_platforms_service.rb
+#
 # Cloudflare Workers Build Service for GitHub Integration
 # Handles multi-environment deployments with automatic git-based builds
 # Privacy-first with app.obfuscated_id in worker names

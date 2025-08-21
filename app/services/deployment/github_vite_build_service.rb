@@ -1,3 +1,8 @@
+# DEPRECATED: This service is replaced by WorkersForPlatformsService 
+# GithubViteBuildService was used for individual Cloudflare Workers per app
+# Now using Workers for Platforms (WFP) with dispatch namespaces
+# See: app/services/deployment/workers_for_platforms_service.rb
+#
 # Service for building and deploying Vite apps from GitHub repositories
 class Deployment::GithubViteBuildService
   include HTTParty
