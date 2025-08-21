@@ -48,7 +48,16 @@ class Deployment::GithubRepositoryService
       
       Rails.logger.info "[GitHubRepositoryService] ✅ Repository forked successfully: #{fork_data['html_url']}"
       
-      # Step 3: Automatically add GitHub Actions workflow for automated deployment
+      # Step 3: Update wrangler.toml with actual values
+      Rails.logger.info "[GitHubRepositoryService] Updating wrangler.toml configuration..."
+      wrangler_result = update_wrangler_config
+      if wrangler_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ Wrangler config updated"
+      else
+        Rails.logger.error "[GitHubRepositoryService] ⚠️ Failed to update wrangler.toml: #{wrangler_result[:error]}"
+      end
+      
+      # Step 4: Automatically add GitHub Actions workflow for automated deployment
       Rails.logger.info "[GitHubRepositoryService] Adding GitHub Actions workflow..."
       workflow_result = add_deployment_workflow
       if workflow_result[:success]
@@ -177,6 +186,45 @@ class Deployment::GithubRepositoryService
     end
   end
 
+  # Update wrangler.toml with actual values for Workers for Platforms deployment
+  def update_wrangler_config
+    return { success: false, error: 'No repository created' } unless @app.repository_name
+    
+    Rails.logger.info "[GitHubRepositoryService] Updating wrangler.toml with actual values"
+    
+    # Load wrangler template
+    wrangler_template_path = Rails.root.join('app/services/ai/templates/overskill_20250728/wrangler.toml')
+    
+    unless File.exist?(wrangler_template_path)
+      return { success: false, error: 'Wrangler template not found' }
+    end
+    
+    # Read template content
+    wrangler_content = File.read(wrangler_template_path)
+    
+    # Replace placeholders with actual values
+    customized_wrangler = wrangler_content
+      .gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+      .gsub('{{SUPABASE_URL}}', ENV['SUPABASE_URL'] || '')
+      .gsub('{{SUPABASE_ANON_KEY}}', ENV['SUPABASE_ANON_KEY'] || '')
+      .gsub('{{OWNER_ID}}', @app.team_id.to_s)
+    
+    # Update the wrangler.toml file in repository
+    result = update_file_in_repository(
+      path: 'wrangler.toml',
+      content: customized_wrangler,
+      message: "feat: Configure wrangler.toml for Workers for Platforms deployment\n\n🤖 Auto-configured with app-specific values\n✅ Ready for WFP deployment"
+    )
+    
+    if result[:success]
+      Rails.logger.info "[GitHubRepositoryService] ✅ Wrangler config updated successfully"
+      { success: true, wrangler_configured: true }
+    else
+      Rails.logger.error "[GitHubRepositoryService] Failed to update wrangler.toml: #{result[:error]}"
+      { success: false, error: result[:error] }
+    end
+  end
+  
   # Add GitHub Actions workflow for automated deployment
   def add_deployment_workflow
     return { success: false, error: 'No repository created' } unless @app.repository_name
