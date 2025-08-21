@@ -250,7 +250,7 @@ class AddRepositoryFieldsToApps < ActiveRecord::Migration[7.0]
     add_column :apps, :repository_status, :string, default: 'pending'
     add_column :apps, :deployment_status, :string, default: 'not_deployed'
     add_column :apps, :staging_deployed_at, :datetime
-    add_column :apps, :last_deployment_at, :datetime
+    add_column :apps, :last_deployed_at, :datetime
 
     # Indexes (repository_name includes obfuscated_id, so safe to index)
     add_index :apps, :repository_name, unique: true
@@ -353,7 +353,7 @@ class Ai::AppBuilderV5
     # Trigger Cloudflare Workers Build (automatic via git push)
     @app.update!(
       deployment_status: 'preview_deployed',
-      last_deployment_at: Time.current
+      last_deployed_at: Time.current
     )
 
     create_deployment_record('preview', "auto-#{@app.obfuscated_id}-#{Time.current.to_i}")

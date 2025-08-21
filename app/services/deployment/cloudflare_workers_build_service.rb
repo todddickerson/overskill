@@ -103,7 +103,7 @@ class Deployment::CloudflareWorkersBuildService
     if deployment_result[:success]
       @app.update!(
         deployment_status: 'production_deployed',
-        last_deployment_at: Time.current
+        last_deployed_at: Time.current
       )
       
       create_deployment_record('production', deployment_result[:deployment_id])
@@ -144,7 +144,7 @@ class Deployment::CloudflareWorkersBuildService
             production: {
               url: generate_production_url(worker_name),
               status: @app.deployment_status == 'production_deployed' ? 'deployed' : 'not_deployed',
-              last_deployed: @app.last_deployment_at
+              last_deployed: @app.last_deployed_at
             }
           }
         }

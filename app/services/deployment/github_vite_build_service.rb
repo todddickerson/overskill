@@ -205,7 +205,7 @@ class Deployment::GithubViteBuildService
     # Update app deployment status
     @app.update!(
       deployment_status: 'deployed',
-      last_deployment_at: Time.current
+      last_deployed_at: Time.current
     )
   end
   

@@ -335,15 +335,45 @@ class DeployAppJob < ApplicationJob
   def wait_for_github_actions_deployment(app, environment)
     Rails.logger.info "[DeployAppJob] Waiting for GitHub Actions deployment to complete"
     
-    # For now, return success immediately as we transition to GitHub Actions
-    # TODO: Implement proper GitHub Actions API polling
+    # Use GitHub Actions monitoring service for proper deployment tracking
+    monitor_service = Deployment::GithubActionsMonitorService.new(app)
+    
+    # Monitor the deployment with automatic error detection and fixing
+    result = monitor_service.monitor_deployment(
+      max_wait_time: 8.minutes,  # Reasonable timeout for build + deployment
+      check_interval: 20.seconds  # Check every 20 seconds
+    )
+    
+    if result[:success]
+      Rails.logger.info "[DeployAppJob] GitHub Actions deployment successful"
+      {
+        success: true,
+        worker_url: result[:deployment_url],
+        deployment_url: result[:deployment_url],
+        message: result[:message] || "GitHub Actions deployment completed successfully",
+        workflow_run_id: result[:workflow_run_id]
+      }
+    else
+      Rails.logger.error "[DeployAppJob] GitHub Actions deployment failed: #{result[:error]}"
+      {
+        success: false,
+        error: result[:error],
+        workflow_run_id: result[:workflow_run_id],
+        error_logs: result[:error_logs],
+        fix_attempted: result[:fix_attempted] || false
+      }
+    end
+  rescue => e
+    Rails.logger.error "[DeployAppJob] Error monitoring GitHub Actions deployment: #{e.message}"
+    
+    # Fallback to expected URL generation if monitoring fails
     deployment_url = generate_expected_deployment_url(app, environment)
     
     {
-      success: true,
+      success: false,
+      error: "Failed to monitor GitHub Actions deployment: #{e.message}",
       worker_url: deployment_url,
-      deployment_url: deployment_url,
-      message: "Deployment triggered via GitHub Actions"
+      deployment_url: deployment_url
     }
   end
   

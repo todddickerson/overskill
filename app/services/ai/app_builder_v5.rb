@@ -287,7 +287,7 @@ module Ai
       @app.update!(
         status: 'ready',
         deployment_status: 'pending_deployment',
-        last_deployment_at: Time.current
+        last_deployed_at: Time.current
       )
       
       Rails.logger.info "[V5_GITHUB] ✅ Generation complete, GitHub Actions will deploy"

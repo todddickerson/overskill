@@ -142,7 +142,7 @@ class Deployment::CloudflareWorkersBuildServiceTest < ActiveSupport::TestCase
     
     @app.reload
     assert_equal 'production_deployed', @app.deployment_status
-    assert_not_nil @app.last_deployment_at
+    assert_not_nil @app.last_deployed_at
   end
 
   test "promote methods fail when no worker configured" do
@@ -165,7 +165,7 @@ class Deployment::CloudflareWorkersBuildServiceTest < ActiveSupport::TestCase
       production_url: 'https://test.workers.dev',
       staging_deployed_at: 1.day.ago,
       deployment_status: 'production_deployed',
-      last_deployment_at: 1.hour.ago
+      last_deployed_at: 1.hour.ago
     )
     
     mock_response = mock()

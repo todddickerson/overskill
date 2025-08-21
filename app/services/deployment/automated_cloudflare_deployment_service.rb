@@ -60,7 +60,7 @@ class Deployment::AutomatedCloudflareDeploymentService
         cloudflare_worker_name: worker_name,
         preview_url: worker_url,
         deployment_status: 'deployed',
-        last_deployment_at: Time.current
+        last_deployed_at: Time.current
       )
       
       Rails.logger.info "[AutomatedDeploy] ✅ Deployment successful: #{worker_url}"

@@ -120,6 +120,13 @@ class AppChatMessage < ApplicationRecord
       partial: "account/app_editors/#{partial_name}",
       locals: { message: self }
     )
+    
+    # Trigger scroll to bottom on updates too (for streaming messages)
+    broadcast_append_to(
+      "app_#{app.id}_chat",
+      target: "chat_messages",
+      html: "<div data-controller='chat-scroller' data-chat-scroller-target='trigger'></div>"
+    )
   end
   
   def should_broadcast_update?

@@ -492,7 +492,7 @@ class App < ApplicationRecord
     if result[:success]
       update!(
         deployment_status: 'production_deployed',
-        last_deployment_at: Time.current,
+        last_deployed_at: Time.current,
         status: 'published'  # Mark as published when deployed to production
       )
       

@@ -296,7 +296,7 @@ class AppGithubMigrationTest < ActiveSupport::TestCase
     @app.reload
     assert_equal 'production_deployed', @app.deployment_status
     assert_equal 'published', @app.status
-    assert_not_nil @app.last_deployment_at
+    assert_not_nil @app.last_deployed_at
     
     deployment = @app.app_deployments.last
     assert_equal 'production', deployment.environment
