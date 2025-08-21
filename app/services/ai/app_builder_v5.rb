@@ -319,19 +319,16 @@ module Ai
         return { success: false, error: "No files to deploy" }
       end
       
-      Rails.logger.info "[V5_LEGACY] Deploying app with #{total_files} total files (#{new_files} new/modified)"
+      Rails.logger.info "[V5_LEGACY] Ready for deployment with #{total_files} total files (#{new_files} new/modified)"
       
-      # Queue deployment job for async processing
-      # This ensures proper version tracking, broadcasts, and error handling
-      job = DeployAppJob.perform_later(@app.id, "preview")
-      Rails.logger.info "[V5_LEGACY] Queued deployment job #{job.job_id} for preview"
+      # NOTE: DeployAppJob is queued by ProcessAppUpdateJobV4 after app version is created
+      # We don't queue it here to ensure proper sequencing
       
-      # Update app status to indicate deployment is in progress
-      @app.update!(status: 'generating')
+      # Update app status to indicate generation is complete
+      @app.update!(status: 'ready')
       
-      # Return success since deployment is now handled asynchronously
-      # The UI will update via ActionCable broadcasts from DeployAppJob
-      { success: true, message: "Deployment queued", job_id: job.job_id }
+      # Return success - deployment will be handled after app version creation
+      { success: true, message: "Generation complete" }
     end
     
     def execute_complex_decision_loop
@@ -810,6 +807,11 @@ module Ai
       
       # Only deploy if we have files AND generation completed successfully
       if app.app_files.count > 0 && @completion_status != :failed
+        # Queue R2 content syncing for all app files (moved from inline callbacks)
+        # This handles R2 storage in the background to keep generation fast
+        Rails.logger.info "[V5_FINALIZE] Queueing R2 content sync for #{app.app_files.count} files"
+        AppFilesInitializationJob.perform_later(app.id, { broadcast: true })
+        
         # Setup R2 asset resolver integration before deployment
         update_thinking_status("Setting up asset management...")
         begin
@@ -928,21 +930,19 @@ module Ai
         ]
       )
       
-      # Queue the deployment job for async processing
-      job = DeployAppJob.perform_later(@app.id, "preview")
+      # NOTE: DeployAppJob will be queued after app version creation
+      # This ensures proper sequencing and version tracking
       
-      Rails.logger.info "[V5_DEPLOY] Deployment job queued: #{job.job_id}"
+      Rails.logger.info "[V5_DEPLOY] Generation complete, deployment will be queued after version creation"
       
-      # Return success since deployment is now async
-      # The UI will update via ActionCable broadcasts from DeployAppJob
+      # Return success - deployment happens after version creation
       {
         success: true,
-        message: "Deployment queued",
-        job_id: job.job_id,
+        message: "Generation complete",
         preview_url: @app.preview_url # Return existing URL if available
       }
     rescue => e
-      Rails.logger.error "[V5_DEPLOY] Failed to queue deployment: #{e.message}"
+      Rails.logger.error "[V5_DEPLOY] Failed to queue deployment: #{e.message} #{e.backtrace.join("\n")}"
       # Broadcast deployment failure
       broadcast_deployment_progress(
         status: 'failed',

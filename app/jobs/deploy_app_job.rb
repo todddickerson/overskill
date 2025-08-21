@@ -5,7 +5,7 @@ class DeployAppJob < ApplicationJob
   
   # Prevent duplicate deployments for the same app
   # Lock until the job completes (successfully or with error)
-  unique :until_executed, lock_ttl: 10.minutes
+  unique :until_executed, lock_ttl: 10.minutes, on_conflict: :log
   
   # Define uniqueness based on app_id only (ignore environment for uniqueness)
   # This prevents multiple deployments of the same app regardless of environment
@@ -13,13 +13,14 @@ class DeployAppJob < ApplicationJob
     "deploy_app:#{arguments.first}"
   end
   
-  # Log when duplicate deployment is rejected
-  on_conflict :log
-  
   def perform(app_id, environment = "production")
     app = App.find(app_id)
     
+    # Reload app to ensure we have latest repository info
+    app.reload
+    
     Rails.logger.info "[DeployAppJob] Starting deployment for app #{app_id} to #{environment}"
+    Rails.logger.info "[DeployAppJob] Repository: #{app.github_repo}, Name: #{app.repository_name}"
     
     # Update status to deploying
     app.update!(status: 'generating')

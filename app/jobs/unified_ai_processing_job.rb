@@ -7,16 +7,13 @@ class UnifiedAiProcessingJob < ApplicationJob
   
   # Prevent duplicate AI processing for the same message
   # Lock until the job completes to avoid concurrent AI generation
-  unique :until_executed, lock_ttl: 30.minutes
+  unique :until_executed, lock_ttl: 30.minutes, on_conflict: :log
   
   # Define uniqueness based on message ID
   def lock_key
     message = arguments.first
     "ai_processing:message:#{message.id}"
   end
-  
-  # Log when duplicate AI processing is rejected
-  on_conflict :log
   
   # Retry configuration
   retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|

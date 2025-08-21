@@ -33,7 +33,8 @@ class AppFile < ApplicationRecord
 
   before_save :update_content_hash, if: :content_changed?
   before_save :update_size_bytes, if: :content_changed?
-  after_create :handle_r2_storage_for_new_records
+  # NOTE: R2 storage now handled async by AppFilesInitializationJob
+  # after_create :handle_r2_storage_for_new_records  # Disabled - moved to background job
   # 🚅 add callbacks above.
 
   # 🚅 add delegations above.
@@ -57,38 +58,17 @@ class AppFile < ApplicationRecord
   def content=(new_content)
     return if new_content.blank?
     
-    strategy = determine_storage_strategy(new_content)
+    # IMPORTANT: Always store content in database first for immediate availability
+    # R2 syncing happens asynchronously via AppFilesInitializationJob
+    # This ensures files are immediately available for AI system prompts
+    super(new_content)
     
-    case strategy
-    when :database_only
-      super(new_content)
-      self.storage_location = 'database'
-      self.r2_object_key = nil
-    when :r2_only  
-      if new_record?
-        # For new records, keep content in database temporarily
-        # The after_create callback will handle R2 storage
-        super(new_content)
-        self.storage_location = 'r2' # Mark intended storage location
-      else
-        # For existing records, store in R2
-        result = store_in_r2(new_content)
-        if result && result[:object_key]
-          # Clear database content for R2-only storage
-          super(nil)
-          self.storage_location = 'r2'
-        else
-          # Fallback to database if R2 storage failed
-          super(new_content)
-          self.storage_location = 'database'
-        end
-      end
-    when :hybrid
-      super(new_content) # Store in database
-      store_in_r2(new_content) unless new_record? # Store in R2 for existing records
-      self.storage_location = 'hybrid'
-    end
+    # Always start with database storage
+    # R2 sync happens in background via AppFilesInitializationJob
+    self.storage_location = 'database'
+    self.r2_object_key = nil # Will be set by background job if applicable
     
+    # Update metadata
     self.content_hash = Digest::SHA256.hexdigest(new_content)
     self.size_bytes = new_content.bytesize
   end
@@ -275,39 +255,41 @@ class AppFile < ApplicationRecord
     end
   end
   
-  def handle_r2_storage_for_new_records
-    # After the record is created, check if we need to store in R2
-    return unless storage_location.in?(['r2', 'hybrid'])
-    return if r2_object_key.present? # Already stored
-    
-    content_to_store = read_attribute(:content)
-    return if content_to_store.blank?
-    
-    # Now we have an ID, we can store in R2
-    service = Storage::R2FileStorageService.new
-    result = service.store_file_content(app.id, path, content_to_store)
-    
-    if result && result[:object_key]
-      # Update the R2 key and clear database content for r2-only files
-      if storage_location == 'r2'
-        update_columns(
-          r2_object_key: result[:object_key],
-          content: nil  # Clear database content for r2-only storage
-        )
-      else
-        # For hybrid storage, just update the R2 key
-        update_column(:r2_object_key, result[:object_key])
-      end
-      
-      Rails.logger.info "[AppFile] Successfully stored #{path} in R2: #{result[:object_key]}"
-    else
-      Rails.logger.error "[AppFile] Failed to store #{path} in R2"
-      # If R2 storage failed for an r2-only file, change to database storage
-      if storage_location == 'r2'
-        update_column(:storage_location, 'database')
-      end
-    end
-  end
+  # DEPRECATED: R2 storage now handled by AppFilesInitializationJob
+  # This method is kept for reference but is no longer called
+  # def handle_r2_storage_for_new_records
+  #   # After the record is created, check if we need to store in R2
+  #   return unless storage_location.in?(['r2', 'hybrid'])
+  #   return if r2_object_key.present? # Already stored
+  #   
+  #   content_to_store = read_attribute(:content)
+  #   return if content_to_store.blank?
+  #   
+  #   # Now we have an ID, we can store in R2
+  #   service = Storage::R2FileStorageService.new
+  #   result = service.store_file_content(app.id, path, content_to_store)
+  #   
+  #   if result && result[:object_key]
+  #     # Update the R2 key and clear database content for r2-only files
+  #     if storage_location == 'r2'
+  #       update_columns(
+  #         r2_object_key: result[:object_key],
+  #         content: nil  # Clear database content for r2-only storage
+  #       )
+  #     else
+  #       # For hybrid storage, just update the R2 key
+  #       update_column(:r2_object_key, result[:object_key])
+  #     end
+  #     
+  #     Rails.logger.info "[AppFile] Successfully stored #{path} in R2: #{result[:object_key]}"
+  #   else
+  #     Rails.logger.error "[AppFile] Failed to store #{path} in R2"
+  #     # If R2 storage failed for an r2-only file, change to database storage
+  #     if storage_location == 'r2'
+  #       update_column(:storage_location, 'database')
+  #     end
+  #   end
+  # end
   
   def update_content_hash
     return unless content_changed? && content.present?

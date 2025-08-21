@@ -7,7 +7,7 @@ class ProcessAppUpdateJobV4 < ApplicationJob
   
   # Prevent duplicate AI processing for the same message
   # Lock until the job completes to avoid concurrent AI generation
-  unique :until_executed, lock_ttl: 30.minutes
+  unique :until_executed, lock_ttl: 30.minutes, on_conflict: :log
   
   # Define uniqueness based on message ID
   def lock_key
@@ -21,9 +21,6 @@ class ProcessAppUpdateJobV4 < ApplicationJob
       "process_app_update_v4:unknown:#{message_or_id.to_s}"
     end
   end
-  
-  # Log when duplicate processing is rejected
-  on_conflict :log
   
   # Retry configuration - V4 has its own retry logic, so limit job-level retries
   retry_on StandardError, wait: :polynomially_longer, attempts: 2 do |job, error|
@@ -79,6 +76,16 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     orchestrator.execute!
     
     Rails.logger.info "[ProcessAppUpdateJobV4] Successfully processed message ##{message.id} with V5 orchestrator"
+    
+    # Queue deployment job after successful generation
+    # This ensures app version is created and files are ready
+    app = message.app
+    if app && app.app_files.any?
+      Rails.logger.info "[ProcessAppUpdateJobV4] Queueing deployment for app ##{app.id}"
+      DeployAppJob.perform_later(app.id, "preview")
+    else
+      Rails.logger.warn "[ProcessAppUpdateJobV4] Skipping deployment - no files generated"
+    end
   rescue ActiveRecord::RecordNotFound => e
     Rails.logger.error "[ProcessAppUpdateJobV4] Message not found: #{e.message}"
     raise # Let job retry logic handle it

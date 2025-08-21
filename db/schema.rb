@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_21_155500) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_21_155501) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -296,10 +296,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_21_155500) do
     t.string "storage_location", default: "database"
     t.string "r2_object_key"
     t.string "content_hash"
+    t.string "r2_sync_status"
+    t.text "r2_sync_error"
+    t.datetime "r2_sync_attempted_at"
+    t.datetime "r2_sync_completed_at"
     t.index ["app_id", "path"], name: "index_app_files_on_app_id_and_path", unique: true
+    t.index ["app_id", "r2_sync_status"], name: "index_app_files_on_app_id_and_r2_sync_status"
     t.index ["app_id"], name: "index_app_files_on_app_id"
     t.index ["content_hash"], name: "index_app_files_on_content_hash"
     t.index ["r2_object_key"], name: "index_app_files_on_r2_object_key", unique: true, where: "(r2_object_key IS NOT NULL)"
+    t.index ["r2_sync_status"], name: "index_app_files_on_r2_sync_status"
     t.index ["storage_location"], name: "index_app_files_on_storage_location"
     t.index ["team_id"], name: "index_app_files_on_team_id"
     t.check_constraint "content IS NOT NULL OR r2_object_key IS NOT NULL", name: "content_or_r2_key_required"
@@ -526,11 +532,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_21_155500) do
     t.string "repository_status", default: "pending"
     t.datetime "subdomain_changed_at"
     t.integer "subdomain_change_count", default: 0, null: false
+    t.string "file_sync_status", default: "pending"
+    t.datetime "file_sync_started_at"
+    t.datetime "file_sync_completed_at"
+    t.text "file_sync_error"
+    t.datetime "file_sync_attempted_at"
+    t.text "file_sync_stats"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"
     t.index ["deployment_status"], name: "index_apps_on_deployment_status"
     t.index ["featured"], name: "index_apps_on_featured"
+    t.index ["file_sync_status", "created_at"], name: "index_apps_on_file_sync_status_and_created_at"
+    t.index ["file_sync_status"], name: "index_apps_on_file_sync_status"
     t.index ["repository_name"], name: "index_apps_on_repository_name", unique: true
     t.index ["repository_status"], name: "index_apps_on_repository_status"
     t.index ["status"], name: "index_apps_on_status"

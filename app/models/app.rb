@@ -437,22 +437,11 @@ class App < ApplicationRecord
     if result[:success]
       Rails.logger.info "[App] ✅ Repository created via fork: #{repository_url}"
       
-      # Setup Cloudflare Worker with git integration
-      worker_result = cloudflare_workers_service.create_worker_with_git_integration(result)
+      # NOTE: Cloudflare Worker creation moved to DeployAppJob
+      # Worker should only be created after app files are generated
+      # This prevents premature worker creation with empty repositories
       
-      if worker_result[:success]
-        update!(
-          cloudflare_worker_name: worker_result[:worker_name],
-          preview_url: worker_result[:preview_url],
-          staging_url: worker_result[:staging_url],
-          production_url: worker_result[:production_url],
-          deployment_status: 'preview_building'
-        )
-        
-        Rails.logger.info "[App] ✅ Cloudflare Worker created with git integration"
-      end
-      
-      worker_result
+      result
     else
       Rails.logger.error "[App] ❌ Repository creation failed: #{result[:error]}"
       update!(repository_status: 'failed')

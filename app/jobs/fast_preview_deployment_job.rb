@@ -4,15 +4,12 @@ class FastPreviewDeploymentJob < ApplicationJob
   queue_as :deployment
   
   # Prevent duplicate fast preview deployments for the same app
-  unique :until_executed, lock_ttl: 5.minutes
+  unique :until_executed, lock_ttl: 5.minutes, on_conflict: :log
   
   # Define uniqueness based on app_id
   def lock_key
     "fast_preview_deploy:app:#{arguments.first}"
   end
-  
-  # Log when duplicate deployment is rejected
-  on_conflict :log
   
   # Deploy app instantly without build step (< 3 seconds)
   def perform(app_id)

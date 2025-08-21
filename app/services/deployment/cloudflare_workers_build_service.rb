@@ -263,22 +263,25 @@ class Deployment::CloudflareWorkersBuildService
       'VITE_ENVIRONMENT' => 'preview'
     }
     
-    variables.each do |key, value|
-      # Use correct /vars endpoint for plain text environment variables
-      response = self.class.put(
-        "/accounts/#{@cloudflare_account_id}/workers/scripts/#{worker_name}/vars/#{key}",
-        body: { value: value.to_s }.to_json,
-        headers: self.class.headers
-      )
-      
-      unless response.success?
-        Rails.logger.warn "[CloudflareWorkersBuildService] Failed to set variable #{key}: #{response.code} - #{response.body}"
-      else
-        Rails.logger.info "[CloudflareWorkersBuildService] ✅ Set variable #{key}"
-      end
-    end
+    # Bulk update all environment variables at once
+    # Using the correct endpoint for environment variables
+    body = {
+      vars: variables.transform_values(&:to_s)
+    }
     
-    { success: true, variables_set: variables.size }
+    response = self.class.patch(
+      "/accounts/#{@cloudflare_account_id}/workers/scripts/#{worker_name}/settings",
+      body: body.to_json,
+      headers: self.class.headers.merge('Content-Type' => 'application/json')
+    )
+    
+    if response.success?
+      Rails.logger.info "[CloudflareWorkersBuildService] ✅ Set #{variables.size} environment variables for worker #{worker_name}"
+      { success: true, variables_set: variables.size }
+    else
+      Rails.logger.error "[CloudflareWorkersBuildService] Failed to set environment variables: #{response.code} - #{response.body}"
+      { success: false, error: "Failed to set environment variables: #{response.code}" }
+    end
   end
 
   def setup_worker_domains(worker_name)
