@@ -14,6 +14,9 @@ class AppVersion < ApplicationRecord
 
   # 🚅 add has_one associations above.
 
+  # Handle R2 storage after creation for new records
+  after_create :handle_r2_storage_after_create
+  
   # Storage strategy tracking
   enum :storage_strategy, { database: 'database', r2: 'r2', hybrid: 'hybrid' }
   
@@ -230,6 +233,9 @@ class AppVersion < ApplicationRecord
   end
   
   def store_snapshot_in_r2(snapshot_content)
+    # Can't store in R2 without an ID (new records)
+    return nil unless persisted?
+    
     service = Storage::R2FileStorageService.new
     
     # Parse JSON if it's a string, to ensure proper formatting
@@ -420,6 +426,35 @@ class AppVersion < ApplicationRecord
       'Restoring'
     else
       'Modifying'
+    end
+  end
+  
+  def r2_storage_enabled?
+    # Feature flag check - must have R2 bucket configured
+    return false unless ENV['CLOUDFLARE_R2_BUCKET_DB_FILES'].present?
+    
+    # Check if app has opted in
+    app.try(:r2_storage_enabled?) != false
+  end
+  
+  def handle_r2_storage_after_create
+    # Only process if we attempted R2 storage during creation
+    return unless storage_strategy.in?(['r2', 'hybrid'])
+    return if r2_snapshot_key.present? # Already stored
+    
+    # Now that we have an ID, store in R2
+    snapshot_content = read_attribute(:files_snapshot)
+    return if snapshot_content.blank?
+    
+    begin
+      result = store_snapshot_in_r2(snapshot_content)
+      if result && result[:object_key]
+        update_column(:r2_snapshot_key, result[:object_key])
+        Rails.logger.info "AppVersion #{id}: Stored snapshot in R2 after creation"
+      end
+    rescue => e
+      Rails.logger.error "AppVersion #{id}: Failed to store snapshot in R2: #{e.message}"
+      # Don't fail the creation if R2 storage fails
     end
   end
 

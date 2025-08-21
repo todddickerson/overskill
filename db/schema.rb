@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_21_155502) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_21_155503) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -487,7 +487,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_21_155502) do
     t.text "prompt", null: false
     t.string "app_type", default: "tool"
     t.string "framework", default: "react"
-    t.string "status", default: "generating"
+    t.string "status", default: "draft"
     t.string "visibility", default: "private"
     t.integer "base_price", default: 0, null: false
     t.string "stripe_product_id"

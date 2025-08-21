@@ -12,13 +12,25 @@ class ProcessAppUpdateJobV4 < ApplicationJob
   # Define uniqueness based on message ID
   def lock_key
     message_or_id = arguments.first
+    
+    # Handle GlobalID objects from ActiveJob serialization
+    if message_or_id.respond_to?(:model_id)
+      return "process_app_update_v4:message:#{message_or_id.model_id}"
+    end
+    
     case message_or_id
     when AppChatMessage
       "process_app_update_v4:message:#{message_or_id.id}"
     when Integer, String
       "process_app_update_v4:message:#{message_or_id}"
     else
-      "process_app_update_v4:unknown:#{message_or_id.to_s}"
+      # Try to extract ID from GlobalID string representation
+      if message_or_id.to_s.include?('AppChatMessage/')
+        id = message_or_id.to_s.split('AppChatMessage/').last.split('>').first
+        "process_app_update_v4:message:#{id}"
+      else
+        "process_app_update_v4:unknown:#{message_or_id.to_s}"
+      end
     end
   end
   

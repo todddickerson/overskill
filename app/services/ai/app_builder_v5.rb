@@ -150,7 +150,7 @@ module Ai
           @agent_state[:github_repository] = {
             url: @app.repository_url,
             name: @app.repository_name,
-            worker_name: @app.cloudflare_worker_name,
+            # worker_name field deprecated - WFP uses dispatch namespaces
             setup_completed: true,
             secrets_configured: secrets_result[:success]
           }
