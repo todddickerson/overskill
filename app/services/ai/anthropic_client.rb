@@ -229,6 +229,29 @@ module Ai
           Rails.logger.error "  Message: #{error_message}"
           Rails.logger.error "  HTTP Code: #{response.code}"
           
+          # Check for overload error and fallback to Opus if using Sonnet
+          if error_type == "overloaded_error" && model == :claude_sonnet_4 && attempt == 1
+            Rails.logger.info "[AnthropicClient] Sonnet overloaded, falling back to Opus 4.1"
+            
+            # Update model to Opus for this attempt
+            model_id = MODELS[:claude_opus_4]
+            body[:model] = model_id
+            request_options[:body] = body.to_json
+            
+            # Retry with Opus immediately
+            response = self.class.post("/v1/messages", request_options)
+            
+            unless response.success?
+              error_details = response.parsed_response["error"] || {}
+              error_message = error_details["message"] || "HTTP #{response.code}"
+              Rails.logger.error "[AnthropicClient] Opus fallback also failed: #{error_message}"
+              raise HTTParty::Error.new("Both Sonnet and Opus failed: #{error_message}")
+            end
+            
+            Rails.logger.info "[AnthropicClient] Successfully fell back to Opus 4.1"
+            return response  # Return successful Opus response
+          end
+          
           # Log the full error for debugging if needed
           if ENV["DEBUG_ANTHROPIC"] == "true"
             Rails.logger.error "  Full error: #{error_details.inspect}"
@@ -400,6 +423,33 @@ module Ai
           Rails.logger.error "  Type: #{error_type}"
           Rails.logger.error "  Message: #{error_message}"
           Rails.logger.error "  HTTP Code: #{response.code}"
+          
+          # Check for overload error and fallback to Opus if using Sonnet
+          if error_type == "overloaded_error" && model == :claude_sonnet_4 && attempt == 1
+            Rails.logger.info "[AnthropicClient] Sonnet overloaded during tool call, falling back to Opus 4.1"
+            
+            # Update model to Opus for this attempt
+            model_id = MODELS[:claude_opus_4]
+            body[:model] = model_id
+            
+            # Adjust max_tokens for Opus (it has lower limit)
+            body[:max_tokens] = [body[:max_tokens], 4096].min
+            
+            request_options[:body] = body.to_json
+            
+            # Retry with Opus immediately
+            response = self.class.post("/v1/messages", request_options)
+            
+            unless response.success?
+              error_details = response.parsed_response["error"] || {}
+              error_message = error_details["message"] || "HTTP #{response.code}"
+              Rails.logger.error "[AnthropicClient] Opus fallback also failed: #{error_message}"
+              raise HTTParty::Error.new("Both Sonnet and Opus failed: #{error_message}")
+            end
+            
+            Rails.logger.info "[AnthropicClient] Successfully fell back to Opus 4.1 for tool call"
+            return response  # Return successful Opus response
+          end
           
           # Log the full error for debugging if needed
           if ENV["DEBUG_ANTHROPIC"] == "true"
