@@ -65,12 +65,27 @@ class AppFile < ApplicationRecord
       self.storage_location = 'database'
       self.r2_object_key = nil
     when :r2_only  
-      store_in_r2(new_content)
-      super(nil) # Clear database content
-      self.storage_location = 'r2'
+      if new_record?
+        # For new records, keep content in database temporarily
+        # The after_create callback will handle R2 storage
+        super(new_content)
+        self.storage_location = 'r2' # Mark intended storage location
+      else
+        # For existing records, store in R2
+        result = store_in_r2(new_content)
+        if result && result[:object_key]
+          # Clear database content for R2-only storage
+          super(nil)
+          self.storage_location = 'r2'
+        else
+          # Fallback to database if R2 storage failed
+          super(new_content)
+          self.storage_location = 'database'
+        end
+      end
     when :hybrid
       super(new_content) # Store in database
-      store_in_r2(new_content) # Also store in R2
+      store_in_r2(new_content) unless new_record? # Store in R2 for existing records
       self.storage_location = 'hybrid'
     end
     
@@ -272,8 +287,26 @@ class AppFile < ApplicationRecord
     service = Storage::R2FileStorageService.new
     result = service.store_file_content(app.id, path, content_to_store)
     
-    # Update just the R2 key without triggering callbacks
-    update_column(:r2_object_key, result[:object_key]) if result[:object_key]
+    if result && result[:object_key]
+      # Update the R2 key and clear database content for r2-only files
+      if storage_location == 'r2'
+        update_columns(
+          r2_object_key: result[:object_key],
+          content: nil  # Clear database content for r2-only storage
+        )
+      else
+        # For hybrid storage, just update the R2 key
+        update_column(:r2_object_key, result[:object_key])
+      end
+      
+      Rails.logger.info "[AppFile] Successfully stored #{path} in R2: #{result[:object_key]}"
+    else
+      Rails.logger.error "[AppFile] Failed to store #{path} in R2"
+      # If R2 storage failed for an r2-only file, change to database storage
+      if storage_location == 'r2'
+        update_column(:storage_location, 'database')
+      end
+    end
   end
   
   def update_content_hash

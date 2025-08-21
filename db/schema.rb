@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_21_133616) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_21_141645) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -285,7 +285,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_21_133616) do
     t.bigint "team_id", null: false
     t.bigint "app_id", null: false
     t.string "path", null: false
-    t.text "content", null: false
+    t.text "content", comment: "File content stored in database. Can be null when content is stored in R2 only."
     t.string "file_type"
     t.integer "size_bytes"
     t.string "checksum"
