@@ -31,21 +31,10 @@ class AppVersionFile < ApplicationRecord
   end
   
   def content=(new_content)
-    return if new_content.blank?
-    
-    strategy = determine_storage_strategy(new_content)
-    
-    case strategy
-    when :database_only
-      super(new_content)
-      self.r2_content_key = nil
-    when :r2_only
-      store_in_r2(new_content)
-      super(nil) # Clear database content
-    when :hybrid
-      super(new_content) # Store in database
-      store_in_r2(new_content) # Also store in R2
-    end
+    # AppVersionFiles are historical records - always store in database
+    # R2 storage is not appropriate for version tracking
+    super(new_content)
+    self.r2_content_key = nil
   end
   
   # Migration methods
@@ -188,6 +177,8 @@ class AppVersionFile < ApplicationRecord
   def r2_storage_enabled?
     # Feature flag check - same as AppFile
     return false unless ENV['CLOUDFLARE_R2_BUCKET_DB_FILES'].present?
+    # Check if app_version and app exist before accessing
+    return false unless app_version && app_version.app
     app_version.app.try(:r2_storage_enabled?) != false
   end
   

@@ -22,6 +22,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Utilize Context7 MCP for documentation look ups
 - Explore then Plan full MD file plans for larger projects and phases.  Have Perplexity research review your plan, consider feedback in context of our application and update plan.  Share files/etc with the MCP if it might get more relevant results.
 
+## For Apps we generate
+  The deployment flow is now:
+  1. ProcessAppUpdateJobV4 runs AI generation
+  2. Files are created immediately in database
+  3. App version is created
+  4. DeployAppJob queues for deployment
+  5. AppFilesInitializationJob runs async for R2 optimization
+
 ## Implementation Plans & Documentation
 <!-- Add new implementation plans here after they are committed and finalized -->
 - **WFP_IMPLEMENTATION_PLAN.md** - Workers for Platforms complete architecture (✅ Implemented)
