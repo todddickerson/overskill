@@ -11,11 +11,30 @@ class Deployment::GithubRepositoryService
     @github_org = ENV['GITHUB_ORG']
     @template_repo = ENV['GITHUB_TEMPLATE_REPO']
     
+    # Validate required environment variables first
+    missing_vars = []
+    missing_vars << 'GITHUB_ORG' if @github_org.blank?
+    missing_vars << 'GITHUB_TEMPLATE_REPO' if @template_repo.blank?
+    
+    if missing_vars.any?
+      error_msg = "Missing required environment variables: #{missing_vars.join(', ')}"
+      Rails.logger.error "[GithubRepositoryService] #{error_msg}"
+      raise error_msg
+    end
+    
     # Use GitHub App authentication instead of direct token
     authenticator = Deployment::GithubAppAuthenticator.new
     @github_token = authenticator.get_installation_token(@github_org)
     
-    raise "Missing required environment variables" unless [@github_token, @github_org, @template_repo].all?(&:present?)
+    if @github_token.blank?
+      error_msg = "Failed to generate GitHub installation token. Check GITHUB_APP_PRIVATE_KEY environment variable and GitHub App installation."
+      Rails.logger.error "[GithubRepositoryService] #{error_msg}"
+      Rails.logger.error "[GithubRepositoryService] Organization: #{@github_org}"
+      Rails.logger.error "[GithubRepositoryService] Make sure the GitHub App is installed for organization: #{@github_org}"
+      raise error_msg
+    end
+    
+    Rails.logger.info "[GithubRepositoryService] Successfully initialized for app #{app.id} with org #{@github_org}"
     
     self.class.headers({
       'Authorization' => "Bearer #{@github_token}",

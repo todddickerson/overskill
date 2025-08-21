@@ -24,13 +24,29 @@ class Deployment::GithubAppAuthenticator
     # First, we need to generate a JWT for the app
     jwt = generate_jwt
     
+    if jwt.nil?
+      Rails.logger.error "[GithubAppAuthenticator] Failed to generate JWT - check GITHUB_APP_PRIVATE_KEY environment variable"
+      return nil
+    end
+    
     # Get the installation ID for the organization
     installation_id = get_installation_id(organization, jwt)
     
-    return nil unless installation_id
+    unless installation_id
+      Rails.logger.error "[GithubAppAuthenticator] Failed to get installation ID for organization: #{organization}"
+      return nil
+    end
     
     # Generate an installation access token
-    generate_installation_token(installation_id, jwt)
+    token = generate_installation_token(installation_id, jwt)
+    
+    if token.nil?
+      Rails.logger.error "[GithubAppAuthenticator] Failed to generate installation token for installation ID: #{installation_id}"
+    else
+      Rails.logger.info "[GithubAppAuthenticator] Successfully generated installation token for #{organization}"
+    end
+    
+    token
   end
   
   def test_authentication
@@ -109,7 +125,7 @@ class Deployment::GithubAppAuthenticator
     
     JWT.encode(payload, OpenSSL::PKey::RSA.new(@private_key), 'RS256')
   rescue => e
-    puts "Error generating JWT: #{e.message}"
+    Rails.logger.error "[GithubAppAuthenticator] Error generating JWT: #{e.message}"
     nil
   end
   
@@ -124,7 +140,7 @@ class Deployment::GithubAppAuthenticator
     if response.success?
       response['id']
     else
-      puts "Failed to get installation ID: #{response.code} - #{response.message}"
+      Rails.logger.warn "[GithubAppAuthenticator] Failed to get installation ID: #{response.code} - #{response.message}"
       
       # Try listing all installations
       all_installations = self.class.get('/app/installations',
@@ -135,10 +151,10 @@ class Deployment::GithubAppAuthenticator
       )
       
       if all_installations.success?
-        puts "Found #{all_installations.size} installations:"
+        Rails.logger.info "[GithubAppAuthenticator] Found #{all_installations.size} installations"
         all_installations.each do |inst|
-          puts "  - #{inst['account']['login']} (ID: #{inst['id']})"
           if inst['account']['login'] == organization
+            Rails.logger.info "[GithubAppAuthenticator] Found matching installation for #{organization} (ID: #{inst['id']})"
             return inst['id']
           end
         end
@@ -148,7 +164,7 @@ class Deployment::GithubAppAuthenticator
     end
   end
   
-  def generate_installation_token(installation_id, jwt)
+  def generate_installation_token(installation_id, jwt, retry_count = 0)
     response = self.class.post("/app/installations/#{installation_id}/access_tokens",
       headers: {
         'Authorization' => "Bearer #{jwt}",
@@ -158,8 +174,15 @@ class Deployment::GithubAppAuthenticator
     
     if response.success?
       response['token']
+    elsif response.code == 500 && retry_count < 3
+      # GitHub API sometimes returns 500 errors transiently
+      Rails.logger.warn "[GithubAppAuthenticator] Got 500 error from GitHub API, retrying (attempt #{retry_count + 1}/3)"
+      sleep(1 * (retry_count + 1)) # Exponential backoff: 1s, 2s, 3s
+      generate_installation_token(installation_id, jwt, retry_count + 1)
     else
-      puts "Failed to generate installation token: #{response.code} - #{response.message}"
+      error_msg = "Failed to generate installation token: #{response.code} - #{response.message}"
+      Rails.logger.error "[GithubAppAuthenticator] #{error_msg}"
+      Rails.logger.error "[GithubAppAuthenticator] Response body: #{response.body}" if response.body.present?
       nil
     end
   end
