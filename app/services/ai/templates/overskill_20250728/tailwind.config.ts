@@ -89,6 +89,12 @@ export default {
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
+			},
+			// Add commonly misused shadow utilities that AI might generate
+			boxShadow: {
+				'3xl': '0 35px 60px -15px rgba(0, 0, 0, 0.3)',
+				'4xl': '0 45px 80px -20px rgba(0, 0, 0, 0.35)',
+				'5xl': '0 55px 100px -25px rgba(0, 0, 0, 0.4)'
 			}
 		}
 	},

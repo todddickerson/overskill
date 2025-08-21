@@ -53,11 +53,19 @@ module Ai
       r2_integration = R2AssetIntegrationService.new(@app)
       transformed_content = r2_integration.transform_file_content(content, file_path)
       
+      # Validate and fix code before saving to prevent build failures
+      begin
+        validated_content = Ai::CodeValidator.validate_file(transformed_content, file_path)
+      rescue => e
+        @logger.error "[AiToolService] Code validation failed for #{file_path}: #{e.message}"
+        return { success: false, error: "Code validation failed: #{e.message}" }
+      end
+      
       app_file = @app.app_files.find_or_initialize_by(path: file_path)
       app_file.team = @app.team  # Ensure team is set for new files
       
-      # Set content before saving to satisfy validation
-      app_file.content = transformed_content
+      # Set validated content before saving
+      app_file.content = validated_content
       
       # Determine file type based on extension for new files
       if app_file.new_record?
