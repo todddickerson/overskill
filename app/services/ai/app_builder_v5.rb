@@ -3999,6 +3999,23 @@ module Ai
       Rails.logger.info "[V5_VERSION] Created AppVersion #{next_version} with #{version.app_version_files.count} file records"
       Rails.logger.info "[V5_VERSION] Changes: #{version.app_version_files.where(action: 'created').count} new, #{version.app_version_files.where(action: 'updated').count} modified, #{version.app_version_files.where(action: 'deleted').count} deleted, #{version.app_version_files.where(action: 'unchanged').count} unchanged"
       
+      # Create GitHub tag for version control and restoration capability
+      begin
+        if @app.repository_name.present?
+          tagging_service = Deployment::GithubVersionTaggingService.new(version)
+          tag_result = tagging_service.create_version_tag
+          
+          if tag_result[:success]
+            Rails.logger.info "[V5_VERSION] Created GitHub tag: #{tag_result[:tag_name]}"
+          else
+            Rails.logger.warn "[V5_VERSION] Failed to create GitHub tag: #{tag_result[:error]}"
+          end
+        end
+      rescue => e
+        Rails.logger.error "[V5_VERSION] GitHub tagging error: #{e.message}"
+        # Don't fail the build if tagging fails
+      end
+      
       version
     end
     

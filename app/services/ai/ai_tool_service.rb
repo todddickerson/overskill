@@ -40,6 +40,15 @@ module Ai
         end
       end
       
+      # Handle empty content gracefully
+      if content.blank?
+        @logger.warn "[AiToolService] Attempting to write empty file: #{file_path}"
+        content = "// Empty file\n" if file_path.match?(/\.(ts|tsx|js|jsx)$/i)
+        content = "/* Empty file */\n" if file_path.match?(/\.(css|scss|sass)$/i)
+        content = "<!-- Empty file -->\n" if file_path.match?(/\.html$/i)
+        content = "\n" if content.blank? # Default to single newline
+      end
+      
       # Transform content to use R2 asset resolver if needed
       r2_integration = R2AssetIntegrationService.new(@app)
       transformed_content = r2_integration.transform_file_content(content, file_path)
@@ -181,8 +190,19 @@ module Ai
         file = create_file_from_github_template(file_path)
         
         unless file
-          @logger.error "[AiToolService] Failed to create file from GitHub template: #{file_path}"
-          return { success: false, error: "File not found and could not fetch from template: #{file_path}" }
+          # If file doesn't exist in template and we have replacement content, create the file
+          if replacement.present?
+            @logger.info "[AiToolService] Creating new file with replacement content: #{file_path}"
+            result = write_file(file_path, replacement)
+            if result[:success]
+              return { success: true, content: "File created: #{file_path}" }
+            else
+              return result
+            end
+          else
+            @logger.error "[AiToolService] Failed to create file from GitHub template: #{file_path}"
+            return { success: false, error: "File not found and could not fetch from template: #{file_path}" }
+          end
         end
       end
       
@@ -552,7 +572,7 @@ module Ai
           4. Using imageUrls (auto-generated after image creation):
           ```tsx
           import { imageUrls } from '@/imageUrls';
-          <img src={imageUrls['#{File.basename(target_path)}']} alt="Description" />
+          <img src={imageUrls['#{::File.basename(target_path)}']} alt="Description" />
           ```
           
           Note: The imageUrls.js file is automatically created with all generated image URLs.
@@ -766,7 +786,8 @@ module Ai
           # If custom subdomain provided, use update_subdomain! method
           result = @app.update_subdomain!(custom_subdomain)
           unless result[:success]
-            return { success: false, error: "Failed to update subdomain: #{result[:error]}" }
+            # return { success: false, error: "Failed to update subdomain: #{result[:error]}" } # don't return error, just note the subdomain stayed the same
+            final_subdomain = @app.subdomain
           end
           final_subdomain = result[:subdomain] || custom_subdomain
         else

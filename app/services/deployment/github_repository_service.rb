@@ -79,8 +79,8 @@ class Deployment::GithubRepositoryService
     end
   end
 
-  # Update files in the forked repository
-  def update_file_in_repository(path:, content:, message:, branch: 'main')
+  # Update files in the forked repository with retry logic for SHA conflicts
+  def update_file_in_repository(path:, content:, message:, branch: 'main', retry_count: 0)
     repo_full_name = "#{@github_org}/#{@app.repository_name}"
     
     Rails.logger.info "[GitHubRepositoryService] Updating file: #{path} in #{repo_full_name}"
@@ -113,9 +113,18 @@ class Deployment::GithubRepositoryService
       if response.success?
         Rails.logger.info "[GitHubRepositoryService] ✅ File updated: #{path}"
         { success: true, sha: response.parsed_response.dig('content', 'sha') }
+      elsif response.code == 409 && retry_count < 3
+        # SHA conflict - another process updated the file
+        Rails.logger.warn "[GitHubRepositoryService] SHA conflict for #{path}, retrying (attempt #{retry_count + 1}/3)"
+        
+        # Wait a bit before retrying to reduce collision chance
+        sleep(0.5 * (retry_count + 1))
+        
+        # Retry with fresh SHA
+        update_file_in_repository(path: path, content: content, message: message, branch: branch, retry_count: retry_count + 1)
       else
         Rails.logger.error "[GitHubRepositoryService] File update failed: #{response.code} - #{response.body}"
-        { success: false, error: "GitHub API error: #{response.code}" }
+        { success: false, error: "GitHub API error: #{response.code}", details: response.body }
       end
     rescue => e
       Rails.logger.error "[GitHubRepositoryService] File update exception: #{e.message}"

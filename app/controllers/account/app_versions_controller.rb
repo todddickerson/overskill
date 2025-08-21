@@ -300,15 +300,40 @@ class Account::AppVersionsController < Account::ApplicationController
   def restore
     app = @app_version.app
     
-    # Create a new version with the content from this version
-    new_version = app.app_versions.build(
-      team: app.team,
-      user: current_user,
-      version_number: next_version_number(app),
-      changelog: "Restored from version #{@app_version.version_number}"
+    # Use the new restoration service for consistent restoration
+    restoration_service = Deployment::AppVersionRestorationService.new(app)
+    result = restoration_service.restore_to_version(
+      @app_version,
+      auto_deploy: false,
+      sync_to_github: true
     )
     
-    if new_version.save
+    if result[:success]
+      # Update the preview deployment
+      UpdatePreviewJob.perform_later(app.id)
+      
+      respond_to do |format|
+        format.json { render json: { 
+          success: true, 
+          new_version_id: result[:version]&.id,
+          files_restored: result[:restored_count],
+          message: result[:message] || "Successfully restored from version #{@app_version.version_number}"
+        } }
+      end
+    else
+      respond_to do |format|
+        format.json { render json: { 
+          success: false, 
+          error: result[:error] || "Failed to restore version",
+          failed_files: result[:failed_files]
+        }, status: :unprocessable_entity }
+      end
+    end
+    
+    return  # Exit early since we've handled all cases
+    
+    # Old code below is now replaced by the restoration service
+    if false  # Keep old code for reference but never execute
       files_restored = 0
       
       # Try to restore from files_snapshot first (V5 versions)

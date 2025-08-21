@@ -1,11 +1,39 @@
 class DeployAppJob < ApplicationJob
   queue_as :deployment
   
+  # Use unique job to prevent concurrent deployments of the same app
+  # This helps avoid GitHub SHA conflicts when multiple deploys run simultaneously
+  def self.perform_unique(app_id, environment = "production")
+    # Check if a deployment is already running for this app
+    cache_key = "deployment_lock_app_#{app_id}"
+    
+    if Rails.cache.read(cache_key)
+      Rails.logger.warn "[DeployAppJob] Deployment already in progress for app #{app_id}, skipping"
+      return
+    end
+    
+    # Set lock with 5 minute expiry (deployments shouldn't take longer)
+    Rails.cache.write(cache_key, true, expires_in: 5.minutes)
+    
+    begin
+      # Perform the actual deployment
+      perform_later(app_id, environment)
+    rescue => e
+      # Clear lock on error
+      Rails.cache.delete(cache_key)
+      raise e
+    end
+  end
+  
   def perform(app_id, environment = "production")
     app = App.find(app_id)
     
-    # Update status to deploying
-    app.update!(status: 'generating')
+    # Clear any existing lock when job starts
+    cache_key = "deployment_lock_app_#{app_id}"
+    
+    begin
+      # Update status to deploying
+      app.update!(status: 'generating')
     
     # Broadcast initial progress
     broadcast_deployment_progress(app, 
@@ -46,10 +74,16 @@ class DeployAppJob < ApplicationJob
     sync_result = github_service.push_file_structure(file_structure)
     
     unless sync_result[:success]
-      # Broadcast sync failure
+      # Broadcast sync failure with detailed error
+      error_message = if sync_result[:failed_files].present?
+        "Failed to sync #{sync_result[:failed_files].size} files to GitHub"
+      else
+        "Failed to sync to GitHub: #{sync_result[:error] || 'Unknown error'}"
+      end
+      
       broadcast_deployment_progress(app, 
         status: 'failed', 
-        deployment_error: "Failed to sync to GitHub: #{sync_result[:error]}",
+        deployment_error: error_message,
         deployment_steps: [
           { name: 'Sync to GitHub', current: false, completed: false },
           { name: 'Trigger GitHub Actions', current: false, completed: false },
@@ -57,7 +91,7 @@ class DeployAppJob < ApplicationJob
           { name: 'Configure routing', current: false, completed: false }
         ]
       )
-      result = { success: false, error: "GitHub sync failed: #{sync_result[:error]}" }
+      result = { success: false, error: error_message }
     else
       Rails.logger.info "[DeployAppJob] Successfully synced #{sync_result[:files_pushed]} files to GitHub"
       
@@ -145,7 +179,7 @@ class DeployAppJob < ApplicationJob
       end
       
       # Create a new version to track this deployment with snapshot
-      app.app_versions.create!(
+      app_version = app.app_versions.create!(
         version_number: generate_version_number(app),
         changelog: "Deployed to #{environment}",
         team: app.team,
@@ -153,6 +187,21 @@ class DeployAppJob < ApplicationJob
           { path: f.path, content: f.content, file_type: f.file_type }
         }.to_json
       )
+      
+      # Create GitHub tag for this version (enables restoration)
+      begin
+        tagging_service = Deployment::GithubVersionTaggingService.new(app_version)
+        tag_result = tagging_service.create_version_tag
+        
+        if tag_result[:success]
+          Rails.logger.info "[DeployAppJob] Created GitHub tag: #{tag_result[:tag_name]}"
+        else
+          Rails.logger.warn "[DeployAppJob] Failed to create GitHub tag: #{tag_result[:error]}"
+        end
+      rescue => e
+        Rails.logger.error "[DeployAppJob] GitHub tagging error: #{e.message}"
+        # Don't fail deployment if tagging fails
+      end
       
       # Final success progress broadcast
       broadcast_deployment_progress(app, 
@@ -201,6 +250,11 @@ class DeployAppJob < ApplicationJob
       )
       broadcast_deployment_update(app, 'failed', e.message)
     end
+  ensure
+    # Always clear the deployment lock when job completes
+    cache_key = "deployment_lock_app_#{app_id}"
+    Rails.cache.delete(cache_key)
+    Rails.logger.info "[DeployAppJob] Released deployment lock for app #{app_id}"
   end
   
   private

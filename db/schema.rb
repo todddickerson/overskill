@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_21_141645) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_21_155500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -454,10 +454,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_21_141645) do
     t.string "ai_model_used"
     t.string "storage_strategy", default: "database"
     t.string "r2_snapshot_key"
+    t.string "github_tag", comment: "GitHub tag name for this version (e.g., v1.2.3-20250821)"
+    t.string "github_commit_sha", comment: "Git commit SHA associated with this version"
+    t.string "github_tag_url", comment: "URL to view this tag on GitHub"
+    t.datetime "tagged_at", comment: "Timestamp when the GitHub tag was created"
     t.index ["ai_cost_cents"], name: "index_app_versions_on_ai_cost_cents"
     t.index ["ai_model_used"], name: "index_app_versions_on_ai_model_used"
+    t.index ["app_id", "github_tag"], name: "index_app_versions_on_app_id_and_github_tag", unique: true
     t.index ["app_id"], name: "index_app_versions_on_app_id"
     t.index ["bookmarked"], name: "index_app_versions_on_bookmarked"
+    t.index ["github_tag"], name: "index_app_versions_on_github_tag"
     t.index ["metadata"], name: "index_app_versions_on_metadata", using: :gin
     t.index ["r2_snapshot_key"], name: "index_app_versions_on_r2_snapshot_key", unique: true, where: "(r2_snapshot_key IS NOT NULL)"
     t.index ["status"], name: "index_app_versions_on_status"

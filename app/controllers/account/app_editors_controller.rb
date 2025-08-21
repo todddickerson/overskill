@@ -155,33 +155,32 @@ class Account::AppEditorsController < Account::ApplicationController
     version = @app.app_versions.find(params[:version_id])
     
     begin
-      # Restore files from version snapshot
-      files_data = JSON.parse(version.files_snapshot)
-      
-      files_data.each do |file_data|
-        file = @app.app_files.find_or_initialize_by(path: file_data['path'])
-        file.team = @app.team if file.new_record?
-        file.content = file_data['content']
-        file.file_type = file_data['file_type']
-        file.size_bytes = file_data['content'].bytesize
-        file.save!
-      end
-      
-      # Create a new version for the restore action
-      restore_version = @app.app_versions.create!(
-        team: @app.team,
-        user: current_user,
-        version_number: next_version_number(@app),
-        changelog: "Restored from version #{version.version_number}",
-        files_snapshot: version.files_snapshot
+      # Use the new restoration service for better reliability
+      restoration_service = Deployment::AppVersionRestorationService.new(@app)
+      result = restoration_service.restore_to_version(
+        version, 
+        auto_deploy: false,  # Don't auto-deploy, just restore files
+        sync_to_github: true  # Sync to GitHub if repo exists
       )
       
-      # Update preview
-      UpdatePreviewJob.perform_later(@app.id)
-      
-      render json: { success: true, message: "Successfully restored to version #{version.version_number}" }
+      if result[:success]
+        # Update preview
+        UpdatePreviewJob.perform_later(@app.id)
+        
+        render json: { 
+          success: true, 
+          message: result[:message] || "Successfully restored to version #{version.version_number}",
+          version_id: result[:version]&.id
+        }
+      else
+        render json: { 
+          success: false, 
+          error: result[:error] || "Failed to restore version"
+        }
+      end
     rescue => e
       Rails.logger.error "Version restore failed: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
       render json: { success: false, error: e.message }
     end
   end
