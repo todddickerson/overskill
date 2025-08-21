@@ -73,6 +73,20 @@ class DeployAppJob < ApplicationJob
     Rails.logger.info "[DeployAppJob] Syncing app files to GitHub repository"
     file_structure = app.app_files.to_h { |file| [file.path, file.content] }
     
+    # Add the workflow file to the push (move from .workflow-templates to .github/workflows)
+    # This activates GitHub Actions since the workflow wasn't in the fork initially
+    workflow_template_path = Rails.root.join('app/services/ai/templates/overskill_20250728/.workflow-templates/deploy.yml')
+    if File.exist?(workflow_template_path)
+      workflow_content = File.read(workflow_template_path)
+      # Replace placeholders with actual app values
+      customized_workflow = workflow_content
+        .gsub('{{APP_ID}}', app.obfuscated_id.downcase)
+        .gsub('{{OWNER_ID}}', app.team.users.first&.id.to_s || '1')
+      
+      file_structure['.github/workflows/deploy.yml'] = customized_workflow
+      Rails.logger.info "[DeployAppJob] Including workflow file in push to activate GitHub Actions"
+    end
+    
     sync_result = github_service.push_file_structure(file_structure)
     
     unless sync_result[:success]

@@ -139,32 +139,15 @@ class Deployment::GithubRepositoryService
         Rails.logger.error "[GitHubRepositoryService] ⚠️ Failed to update wrangler.toml: #{wrangler_result[:error]}"
       end
       
-      # Step 4: Automatically add GitHub Actions workflow for automated deployment
-      Rails.logger.info "[GitHubRepositoryService] Adding GitHub Actions workflow..."
-      workflow_result = add_deployment_workflow
-      if workflow_result[:success]
-        Rails.logger.info "[GitHubRepositoryService] ✅ GitHub Actions workflow added"
-      else
-        Rails.logger.warn "[GitHubRepositoryService] ⚠️ Failed to add workflow: #{workflow_result[:error]}"
-      end
-      
-      # Move workflow file from .workflow-templates to .github/workflows
-      Rails.logger.info "[GitHubRepositoryService] Moving workflow file to activate GitHub Actions"
-      move_result = move_workflow_file_post_fork(repo_name)
-      
-      if move_result[:success]
-        Rails.logger.info "[GitHubRepositoryService] ✅ Workflow file moved successfully"
-      else
-        Rails.logger.warn "[GitHubRepositoryService] ⚠️ Failed to move workflow file: #{move_result[:error]}"
-      end
+      # Note: Workflow file will be added during file push in DeployAppJob
+      # This ensures it's added with the app files in a single commit
       
       {
         success: true,
         repository: fork_data,
         repo_name: repo_name,
         ready: true,
-        fork_time: '2-3 seconds',
-        workflow_moved: move_result[:success]
+        fork_time: '2-3 seconds'
       }
     rescue => e
       Rails.logger.error "[GitHubRepositoryService] Fork creation failed: #{e.message}"
