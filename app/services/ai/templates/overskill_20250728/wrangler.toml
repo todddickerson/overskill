@@ -2,9 +2,17 @@
 # This app will be deployed to WFP dispatch namespaces, not as standalone worker
 
 name = "{{APP_ID}}"
-main = "dist/index.js"
+main = "src/worker.js"
 compatibility_date = "2024-08-01"
 compatibility_flags = ["nodejs_compat"]
+
+# SPA routing support - ensures React Router works correctly
+[site]
+bucket = "./dist"
+
+# This is critical for React Router to work
+[[rules]]
+not_found_handling = "single-page-application"
 
 # Workers for Platforms configuration
 # Apps are deployed to dispatch namespaces via GitHub Actions
@@ -43,4 +51,4 @@ exclude = ["*.map"]
 
 # No routes needed - WFP dispatch worker handles routing
 # Apps accessed via: https://dispatch-worker.account.workers.dev/app/{{APP_ID}}
-# Or via custom domain: https://{{APP_ID}}.overskill.app
+# Or via custom domain: https://{{APP_ID}}.overskill.com

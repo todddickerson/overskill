@@ -24,7 +24,80 @@ class Deployment::GithubRepositoryService
     })
   end
 
+  # Create new repository instead of forking (works with private repos and Actions)
+  def create_app_repository_via_new_repo
+    repo_name = generate_unique_repo_name
+    
+    Rails.logger.info "[GitHubRepositoryService] Creating new repository: #{repo_name}"
+    
+    begin
+      # Step 1: Create a new repository (not a fork)
+      create_response = self.class.post("/orgs/#{@github_org}/repos",
+        body: {
+          name: repo_name,
+          description: "AI-generated app by OverSkill - #{@app.name}",
+          private: true,
+          auto_init: true,  # Initialize with README
+          has_issues: false,
+          has_projects: false,
+          has_wiki: false
+        }.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
+      )
+      
+      unless create_response.success?
+        return { success: false, error: "Repository creation failed: #{create_response.code} - #{create_response.body}" }
+      end
+      
+      repo_data = create_response.parsed_response
+      
+      # Step 2: Update app record
+      @app.update!(
+        github_repo: "#{@github_org}/#{repo_name}",
+        repository_url: repo_data['html_url'],
+        repository_name: repo_name,
+        github_repo_id: repo_data['id'],
+        repository_status: 'ready'
+      )
+      
+      Rails.logger.info "[GitHubRepositoryService] ✅ Repository created successfully: #{repo_data['html_url']}"
+      
+      # Step 3: Copy template files from local template
+      Rails.logger.info "[GitHubRepositoryService] Copying template files..."
+      template_result = copy_template_files
+      if template_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ Template files copied"
+      else
+        Rails.logger.error "[GitHubRepositoryService] ⚠️ Failed to copy template files: #{template_result[:error]}"
+      end
+      
+      # Step 4: Update configuration files
+      Rails.logger.info "[GitHubRepositoryService] Updating configuration..."
+      config_result = update_wrangler_config
+      if config_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ Configuration updated"
+      else
+        Rails.logger.error "[GitHubRepositoryService] ⚠️ Failed to update configuration: #{config_result[:error]}"
+      end
+      
+      # Step 5: Add GitHub Actions workflow
+      Rails.logger.info "[GitHubRepositoryService] Adding GitHub Actions workflow..."
+      workflow_result = add_deployment_workflow
+      if workflow_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ GitHub Actions workflow added"
+      else
+        Rails.logger.error "[GitHubRepositoryService] ⚠️ Failed to add workflow: #{workflow_result[:error]}"
+      end
+      
+      { success: true, repository_url: repo_data['html_url'], repository_name: repo_name }
+    rescue => e
+      Rails.logger.error "[GitHubRepositoryService] Repository creation error: #{e.message}"
+      { success: false, error: e.message }
+    end
+  end
+  
   # Fork-based repository creation for ultra-fast app generation (2-3 seconds)
+  # NOTE: This doesn't work with private repos - Actions won't run on private forks
   def create_app_repository_via_fork
     repo_name = generate_unique_repo_name
     
@@ -48,6 +121,15 @@ class Deployment::GithubRepositoryService
       
       Rails.logger.info "[GitHubRepositoryService] ✅ Repository forked successfully: #{fork_data['html_url']}"
       
+      # Step 2.5: Enable GitHub Actions for the forked repository
+      Rails.logger.info "[GitHubRepositoryService] Enabling GitHub Actions..."
+      actions_result = enable_github_actions(repo_name)
+      if actions_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ GitHub Actions enabled"
+      else
+        Rails.logger.warn "[GitHubRepositoryService] ⚠️ Failed to enable GitHub Actions: #{actions_result[:error]}"
+      end
+      
       # Step 3: Update wrangler.toml with actual values
       Rails.logger.info "[GitHubRepositoryService] Updating wrangler.toml configuration..."
       wrangler_result = update_wrangler_config
@@ -66,12 +148,23 @@ class Deployment::GithubRepositoryService
         Rails.logger.warn "[GitHubRepositoryService] ⚠️ Failed to add workflow: #{workflow_result[:error]}"
       end
       
+      # Move workflow file from .workflow-templates to .github/workflows
+      Rails.logger.info "[GitHubRepositoryService] Moving workflow file to activate GitHub Actions"
+      move_result = move_workflow_file_post_fork(repo_name)
+      
+      if move_result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ Workflow file moved successfully"
+      else
+        Rails.logger.warn "[GitHubRepositoryService] ⚠️ Failed to move workflow file: #{move_result[:error]}"
+      end
+      
       {
         success: true,
         repository: fork_data,
         repo_name: repo_name,
         ready: true,
-        fork_time: '2-3 seconds'
+        fork_time: '2-3 seconds',
+        workflow_moved: move_result[:success]
       }
     rescue => e
       Rails.logger.error "[GitHubRepositoryService] Fork creation failed: #{e.message}"
@@ -249,6 +342,41 @@ class Deployment::GithubRepositoryService
       { success: false, error: e.message }
     end
   end
+
+  # Set up GitHub repository secrets for Cloudflare Workers deployment
+  def setup_deployment_secrets
+    return { success: false, error: 'No repository created' } unless @app.repository_name
+    
+    repo_full_name = "#{@github_org}/#{@app.repository_name}"
+    Rails.logger.info "[GitHubRepositoryService] Setting up deployment secrets for #{repo_full_name}"
+    
+    # Required secrets for GitHub Actions workflow
+    secrets = {
+      'CLOUDFLARE_API_TOKEN' => ENV['CLOUDFLARE_API_TOKEN'],
+      'CLOUDFLARE_ACCOUNT_ID' => ENV['CLOUDFLARE_ACCOUNT_ID']
+    }
+    
+    results = []
+    
+    secrets.each do |name, value|
+      next unless value.present?
+      
+      result = set_repository_secret(repo_full_name, name, value)
+      results << { name: name, success: result[:success], error: result[:error] }
+    end
+    
+    success_count = results.count { |r| r[:success] }
+    total_count = results.size
+    
+    if success_count == total_count
+      Rails.logger.info "[GitHubRepositoryService] ✅ All #{total_count} secrets configured"
+      { success: true, secrets_configured: total_count }
+    else
+      failed_secrets = results.reject { |r| r[:success] }
+      Rails.logger.error "[GitHubRepositoryService] Failed to configure secrets: #{failed_secrets.map { |s| s[:name] }.join(', ')}"
+      { success: false, failed_secrets: failed_secrets }
+    end
+  end
   
   private
   
@@ -375,42 +503,99 @@ class Deployment::GithubRepositoryService
     end
   end
 
-  # Set up GitHub repository secrets for Cloudflare Workers deployment
-  def setup_deployment_secrets
-    return { success: false, error: 'No repository created' } unless @app.repository_name
+  private
+
+  # Move workflow file from .workflow-templates to .github/workflows after fork
+  def move_workflow_file_post_fork(repo_name)
+    repo_full_name = "#{@github_org}/#{repo_name}"
     
-    repo_full_name = "#{@github_org}/#{@app.repository_name}"
-    Rails.logger.info "[GitHubRepositoryService] Setting up deployment secrets for #{repo_full_name}"
+    Rails.logger.info "[GitHubRepositoryService] Moving workflow from .workflow-templates to .github/workflows"
     
-    # Required secrets for GitHub Actions workflow
-    secrets = {
-      'CLOUDFLARE_API_TOKEN' => ENV['CLOUDFLARE_API_TOKEN'],
-      'CLOUDFLARE_ACCOUNT_ID' => ENV['CLOUDFLARE_ACCOUNT_ID']
-    }
-    
-    results = []
-    
-    secrets.each do |name, value|
-      next unless value.present?
+    begin
+      # Get the workflow file from .workflow-templates
+      source_response = self.class.get("/repos/#{repo_full_name}/contents/.workflow-templates/deploy.yml",
+        headers: self.class.headers
+      )
       
-      result = set_repository_secret(repo_full_name, name, value)
-      results << { name: name, success: result[:success], error: result[:error] }
-    end
-    
-    success_count = results.count { |r| r[:success] }
-    total_count = results.size
-    
-    if success_count == total_count
-      Rails.logger.info "[GitHubRepositoryService] ✅ All #{total_count} secrets configured"
-      { success: true, secrets_configured: total_count }
-    else
-      failed_secrets = results.reject { |r| r[:success] }
-      Rails.logger.error "[GitHubRepositoryService] Failed to configure secrets: #{failed_secrets.map { |s| s[:name] }.join(', ')}"
-      { success: false, failed_secrets: failed_secrets }
+      if !source_response.success?
+        Rails.logger.warn "[GitHubRepositoryService] No workflow template found at .workflow-templates/deploy.yml"
+        return { success: false, error: "No workflow template found" }
+      end
+      
+      # Decode the content
+      workflow_content = Base64.decode64(source_response.parsed_response['content'])
+      source_sha = source_response.parsed_response['sha']
+      
+      # Replace placeholders with actual app values
+      customized_workflow = workflow_content
+        .gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+        .gsub('{{OWNER_ID}}', @app.team.users.first&.id.to_s || '1')
+      
+      # Create .github/workflows directory structure and add the file
+      create_response = self.class.put("/repos/#{repo_full_name}/contents/.github/workflows/deploy.yml",
+        body: {
+          message: "Activate GitHub Actions workflow",
+          content: Base64.strict_encode64(customized_workflow),
+          branch: 'main'
+        }.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
+      )
+      
+      if create_response.success?
+        Rails.logger.info "[GitHubRepositoryService] ✅ Workflow moved to .github/workflows/deploy.yml"
+        
+        # Delete the original file from .workflow-templates
+        delete_response = self.class.delete("/repos/#{repo_full_name}/contents/.workflow-templates/deploy.yml",
+          body: {
+            message: "Remove workflow template after moving to .github/workflows",
+            sha: source_sha,
+            branch: 'main'
+          }.to_json,
+          headers: self.class.headers.merge('Content-Type' => 'application/json')
+        )
+        
+        if delete_response.success?
+          Rails.logger.info "[GitHubRepositoryService] ✅ Removed workflow template from .workflow-templates"
+        else
+          Rails.logger.warn "[GitHubRepositoryService] Failed to remove template: #{delete_response.code}"
+        end
+        
+        { success: true }
+      else
+        Rails.logger.error "[GitHubRepositoryService] Failed to create workflow: #{create_response.code} - #{create_response.body}"
+        { success: false, error: "Failed to create workflow file: #{create_response.code}" }
+      end
+    rescue => e
+      Rails.logger.error "[GitHubRepositoryService] Workflow move error: #{e.message}"
+      { success: false, error: e.message }
     end
   end
 
-  private
+  # Enable GitHub Actions for a repository
+  def enable_github_actions(repo_name)
+    repo_full_name = "#{@github_org}/#{repo_name}"
+    
+    Rails.logger.info "[GitHubRepositoryService] Enabling Actions for #{repo_full_name}"
+    
+    begin
+      # Enable Actions for the repository
+      response = self.class.patch("/repos/#{repo_full_name}/actions/permissions",
+        body: { enabled: true, allowed_actions: 'all' }.to_json,
+        headers: self.class.headers.merge('Content-Type' => 'application/json')
+      )
+      
+      if response.success?
+        Rails.logger.info "[GitHubRepositoryService] ✅ GitHub Actions enabled for #{repo_full_name}"
+        { success: true }
+      else
+        Rails.logger.error "[GitHubRepositoryService] Failed to enable Actions: #{response.code} - #{response.body}"
+        { success: false, error: "Failed to enable GitHub Actions: #{response.code}" }
+      end
+    rescue => e
+      Rails.logger.error "[GitHubRepositoryService] Actions enablement error: #{e.message}"
+      { success: false, error: e.message }
+    end
+  end
 
   def fork_template_repository(new_repo_name)
     fork_body = {
@@ -425,6 +610,45 @@ class Deployment::GithubRepositoryService
     )
   end
 
+  # Copy template files from local template directory
+  def copy_template_files
+    return { success: false, error: 'No repository created' } unless @app.repository_name
+    
+    template_dir = Rails.root.join('app', 'services', 'ai', 'templates', 'overskill_20250728')
+    repo_full_name = "#{@github_org}/#{@app.repository_name}"
+    
+    Rails.logger.info "[GitHubRepositoryService] Copying template files from #{template_dir}"
+    
+    begin
+      # Read all template files
+      template_files = {}
+      Dir.glob("#{template_dir}/**/*", File::FNM_DOTMATCH).each do |file_path|
+        next if File.directory?(file_path)
+        next if file_path.include?('.git/')
+        next if file_path.include?('node_modules/')
+        
+        relative_path = file_path.sub("#{template_dir}/", '')
+        content = File.read(file_path)
+        template_files[relative_path] = content
+      end
+      
+      Rails.logger.info "[GitHubRepositoryService] Found #{template_files.size} template files to copy"
+      
+      # Push all files in a single commit
+      result = push_file_structure(template_files, "Initialize app from template")
+      
+      if result[:success]
+        Rails.logger.info "[GitHubRepositoryService] ✅ Template files copied successfully"
+        { success: true }
+      else
+        { success: false, error: result[:error] }
+      end
+    rescue => e
+      Rails.logger.error "[GitHubRepositoryService] Template copy error: #{e.message}"
+      { success: false, error: e.message }
+    end
+  end
+  
   def generate_unique_repo_name
     # Use obfuscated_id for privacy instead of exposing real app ID
     base_name = @app.name.parameterize

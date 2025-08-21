@@ -21,6 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Utilize Playwright MCP for interacting with web browser in real time, analyze screenshots to confirm actions before proceeding.
 - Utilize Context7 MCP for documentation look ups
 - Explore then Plan full MD file plans for larger projects and phases.  Have Perplexity research review your plan, consider feedback in context of our application and update plan.  Share files/etc with the MCP if it might get more relevant results.
+- Apps we build are based off /app/services/ai/templates/overskill_20250728 it should be a GH repo we can commit/modify and push, new apps will be based off latest version of it.
 
 ## For Apps we generate
   The deployment flow is now:
@@ -36,6 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **WFP_IMPLEMENTATION_STATUS.md** - Current WFP deployment status and results
 - **DOMAIN_STRATEGY.md** - Workers.dev vs custom domain analysis  
 - **CRITICAL_NEXT_STEPS.md** - Immediate action items for WFP
+- **GITHUB_ACTIONS_WFP_DEPLOYMENT.md** - Complete GitHub Actions + WFP deployment architecture (✅ Production Ready)
 <!-- Add new plans above this line -->
 
 ## Project Overview

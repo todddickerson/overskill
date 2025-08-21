@@ -477,7 +477,8 @@ module Ai
         
         # Parse package name and version
         if package.include?('@')
-          name, version = package.rsplit('@', 2)
+          # Use rpartition to split on the last '@' (for scoped packages like @types/node)
+          name, _, version = package.rpartition('@')
           version = version.presence || 'latest'
         else
           name = package

@@ -1,3 +1,4 @@
+[1;34mINFO [0m 2025-08-21T18:07:59.849Z pid=7290 tid=ba: Sidekiq 8.0.5 connecting to Redis with options {:size=>10, :pool_name=>"internal", :url=>"redis://localhost:6379/0"}
 {
   "name": "overskill-app",
   "private": true,
@@ -5,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/prepare-worker.js",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -66,7 +67,6 @@
     "zustand": "^4.4.0"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^0.0.5",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
@@ -82,7 +82,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^6.0.7",
+    "vite": "^5.4.19",
     "wrangler": "^3.0.0"
   }
 }
