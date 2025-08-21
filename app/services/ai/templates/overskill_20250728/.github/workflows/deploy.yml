@@ -28,27 +28,58 @@ jobs:
       
     - name: Deploy to Workers for Platforms (Preview)
       if: github.event_name == 'pull_request'
-      uses: cloudflare/wrangler-action@v3
-      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        # Deploy to preview namespace using Workers for Platforms
-        command: deploy --dispatch-namespace overskill-development-preview --name preview-{{APP_ID}} --env development
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        # Deploy to WFP namespace using direct API call
+        NAMESPACE="overskill-development-preview"
+        SCRIPT_NAME="preview-{{APP_ID}}"
+        
+        # Bundle the worker script
+        echo "export default { async fetch(request, env, ctx) { return new Response('App {{APP_ID}} Preview', { status: 200 }) } }" > worker.js
+        
+        # Create form data for multipart upload
+        curl -X PUT "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/dispatch/namespaces/${NAMESPACE}/scripts/${SCRIPT_NAME}" \
+          -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+          -F "metadata={\"main_module\":\"worker.js\",\"compatibility_date\":\"2024-01-01\"}" \
+          -F "worker.js=@dist/index.js;type=application/javascript+module"
+        
+        echo "✅ Deployed to preview: https://preview-{{APP_ID}}.overskill.com"
         
     - name: Deploy to Workers for Platforms (Production)
       if: github.ref == 'refs/heads/main'
-      uses: cloudflare/wrangler-action@v3
-      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        # Deploy to production namespace using Workers for Platforms
-        command: deploy --dispatch-namespace overskill-development-production --name {{APP_ID}} --env production
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        # Deploy to WFP namespace using direct API call
+        NAMESPACE="overskill-development-production"
+        SCRIPT_NAME="{{APP_ID}}"
+        
+        # Create form data for multipart upload
+        curl -X PUT "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/dispatch/namespaces/${NAMESPACE}/scripts/${SCRIPT_NAME}" \
+          -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+          -F "metadata={\"main_module\":\"worker.js\",\"compatibility_date\":\"2024-01-01\"}" \
+          -F "worker.js=@dist/index.js;type=application/javascript+module"
+        
+        echo "✅ Deployed to production: https://{{APP_ID}}.overskill.com"
 
     # Staging deployment (manual trigger or special branch)
     - name: Deploy to Workers for Platforms (Staging)
       if: github.ref == 'refs/heads/staging'
-      uses: cloudflare/wrangler-action@v3
-      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        command: deploy --dispatch-namespace overskill-development-staging --name staging-{{APP_ID}} --env development
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        # Deploy to WFP namespace using direct API call
+        NAMESPACE="overskill-development-staging"
+        SCRIPT_NAME="staging-{{APP_ID}}"
+        
+        # Create form data for multipart upload
+        curl -X PUT "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/dispatch/namespaces/${NAMESPACE}/scripts/${SCRIPT_NAME}" \
+          -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+          -F "metadata={\"main_module\":\"worker.js\",\"compatibility_date\":\"2024-01-01\"}" \
+          -F "worker.js=@dist/index.js;type=application/javascript+module"
+        
+        echo "✅ Deployed to staging: https://staging-{{APP_ID}}.overskill.com"

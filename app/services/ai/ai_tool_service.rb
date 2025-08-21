@@ -50,6 +50,23 @@ module Ai
       # Set content before saving to satisfy validation
       app_file.content = transformed_content
       
+      # Determine file type based on extension for new files
+      if app_file.new_record?
+        app_file.file_type = case ::File.extname(file_path).downcase
+                            when '.tsx', '.ts' then 'typescript'
+                            when '.jsx', '.js' then 'javascript'
+                            when '.css' then 'css'
+                            when '.html' then 'html'
+                            when '.json' then 'json'
+                            when '.md' then 'markdown'
+                            when '.yml', '.yaml' then 'yaml'
+                            when '.svg' then 'svg'
+                            when '.png', '.jpg', '.jpeg', '.gif' then 'image'
+                            else 'text'
+                            end
+        @logger.info "[AiToolService] Creating new file: #{file_path} (type: #{app_file.file_type})"
+      end
+      
       if app_file.save
         @logger.info "[AiToolService] File written: #{file_path} (#{content.length} chars)"
         
@@ -60,10 +77,13 @@ module Ai
         
         { success: true, content: "File #{file_path} written successfully" }
       else
+        @logger.error "[AiToolService] Failed to save file #{file_path}: #{app_file.errors.full_messages.join(", ")}"
+        @logger.error "[AiToolService] File details - new_record: #{app_file.new_record?}, path: #{app_file.path}, team_id: #{app_file.team_id}, app_id: #{app_file.app_id}, file_type: #{app_file.file_type}, content_length: #{app_file.content&.length}"
         { success: false, error: app_file.errors.full_messages.join(", ") }
       end
     rescue StandardError => e
       @logger.error "[AiToolService] Error writing file #{file_path}: #{e.message}"
+      @logger.error "[AiToolService] Backtrace: #{e.backtrace.first(5).join("\n")}"
       { success: false, error: e.message }
     end
     
