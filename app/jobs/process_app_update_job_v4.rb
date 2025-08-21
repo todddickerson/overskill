@@ -1,7 +1,29 @@
 # ProcessAppUpdateJobV4 - Named V4 but actually uses V5 orchestrator (Vite + TypeScript builds)
 # TODO: Rename to ProcessAppUpdateJobV5 when convenient
 class ProcessAppUpdateJobV4 < ApplicationJob
+  include ActiveJob::Uniqueness
+  
   queue_as :ai_processing
+  
+  # Prevent duplicate AI processing for the same message
+  # Lock until the job completes to avoid concurrent AI generation
+  unique :until_executed, lock_ttl: 30.minutes
+  
+  # Define uniqueness based on message ID
+  def lock_key
+    message_or_id = arguments.first
+    case message_or_id
+    when AppChatMessage
+      "process_app_update_v4:message:#{message_or_id.id}"
+    when Integer, String
+      "process_app_update_v4:message:#{message_or_id}"
+    else
+      "process_app_update_v4:unknown:#{message_or_id.to_s}"
+    end
+  end
+  
+  # Log when duplicate processing is rejected
+  on_conflict :log
   
   # Retry configuration - V4 has its own retry logic, so limit job-level retries
   retry_on StandardError, wait: :polynomially_longer, attempts: 2 do |job, error|
