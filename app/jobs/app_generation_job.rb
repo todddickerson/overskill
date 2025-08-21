@@ -1,5 +1,25 @@
 class AppGenerationJob < ApplicationJob
+  include ActiveJob::Uniqueness
+  
   queue_as :ai_generation
+
+  # Prevent duplicate app generations for the same app
+  unique :until_executed, lock_ttl: 1.hour
+  
+  # Define uniqueness based on app_generation id or app id
+  def lock_key
+    arg = arguments.first
+    if arg.is_a?(AppGeneration)
+      "app_generation:#{arg.id}"
+    elsif arg.is_a?(App)
+      "app_generation:app:#{arg.id}"
+    else
+      "app_generation:#{arg}"
+    end
+  end
+  
+  # Log when duplicate generation is rejected
+  on_conflict :log
 
   # Retry up to 3 times with exponential backoff
   retry_on StandardError, wait: :polynomially_longer, attempts: 3

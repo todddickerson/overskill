@@ -166,6 +166,7 @@ gem "serpapi", "~> 1.0", ">= 1.0.1" # Official SerpApi Ruby client
 # Background Processing
 gem "sidekiq-cron" # Scheduled jobs
 gem "sidekiq-status" # Job status tracking
+gem "activejob-uniqueness", "~> 0.3" # Prevent duplicate job executions
 
 # File Processing
 gem "mini_magick" # Image processing

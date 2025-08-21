@@ -1,5 +1,19 @@
 class UpdatePreviewJob < ApplicationJob
+  include ActiveJob::Uniqueness
+  
   queue_as :preview_updates
+  
+  # Prevent duplicate preview updates for the same app
+  # Use while_executing to allow queueing but prevent concurrent execution
+  unique :while_executing, lock_ttl: 5.minutes
+  
+  # Define uniqueness based on app_id
+  def lock_key
+    "update_preview:app:#{arguments.first}"
+  end
+  
+  # Log when duplicate preview update is rejected
+  on_conflict :log
   
   def perform(app_id)
     app = App.find(app_id)

@@ -1,39 +1,28 @@
 class DeployAppJob < ApplicationJob
+  include ActiveJob::Uniqueness
+
   queue_as :deployment
   
-  # Use unique job to prevent concurrent deployments of the same app
-  # This helps avoid GitHub SHA conflicts when multiple deploys run simultaneously
-  def self.perform_unique(app_id, environment = "production")
-    # Check if a deployment is already running for this app
-    cache_key = "deployment_lock_app_#{app_id}"
-    
-    if Rails.cache.read(cache_key)
-      Rails.logger.warn "[DeployAppJob] Deployment already in progress for app #{app_id}, skipping"
-      return
-    end
-    
-    # Set lock with 5 minute expiry (deployments shouldn't take longer)
-    Rails.cache.write(cache_key, true, expires_in: 5.minutes)
-    
-    begin
-      # Perform the actual deployment
-      perform_later(app_id, environment)
-    rescue => e
-      # Clear lock on error
-      Rails.cache.delete(cache_key)
-      raise e
-    end
+  # Prevent duplicate deployments for the same app
+  # Lock until the job completes (successfully or with error)
+  unique :until_executed, lock_ttl: 10.minutes
+  
+  # Define uniqueness based on app_id only (ignore environment for uniqueness)
+  # This prevents multiple deployments of the same app regardless of environment
+  def lock_key
+    "deploy_app:#{arguments.first}"
   end
+  
+  # Log when duplicate deployment is rejected
+  on_conflict :log
   
   def perform(app_id, environment = "production")
     app = App.find(app_id)
     
-    # Clear any existing lock when job starts
-    cache_key = "deployment_lock_app_#{app_id}"
+    Rails.logger.info "[DeployAppJob] Starting deployment for app #{app_id} to #{environment}"
     
-    begin
-      # Update status to deploying
-      app.update!(status: 'generating')
+    # Update status to deploying
+    app.update!(status: 'generating')
     
     # Broadcast initial progress
     broadcast_deployment_progress(app, 
@@ -250,11 +239,6 @@ class DeployAppJob < ApplicationJob
       )
       broadcast_deployment_update(app, 'failed', e.message)
     end
-  ensure
-    # Always clear the deployment lock when job completes
-    cache_key = "deployment_lock_app_#{app_id}"
-    Rails.cache.delete(cache_key)
-    Rails.logger.info "[DeployAppJob] Released deployment lock for app #{app_id}"
   end
   
   private

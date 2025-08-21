@@ -59,6 +59,9 @@ GEM
     activejob (8.0.2)
       activesupport (= 8.0.2)
       globalid (>= 0.3.6)
+    activejob-uniqueness (0.4.0)
+      activejob (>= 4.2, < 8.1)
+      redlock (>= 2.0, < 3)
     activemodel (8.0.2)
       activesupport (= 8.0.2)
     activerecord (8.0.2)
@@ -687,6 +690,8 @@ GEM
       redis-client (>= 0.22.0)
     redis-client (0.25.1)
       connection_pool
+    redlock (2.0.6)
+      redis-client (>= 0.14.1, < 1.0.0)
     regexp_parser (2.10.0)
     reline (0.6.2)
       io-console (~> 0.5)
@@ -865,6 +870,7 @@ PLATFORMS
 
 DEPENDENCIES
   active_hash
+  activejob-uniqueness (~> 0.3)
   acts_as_follower!
   acts_as_votable
   ahoy_captain

@@ -1,6 +1,21 @@
 # Background job for publishing apps to production
 class PublishAppToProductionJob < ApplicationJob
+  include ActiveJob::Uniqueness
+  
   queue_as :deployment
+  
+  # Prevent duplicate production deployments for the same app
+  unique :until_executed, lock_ttl: 15.minutes
+  
+  # Define uniqueness based on app id
+  def lock_key
+    app = arguments.first
+    app_id = app.is_a?(App) ? app.id : app
+    "publish_to_production:app:#{app_id}"
+  end
+  
+  # Log when duplicate publish is rejected
+  on_conflict :log
   
   def perform(app)
     Rails.logger.info "[PublishJob] Starting production deployment for app ##{app.id}"
