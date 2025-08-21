@@ -27,7 +27,7 @@ module Ai
       @use_repository_mode = ENV['USE_REPOSITORY_MODE'] == 'true'
       if @use_repository_mode && @app
         @github_service = @app.github_repository_service
-        @cloudflare_service = @app.cloudflare_workers_service
+        # No longer need @cloudflare_service - GitHub Actions handles deployment
         Rails.logger.info "[V5_GITHUB] Repository mode enabled for app ##{@app.id}"
       end
       
@@ -272,41 +272,31 @@ module Ai
     end
 
     def deploy_with_github_workers
-      Rails.logger.info "[V5_GITHUB] Deploying with Cloudflare Workers Builds"
+      Rails.logger.info "[V5_GITHUB] GitHub Actions will handle deployment"
       
       # Check if repository is ready
       unless @app.repository_ready?
         return { success: false, error: "Repository not ready for deployment" }
       end
       
-      # The repository already has files pushed to it by the GitHub service
-      # Cloudflare Workers Builds will automatically build and deploy from the repository
+      # GitHub Actions will automatically build and deploy from the repository
+      # DeployAppJob will be queued by ProcessAppUpdateJobV4 after version creation
+      # No need to call old Cloudflare services anymore
       
-      # Get deployment status
-      deployment_result = @cloudflare_service.get_deployment_status
+      # Update app status to indicate generation is complete
+      @app.update!(
+        status: 'ready',
+        deployment_status: 'pending_deployment',
+        last_deployment_at: Time.current
+      )
       
-      if deployment_result[:success]
-        preview_url = deployment_result.dig(:environments, :preview, :url) || @app.preview_url
-        
-        # Update app status
-        @app.update!(
-          status: 'ready', 
-          deployment_status: 'preview_deployed',
-          last_deployment_at: Time.current
-        )
-        
-        Rails.logger.info "[V5_GITHUB] ✅ GitHub Workers deployment successful: #{preview_url}"
-        
-        return {
-          success: true,
-          preview_url: preview_url,
-          deployment_type: 'github_workers',
-          message: "Deployed with Cloudflare Workers Builds"
-        }
-      else
-        Rails.logger.error "[V5_GITHUB] ❌ GitHub Workers deployment failed: #{deployment_result[:error]}"
-        return { success: false, error: deployment_result[:error] }
-      end
+      Rails.logger.info "[V5_GITHUB] ✅ Generation complete, GitHub Actions will deploy"
+      
+      return {
+        success: true,
+        deployment_type: 'github_actions',
+        message: "Generation complete, deployment will be handled by GitHub Actions"
+      }
     end
 
     def deploy_with_legacy_job
