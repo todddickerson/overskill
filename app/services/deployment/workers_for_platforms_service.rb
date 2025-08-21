@@ -331,17 +331,19 @@ module Deployment
     def generate_script_name(environment)
       return nil unless @app
       
-      base = @app.obfuscated_id.downcase
-      
+      # Use subdomain for production, obfuscated_id for preview/staging
       case environment.to_sym
       when :production
-        base
+        # Use the app's subdomain slug for production URLs
+        @app.subdomain || @app.obfuscated_id.downcase
       when :staging
-        "staging-#{base}"
+        # Use obfuscated_id for staging (internal use)
+        "staging-#{@app.obfuscated_id.downcase}"
       when :preview
-        "preview-#{base}"
+        # Use obfuscated_id for preview (internal use)
+        "preview-#{@app.obfuscated_id.downcase}"
       else
-        "preview-#{base}"
+        "preview-#{@app.obfuscated_id.downcase}"
       end
     end
     

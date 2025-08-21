@@ -117,10 +117,41 @@ class App < ApplicationRecord
     service.deploy_to_production!
   end
   
-  # Update subdomain (with uniqueness check)
+  # Update subdomain (with uniqueness check and one-change limit)
   def update_subdomain!(new_subdomain)
-    service = Deployment::ProductionDeploymentService.new(self)
-    service.update_subdomain(new_subdomain)
+    # Check if subdomain has already been changed once
+    if subdomain_change_count && subdomain_change_count >= 1
+      return {success: false, error: "Subdomain can only be changed once. Current subdomain: #{subdomain}"}
+    end
+    
+    # Validate new subdomain format
+    unless new_subdomain =~ /\A[a-z0-9][a-z0-9-]*[a-z0-9]\z/
+      return {success: false, error: "Invalid subdomain format. Use lowercase letters, numbers, and hyphens only."}
+    end
+    
+    # Check uniqueness
+    if App.where(subdomain: new_subdomain).where.not(id: id).exists?
+      return {success: false, error: "Subdomain '#{new_subdomain}' is already taken"}
+    end
+    
+    # Update subdomain with tracking
+    old_subdomain = subdomain
+    self.subdomain = new_subdomain
+    self.subdomain_changed_at = Time.current
+    self.subdomain_change_count = (subdomain_change_count || 0) + 1
+    
+    if save
+      # If app is deployed, update the deployment
+      if status == 'published' || status == 'ready'
+        service = Deployment::ProductionDeploymentService.new(self)
+        service.update_subdomain(new_subdomain)
+      end
+      
+      Rails.logger.info "[App #{id}] Subdomain changed from '#{old_subdomain}' to '#{new_subdomain}'"
+      {success: true, subdomain: new_subdomain, old_subdomain: old_subdomain}
+    else
+      {success: false, error: errors.full_messages.join(', ')}
+    end
   end
 
   # Regenerate subdomain based on current name.
