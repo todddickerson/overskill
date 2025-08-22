@@ -1,7 +1,6 @@
 class Account::AppApiCallsController < Account::ApplicationController
-  include Account::Apps::ControllerBase
+  account_load_and_authorize_resource :app_api_call, through: :app, through_association: :app_api_calls
   
-  before_action :set_app
   before_action :set_api_call, only: [:show, :destroy]
   
   def index
