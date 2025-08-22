@@ -43,7 +43,7 @@ class SyncUsersToSupabaseJob < ApplicationJob
     Rails.logger.info "[SyncUsersToSupabase] Syncing user #{user.id} (#{user.email})"
     
     # Skip if already synced recently
-    if user.supabase_user_id.present? && user.supabase_last_synced_at&.> 1.hour.ago
+    if user.supabase_user_id.present? && user.supabase_last_synced_at && user.supabase_last_synced_at > 1.hour.ago
       Rails.logger.info "[SyncUsersToSupabase] User #{user.id} already synced recently, skipping"
       return { success: true }
     end
