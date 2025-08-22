@@ -1,0 +1,194 @@
+name: Golden Flow Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  golden-flows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: overskill_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/overskill_test
+      REDIS_URL: redis://localhost:6379/1
+      HEADLESS: true
+      CI: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: true
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install JavaScript dependencies
+      run: npm install
+        
+    - name: Setup test database
+      run: |
+        bundle exec rails db:create
+        bundle exec rails db:schema:load
+        
+    - name: Precompile assets for system tests
+      run: bundle exec rails assets:precompile
+        
+    - name: Run model and unit tests
+      run: bundle exec rails test
+      
+    - name: Run golden flow system tests
+      run: bundle exec rails test test/system/golden_flows_test.rb
+      
+    - name: Run golden flow baseline performance tests
+      run: bundle exec rails runner "Testing::GoldenFlowBaselineService.new.measure_all_flows"
+        
+    - name: Run golden flow playwright tests (simulation)
+      run: bundle exec rails runner "Testing::PlaywrightMcpService.new('test').run_golden_flow_tests"
+        
+    - name: Upload screenshots on failure
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: golden-flow-screenshots-${{ github.run_id }}
+        path: tmp/screenshots/
+        retention-days: 7
+        
+    - name: Upload performance metrics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: golden-flow-metrics-${{ github.run_id }}
+        path: tmp/golden_flow_metrics.log
+        retention-days: 30
+        
+    - name: Upload test reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-reports-${{ github.run_id }}
+        path: |
+          test/reports/
+          playwright_mcp_test_report_*.md
+        retention-days: 30
+
+  # Optional: Real browser testing with Playwright (when available)
+  playwright-integration:
+    runs-on: ubuntu-latest
+    if: false # Enable when Playwright MCP is available
+    timeout-minutes: 45
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: overskill_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: true
+    
+    - name: Install Playwright
+      run: npx playwright install --with-deps chromium
+      
+    - name: Setup test database
+      env:
+        RAILS_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/overskill_test
+        REDIS_URL: redis://localhost:6379/1
+      run: |
+        bundle exec rails db:create db:schema:load
+        
+    - name: Start Rails server
+      env:
+        RAILS_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/overskill_test
+        REDIS_URL: redis://localhost:6379/1
+      run: |
+        bundle exec rails server -e test -p 3000 &
+        sleep 10 # Wait for server to start
+        
+    - name: Run real Playwright golden flow tests
+      env:
+        RAILS_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/overskill_test
+        REDIS_URL: redis://localhost:6379/1
+        PLAYWRIGHT_MCP_AVAILABLE: true
+      run: |
+        # This would run real browser tests with Playwright MCP
+        # bundle exec rails runner "Testing::PlaywrightMcpService.new('test').run_golden_flow_tests"
+        echo "Playwright MCP integration ready - enable when available"
+        
+    - name: Upload Playwright artifacts
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: playwright-screenshots-${{ github.run_id }}
+        path: |
+          test-results/
+          tmp/screenshots/
+        retention-days: 7

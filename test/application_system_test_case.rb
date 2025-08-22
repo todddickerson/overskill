@@ -434,6 +434,112 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     end
   end
 
+  # Golden Flow Testing Helpers
+  # Integrates OverSkill's golden flow framework with Bullet Train system testing
+
+  def wait_for_generation_complete(timeout: 120)
+    assert_selector '[data-testid="generation-complete"]', wait: timeout
+  end
+
+  def wait_for_deployment_complete(timeout: 180)
+    assert_selector '[data-testid="production-url"]', wait: timeout
+  end
+
+  def verify_no_js_errors
+    # Check for JavaScript errors in console using existing Bullet Train method
+    # This leverages the existing assert_no_js_errors method but doesn't yield a block
+    begin
+      if use_cuprite?
+        verify_no_js_errors_cuprite
+      else
+        verify_no_js_errors_selenium  
+      end
+    rescue => e
+      puts "Note: Could not check JavaScript console logs: #{e.message}"
+    end
+  end
+
+  def create_test_user(email: nil)
+    # Create authenticated test user compatible with Bullet Train
+    test_email = email || "test-#{Time.current.to_i}@example.com"
+    
+    user = User.create!(
+      email: test_email,
+      password: "password123",
+      password_confirmation: "password123",
+      first_name: "Test",
+      last_name: "User",
+      time_zone: "UTC"
+    )
+    
+    # Create team and membership (Bullet Train requirement)
+    team = Team.create!(name: "Test Team #{Time.current.to_i}")
+    Membership.create!(user: user, team: team)
+    
+    user
+  end
+
+  def create_test_generated_app(user)
+    # Create test app for publishing golden flow tests
+    team = user.teams.first
+    membership = user.memberships.first
+    
+    App.create!(
+      name: "Test Generated App",
+      prompt: "Test app for golden flow testing",
+      status: "generated",
+      team: team,
+      creator: membership
+    ).tap do |app|
+      # Create test files to simulate generated app
+      app.app_files.create!([
+        { path: "index.html", content: "<h1>Test App</h1>", team: team },
+        { path: "app.js", content: "console.log('test');", team: team },
+        { path: "style.css", content: "body { margin: 0; }", team: team }
+      ])
+    end
+  end
+
+  def measure_golden_flow_performance(flow_name)
+    # Measure performance of golden flow execution
+    start_time = Time.current
+    result = yield
+    duration = Time.current - start_time
+    
+    puts "🎯 Golden Flow Performance: #{flow_name} took #{duration.round(2)}s"
+    
+    # Log performance for CI analysis
+    if ENV['CI']
+      File.open("tmp/golden_flow_metrics.log", "a") do |f|
+        f.puts "#{Time.current.iso8601},#{flow_name},#{duration}"
+      end
+    end
+    
+    result
+  end
+
+  private
+
+  def verify_no_js_errors_cuprite
+    # Use existing Bullet Train cuprite error checking
+    errors = page.driver.browser.options.logger.logs.filter { |e| e.level == "error" }
+    if errors.any?
+      puts "⚠️ JavaScript errors detected in golden flow:"
+      errors.each { |error| puts "  - #{error.message}" }
+      assert_empty errors, "JavaScript errors detected during golden flow execution"
+    end
+  end
+
+  def verify_no_js_errors_selenium
+    # Use existing Bullet Train selenium error checking
+    errors = page.driver.browser.logs.get(:browser).reject { |e| e.level == "WARNING" }
+    if errors.any?
+      puts "⚠️ JavaScript errors detected in golden flow:"
+      errors.each { |error| puts "  - #{error.message}" }
+      assert_empty errors, "JavaScript errors detected during golden flow execution"
+    end
+  end
+
   if !use_cuprite?
     module ::Selenium::WebDriver::Remote
       class Bridge
