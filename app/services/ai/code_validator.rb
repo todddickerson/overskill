@@ -22,6 +22,7 @@ class Ai::CodeValidator
     fixed_content = content.dup
     replacements_made = []
     
+    # First, fix invalid Tailwind classes
     INVALID_CLASS_REPLACEMENTS.each do |invalid, valid|
       if fixed_content.include?(invalid)
         fixed_content.gsub!(invalid, valid)
@@ -29,11 +30,138 @@ class Ai::CodeValidator
       end
     end
     
+    # Then check and fix CSS syntax issues
+    syntax_fixes = fix_css_syntax_issues(fixed_content)
+    if syntax_fixes[:fixed]
+      fixed_content = syntax_fixes[:content]
+      replacements_made.concat(syntax_fixes[:fixes])
+    end
+    
     if replacements_made.any?
-      Rails.logger.warn "[AI_VALIDATOR] Fixed invalid CSS classes: #{replacements_made.join(', ')}"
+      Rails.logger.warn "[AI_VALIDATOR] Fixed CSS issues: #{replacements_made.join(', ')}"
     end
     
     fixed_content
+  end
+  
+  def self.fix_css_syntax_issues(content)
+    fixes = []
+    lines = content.split("\n")
+    fixed_lines = []
+    brace_stack = []
+    in_comment = false
+    
+    lines.each_with_index do |line, index|
+      current_line = line
+      
+      # Track comment state
+      if line.include?('/*') && !line.include?('*/')
+        in_comment = true
+      end
+      if line.include?('*/')
+        in_comment = false
+        fixed_lines << current_line
+        next
+      end
+      
+      if in_comment
+        fixed_lines << current_line
+        next
+      end
+      
+      # Remove extra closing braces (}})
+      if current_line.match?(/\}\s*\}/)
+        # Count how many closing braces vs what we expect
+        expected_closes = brace_stack.size > 0 ? 1 : 0
+        actual_closes = current_line.scan(/\}/).count
+        
+        if actual_closes > expected_closes && actual_closes > 1
+          # Remove extra closing braces
+          current_line = current_line.sub(/\}\s*\}/, '}')
+          fixes << "Removed extra closing brace at line #{index + 1}"
+        end
+      end
+      
+      # Count braces after fixing extras
+      opening_braces = current_line.count('{')
+      closing_braces = current_line.count('}')
+      
+      # Track nested structure
+      opening_braces.times do
+        # Determine what opened
+        if line.match?(/@layer\s+\w+\s*\{/)
+          brace_stack.push({ type: 'layer', line: index })
+        elsif line.match?(/@media[^{]*\{/)
+          brace_stack.push({ type: 'media', line: index })
+        elsif line.match?(/@keyframes\s+\w+\s*\{/)
+          brace_stack.push({ type: 'keyframes', line: index })
+        elsif line.match?(/^\s*\w+[^{]*\{/) || line.match?(/^\s*\*\s*\{/)
+          brace_stack.push({ type: 'selector', line: index })
+        else
+          brace_stack.push({ type: 'block', line: index })
+        end
+      end
+      
+      closing_braces.times { brace_stack.pop if brace_stack.any? }
+      
+      # Add missing semicolons (but not after closing braces or @apply)
+      if !current_line.strip.empty? && 
+         !current_line.strip.end_with?(';', '{', '}', '*/') && 
+         !current_line.include?('@layer') && 
+         !current_line.include?('@media') &&
+         !current_line.include?('@keyframes') &&
+         current_line.include?(':') &&
+         !current_line.include?('@apply') # Don't add semicolon after @apply
+        current_line += ';'
+        fixes << "Added missing semicolon at line #{index + 1}"
+      end
+      
+      fixed_lines << current_line
+    end
+    
+    # Check for unclosed blocks at specific nesting points
+    if brace_stack.any?
+      # Add closing braces for unclosed blocks
+      brace_stack.reverse.each do |block|
+        case block[:type]
+        when 'layer'
+          # Check if a new @layer started without closing previous one
+          layer_line = lines[block[:line]]
+          if layer_line && layer_line.match?(/@layer\s+(\w+)/)
+            layer_name = $1
+            # Find where this layer's content should end
+            # Look for the next @layer or end of file
+            next_layer_index = lines.index.with_index { |l, i| i > block[:line] && l.match?(/@layer\s+(?!#{layer_name})/) }
+            
+            if next_layer_index
+              # Insert closing brace before the next @layer
+              fixed_lines.insert(next_layer_index, '}')
+              fixes << "Added missing closing brace for @layer #{layer_name}"
+            else
+              # Add at end if no next layer found
+              fixed_lines << '}'
+              fixes << "Added missing closing brace for @layer #{layer_name} at end"
+            end
+          end
+        when 'selector'
+          # Find the selector name for context
+          selector_line = lines[block[:line]]
+          selector_name = selector_line.strip.split('{').first.strip
+          # Add closing brace at the next appropriate position
+          fixed_lines << '}'
+          fixes << "Added missing closing brace for selector '#{selector_name}'"
+        else
+          fixed_lines << '}'
+          fixes << "Added missing closing brace for #{block[:type]}"
+        end
+      end
+    end
+    
+    { 
+      fixed: fixes.any?, 
+      content: fixed_lines.join("\n"),
+      fixes: fixes
+    }
   end
   
   def self.validate_jsx_syntax(content, file_path = nil)
@@ -86,15 +214,19 @@ class Ai::CodeValidator
     
     errors = []
     
-    # Check for missing return in function components
-    if content.match?(/export\s+(default\s+)?function\s+\w+.*?\{/)
-      function_bodies = content.scan(/export\s+(?:default\s+)?function\s+\w+[^{]*\{([^}]*)\}/m)
-      function_bodies.each do |body|
-        unless body[0].include?('return')
-          errors << "Function component missing return statement"
-        end
-      end
-    end
+    # DISABLED: This validation has a broken regex that causes false positives
+    # The regex [^}]* stops at the first closing brace, so any function with
+    # nested blocks (if statements, loops, etc.) will be incorrectly flagged
+    # as missing a return statement even when it has one.
+    #
+    # if content.match?(/export\s+(default\s+)?function\s+\w+.*?\{/)
+    #   function_bodies = content.scan(/export\s+(?:default\s+)?function\s+\w+[^{]*\{([^}]*)\}/m)
+    #   function_bodies.each do |body|
+    #     unless body[0].include?('return')
+    #       errors << "Function component missing return statement"
+    #     end
+    #   end
+    # end
     
     # Check for incorrect useState syntax
     if content.match?(/const\s+\w+\s*=\s*useState\(/) && !content.match?(/const\s+\[\w+,\s*set\w+\]\s*=\s*useState\(/)

@@ -54,11 +54,65 @@ module Ai
       transformed_content = r2_integration.transform_file_content(content, file_path)
       
       # Validate and fix code before saving to prevent build failures
-      begin
-        validated_content = Ai::CodeValidator.validate_file(transformed_content, file_path)
-      rescue => e
-        @logger.error "[AiToolService] Code validation failed for #{file_path}: #{e.message}"
-        return { success: false, error: "Code validation failed: #{e.message}" }
+      validated_content = transformed_content
+      
+      # Apply validation and auto-fixing based on file type
+      if file_path.match?(/\.css$/i)
+        # CSS validation with auto-fix
+        begin
+          # First pass: CodeValidator for syntax
+          fixed_css = Ai::CodeValidator.validate_and_fix_css(validated_content)
+          
+          # Second pass: CssValidatorService for additional fixes
+          css_validator = Ai::CssValidatorService.new(@app)
+          fixed_css = css_validator.validate_and_fix_css(file_path, fixed_css)
+          
+          # Check if we actually fixed anything
+          if fixed_css != validated_content
+            @logger.info "[AiToolService] Auto-fixed CSS issues in #{file_path}"
+            validated_content = fixed_css
+          end
+          
+          # Final validation check - if still has issues, fail the tool call
+          syntax_check = Ai::CodeValidator.fix_css_syntax_issues(validated_content)
+          if syntax_check[:fixed]
+            @logger.error "[AiToolService] CSS validation failed after auto-fix attempt for #{file_path}: #{syntax_check[:fixes].join(', ')}"
+            return { success: false, error: "CSS syntax errors could not be auto-fixed: #{syntax_check[:fixes].join(', ')}" }
+          end
+        rescue => e
+          @logger.error "[AiToolService] CSS validation error for #{file_path}: #{e.message}"
+          return { success: false, error: "CSS validation failed: #{e.message}" }
+        end
+      elsif file_path.match?(/\.(ts|tsx|js|jsx)$/i)
+        # TypeScript/JavaScript validation
+        begin
+          # Use TypescriptValidatorService for auto-fixing
+          ts_validator = Ai::TypescriptValidatorService.new(@app)
+          fixed_ts = ts_validator.validate_and_fix_typescript(file_path, validated_content)
+          
+          if fixed_ts != validated_content
+            @logger.info "[AiToolService] Auto-fixed TypeScript/JavaScript issues in #{file_path}"
+            validated_content = fixed_ts
+          end
+          
+          # Check TypeScript validation result
+          ts_result = Ai::CodeValidator.validate_typescript(validated_content, file_path)
+          if !ts_result[:valid]
+            @logger.error "[AiToolService] TypeScript validation failed after auto-fix for #{file_path}: #{ts_result[:errors].join(', ')}"
+            return { success: false, error: "TypeScript/JavaScript errors could not be auto-fixed: #{ts_result[:errors].join(', ')}" }
+          end
+        rescue => e
+          @logger.error "[AiToolService] TypeScript validation error for #{file_path}: #{e.message}"
+          return { success: false, error: "TypeScript/JavaScript validation failed: #{e.message}" }
+        end
+      else
+        # For other file types, use basic validation
+        begin
+          validated_content = Ai::CodeValidator.validate_file(transformed_content, file_path)
+        rescue => e
+          @logger.error "[AiToolService] Code validation failed for #{file_path}: #{e.message}"
+          return { success: false, error: "Code validation failed: #{e.message}" }
+        end
       end
       
       app_file = @app.app_files.find_or_initialize_by(path: file_path)

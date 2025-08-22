@@ -3615,19 +3615,8 @@ module Ai
     end
     
     def store_generated_file(path, content)
-      # Validate and auto-fix TypeScript/JavaScript files before saving
-      if path.match?(/\.(ts|tsx|js|jsx)$/)
-        fixed_content = validate_and_fix_typescript(path, content)
-        content = fixed_content if fixed_content != content
-      end
-      
-      # Validate and auto-fix CSS files before saving
-      if path.match?(/\.css$/)
-        css_validator = Ai::CssValidatorService.new(@app)
-        fixed_content = css_validator.validate_and_fix_css(path, content)
-        content = fixed_content if fixed_content != content
-      end
-      
+      # Validation is now handled in AiToolService.write_file
+      # This ensures validation happens for ALL file writes, not just during initial generation
       app.app_files.create!(
         path: path,
         content: content,
