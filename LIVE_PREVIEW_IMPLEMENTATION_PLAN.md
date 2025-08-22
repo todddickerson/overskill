@@ -1,9 +1,17 @@
 # Live Preview Implementation Plan
 ## Approaching Lovable.dev-Level Real-Time Development Experience
 
+### ✅ UPDATED: See COMPREHENSIVE_WFP_IMPLEMENTATION_PLAN.md for full integration
+
 ### Executive Summary
 
 Based on comprehensive technical analysis of Lovable.dev's architecture and current OverSkill capabilities, this plan outlines a phased approach to implementing live preview functionality that provides instant visual feedback for AI-generated applications. The implementation leverages our existing Workers for Platforms architecture while adding sophisticated real-time preview capabilities.
+
+**Key Updates from Comprehensive Plan:**
+- Preview environments use WFP dispatch workers (5-10 second provisioning)
+- WebSocket integration for real-time file synchronization
+- Coordination with tool streaming for live updates
+- Supabase integration for secure multi-tenant data access
 
 ### Current Architecture Assessment
 

@@ -15,19 +15,25 @@ export default class extends Controller {
   
   static values = {
     messageId: Number,
+    appId: String,
     channel: String
   }
   
   connect() {
-    // Subscribe to Action Cable channel for real-time updates
-    if (this.hasMessageIdValue) {
+    // Subscribe to unified app channel for real-time updates
+    if (this.hasAppIdValue) {
       this.subscription = consumer.subscriptions.create(
         { 
-          channel: "ChatProgressChannel",
-          message_id: this.messageIdValue
+          channel: "UnifiedAppChannel",
+          app_id: this.appIdValue
         },
         {
-          received: (data) => this.handleChannelData(data)
+          received: (data) => {
+            // Filter to only handle chat/progress updates for our message
+            if (data.message_id == this.messageIdValue || data.type?.includes('progress')) {
+              this.handleChannelData(data)
+            }
+          }
         }
       )
     }

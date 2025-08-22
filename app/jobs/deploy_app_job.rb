@@ -338,10 +338,14 @@ class DeployAppJob < ApplicationJob
     # Use GitHub Actions monitoring service for proper deployment tracking
     monitor_service = Deployment::GithubActionsMonitorService.new(app)
     
-    # Monitor the deployment with automatic error detection and fixing
+    # Find the latest assistant message to attach build progress to
+    latest_message = app.app_chat_messages.where(role: 'assistant').order(created_at: :desc).first
+    
+    # Monitor the deployment with automatic error detection and fixing + build timing
     result = monitor_service.monitor_deployment(
       max_wait_time: 8.minutes,  # Reasonable timeout for build + deployment
-      check_interval: 20.seconds  # Check every 20 seconds
+      check_interval: 20.seconds, # Check every 20 seconds
+      message: latest_message     # Pass message for build timing updates
     )
     
     if result[:success]

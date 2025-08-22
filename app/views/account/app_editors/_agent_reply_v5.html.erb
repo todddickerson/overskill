@@ -97,9 +97,83 @@
             <% end %>
           </div>
           
-          <%# Estimated time remaining %>
+          <%# Build countdown timer - Shows during GitHub Actions build %>
+          <%# Check if we have build timing metadata to show countdown %>
+          <% build_metadata = message.respond_to?(:metadata) && message.metadata.present? ? message.metadata : nil %>
+          <% workflow_run_id = build_metadata&.dig('workflow_run_id') %>
+          <% build_status = build_metadata&.dig('build_status') %>
+          
+          <% if workflow_run_id.present? && ['in_progress', 'queued', 'completed'].include?(build_status) %>
+            <div class="mt-3 p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
+                 data-controller="build-countdown"
+                 data-build-countdown-app-id-value="<%= message.app.id %>"
+                 data-build-countdown-message-id-value="<%= message.id %>"
+                 data-build-countdown-estimated-seconds-value="120">
+              
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center space-x-2">
+                  <i class="fas fa-hammer text-gray-500"></i>
+                  <span class="font-medium text-gray-700 dark:text-gray-300">GitHub Actions Build</span>
+                  <% build_conclusion = build_metadata&.dig('build_conclusion') %>
+                  <span data-build-countdown-target="status" class="<%= 
+                    case build_status
+                    when 'completed'
+                      build_conclusion == 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                    else
+                      'text-blue-600 dark:text-blue-400'
+                    end %>">
+                    <%= case build_status
+                        when 'completed'
+                          build_conclusion == 'success' ? 'Build completed!' : 'Build failed'
+                        when 'queued'
+                          'Queued...'
+                        else
+                          'Building...'
+                        end %>
+                  </span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <% total_build_seconds = build_metadata&.dig('total_build_seconds') %>
+                  <% if build_status == 'completed' && total_build_seconds.present? %>
+                    <span class="text-gray-500">Total:</span>
+                    <span data-build-countdown-target="timer" class="font-mono text-gray-600 dark:text-gray-400">
+                      <%= "#{total_build_seconds / 60}:#{(total_build_seconds % 60).to_s.rjust(2, '0')}" %>
+                    </span>
+                  <% else %>
+                    <span class="text-gray-500">ETA:</span>
+                    <span data-build-countdown-target="timer" class="font-mono text-blue-600 dark:text-blue-400">2:00</span>
+                  <% end %>
+                </div>
+              </div>
+              
+              <%# Build progress bar %>
+              <div class="mt-2">
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                  <div data-build-countdown-target="progress" 
+                       class="<%= 
+                         case build_status
+                         when 'completed'
+                           build_conclusion == 'success' ? 
+                             'bg-gradient-to-r from-green-500 to-green-600' : 
+                             'bg-gradient-to-r from-red-500 to-red-600'
+                         else
+                           'bg-gradient-to-r from-blue-500 to-blue-600'
+                         end
+                       %> h-1 rounded-full transition-all duration-1000 ease-out"
+                       style="width: <%= build_status == 'completed' ? '100' : '0' %>%"></div>
+                </div>
+              </div>
+              
+              <%# Elapsed time %>
+              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Elapsed: <span data-build-countdown-target="elapsed" class="font-mono">0:00</span>
+              </div>
+            </div>
+          <% end %>
+
+          <%# Estimated time remaining (fallback for deployment phases without build timing) %>
           <% deployment_eta = message.respond_to?(:deployment_eta) ? message.deployment_eta : nil %>
-          <% if deployment_eta.present? %>
+          <% if deployment_eta.present? && workflow_run_id.blank? %>
             <div class="mt-2 text-xs text-blue-600 dark:text-blue-400">
               Estimated time remaining: <%= deployment_eta %> seconds
             </div>

@@ -7,7 +7,7 @@ class Deployment::GithubActionsMonitorService
     @github_auth = Deployment::GithubAppAuthenticator.new
   end
   
-  def monitor_deployment(max_wait_time: 10.minutes, check_interval: 30.seconds)
+  def monitor_deployment(max_wait_time: 10.minutes, check_interval: 30.seconds, message: nil)
     Rails.logger.info "[GithubActionsMonitor] Starting workflow monitoring for app #{@app.id}"
     
     # Retry getting workflow runs for up to 3 minutes for new repos
@@ -15,29 +15,97 @@ class Deployment::GithubActionsMonitorService
     return { success: false, error: "No workflow runs found after 3 minutes of retrying" } if workflow_runs.empty?
     
     latest_run = workflow_runs.first
+    build_start_time = Time.parse(latest_run['created_at'])
+    monitoring_start = Time.current
+    
     Rails.logger.info "[GithubActionsMonitor] Monitoring workflow run #{latest_run['id']} (#{latest_run['status']})"
     
-    start_time = Time.current
+    # Store build timing information in the message if provided
+    if message
+      message.update!(
+        metadata: (message.metadata || {}).merge({
+          build_started_at: build_start_time,
+          workflow_run_id: latest_run['id'],
+          build_status: latest_run['status']
+        })
+      )
+      
+      # Broadcast initial build status
+      broadcast_build_status(message, {
+        status: 'in_progress',
+        elapsed_seconds: 0,
+        estimated_total_seconds: 120, # 2 minutes default estimate
+        workflow_run_id: latest_run['id']
+      })
+    end
     
-    while Time.current < start_time + max_wait_time
+    while Time.current < monitoring_start + max_wait_time
       run_status = get_workflow_run_status(latest_run['id'])
+      elapsed_seconds = (Time.current - build_start_time).to_i
+      
+      # Update build status in real-time
+      if message
+        broadcast_build_status(message, {
+          status: run_status['status'],
+          elapsed_seconds: elapsed_seconds,
+          estimated_total_seconds: 120,
+          workflow_run_id: latest_run['id']
+        })
+      end
       
       case run_status['status']
       when 'completed'
+        total_build_time = (Time.current - build_start_time).to_i
+        
+        # Update final build timing
+        if message
+          message.update!(
+            metadata: message.metadata.merge({
+              build_completed_at: Time.current,
+              total_build_seconds: total_build_time,
+              build_status: 'completed',
+              build_conclusion: run_status['conclusion']
+            })
+          )
+        end
+        
         if run_status['conclusion'] == 'success'
-          Rails.logger.info "[GithubActionsMonitor] Deployment successful for app #{@app.id}"
+          Rails.logger.info "[GithubActionsMonitor] Deployment successful for app #{@app.id} in #{total_build_time}s"
+          
+          # Broadcast final success status
+          if message
+            broadcast_build_status(message, {
+              status: 'completed',
+              conclusion: 'success',
+              elapsed_seconds: total_build_time,
+              workflow_run_id: latest_run['id']
+            })
+          end
+          
           return {
             success: true,
             workflow_run_id: latest_run['id'],
             deployment_url: generate_deployment_url,
-            message: "GitHub Actions deployment completed successfully"
+            message: "GitHub Actions deployment completed successfully",
+            build_time_seconds: total_build_time
           }
         else
           Rails.logger.error "[GithubActionsMonitor] Deployment failed for app #{@app.id}: #{run_status['conclusion']}"
+          
+          # Broadcast failure status
+          if message
+            broadcast_build_status(message, {
+              status: 'completed',
+              conclusion: 'failure',
+              elapsed_seconds: total_build_time,
+              workflow_run_id: latest_run['id']
+            })
+          end
+          
           return handle_deployment_failure(latest_run['id'])
         end
       when 'in_progress', 'queued'
-        Rails.logger.info "[GithubActionsMonitor] Workflow still running, checking again in #{check_interval} seconds"
+        Rails.logger.info "[GithubActionsMonitor] Workflow still running (#{elapsed_seconds}s elapsed), checking again in #{check_interval} seconds"
         sleep check_interval.to_i
         next
       else
@@ -47,11 +115,22 @@ class Deployment::GithubActionsMonitorService
     end
     
     # Timeout occurred
-    Rails.logger.error "[GithubActionsMonitor] Timeout waiting for deployment completion"
+    total_elapsed = (Time.current - build_start_time).to_i
+    Rails.logger.error "[GithubActionsMonitor] Timeout waiting for deployment completion after #{total_elapsed}s"
+    
+    if message
+      broadcast_build_status(message, {
+        status: 'timeout',
+        elapsed_seconds: total_elapsed,
+        workflow_run_id: latest_run['id']
+      })
+    end
+    
     {
       success: false,
-      error: "Deployment timed out after #{max_wait_time} seconds",
-      workflow_run_id: latest_run['id']
+      error: "Deployment timed out after #{total_elapsed} seconds",
+      workflow_run_id: latest_run['id'],
+      build_time_seconds: total_elapsed
     }
   end
   
@@ -367,6 +446,21 @@ class Deployment::GithubActionsMonitorService
     )
   end
   
+  def broadcast_build_status(message, status_data)
+    # Broadcast build status updates via ActionCable for real-time UI updates
+    ActionCable.server.broadcast(
+      "app_#{@app.id}_build_status",
+      {
+        type: 'build_status_update',
+        message_id: message.id,
+        build_status: status_data,
+        app_id: @app.id
+      }
+    )
+    
+    Rails.logger.info "[GithubActionsMonitor] Broadcasting build status: #{status_data[:status]} (#{status_data[:elapsed_seconds]}s elapsed)"
+  end
+
   def generate_deployment_url
     subdomain = @app.obfuscated_id.downcase
     "https://#{subdomain}.overskill.app"

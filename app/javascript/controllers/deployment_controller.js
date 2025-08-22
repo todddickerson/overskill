@@ -7,10 +7,13 @@ export default class extends Controller {
 
   connect() {
     this.subscription = consumer.subscriptions.create(
-      { channel: "DeploymentChannel", app_id: this.appIdValue },
+      { channel: "UnifiedAppChannel", app_id: this.appIdValue },
       {
         received: (data) => {
-          this.updateStatus(data)
+          // Only handle deployment-related updates
+          if (data.type && data.type.includes('deployment')) {
+            this.updateStatus(data)
+          }
         }
       }
     )

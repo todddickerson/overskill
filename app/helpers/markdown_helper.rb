@@ -145,7 +145,7 @@ module MarkdownHelper
     html.gsub!(/<ol>/, '<ol class="list-decimal list-inside space-y-0.5 my-1 ml-3 text-sm">')
     
     # Code blocks - smaller padding
-    html.gsub!(/<pre>/, '<pre class="bg-gray-100 dark:bg-gray-800 rounded-md p-2 overflow-x-auto my-1 text-xs">')
+    html.gsub!(/<pre>/, '<pre class="bg-gray-100 dark:bg-gray-800 rounded-md p-2 overflow-x-auto my-1 text-xs text-gray-800 dark:text-gray-200">')
     html.gsub!(/<code>/, '<code class="text-xs text-gray-800 dark:text-gray-200 font-mono">')
     
     # Inline code (not inside pre tags)
