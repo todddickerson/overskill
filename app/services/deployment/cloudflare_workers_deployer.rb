@@ -119,9 +119,9 @@ module Deployment
       # Get the hostname for this deployment
       hostname = case deployment_type
       when :preview
-        "preview-#{@app.id}.overskillproject.com"
+        "preview-#{@app.obfuscated_id.downcase}.overskillproject.com"
       when :production
-        "app-#{@app.id}.overskillproject.com"
+        "app-#{@app.obfuscated_id.downcase}.overskillproject.com"
       else
         "#{worker_name}.overskillproject.com"
       end
@@ -157,11 +157,11 @@ module Deployment
       # Different worker names for preview vs production
       case deployment_type
       when :preview
-        "preview-app-#{@app.id}"
+        "preview-app-#{@app.obfuscated_id.downcase}"
       when :production
-        "app-#{@app.id}"
+        "app-#{@app.obfuscated_id.downcase}"
       else
-        "app-#{@app.id}-#{deployment_type}"
+        "app-#{@app.obfuscated_id.downcase}-#{deployment_type}"
       end
     end
     

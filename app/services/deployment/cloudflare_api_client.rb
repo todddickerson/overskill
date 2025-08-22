@@ -345,13 +345,13 @@ module Deployment
 
       # Fallback routes for app
       routes << {
-        pattern: "preview-#{@app.id}.#{@base_domain}/*",
+        pattern: "preview-#{@app.obfuscated_id.downcase}.#{@base_domain}/*",
         zone: @zone_id,
         type: 'preview'
       }
       
       routes << {
-        pattern: "app-#{@app.id}.#{@base_domain}/*",
+        pattern: "app-#{@app.obfuscated_id.downcase}.#{@base_domain}/*",
         zone: @zone_id,
         type: 'production'
       }

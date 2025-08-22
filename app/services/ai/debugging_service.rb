@@ -118,7 +118,7 @@ module Ai
       # This would integrate with Cloudflare Workers logging in production
       # For now, simulate common console logs from deployed apps
       
-      preview_url = "https://preview-#{@app.id}.overskill.app"
+      preview_url = "https://preview-#{@app.obfuscated_id.downcase}.overskill.app"
       
       # Simulate console logs - in production, this would be real data
       [
@@ -170,7 +170,7 @@ module Ai
       # This would integrate with Cloudflare Workers or DevTools in production
       # For now, simulate common network requests from deployed apps
       
-      preview_url = "https://preview-#{@app.id}.overskill.app"
+      preview_url = "https://preview-#{@app.obfuscated_id.downcase}.overskill.app"
       
       # Simulate network requests - in production, this would be real data
       [

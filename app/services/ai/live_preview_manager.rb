@@ -481,7 +481,7 @@ module Ai
     def generate_preview_url
       # Generate the expected preview URL for this app
       base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
-      "https://preview-#{@app.id}.#{base_domain}"
+      "https://preview-#{@app.obfuscated_id.downcase}.#{base_domain}"
     end
     
     # Utility method to check if incremental builds are supported

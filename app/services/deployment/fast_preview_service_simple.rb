@@ -11,8 +11,8 @@ module Deployment
       
       return { success: false, error: "Missing Cloudflare credentials" } unless credentials_present?
       
-      worker_name = "preview-#{@app.id}"
-      subdomain = "preview-#{@app.id}"
+      worker_name = "preview-#{@app.obfuscated_id.downcase}"
+      subdomain = "preview-#{@app.obfuscated_id.downcase}"
       
       # Generate simple worker script
       worker_script = generate_simple_worker

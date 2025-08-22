@@ -28,8 +28,8 @@ class Deployment::CloudflarePreviewService
   def update_preview!
     return { success: false, error: "Missing Cloudflare credentials" } unless credentials_present?
     
-    worker_name = "preview-#{@app.id}"
-    preview_subdomain = "preview-#{@app.id}" # Use preview-{uuid} as subdomain
+    worker_name = "preview-#{@app.obfuscated_id.downcase}"
+    preview_subdomain = "preview-#{@app.obfuscated_id.downcase}" # Use preview-{uuid} as subdomain
     
     # Ensure database tables exist before building
     ensure_database_tables_exist!
