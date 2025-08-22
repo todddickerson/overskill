@@ -3152,9 +3152,21 @@ module Ai
       
       template_files = []
       
-      # NOTE: We no longer add the useful_context as a fake template file here
-      # The useful_context is properly added to context_data in build_current_context_data
-      # This prevents it from being incorrectly formatted with line numbers and document tags
+      # Only include base template context on first iteration (before modifications)
+      if @iteration_count == 1
+        # Get the useful context which includes all template files
+        base_context_service = Ai::BaseContextService.new(@app)
+        useful_context = base_context_service.build_useful_context
+        
+        # Create a pseudo-file object for the template content
+        # This allows CachedPromptBuilder to handle it properly
+        if useful_context.present? && useful_context.length > 1000
+          template_files << OpenStruct.new(
+            path: "template_context",
+            content: useful_context
+          )
+        end
+      end
       
       # Don't cache existing app files as they may have been modified
       # Let them go in the dynamic context section instead
