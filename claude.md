@@ -23,6 +23,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Explore then Plan full MD file plans for larger projects and phases.  Have Perplexity research review your plan, consider feedback in context of our application and update plan.  Share files/etc with the MCP if it might get more relevant results.
 - Apps we build are based off /app/services/ai/templates/overskill_20250728 it should be a GH repo we can commit/modify and push, new apps will be based off latest version of it.
 
+## 🎭 Golden Flow Testing Framework
+**CRITICAL**: OverSkill has a comprehensive testing framework to protect core user workflows. Before making UI/UX changes:
+
+### Quick Commands
+```bash
+# Test all golden flows (user clicking workflows)
+bin/rails runner "Testing::PlaywrightMcpService.new('development').run_golden_flow_tests"
+
+# Measure performance baselines  
+bin/rails runner "Testing::GoldenFlowBaselineService.new.measure_all_flows"
+
+# Analyze test coverage
+bin/rails runner "Testing::TestAuditorService.new.analyze_test_coverage"
+```
+
+### Key Files
+- `docs/testing/AI_TESTING_GUIDE.md` - Complete testing guide for AI assistants
+- `docs/testing/MCP_INTEGRATION_PATTERNS.md` - Playwright MCP integration patterns
+- `config/playwright_golden_flows.yml` - Golden flow definitions
+- `app/services/testing/` - All testing services
+
+### Data-TestID Strategy
+**Always add `data-testid` attributes** for golden flow elements:
+```erb
+<%= button_tag "Generate", data: { testid: "generate-button" } %>
+<div data-testid="generation-complete">Complete!</div>
+```
+
+**Golden Flows Protected**: App Generation, App Publishing, User Authentication
+
 ## For Apps we generate
   The deployment flow is now:
   1. ProcessAppUpdateJobV4 runs AI generation
@@ -42,6 +72,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **LIVE_PREVIEW_IMPLEMENTATION_PLAN.md** - Live preview with WFP (Coordinated with comprehensive plan)
 - **WEBSOCKET_TOOL_STREAMING_STRATEGY.md** - Real-time tool execution streaming (Coordinated with comprehensive plan)
 - **DEPLOYMENT_URL_PATTERNS.md** - ⚠️ CRITICAL: Correct URL formats for deployed apps (Use overskill.app domain, NOT workers.dev)
+- **DEVELOPER_EXPERIENCE_ENHANCEMENT_PLAN.md** - Golden flow protection and AI testing integration (✅ Phase 2.2 Complete)
+- **docs/testing/** - Complete AI testing knowledge base and Playwright MCP integration patterns (✅ Production Ready)
 <!-- Add new plans above this line -->
 
 ## Project Overview
