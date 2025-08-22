@@ -36,10 +36,20 @@ class DatabaseShard < ApplicationRecord
     def current_shard
       # Skip during Rails initialization and testing
       return nil if Rails.application.config.eager_load == false
-      return nil unless connection.table_exists?('database_shards')
-      return nil unless connection.active?
       
-      with_capacity.ordered_by_usage.first
+      # Prevent infinite recursion by using a thread-local variable
+      return nil if Thread.current[:database_shard_current_shard_called]
+      
+      Thread.current[:database_shard_current_shard_called] = true
+      
+      begin
+        return nil unless ApplicationRecord.connection.table_exists?('database_shards')
+        return nil unless ApplicationRecord.connection.active?
+        
+        with_capacity.ordered_by_usage.first
+      ensure
+        Thread.current[:database_shard_current_shard_called] = false
+      end
     rescue => e
       Rails.logger.warn "[DatabaseShard] Error in current_shard: #{e.message}"
       nil
