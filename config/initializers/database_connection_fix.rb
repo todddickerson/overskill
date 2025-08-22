@@ -8,13 +8,13 @@ if Rails.env.test?
       class ConnectionHandler
         alias_method :original_retrieve_connection_pool, :retrieve_connection_pool
 
-        def retrieve_connection_pool(connection_name, shard: nil, role: nil)
+        def retrieve_connection_pool(connection_name, **options)
           # If shard is an empty string, default to primary connection
-          if shard == ""
-            shard = :primary
+          if options[:shard] == ""
+            options[:shard] = :primary
           end
           
-          original_retrieve_connection_pool(connection_name, shard: shard, role: role)
+          original_retrieve_connection_pool(connection_name, **options)
         end
       end
     end
