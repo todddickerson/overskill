@@ -2,7 +2,6 @@ require "application_system_test_case"
 
 class WebhooksSystemTest < ApplicationSystemTestCase
   # SKIP: Not part of core OverSkill golden flows - focus on app generation, auth, publishing, chat, and file management
-  skip "Webhook test - not part of core user workflows"
   include ActiveJob::TestHelper
 
   setup do
@@ -28,6 +27,7 @@ class WebhooksSystemTest < ApplicationSystemTestCase
   end
 
   device_test "team member registers for webhooks and then receives them" do
+    skip "Webhook test - not part of core user workflows"
     login_as(@user, scope: :user)
 
     visit root_path
