@@ -38,6 +38,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **DOMAIN_STRATEGY.md** - Workers.dev vs custom domain analysis  
 - **CRITICAL_NEXT_STEPS.md** - Immediate action items for WFP
 - **GITHUB_ACTIONS_WFP_DEPLOYMENT.md** - Complete GitHub Actions + WFP deployment architecture (✅ Production Ready)
+- **COMPREHENSIVE_WFP_IMPLEMENTATION_PLAN.md** - ✨ NEW: Integrated live preview, tool streaming, and 50k+ app scale (Jan 2025)
+- **LIVE_PREVIEW_IMPLEMENTATION_PLAN.md** - Live preview with WFP (Coordinated with comprehensive plan)
+- **WEBSOCKET_TOOL_STREAMING_STRATEGY.md** - Real-time tool execution streaming (Coordinated with comprehensive plan)
+- **DEPLOYMENT_URL_PATTERNS.md** - ⚠️ CRITICAL: Correct URL formats for deployed apps (Use overskill.app domain, NOT workers.dev)
 <!-- Add new plans above this line -->
 
 ## Project Overview
