@@ -57,7 +57,7 @@ class Deployment::GithubActionsMonitorService
   
   private
   
-  def get_workflow_runs_with_retry(max_retry_time: 3.minutes)
+  def get_workflow_runs_with_retry(max_retry_time: 5.minutes)
     Rails.logger.info "[GithubActionsMonitor] Will retry getting workflow runs for up to #{max_retry_time}"
     
     start_time = Time.current
@@ -99,9 +99,13 @@ class Deployment::GithubActionsMonitorService
     delay = 5 # Start with 5 second delay
     
     begin
-      # Wait before first attempt if this is a new repo (created within last 2 minutes)
-      if @app.created_at > 2.minutes.ago && retries == 0
-        Rails.logger.info "[GithubActionsMonitor] New repo detected, waiting #{delay}s for GitHub to propagate permissions"
+      # Always wait on first attempt for new deployments to allow GitHub propagation
+      # Check if GitHub repo was recently created (within last 10 minutes)
+      # Using updated_at as proxy since that's when repo info is set
+      repo_is_new = @app.github_repo.present? && @app.updated_at > 10.minutes.ago
+      
+      if repo_is_new && retries == 0
+        Rails.logger.info "[GithubActionsMonitor] Recently updated repo detected, waiting #{delay}s for GitHub to propagate permissions"
         sleep delay
       end
       
@@ -120,9 +124,10 @@ class Deployment::GithubActionsMonitorService
       if response.success?
         runs = response['workflow_runs'] || []
         
-        # If no runs found but repo is very new, retry
-        if runs.empty? && @app.created_at > 1.minute.ago && retries < max_retries
-          raise "No runs found for new repo, retrying..."
+        # If no runs found and repo was recently updated, retry
+        # This handles the race condition where workflow hasn't started yet
+        if runs.empty? && repo_is_new && retries < max_retries
+          raise "No runs found for recently updated repo, retrying..."
         end
         
         return runs

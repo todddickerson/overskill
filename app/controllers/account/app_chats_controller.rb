@@ -11,8 +11,8 @@ class Account::AppChatsController < Account::ApplicationController
     @message.role = "user"
 
     if @message.save
-      # Process the request with AI - use configured orchestrator version
-      ProcessAppUpdateJobV4.perform_later(@message)
+      # Process the request with AI - use V5 wrapper (delegates to V4)
+      ProcessAppUpdateJobV5.perform_later(@message)
      
 
       respond_to do |format|
