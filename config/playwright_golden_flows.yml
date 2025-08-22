@@ -1,0 +1,173 @@
+# Playwright MCP Golden Flow Test Configuration
+# This file defines the user flows that AI should test using real browser automation
+
+development:
+  base_url: "http://localhost:3000"
+  browser: "chromium"
+  headless: false  # Show browser for development
+  timeout: 30000   # 30 seconds
+  
+  golden_flows:
+    end_to_end_app_generation:
+      name: "End-to-End App Generation"
+      description: "User creates app, generates with AI, sees files created"
+      test_steps:
+        - action: navigate
+          url: "/apps/new"
+          description: "Go to new app creation page"
+        - action: fill
+          selector: '[data-testid="app-name"]'
+          value: "Test Todo App"
+          description: "Enter app name"
+        - action: fill  
+          selector: '[data-testid="app-prompt"]'
+          value: "Create a simple todo app with add, edit, delete functionality"
+          description: "Enter app generation prompt"
+        - action: click
+          selector: '[data-testid="generate-button"]'
+          description: "Click Generate button"
+        - action: wait_for
+          selector: '[data-testid="generation-progress"]'
+          description: "Wait for generation progress to appear"
+        - action: wait_for
+          selector: '[data-testid="generation-complete"]'
+          timeout: 120000  # 2 minutes for AI generation
+          description: "Wait for generation to complete"
+        - action: verify
+          selector: '[data-testid="app-files-list"]'
+          description: "Verify generated files are visible"
+        - action: screenshot
+          name: "app-generation-complete"
+          description: "Capture completion state"
+      
+      success_criteria:
+        - element_exists: '[data-testid="generation-complete"]'
+        - element_contains:
+            selector: '[data-testid="app-files-list"]'
+            text: "index.html"
+        - element_contains:
+            selector: '[data-testid="app-files-list"]'
+            text: ".js"
+        - element_contains:
+            selector: '[data-testid="app-files-list"]'
+            text: ".css"
+        - no_errors_in_console: true
+
+    end_to_end_publishing:
+      name: "End-to-End App Publishing"
+      description: "User publishes generated app and accesses live URL"
+      prerequisites:
+        - requires_generated_app: true
+      test_steps:
+        - action: navigate
+          url: "/apps/{app_id}"
+          description: "Go to generated app page"
+        - action: click
+          selector: '[data-testid="publish-button"]'
+          description: "Click Publish to Production"
+        - action: wait_for
+          selector: '[data-testid="deployment-progress"]'
+          description: "Wait for deployment progress"
+        - action: wait_for  
+          selector: '[data-testid="production-url"]'
+          timeout: 180000  # 3 minutes for deployment
+          description: "Wait for production URL to be available"
+        - action: extract_text
+          selector: '[data-testid="production-url"]'
+          variable: "production_url"
+          description: "Get the production URL"
+        - action: navigate_new_tab
+          url: "{production_url}"
+          description: "Open production URL in new tab"
+        - action: verify
+          description: "Verify app loads in production"
+        - action: screenshot
+          name: "published-app-live"
+          description: "Capture live app state"
+      
+      success_criteria:
+        - element_exists: '[data-testid="production-url"]'
+        - production_url_accessible: true
+        - app_loads_successfully: true
+        - no_deployment_errors: true
+
+    basic_auth_flow:
+      name: "Basic User Authentication"
+      description: "User signs up, logs in, accesses dashboard"
+      test_steps:
+        - action: navigate
+          url: "/users/sign_up"
+          description: "Go to signup page"
+        - action: fill
+          selector: '[data-testid="email-field"]'
+          value: "test-{timestamp}@example.com"
+          description: "Enter unique email"
+        - action: fill
+          selector: '[data-testid="password-field"]'
+          value: "password123"
+          description: "Enter password"
+        - action: fill
+          selector: '[data-testid="password-confirmation-field"]'
+          value: "password123"
+          description: "Confirm password"
+        - action: click
+          selector: '[data-testid="sign-up-button"]'
+          description: "Click Sign Up"
+        - action: wait_for
+          selector: '[data-testid="dashboard"]'
+          description: "Wait for dashboard to load"
+        - action: verify
+          selector: '[data-testid="apps-section"]'
+          description: "Verify apps section is visible"
+        - action: screenshot
+          name: "user-dashboard-loaded"
+          description: "Capture dashboard state"
+      
+      success_criteria:
+        - element_exists: '[data-testid="dashboard"]'
+        - element_exists: '[data-testid="apps-section"]'
+        - user_authenticated: true
+        - can_create_apps: true
+
+production:
+  base_url: "https://overskill.app"
+  browser: "chromium" 
+  headless: true   # Headless for production testing
+  timeout: 45000   # Longer timeout for production
+  
+  # Same flows as development but with production-specific adjustments
+  golden_flows:
+    # Inherit from development but override specific settings
+    end_to_end_app_generation:
+      test_steps:
+        # Same as development
+      performance_requirements:
+        generation_time_max: 120000  # 2 minutes max in production
+        first_progress_response_max: 3000  # 3 seconds to see progress
+      
+    end_to_end_publishing:
+      test_steps:
+        # Same as development  
+      performance_requirements:
+        deployment_time_max: 300000  # 5 minutes max in production
+        url_accessibility_max: 60000  # 1 minute to be accessible
+
+test:
+  base_url: "http://localhost:3000"
+  browser: "chromium"
+  headless: true
+  timeout: 15000   # Faster for automated tests
+  
+  # Simplified flows for CI testing
+  golden_flows:
+    smoke_test_app_generation:
+      name: "Smoke Test - App Generation"
+      test_steps:
+        - action: navigate
+          url: "/apps/new"
+        - action: verify
+          selector: '[data-testid="generate-button"]'
+          description: "Generation form loads"
+      success_criteria:
+        - page_loads: true
+        - form_elements_present: true

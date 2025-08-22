@@ -193,6 +193,8 @@ When generating apps, ensure:
    - Add routes between {{AI_ROUTES_START}} and {{AI_ROUTES_END}} markers
    - For landing pages, replace default "/" route with <Route path="/" element={<Index />} />
    - Keep authentication routes intact unless specifically changing auth flow
+8. Ensure routes utilize parameterized standards 
+   - IE: `<Route path="/order-form" element={<OrderForm />} />` and NOT `<Route path="/order" element={<OrderForm />} />`
 
 ### CRITICAL Import Requirements - Template-Based Approach
 **MANDATORY: Determine ALL required imports BEFORE writing ANY code!**

@@ -40,6 +40,28 @@ module Ai
       @validation_errors = []
     end
 
+    # Single file validation and auto-fix method (used by AiToolService)
+    def validate_and_fix_typescript(file_path, content)
+      return content unless typescript_or_javascript?(file_path)
+      
+      Rails.logger.info "[TypescriptValidator] Validating #{file_path}"
+      
+      fixed_content = auto_fix_content(content, file_path)
+      
+      if fixed_content != content
+        Rails.logger.info "[TypescriptValidator] Auto-fixed issues in #{file_path}"
+        @fixed_files << file_path
+      end
+      
+      # Run additional validation after fixes
+      remaining_errors = validate_content(fixed_content, file_path)
+      if remaining_errors.any?
+        @validation_errors.concat(remaining_errors)
+      end
+      
+      fixed_content
+    end
+
     # Main validation and auto-fix method
     def validate_and_fix_files(files)
       Rails.logger.info "[TypescriptValidator] Validating #{files.count} files"
