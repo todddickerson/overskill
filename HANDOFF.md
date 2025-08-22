@@ -84,6 +84,13 @@
 - **Solution**: Update tool status in both tool_calls AND pending_tool_calls before flushing
 - **Added**: Debug logging to track tool status updates across all data structures
 
+### [x] Build Status Real-time Display Fix (August 22, 2025)
+- **Fixed**: AppChatMessage metadata wasn't triggering UI updates for build status display
+- **Issue**: Metadata updates with workflow_run_id and build_status weren't broadcasting
+- **Solution**: Added `saved_change_to_metadata?` to `should_broadcast_update?` method
+- **Enhanced**: Updated `use_v5_partial?` to render V5 partial when build metadata present
+- **Result**: Build countdown timer and progress now display correctly during deployments
+
 ## 📋 NEXT: Version Preview URLs Implementation
 
 ### AppVersion Preview URLs (Future Enhancement)
