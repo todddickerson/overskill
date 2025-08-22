@@ -63,87 +63,75 @@ async function fixTailwindClasses() {
   }
 }
 
-// 2. Validate JSX/TSX syntax
+// 2. Validate JSX/TSX syntax using TypeScript compiler
 async function validateJSXSyntax() {
-  console.log(`${colors.blue}🔍 Validating JSX/TSX syntax...${colors.reset}`);
+  console.log(`${colors.blue}🔍 Validating JSX/TSX syntax using TypeScript compiler...${colors.reset}`);
   
-  const jsxFiles = await glob('src/**/*.{jsx,tsx}');
-  
-  for (const file of jsxFiles) {
-    const content = fs.readFileSync(file, 'utf-8');
+  try {
+    // Use TypeScript compiler to check for syntax and type errors
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
     
-    // Check for mismatched tags using a simple stack
-    const tagStack = [];
-    const tagRegex = /<\/?([A-Z][A-Za-z]*)[^>]*>/g;
-    let match;
+    // Run TypeScript compiler in check mode (no emit)
+    const { stdout, stderr } = await execAsync('npx tsc --noEmit --skipLibCheck');
     
-    while ((match = tagRegex.exec(content)) !== null) {
-      const fullTag = match[0];
-      const tagName = match[1];
-      
-      if (fullTag.startsWith('</')) {
-        // Closing tag
-        if (tagStack.length === 0 || tagStack[tagStack.length - 1] !== tagName) {
-          console.log(`${colors.red}  ❌ Mismatched closing tag </${tagName}> in ${file}${colors.reset}`);
-          hasErrors = true;
-        } else {
-          tagStack.pop();
-        }
-      } else if (!fullTag.endsWith('/>')) {
-        // Opening tag (not self-closing)
-        tagStack.push(tagName);
-      }
+    // If there's stderr output, it means there are compilation errors
+    if (stderr) {
+      console.log(`${colors.red}  ❌ TypeScript compilation errors:${colors.reset}`);
+      console.log(stderr);
+      hasErrors = true;
+    } else {
+      console.log(`${colors.green}  ✅ JSX/TSX syntax validation passed${colors.reset}`);
     }
-    
-    if (tagStack.length > 0) {
-      console.log(`${colors.red}  ❌ Unclosed tags in ${file}: ${tagStack.join(', ')}${colors.reset}`);
+  } catch (error) {
+    // tsc returns non-zero exit code when there are errors
+    if (error.stdout || error.stderr) {
+      console.log(`${colors.red}  ❌ TypeScript compilation errors:${colors.reset}`);
+      if (error.stdout) console.log(error.stdout);
+      if (error.stderr) console.log(error.stderr);
+      hasErrors = true;
+    } else {
+      console.log(`${colors.red}  ❌ Failed to run TypeScript compiler: ${error.message}${colors.reset}`);
       hasErrors = true;
     }
   }
 }
 
-// 3. Validate TypeScript imports
-async function validateImports() {
-  console.log(`${colors.blue}🔍 Checking for missing imports...${colors.reset}`);
+// 3. Run ESLint for code quality checks
+async function runESLintValidation() {
+  console.log(`${colors.blue}🔍 Running ESLint validation...${colors.reset}`);
   
-  const tsxFiles = await glob('src/**/*.{ts,tsx}');
-  
-  for (const file of tsxFiles) {
-    const content = fs.readFileSync(file, 'utf-8');
+  try {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
     
-    // Common components that need imports
-    const componentPatterns = [
-      { pattern: /<(Card|CardContent|CardHeader|CardFooter|CardTitle|CardDescription)\b/, import: "import { $1 } from '@/components/ui/card'" },
-      { pattern: /<(Button)\b/, import: "import { Button } from '@/components/ui/button'" },
-      { pattern: /<(Input)\b/, import: "import { Input } from '@/components/ui/input'" },
-      { pattern: /<(Label)\b/, import: "import { Label } from '@/components/ui/label'" },
-      { pattern: /<(Select|SelectContent|SelectItem|SelectTrigger|SelectValue)\b/, import: "import { $1 } from '@/components/ui/select'" }
-    ];
+    // Run ESLint on src directory
+    const { stdout, stderr } = await execAsync('npx eslint src/ --ext .js,.jsx,.ts,.tsx --format compact');
     
-    let importsToAdd = [];
-    
-    for (const { pattern, import: importStatement } of componentPatterns) {
-      if (pattern.test(content) && !content.includes(importStatement.split(' from ')[0])) {
-        importsToAdd.push(importStatement);
-      }
+    if (stdout.trim()) {
+      console.log(`${colors.yellow}  ⚠️  ESLint issues found:${colors.reset}`);
+      console.log(stdout);
+      // ESLint issues are warnings, not build blockers
+    } else {
+      console.log(`${colors.green}  ✅ ESLint validation passed${colors.reset}`);
     }
-    
-    if (importsToAdd.length > 0) {
-      console.log(`${colors.yellow}  ⚠️  Missing imports in ${file}${colors.reset}`);
-      
-      // Add imports at the beginning of the file
-      const updatedContent = importsToAdd.join('\n') + '\n\n' + content;
-      fs.writeFileSync(file, updatedContent);
-      
-      console.log(`${colors.green}  ✅ Added ${importsToAdd.length} missing imports${colors.reset}`);
-      fixedCount++;
+  } catch (error) {
+    // ESLint returns non-zero exit code when there are errors
+    if (error.stdout) {
+      console.log(`${colors.yellow}  ⚠️  ESLint issues found:${colors.reset}`);
+      console.log(error.stdout);
+      // Don't fail build for ESLint issues, they're usually style/quality issues
+    } else if (error.stderr) {
+      console.log(`${colors.yellow}  ⚠️  ESLint warning: ${error.stderr}${colors.reset}`);
     }
   }
 }
 
-// 4. Fix common TypeScript errors
-async function fixTypeScriptErrors() {
-  console.log(`${colors.blue}🔍 Fixing common TypeScript errors...${colors.reset}`);
+// 4. Validate TypeScript imports and auto-fix missing page/component imports
+async function validateImports() {
+  console.log(`${colors.blue}🔍 Checking for missing imports...${colors.reset}`);
   
   const tsxFiles = await glob('src/**/*.{ts,tsx}');
   
@@ -151,31 +139,122 @@ async function fixTypeScriptErrors() {
     let content = fs.readFileSync(file, 'utf-8');
     let modified = false;
     
-    // Fix missing return statements in components
-    if (content.includes('export default function') || content.includes('export function')) {
-      // Ensure components have return statements
-      const functionRegex = /export\s+(default\s+)?function\s+\w+\([^)]*\)\s*{([^}]*)}/g;
-      content = content.replace(functionRegex, (match, defaultExport, body) => {
-        if (!body.includes('return')) {
-          console.log(`${colors.yellow}  ⚠️  Missing return statement in ${file}${colors.reset}`);
-          // This is too complex to auto-fix reliably
-          hasErrors = true;
-        }
-        return match;
-      });
+    // Check for usage of components/pages in JSX and Routes
+    // Pattern to find JSX components and Route elements
+    const jsxUsageRegex = /<([A-Z][A-Za-z]*)\s*[^>]*\/?>|element=\{<([A-Z][A-Za-z]*)\s*[^>]*\/?>}/g;
+    const usedComponents = new Set();
+    
+    let match;
+    while ((match = jsxUsageRegex.exec(content)) !== null) {
+      const componentName = match[1] || match[2];
+      if (componentName && !componentName.includes('.')) {
+        usedComponents.add(componentName);
+      }
     }
     
-    // Fix incorrect useState syntax
+    // Check which components are not imported
+    const missingImports = [];
+    for (const component of usedComponents) {
+      // Skip HTML elements and already imported components
+      const htmlElements = ['Router', 'Routes', 'Route', 'BrowserRouter', 'Link', 'NavLink'];
+      if (htmlElements.includes(component)) continue;
+      
+      // Check if component is already imported
+      const importRegex = new RegExp(`import\\s+(?:{[^}]*\\b${component}\\b[^}]*}|${component})\\s+from`, 'm');
+      if (!importRegex.test(content)) {
+        // Check if it's a page component
+        const pagePath = `./pages/${component}`;
+        const pageFile = path.join(path.dirname(file), 'pages', `${component}.tsx`);
+        if (fs.existsSync(pageFile)) {
+          missingImports.push(`import ${component} from "${pagePath}";`);
+          console.log(`${colors.yellow}  ⚠️  Missing import for page component '${component}' in ${file}${colors.reset}`);
+        }
+        // Check if it's a component
+        else {
+          const componentPath = `./components/${component}`;
+          const componentFile = path.join(path.dirname(file), 'components', `${component}.tsx`);
+          if (fs.existsSync(componentFile)) {
+            missingImports.push(`import ${component} from "${componentPath}";`);
+            console.log(`${colors.yellow}  ⚠️  Missing import for component '${component}' in ${file}${colors.reset}`);
+          }
+        }
+      }
+    }
+    
+    // Common UI components that need imports
+    const componentPatterns = [
+      { pattern: /<(Card|CardContent|CardHeader|CardFooter|CardTitle|CardDescription)\b/, import: "import { Card, CardContent, CardHeader, CardFooter, CardTitle, CardDescription } from '@/components/ui/card'" },
+      { pattern: /<(Button)\b/, import: "import { Button } from '@/components/ui/button'" },
+      { pattern: /<(Input)\b/, import: "import { Input } from '@/components/ui/input'" },
+      { pattern: /<(Label)\b/, import: "import { Label } from '@/components/ui/label'" },
+      { pattern: /<(Select|SelectContent|SelectItem|SelectTrigger|SelectValue)\b/, import: "import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'" }
+    ];
+    
+    for (const { pattern, import: importStatement } of componentPatterns) {
+      const importPath = importStatement.split(' from ')[1];
+      const existingImportRegex = new RegExp(`import\\s*{[^}]*}\\s*from\\s*${importPath.replace(/['"]/g, '[\'"]')}`);
+      
+      if (pattern.test(content) && !existingImportRegex.test(content)) {
+        missingImports.push(importStatement);
+      }
+    }
+    
+    if (missingImports.length > 0) {
+      // Find the last import statement to add new imports after it
+      const importMatches = content.match(/^import\s+.*$/gm);
+      if (importMatches && importMatches.length > 0) {
+        const lastImport = importMatches[importMatches.length - 1];
+        const lastImportIndex = content.lastIndexOf(lastImport);
+        const beforeImports = content.substring(0, lastImportIndex + lastImport.length);
+        const afterImports = content.substring(lastImportIndex + lastImport.length);
+        
+        content = beforeImports + '\n' + missingImports.join('\n') + afterImports;
+      } else {
+        // No existing imports, add at the beginning
+        content = missingImports.join('\n') + '\n\n' + content;
+      }
+      
+      fs.writeFileSync(file, content);
+      console.log(`${colors.green}  ✅ Auto-fixed ${missingImports.length} missing imports in ${file}${colors.reset}`);
+      fixedCount += missingImports.length;
+      modified = true;
+    }
+  }
+}
+
+// 4. Fix common non-breaking TypeScript patterns (warnings only)
+async function fixTypeScriptErrors() {
+  console.log(`${colors.blue}🔍 Checking common TypeScript patterns...${colors.reset}`);
+  
+  const tsxFiles = await glob('src/**/*.{ts,tsx}');
+  
+  for (const file of tsxFiles) {
+    let content = fs.readFileSync(file, 'utf-8');
+    let modified = false;
+    
+    // Fix incorrect useState syntax (this is fixable)
     const incorrectUseState = /const\s+(\w+)\s*=\s*useState\(/g;
     if (incorrectUseState.test(content)) {
       content = content.replace(incorrectUseState, 'const [$1, set$1] = useState(');
       modified = true;
       fixedCount++;
+      console.log(`${colors.green}  ✅ Fixed useState syntax in ${file}${colors.reset}`);
+    }
+    
+    // Check for missing return statements (warning only - too complex to auto-fix)
+    if (content.includes('export default function') || content.includes('export function')) {
+      const functionRegex = /export\s+(default\s+)?function\s+\w+\([^)]*\)\s*{([^}]*)}/g;
+      let match;
+      while ((match = functionRegex.exec(content)) !== null) {
+        const body = match[2];
+        if (!body.includes('return') && body.trim().length > 10) {
+          console.log(`${colors.yellow}  ⚠️  Function may be missing return statement in ${file} (not breaking build)${colors.reset}`);
+        }
+      }
     }
     
     if (modified) {
       fs.writeFileSync(file, content);
-      console.log(`${colors.green}  ✅ Fixed TypeScript issues in ${file}${colors.reset}`);
     }
   }
 }
@@ -185,20 +264,24 @@ async function main() {
   console.log(`${colors.blue}🚀 Starting pre-build validation...${colors.reset}\n`);
   
   try {
+    // Run all validation steps
     await fixTailwindClasses();
-    await validateJSXSyntax();
-    await validateImports();
-    await fixTypeScriptErrors();
+    await validateJSXSyntax();          // Only fails on critical TypeScript/JSX syntax errors
+    await runESLintValidation();        // Warnings only, won't fail build
+    await validateImports();            // Auto-fixes what it can, warns about the rest
+    await fixTypeScriptErrors();        // Auto-fixes patterns, warns about issues
     
     console.log(`\n${colors.blue}📊 Validation Summary:${colors.reset}`);
     console.log(`  ${colors.green}✅ Fixed ${fixedCount} issues automatically${colors.reset}`);
     
     if (hasErrors) {
-      console.log(`  ${colors.red}❌ Found errors that require manual fixing${colors.reset}`);
-      console.log(`\n${colors.red}⚠️  Build may fail due to unresolved issues${colors.reset}`);
+      console.log(`  ${colors.red}❌ Found critical build-breaking errors${colors.reset}`);
+      console.log(`  ${colors.red}These must be fixed before deployment can continue${colors.reset}`);
+      console.log(`\n${colors.red}⚠️  Build stopped due to critical issues${colors.reset}`);
       process.exit(1);
     } else {
-      console.log(`  ${colors.green}✅ All checks passed!${colors.reset}`);
+      console.log(`  ${colors.green}✅ All critical checks passed!${colors.reset}`);
+      console.log(`  ${colors.blue}Note: Warnings above are informational and don't block the build${colors.reset}`);
     }
   } catch (error) {
     console.error(`${colors.red}❌ Validation script failed: ${error.message}${colors.reset}`);
