@@ -605,10 +605,23 @@ class App < ApplicationRecord
     
     files_copied = 0
     
+    # Files to exclude from template copying (large/generated files)
+    excluded_files = [
+      'package-lock.json',
+      'yarn.lock',
+      'pnpm-lock.yaml',
+      '.git',
+      'node_modules'
+    ]
+    
     Dir.glob(::File.join(template_dir, "**/*")).each do |file_path|
       next unless ::File.file?(file_path)
       
       relative_path = file_path.sub("#{template_dir}/", '')
+      
+      # Skip excluded files and directories
+      next if excluded_files.any? { |excluded| relative_path.include?(excluded) }
+      
       content = ::File.read(file_path)
       
       # Skip empty files
