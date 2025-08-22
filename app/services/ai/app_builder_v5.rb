@@ -116,6 +116,34 @@ module Ai
         # Finalize
         finalize_app_generation
         
+      rescue Ai::RateLimitError => e
+        Rails.logger.error "[V5_RATE_LIMIT] Rate limit error: #{e.message}"
+        
+        # Create user-friendly error message
+        error_message = if e.message.include?("0 token")
+          "⚠️ **API Access Issue**\n\n" \
+          "The Anthropic API key currently has no available tokens. This usually means:\n" \
+          "- The API key may need billing setup at console.anthropic.com\n" \
+          "- The account may be suspended or require payment\n" \
+          "- The API key might be invalid\n\n" \
+          "Please contact support to resolve this issue."
+        else
+          "⚠️ **Rate Limit Exceeded**\n\n" \
+          "We've hit the Anthropic API rate limit. Please wait a few moments and try again.\n\n" \
+          "If this persists, we may need to upgrade our API plan."
+        end
+        
+        # Update assistant message with error
+        @assistant_message.update!(
+          content: error_message,
+          status: "failed"
+        )
+        
+        # Update app status
+        app.update!(status: "failed", build_error: e.message)
+        
+        return # Don't continue processing
+        
       rescue => e
         Rails.logger.error "[V5_CRITICAL] AppBuilderV5 execute! failed: #{e.message}"
         Rails.logger.error e.backtrace.first(10).join("\n")

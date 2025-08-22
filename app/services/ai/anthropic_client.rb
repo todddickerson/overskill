@@ -1,6 +1,9 @@
 require 'net/http'
 
 module Ai
+  # Custom error for rate limit issues
+  class RateLimitError < StandardError; end
+  
   # Anthropic API client with optional Helicone.ai integration for observability
   #
   # Helicone Integration:
@@ -229,6 +232,18 @@ module Ai
           Rails.logger.error "  Message: #{error_message}"
           Rails.logger.error "  HTTP Code: #{response.code}"
           
+          # Check for rate limit error
+          if error_type == "rate_limit_error" || response.code == 429
+            # Extract rate limit details from error message
+            if error_message.include?("0 input tokens per minute")
+              Rails.logger.error "[AnthropicClient] CRITICAL: API key has 0 token rate limit - API access is disabled"
+              raise RateLimitError.new("Your Anthropic API key has no available tokens. Please check your API key status and billing at console.anthropic.com")
+            else
+              Rails.logger.error "[AnthropicClient] Rate limit exceeded: #{error_message}"
+              raise RateLimitError.new("Anthropic API rate limit exceeded. Please wait a moment and try again. Details: #{error_message}")
+            end
+          end
+          
           # Check for overload error and fallback to Opus if using Sonnet
           if error_type == "overloaded_error" && model == :claude_sonnet_4 && attempt == 1
             Rails.logger.info "[AnthropicClient] Sonnet overloaded, falling back to Opus 4.1"
@@ -423,6 +438,18 @@ module Ai
           Rails.logger.error "  Type: #{error_type}"
           Rails.logger.error "  Message: #{error_message}"
           Rails.logger.error "  HTTP Code: #{response.code}"
+          
+          # Check for rate limit error
+          if error_type == "rate_limit_error" || response.code == 429
+            # Extract rate limit details from error message
+            if error_message.include?("0 input tokens per minute")
+              Rails.logger.error "[AnthropicClient] CRITICAL: API key has 0 token rate limit - API access is disabled"
+              raise RateLimitError.new("Your Anthropic API key has no available tokens. Please check your API key status and billing at console.anthropic.com")
+            else
+              Rails.logger.error "[AnthropicClient] Rate limit exceeded: #{error_message}"
+              raise RateLimitError.new("Anthropic API rate limit exceeded. Please wait a moment and try again. Details: #{error_message}")
+            end
+          end
           
           # Check for overload error and fallback to Opus if using Sonnet
           if error_type == "overloaded_error" && model == :claude_sonnet_4 && attempt == 1
