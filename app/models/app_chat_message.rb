@@ -113,6 +113,7 @@ class AppChatMessage < ApplicationRecord
   end
   
   def broadcast_message_updated
+    Rails.logger.info "[AppChatMessage] Broadcasting update for message #{id}, partial: #{partial_name}, metadata: #{metadata.inspect}"
     
     broadcast_replace_to(
       "app_#{app.id}_chat",
@@ -138,7 +139,8 @@ class AppChatMessage < ApplicationRecord
     saved_change_to_tool_calls? ||
     saved_change_to_iteration_count? ||
     saved_change_to_is_code_generation? ||
-    saved_change_to_conversation_flow?
+    saved_change_to_conversation_flow? ||
+    saved_change_to_metadata?  # IMPORTANT: Broadcast when build metadata updates
   end
   
   def use_v5_partial?
@@ -149,7 +151,8 @@ class AppChatMessage < ApplicationRecord
       tool_calls.present? ||
       iteration_count.to_i > 0 ||
       is_code_generation? ||
-      conversation_flow.present?
+      conversation_flow.present? ||
+      metadata.present? && metadata['workflow_run_id'].present?  # Use V5 for build status
     )
   end
 end

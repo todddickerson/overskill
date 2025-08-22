@@ -27,6 +27,8 @@ class Deployment::GithubActionsMonitorService
     
     # Store build timing information in the message if provided
     if message
+      Rails.logger.info "[GithubActionsMonitor] Updating message #{message.id} metadata with workflow_run_id: #{latest_run['id']}, status: #{latest_run['status']}"
+      
       message.update!(
         metadata: (message.metadata || {}).merge({
           build_started_at: build_start_time,
@@ -34,6 +36,8 @@ class Deployment::GithubActionsMonitorService
           build_status: latest_run['status']
         })
       )
+      
+      Rails.logger.info "[GithubActionsMonitor] Message metadata after update: #{message.reload.metadata.inspect}"
       
       # Broadcast initial build status
       broadcast_build_status(message, {
@@ -311,15 +315,15 @@ class Deployment::GithubActionsMonitorService
     failed_steps
   end
   
-  def handle_deployment_failure(run_id)
-    Rails.logger.info "[GithubActionsMonitor] Handling deployment failure, attempting automatic fix"
+  def handle_deployment_failure(run_id, retry_count = 0)
+    Rails.logger.info "[GithubActionsMonitor] Handling deployment failure (attempt #{retry_count + 1}), attempting automatic fix"
     
     # Get detailed error logs
     error_logs = get_workflow_run_logs(run_id)
     
     if error_logs.any?
       # Attempt automatic fix using error detection service
-      fix_result = attempt_automatic_fix(error_logs)
+      fix_result = attempt_automatic_fix(error_logs, retry_count)
       
       if fix_result[:success]
         Rails.logger.info "[GithubActionsMonitor] Automatic fix successful, retriggering deployment"
@@ -328,36 +332,144 @@ class Deployment::GithubActionsMonitorService
         broadcast_auto_fix_success(fix_result)
         
         # Re-trigger deployment by making a new commit
-        push_fix_and_retrigger(fix_result[:fixes])
+        push_result = push_fix_and_retrigger(fix_result[:fixes])
         
-        # Monitor the new deployment
-        return monitor_deployment(max_wait_time: 8.minutes)
+        if push_result[:success]
+          # Monitor the new deployment with retry tracking
+          return monitor_deployment_with_retry(max_wait_time: 8.minutes, retry_count: retry_count)
+        else
+          Rails.logger.error "[GithubActionsMonitor] Failed to push fixes: #{push_result[:error]}"
+          return handle_retry_strategy(error_logs, fix_result, retry_count, "Push failed: #{push_result[:error]}")
+        end
       else
-        Rails.logger.warn "[GithubActionsMonitor] Automatic fix failed, reporting error to AI chat"
-        
-        # Report error back to AI chat for manual intervention
-        broadcast_build_error_to_chat(error_logs, fix_result[:error])
-        
-        return {
-          success: false,
-          error: "Build failed and automatic fix unsuccessful",
-          workflow_run_id: run_id,
-          error_logs: error_logs,
-          fix_attempted: true,
-          fix_error: fix_result[:error]
-        }
+        Rails.logger.warn "[GithubActionsMonitor] Automatic fix failed: #{fix_result[:error]}"
+        return handle_retry_strategy(error_logs, fix_result, retry_count, fix_result[:error])
       end
     else
-      return {
-        success: false,
-        error: "Build failed but unable to retrieve error logs",
-        workflow_run_id: run_id
-      }
+      Rails.logger.error "[GithubActionsMonitor] No error logs available for automatic fixing"
+      return handle_retry_strategy([], { success: false, error: "No error logs available" }, retry_count, "No error logs available")
     end
   end
   
-  def attempt_automatic_fix(error_logs)
-    Rails.logger.info "[GithubActionsMonitor] Attempting automatic error fix"
+  def handle_retry_strategy(error_logs, fix_result, retry_count, error_message)
+    max_retries = determine_max_retries(error_logs)
+    
+    if retry_count < max_retries && should_retry?(error_logs, fix_result, retry_count)
+      Rails.logger.info "[GithubActionsMonitor] Scheduling retry #{retry_count + 1}/#{max_retries} with delay"
+      
+      # Calculate progressive delay: 30s, 60s, 120s
+      delay_seconds = [30, 60, 120][retry_count] || 180
+      
+      # Broadcast retry status to chat
+      broadcast_retry_attempt(retry_count + 1, max_retries, delay_seconds, error_message)
+      
+      # Schedule retry with delay
+      sleep(delay_seconds)
+      
+      # Get fresh workflow run for retry
+      latest_runs = get_workflow_runs
+      if latest_runs.any?
+        latest_run = latest_runs.first
+        return handle_deployment_failure(latest_run['id'], retry_count + 1)
+      else
+        Rails.logger.error "[GithubActionsMonitor] No workflow runs found for retry"
+        return build_final_failure_response(error_logs, fix_result, retry_count, "No workflow runs found for retry")
+      end
+    else
+      Rails.logger.warn "[GithubActionsMonitor] Maximum retries exceeded or not retryable, reporting to AI chat"
+      broadcast_build_error_to_chat(error_logs, error_message)
+      return build_final_failure_response(error_logs, fix_result, retry_count, error_message)
+    end
+  end
+  
+  def monitor_deployment_with_retry(max_wait_time:, retry_count:)
+    result = monitor_deployment(max_wait_time: max_wait_time)
+    
+    # If deployment fails again, check if we should retry
+    if !result[:success] && result[:workflow_run_id]
+      return handle_deployment_failure(result[:workflow_run_id], retry_count)
+    end
+    
+    result
+  end
+  
+  def determine_max_retries(error_logs)
+    # Analyze error logs to determine appropriate retry count
+    error_detector = Deployment::BuildErrorDetectorService.new(@app)
+    detected_errors = error_detector.analyze_build_errors(error_logs)
+    
+    return 0 if detected_errors.empty? # No retries if we can't detect errors
+    
+    auto_fixable_count = detected_errors.count { |error| error[:auto_fixable] }
+    total_errors = detected_errors.length
+    
+    case
+    when auto_fixable_count == total_errors && total_errors <= 3
+      3 # High confidence in fixing simple errors
+    when auto_fixable_count >= (total_errors * 0.7) && total_errors <= 5
+      2 # Good confidence in fixing most errors
+    when auto_fixable_count > 0
+      1 # Some confidence in fixing at least some errors
+    else
+      0 # No auto-fixable errors detected
+    end
+  end
+  
+  def should_retry?(error_logs, fix_result, retry_count)
+    # Don't retry if this is a completely different type of failure
+    return false if error_logs.empty?
+    
+    # Don't retry if we've already tried and the error types haven't changed
+    if retry_count > 0 && fix_result[:error]&.include?("No fixable errors detected")
+      return false
+    end
+    
+    # Don't retry dependency conflicts or infrastructure issues
+    error_detector = Deployment::BuildErrorDetectorService.new(@app)
+    detected_errors = error_detector.analyze_build_errors(error_logs)
+    
+    non_retryable_types = [:dependency_conflict, :dependency_resolution_error]
+    return false if detected_errors.any? { |error| non_retryable_types.include?(error[:type]) }
+    
+    # Retry if we have any auto-fixable errors
+    detected_errors.any? { |error| error[:auto_fixable] }
+  end
+  
+  def build_final_failure_response(error_logs, fix_result, retry_count, error_message)
+    {
+      success: false,
+      error: "Build failed after #{retry_count + 1} attempts: #{error_message}",
+      error_logs: error_logs,
+      fix_attempted: true,
+      retry_count: retry_count,
+      fix_error: fix_result[:error]
+    }
+  end
+  
+  def broadcast_retry_attempt(attempt_number, max_attempts, delay_seconds, error_message)
+    # Find the latest assistant message to attach the retry notification
+    latest_message = @app.app_chat_messages.where(role: 'assistant').order(created_at: :desc).first
+    return unless latest_message
+    
+    retry_message = "🔄 **Auto-Retry #{attempt_number}/#{max_attempts}**\n\n" \
+                   "Build failed with: #{error_message}\n\n" \
+                   "Retrying in #{delay_seconds} seconds with enhanced error detection and fixing..."
+    
+    @app.app_chat_messages.create!(
+      role: 'assistant',
+      content: retry_message,
+      team: @app.team,
+      metadata: {
+        retry_attempt: attempt_number,
+        max_attempts: max_attempts,
+        delay_seconds: delay_seconds,
+        error_message: error_message
+      }
+    )
+  end
+  
+  def attempt_automatic_fix(error_logs, retry_count = 0)
+    Rails.logger.info "[GithubActionsMonitor] Attempting automatic error fix (retry #{retry_count})"
     
     error_detector = Deployment::BuildErrorDetectorService.new(@app)
     fix_service = Deployment::AutoFixService.new(@app)
@@ -453,6 +565,7 @@ class Deployment::GithubActionsMonitorService
   
   def broadcast_build_status(message, status_data)
     # Broadcast build status updates via ActionCable for real-time UI updates
+    # This is used by the build_countdown_controller.js to update the timer in real-time
     ActionCable.server.broadcast(
       "app_#{@app.id}_build_status",
       {
@@ -464,6 +577,10 @@ class Deployment::GithubActionsMonitorService
     )
     
     Rails.logger.info "[GithubActionsMonitor] Broadcasting build status: #{status_data[:status]} (#{status_data[:elapsed_seconds]}s elapsed)"
+    
+    # Note: The AppChatMessage model will automatically broadcast the updated partial
+    # when metadata changes via its after_update_commit callback, so we don't need
+    # to manually broadcast the Turbo Stream update here anymore.
   end
 
   def generate_deployment_url
