@@ -63,8 +63,15 @@ jobs:
         node-version: '18'
         cache: 'npm'
     
+    - name: Install bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    
     - name: Install JavaScript dependencies
-      run: npm install
+      run: |
+        npm install
+        bun install
         
     - name: Setup test database
       run: |

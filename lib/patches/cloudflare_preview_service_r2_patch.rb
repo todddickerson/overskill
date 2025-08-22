@@ -1,6 +1,12 @@
 # Monkey patch for CloudflarePreviewService to integrate R2 asset offloading
-module Deployment
-  class CloudflarePreviewService
+module Patches
+  module CloudflarePreviewServiceR2Patch
+    extend ActiveSupport::Concern
+    
+    # This patch extends Deployment::CloudflarePreviewService
+    def self.apply!
+      Deployment::CloudflarePreviewService.prepend(self)
+    end
     
     # Override deploy_to_environment to use R2 assets
     def deploy_to_environment_with_r2(environment, subdomain)
@@ -263,14 +269,12 @@ module Deployment
     end
     
     # Override staging deploy to use R2
-    alias_method :deploy_staging_original, :deploy_staging!
     def deploy_staging!
       staging_subdomain = "preview--#{@app.subdomain}"
       deploy_to_environment_with_r2(:staging, staging_subdomain)
     end
     
-    # Override production deploy to use R2
-    alias_method :deploy_production_original, :deploy_production!
+    # Override production deploy to use R2  
     def deploy_production!
       production_subdomain = @app.subdomain
       deploy_to_environment_with_r2(:production, production_subdomain)
