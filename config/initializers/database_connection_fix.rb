@@ -9,9 +9,15 @@ if Rails.env.test?
         alias_method :original_retrieve_connection_pool, :retrieve_connection_pool
 
         def retrieve_connection_pool(connection_name, **options)
-          # If shard is an empty string, default to primary connection
+          # If shard is an empty string, return nil to trigger fallback behavior
           if options[:shard] == ""
-            options[:shard] = :primary
+            # Try to get the primary connection pool as fallback
+            begin
+              return original_retrieve_connection_pool(connection_name, **options.merge(shard: :primary))
+            rescue ActiveRecord::ConnectionNotDefined
+              # If even primary fails, just return nil to let Rails handle it gracefully
+              return nil
+            end
           end
           
           original_retrieve_connection_pool(connection_name, **options)
