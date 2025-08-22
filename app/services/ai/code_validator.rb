@@ -69,24 +69,11 @@ class Ai::CodeValidator
         next
       end
       
-      # Remove extra closing braces (}})
-      if current_line.match?(/\}\s*\}/)
-        # Count how many closing braces vs what we expect
-        expected_closes = brace_stack.size > 0 ? 1 : 0
-        actual_closes = current_line.scan(/\}/).count
-        
-        if actual_closes > expected_closes && actual_closes > 1
-          # Remove extra closing braces
-          current_line = current_line.sub(/\}\s*\}/, '}')
-          fixes << "Removed extra closing brace at line #{index + 1}"
-        end
-      end
-      
-      # Count braces after fixing extras
+      # Count braces first before any modifications
       opening_braces = current_line.count('{')
       closing_braces = current_line.count('}')
       
-      # Track nested structure
+      # Track nested structure first
       opening_braces.times do
         # Determine what opened
         if line.match?(/@layer\s+\w+\s*\{/)
@@ -102,16 +89,32 @@ class Ai::CodeValidator
         end
       end
       
+      # Now handle closing braces - check for extras before popping from stack
+      if closing_braces > 0
+        available_to_close = brace_stack.size
+        if closing_braces > available_to_close
+          # We have more closing braces than open blocks - remove extras
+          extra_closes = closing_braces - available_to_close
+          (1..extra_closes).each do
+            # Remove one extra closing brace each time
+            current_line = current_line.sub(/\s*\}\s*$/, '')
+            fixes << "Removed extra closing brace at line #{index + 1}"
+          end
+          # Recalculate after removing extras
+          closing_braces = current_line.count('}')
+        end
+      end
+      
+      # Pop from stack for the remaining valid closing braces
       closing_braces.times { brace_stack.pop if brace_stack.any? }
       
-      # Add missing semicolons (but not after closing braces or @apply)
+      # Add missing semicolons (including after @apply which needs semicolons)
       if !current_line.strip.empty? && 
          !current_line.strip.end_with?(';', '{', '}', '*/') && 
          !current_line.include?('@layer') && 
          !current_line.include?('@media') &&
          !current_line.include?('@keyframes') &&
-         current_line.include?(':') &&
-         !current_line.include?('@apply') # Don't add semicolon after @apply
+         (current_line.include?(':') || current_line.include?('@apply'))
         current_line += ';'
         fixes << "Added missing semicolon at line #{index + 1}"
       end

@@ -229,6 +229,131 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
     assert fixed.include?(".container"), "Should preserve nested rules"
   end
 
+  # Additional tests for the specific FunnelCraft issue
+  test "should detect and fix unclosed body selector with nested @layer" do
+    # This is the exact pattern that caused the FunnelCraft failure
+    content = <<~CSS
+      @layer base {
+        body {
+          @apply bg-background text-foreground;
+      /* OverSkill Branding */
+      @layer components {
+        .overskill-badge {
+          @apply fixed bottom-4 right-4;
+        }
+      }
+    CSS
+    
+    # Should detect structural issues and fix them
+    syntax_check = Ai::CodeValidator.fix_css_syntax_issues(content)
+    
+    if syntax_check[:fixed]
+      fixed_content = syntax_check[:content]
+      # Verify braces are balanced after fix
+      opening_braces = fixed_content.count('{')
+      closing_braces = fixed_content.count('}')
+      assert_equal opening_braces, closing_braces, "Should balance braces after fixing"
+      
+      # Should have proper structure
+      assert fixed_content.match?(/body\s*\{[^}]*\}/m), "Body selector should be properly closed"
+      assert fixed_content.match?(/@layer\s+components\s*\{/), "Components layer should be preserved"
+    else
+      flunk "Should have detected CSS structure issues requiring fixes"
+    end
+  end
+
+  test "should detect extra closing braces" do
+    content = <<~CSS
+      .container {
+        padding: 20px;
+      }
+      }
+      }
+    CSS
+    
+    syntax_check = Ai::CodeValidator.fix_css_syntax_issues(content)
+    assert syntax_check[:fixed], "Should detect extra closing braces"
+    assert syntax_check[:fixes].any? { |f| f.include?("extra closing brace") }, "Should report extra brace fixes"
+    
+    fixed_content = syntax_check[:content]
+    opening_braces = fixed_content.count('{')
+    closing_braces = fixed_content.count('}')
+    assert_equal opening_braces, closing_braces, "Should balance braces after removing extras"
+  end
+
+  test "should detect missing closing braces in nested structures" do
+    content = <<~CSS
+      @layer base {
+        .selector-one {
+          color: red;
+        
+        .selector-two {
+          color: blue;
+        }
+      /* Missing closing brace for selector-one and @layer base */
+    CSS
+    
+    syntax_check = Ai::CodeValidator.fix_css_syntax_issues(content)
+    assert syntax_check[:fixed], "Should detect missing closing braces"
+    
+    fixed_content = syntax_check[:content]
+    opening_braces = fixed_content.count('{')
+    closing_braces = fixed_content.count('}')
+    assert_equal opening_braces, closing_braces, "Should balance braces after adding missing ones"
+  end
+
+  test "should handle PostCSS @apply directives correctly" do
+    content = <<~CSS
+      .component {
+        @apply bg-blue-500 text-white p-4;
+      }
+      
+      .another {
+        @apply flex items-center
+      }
+    CSS
+    
+    fixed = Ai::CodeValidator.validate_and_fix_css(content)
+    # Should add semicolon after @apply without one
+    assert fixed.include?("@apply flex items-center;"), "Should add missing semicolon after @apply"
+    assert fixed.include?("@apply bg-blue-500 text-white p-4;"), "Should preserve existing semicolons"
+  end
+
+  test "should validate real-world Tailwind CSS structure" do
+    # This mirrors the actual structure from our apps
+    content = <<~CSS
+      @tailwind base;
+      @tailwind components;
+      @tailwind utilities;
+
+      @layer base {
+        :root {
+          --background: 0 0% 100%;
+        }
+        
+        body {
+          @apply bg-background text-foreground;
+        }
+      }
+
+      @layer components {
+        .btn-primary {
+          @apply bg-blue-500 text-white px-4 py-2 rounded;
+        }
+      }
+    CSS
+    
+    # Should pass validation without changes
+    fixed = Ai::CodeValidator.validate_and_fix_css(content)
+    syntax_check = Ai::CodeValidator.fix_css_syntax_issues(fixed)
+    assert_not syntax_check[:fixed], "Valid Tailwind structure should not need fixes"
+    
+    # Verify structure is preserved
+    assert fixed.include?("@tailwind base"), "Should preserve Tailwind directives"
+    assert fixed.include?("@layer base"), "Should preserve @layer blocks"
+    assert fixed.include?("@layer components"), "Should preserve component layer"
+  end
+
   # Integration test for validate_file
   test "should validate and process TypeScript files correctly" do
     content = <<~TS
