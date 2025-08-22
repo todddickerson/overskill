@@ -2922,10 +2922,10 @@ module Ai
 
       # TODO Implement a is_discussion variable on the app chat message based on if they have it toggled on or off in UI
       is_discussion = false
-      
+
       # If not a discussion and appears to be a change request, append the instruction
       if !is_discussion
-        user_content = "#{user_content}\n\nUpdate all necessary files in one response."
+        user_content = "#{user_content} \n\n Think ahead around tool calling needs, and update all necessary files in one response."
         Rails.logger.info "[V5_PROMPT] Appended batch update instruction to user prompt"
       end
       
