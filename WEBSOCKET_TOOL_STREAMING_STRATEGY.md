@@ -4,6 +4,13 @@
 
 OverSkill already has **80% of the infrastructure** needed for Netflix/Uber-grade real-time tool execution streaming. The foundation exists with ActionCable, Stimulus controllers, and Turbo Streams. This document outlines a comprehensive strategy to implement **Option 4: WebSocket Streaming Updates** for AppBuilderV5 tool execution.
 
+## ✅ COORDINATED WITH: COMPREHENSIVE_WFP_IMPLEMENTATION_PLAN.md
+**Integration Points:**
+- WebSocket channels coordinate with WFP preview environments
+- Tool streaming shows real-time updates in live preview
+- File updates trigger both tool progress and preview refresh
+- Unified monitoring across WebSocket and WFP infrastructure
+
 ## Current Infrastructure Analysis ✅
 
 ### Already Implemented:

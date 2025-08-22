@@ -3621,6 +3621,13 @@ module Ai
         content = fixed_content if fixed_content != content
       end
       
+      # Validate and auto-fix CSS files before saving
+      if path.match?(/\.css$/)
+        css_validator = Ai::CssValidatorService.new(@app)
+        fixed_content = css_validator.validate_and_fix_css(path, content)
+        content = fixed_content if fixed_content != content
+      end
+      
       app.app_files.create!(
         path: path,
         content: content,

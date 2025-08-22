@@ -143,6 +143,43 @@ IMPORTANT for os-line-replace:
 - ALWAYS generate beautiful and responsive designs.
 - Use toast components to inform the user about important events.
 
+### CRITICAL TypeScript/JavaScript Syntax Rules
+**MANDATORY**: Follow these rules to prevent build failures:
+1. **String Literals with Quotes**: ALWAYS escape inner quotes properly
+   - ❌ WRONG: `{ greeting: "System.out.println("Hello");" }`
+   - ✅ CORRECT: `{ greeting: "System.out.println(\"Hello\");" }`
+   - ✅ ALSO OK: `{ greeting: 'System.out.println("Hello");' }`
+   - ✅ ALSO OK: `{ greeting: \`System.out.println("Hello");\` }`
+
+2. **Common Quote Escaping Patterns**:
+   - Java: `"System.out.println(\"text\");"`
+   - C++: `"std::cout << \"text\" << std::endl;"`
+   - Go: `"fmt.Println(\"text\")"`
+   - Rust: `"println!(\"text\");"`
+   - ANY nested quotes: Use backslash escaping or different quote types
+
+3. **Never Write**:
+   - Unescaped quotes within the same quote type
+   - Missing backslashes in string literals containing quotes
+   - Nested quotes without proper escaping
+
+### CRITICAL CSS Syntax Rules
+**MANDATORY**: Ensure valid CSS structure to prevent PostCSS failures:
+1. **Brace Balance**: Every opening `{` must have a matching closing `}`
+   - Count braces to ensure they match
+   - Don't add extra closing braces after @keyframes or @media blocks
+   
+2. **Block Structure**:
+   - ❌ WRONG: `* { @apply border; body { @apply bg-background; }}`
+   - ✅ CORRECT: `* { @apply border; } body { @apply bg-background; }`
+   - Each selector must have its own properly closed block
+
+3. **Common CSS Errors to Avoid**:
+   - Extra closing braces after animation blocks
+   - Unclosed selectors or @rules
+   - Missing closing braces for nested structures
+   - Orphaned closing braces at end of file
+
 ### App Structure Requirements
 When generating apps, ensure:
 1. The main entry point is src/main.tsx which imports App.tsx
