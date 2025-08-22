@@ -6,6 +6,11 @@ class Deployment::GithubActionsMonitorService
     @app = app
     @github_auth = Deployment::GithubAppAuthenticator.new
   end
+
+  # Helper method to get the organization from the github_repo
+  def organization_name
+    @organization_name ||= @app.github_repo&.split('/')&.first || 'Overskill-apps'
+  end
   
   def monitor_deployment(max_wait_time: 10.minutes, check_interval: 30.seconds, message: nil)
     Rails.logger.info "[GithubActionsMonitor] Starting workflow monitoring for app #{@app.id}"
@@ -171,7 +176,7 @@ class Deployment::GithubActionsMonitorService
   end
   
   def get_workflow_runs
-    Rails.logger.info "[GithubActionsMonitor] Fetching workflow runs for #{@app.repository_name}"
+    Rails.logger.info "[GithubActionsMonitor] Fetching workflow runs for #{@app.github_repo}"
     
     retries = 0
     max_retries = 3
@@ -189,9 +194,9 @@ class Deployment::GithubActionsMonitorService
       end
       
       response = self.class.get(
-        "/repos/#{@app.repository_name}/actions/runs",
+        "/repos/#{@app.github_repo}/actions/runs",
         headers: {
-          'Authorization' => "token #{@github_auth.get_installation_token(@app.repository_name)}",
+          'Authorization' => "token #{@github_auth.get_installation_token(organization_name)}",
           'Accept' => 'application/vnd.github.v3+json'
         },
         query: {
@@ -235,9 +240,9 @@ class Deployment::GithubActionsMonitorService
     Rails.logger.info "[GithubActionsMonitor] Checking status of workflow run #{run_id}"
     
     response = self.class.get(
-      "/repos/#{@app.repository_name}/actions/runs/#{run_id}",
+      "/repos/#{@app.github_repo}/actions/runs/#{run_id}",
       headers: {
-        'Authorization' => "token #{@github_auth.get_installation_token(@app.repository_name)}",
+        'Authorization' => "token #{@github_auth.get_installation_token(organization_name)}",
         'Accept' => 'application/vnd.github.v3+json'
       }
     )
@@ -255,9 +260,9 @@ class Deployment::GithubActionsMonitorService
     
     # Get jobs for this workflow run
     jobs_response = self.class.get(
-      "/repos/#{@app.repository_name}/actions/runs/#{run_id}/jobs",
+      "/repos/#{@app.github_repo}/actions/runs/#{run_id}/jobs",
       headers: {
-        'Authorization' => "token #{@github_auth.get_installation_token(@app.repository_name)}",
+        'Authorization' => "token #{@github_auth.get_installation_token(organization_name)}",
         'Accept' => 'application/vnd.github.v3+json'
       }
     )
@@ -269,9 +274,9 @@ class Deployment::GithubActionsMonitorService
       if job['conclusion'] == 'failure'
         # Get logs for failed job
         logs_response = self.class.get(
-          "/repos/#{@app.repository_name}/actions/jobs/#{job['id']}/logs",
+          "/repos/#{@app.github_repo}/actions/jobs/#{job['id']}/logs",
           headers: {
-            'Authorization' => "token #{@github_auth.get_installation_token(@app.repository_name)}",
+            'Authorization' => "token #{@github_auth.get_installation_token(organization_name)}",
             'Accept' => 'application/vnd.github.v3+json'
           }
         )
