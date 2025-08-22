@@ -1,7 +1,6 @@
 module Api
   module V1
-    class IframeBridgeController < ApplicationController
-      skip_before_action :verify_authenticity_token
+    class IframeBridgeController < Api::V1::ApplicationController
       before_action :find_app
       before_action :validate_app_access, except: [:log] # Allow logs from deployed apps
       
