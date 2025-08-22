@@ -13,6 +13,18 @@ class Deployment::AutoFixService
       fix_jsx_unclosed_tag(error)
     when :jsx_syntax_error
       fix_jsx_syntax_error(error)
+    when :jsx_expression_error
+      fix_jsx_expression_error(error)
+    when :unterminated_string
+      fix_unterminated_string(error)
+    when :unexpected_token
+      fix_unexpected_token(error)
+    when :missing_react_import
+      fix_missing_react_import(error)
+    when :missing_semicolon
+      fix_missing_semicolon(error)
+    when :missing_parenthesis
+      fix_missing_parenthesis(error)
     when :module_not_found, :missing_import
       fix_import_error(error)
     when :property_not_found
@@ -294,6 +306,271 @@ class Deployment::AutoFixService
     # Dependency conflicts typically require package.json changes
     # This is complex and should be handled manually
     { success: false, error: "Dependency conflicts require manual package.json modifications" }
+  end
+  
+  def fix_jsx_expression_error(error)
+    app_file = find_app_file(error[:file])
+    return { success: false, error: "File not found: #{error[:file]}" } unless app_file
+    
+    content = app_file.content
+    lines = content.split("\n")
+    target_line_index = error[:line] - 1
+    
+    return { success: false, error: "Line number out of range" } if target_line_index >= lines.length
+    
+    target_line = lines[target_line_index]
+    original_line = target_line.dup
+    
+    # Fix common JSX expression issues
+    if error[:message].include?('className')
+      # Fix malformed className attributes
+      target_line.gsub!(/(className=")([^"]*)\\"([^>]*)>/, '\\1\\2"\\3>')
+      target_line.gsub!(/(className=\\")([^\\]*)\\"/, '\\1\\2"')
+    end
+    
+    if error[:message].include?('style')
+      # Fix malformed style attributes
+      target_line.gsub!(/(style=")([^"]*)\\"([^>]*)>/, '\\1\\2"\\3>')
+    end
+    
+    if target_line != original_line
+      lines[target_line_index] = target_line
+      new_content = lines.join("\n")
+      app_file.update!(content: new_content)
+      
+      return {
+        success: true,
+        description: "Fixed JSX expression error in className/style attribute",
+        changes: [
+          {
+            file: error[:file],
+            line: error[:line],
+            old: original_line.strip,
+            new: target_line.strip
+          }
+        ]
+      }
+    end
+    
+    { success: false, error: "Could not automatically fix JSX expression error" }
+  end
+  
+  def fix_unterminated_string(error)
+    app_file = find_app_file(error[:file])
+    return { success: false, error: "File not found: #{error[:file]}" } unless app_file
+    
+    content = app_file.content
+    lines = content.split("\n")
+    target_line_index = error[:line] - 1
+    
+    return { success: false, error: "Line number out of range" } if target_line_index >= lines.length
+    
+    target_line = lines[target_line_index]
+    original_line = target_line.dup
+    
+    # Look for unterminated strings and add closing quote
+    if target_line.count('"').odd?
+      # Add missing closing quote at logical end
+      if target_line.include?('className=') || target_line.include?('style=')
+        # JSX attribute context
+        target_line.gsub!(/(className|style)="([^"]*)(>|$)/, '\\1="\\2"\\3')
+      else
+        # Generic string - add quote at end of line
+        target_line += '"' unless target_line.end_with?('"')
+      end
+    end
+    
+    if target_line != original_line
+      lines[target_line_index] = target_line
+      new_content = lines.join("\n")
+      app_file.update!(content: new_content)
+      
+      return {
+        success: true,
+        description: "Added missing closing quote to unterminated string",
+        changes: [
+          {
+            file: error[:file],
+            line: error[:line],
+            old: original_line.strip,
+            new: target_line.strip
+          }
+        ]
+      }
+    end
+    
+    { success: false, error: "Could not automatically fix unterminated string" }
+  end
+  
+  def fix_unexpected_token(error)
+    app_file = find_app_file(error[:file])
+    return { success: false, error: "File not found: #{error[:file]}" } unless app_file
+    
+    content = app_file.content
+    lines = content.split("\n")
+    target_line_index = error[:line] - 1
+    
+    return { success: false, error: "Line number out of range" } if target_line_index >= lines.length
+    
+    target_line = lines[target_line_index]
+    original_line = target_line.dup
+    
+    # Fix common unexpected token issues
+    if error[:message].include?('{')
+      # Missing closing brace
+      if target_line.count('{') > target_line.count('}')
+        target_line += '}'
+      end
+    elsif error[:message].include?('}')
+      # Extra closing brace - remove it
+      target_line.gsub!(/\}\s*$/, '')
+    end
+    
+    if target_line != original_line
+      lines[target_line_index] = target_line
+      new_content = lines.join("\n")
+      app_file.update!(content: new_content)
+      
+      return {
+        success: true,
+        description: "Fixed unexpected token by balancing braces",
+        changes: [
+          {
+            file: error[:file],
+            line: error[:line],
+            old: original_line.strip,
+            new: target_line.strip
+          }
+        ]
+      }
+    end
+    
+    { success: false, error: "Could not automatically fix unexpected token" }
+  end
+  
+  def fix_missing_semicolon(error)
+    app_file = find_app_file(error[:file])
+    return { success: false, error: "File not found: #{error[:file]}" } unless app_file
+    
+    content = app_file.content
+    lines = content.split("\n")
+    target_line_index = error[:line] - 1
+    
+    return { success: false, error: "Line number out of range" } if target_line_index >= lines.length
+    
+    target_line = lines[target_line_index]
+    original_line = target_line.dup
+    
+    # Add semicolon to end of line if not present
+    unless target_line.strip.end_with?(';', '}', '{')
+      target_line = target_line.rstrip + ';'
+    end
+    
+    if target_line != original_line
+      lines[target_line_index] = target_line
+      new_content = lines.join("\n")
+      app_file.update!(content: new_content)
+      
+      return {
+        success: true,
+        description: "Added missing semicolon",
+        changes: [
+          {
+            file: error[:file],
+            line: error[:line],
+            old: original_line.strip,
+            new: target_line.strip
+          }
+        ]
+      }
+    end
+    
+    { success: false, error: "Could not automatically add semicolon" }
+  end
+  
+  def fix_missing_parenthesis(error)
+    app_file = find_app_file(error[:file])
+    return { success: false, error: "File not found: #{error[:file]}" } unless app_file
+    
+    content = app_file.content
+    lines = content.split("\n")
+    target_line_index = error[:line] - 1
+    
+    return { success: false, error: "Line number out of range" } if target_line_index >= lines.length
+    
+    target_line = lines[target_line_index]
+    original_line = target_line.dup
+    
+    # Balance parentheses
+    open_count = target_line.count('(')
+    close_count = target_line.count(')')
+    
+    if open_count > close_count
+      # Add missing closing parentheses
+      target_line += ')' * (open_count - close_count)
+    end
+    
+    if target_line != original_line
+      lines[target_line_index] = target_line
+      new_content = lines.join("\n")
+      app_file.update!(content: new_content)
+      
+      return {
+        success: true,
+        description: "Added missing closing parenthesis",
+        changes: [
+          {
+            file: error[:file],
+            line: error[:line],
+            old: original_line.strip,
+            new: target_line.strip
+          }
+        ]
+      }
+    end
+    
+    { success: false, error: "Could not automatically fix missing parenthesis" }
+  end
+  
+  def fix_missing_react_import(error)
+    # Handle "React refers to a UMD global" error
+    app_file = find_app_file(error[:file])
+    return { success: false, error: "File not found: #{error[:file]}" } unless app_file
+    
+    content = app_file.content
+    
+    # Check if React is already imported
+    if content.match?(/import\s+(?:\*\s+as\s+)?React(?:\s*,\s*{[^}]*})?(?:\s+from\s+['"]react['"])/)
+      return { success: false, error: "React import already exists" }
+    end
+    
+    # Add React import at the beginning
+    import_statement = "import React from 'react';"
+    
+    # Find the first import statement or the beginning of the file
+    first_import = content.match(/^import\s+.*$/m)
+    
+    new_content = if first_import
+      # Add before the first import
+      content.sub(first_import[0], "#{import_statement}\n#{first_import[0]}")
+    else
+      # No imports, add at the beginning
+      "#{import_statement}\n\n#{content}"
+    end
+    
+    app_file.update!(content: new_content)
+    
+    {
+      success: true,
+      description: "Added missing React import",
+      changes: [
+        {
+          file: error[:file],
+          added: import_statement,
+          line: 1
+        }
+      ]
+    }
   end
   
   # Helper methods

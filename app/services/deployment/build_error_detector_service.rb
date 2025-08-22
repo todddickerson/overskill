@@ -28,10 +28,74 @@ class Deployment::BuildErrorDetectorService
   def detect_jsx_syntax_errors(log_content)
     errors = []
     
-    # Match JSX syntax errors like the Calculator.tsx issue we just fixed
+    # Modern TypeScript compiler error format: ##[error]src/pages/File.tsx(line,col): error TSxxxx: message
+    modern_ts_errors = log_content.scan(/##\[error\]([^(]+)\((\d+),(\d+)\): error TS\d+: (.+)/)
+    
+    modern_ts_errors.each do |file, line, col, message|
+      error_type = case message
+      when /JSX element '(.+)' has no corresponding closing tag/
+        :jsx_unclosed_tag
+      when /Unexpected closing '(.+)' tag does not match opening '(.+)' tag/
+        :jsx_tag_mismatch
+      when /Expected corresponding JSX closing tag for '(.+)'/
+        :jsx_unclosed_tag
+      when /JSX expression expected/
+        :jsx_expression_error
+      when /Cannot read properties of undefined/
+        :undefined_property_access
+      when /JSX/i
+        :jsx_syntax_error
+      when /'\)' expected/
+        :missing_parenthesis
+      when /';' expected/
+        :missing_semicolon
+      when /Expression expected/
+        :invalid_expression
+      when /Declaration or statement expected/
+        :invalid_statement
+      when /Unterminated string literal/
+        :unterminated_string
+      when /Unexpected token/
+        :unexpected_token
+      else
+        next # Skip non-JSX errors, handle in detect_typescript_errors
+      end
+      
+      # Extract tag name for unclosed tag errors
+      tag_name = case message
+      when /JSX element '(.+)' has no corresponding closing tag/
+        $1
+      when /Expected corresponding JSX closing tag for '(.+)'/
+        $1
+      when /Unexpected closing '(.+)' tag does not match opening '(.+)' tag/
+        $2 # The opening tag name
+      else
+        nil
+      end
+      
+      # Extract additional context for better auto-fixing
+      context = extract_error_context(message)
+      
+      errors << {
+        type: error_type,
+        file: extract_relative_path(file),
+        line: line.to_i,
+        column: col.to_i,
+        message: message,
+        tag_name: tag_name,
+        context: context,
+        severity: :high,
+        auto_fixable: auto_fixable_error?(error_type, message)
+      }
+    end
+    
+    # Legacy error format support (keep for compatibility)
     jsx_tag_mismatch = log_content.scan(/Error: (.+):(\d+):(\d+): Unexpected closing '(.+)' tag does not match opening '(.+)' tag/)
     
     jsx_tag_mismatch.each do |file, line, col, closing_tag, opening_tag|
+      # Skip if already found by modern format
+      next if errors.any? { |e| e[:file] == extract_relative_path(file) && e[:line] == line.to_i }
+      
       errors << {
         type: :jsx_tag_mismatch,
         file: extract_relative_path(file),
@@ -44,10 +108,11 @@ class Deployment::BuildErrorDetectorService
       }
     end
     
-    # Match other JSX syntax errors
+    # Legacy JSX syntax errors
     jsx_syntax_errors = log_content.scan(/Error: (.+):(\d+):(\d+): (.+JSX.+)/)
     
     jsx_syntax_errors.each do |file, line, col, message|
+      # Skip if already found by modern format
       next if errors.any? { |e| e[:file] == extract_relative_path(file) && e[:line] == line.to_i }
       
       errors << {
@@ -60,26 +125,27 @@ class Deployment::BuildErrorDetectorService
       }
     end
     
-    # Detect unclosed JSX tags
-    unclosed_jsx = log_content.scan(/Error: (.+):(\d+):(\d+): Expected corresponding JSX closing tag for <(.+)>/)
-    
-    unclosed_jsx.each do |file, line, col, tag|
-      errors << {
-        type: :jsx_unclosed_tag,
-        file: extract_relative_path(file),
-        line: line.to_i,
-        column: col.to_i,
-        message: "Expected corresponding JSX closing tag for <#{tag}>",
-        tag_name: tag,
-        severity: :high
-      }
-    end
-    
     errors
   end
   
   def detect_typescript_errors(log_content)
     errors = []
+    
+    # Modern TypeScript error format for React import errors
+    # ##[error]src/pages/Upsell.tsx(14,3): error TS2686: 'React' refers to a UMD global
+    react_import_errors = log_content.scan(/##\[error\]([^(]+)\((\d+),(\d+)\): error TS2686: 'React' refers to a UMD global/)
+    
+    react_import_errors.each do |file, line, col|
+      errors << {
+        type: :missing_react_import,
+        file: extract_relative_path(file),
+        line: line.to_i,
+        column: col.to_i,
+        message: "'React' refers to a UMD global, but the current file is a module",
+        severity: :high,
+        auto_fixable: true
+      }
+    end
     
     # TypeScript type errors
     ts_errors = log_content.scan(/Error: (.+\.tsx?):(\d+):(\d+): (.+)/)
@@ -97,6 +163,8 @@ class Deployment::BuildErrorDetectorService
         :type_mismatch
       when /Expected \d+ arguments, but got \d+/
         :argument_count_mismatch
+      when /'React' refers to a UMD global/
+        :missing_react_import
       else
         :typescript_error
       end
@@ -107,7 +175,8 @@ class Deployment::BuildErrorDetectorService
         line: line.to_i,
         column: col.to_i,
         message: message,
-        severity: :medium
+        severity: error_type == :missing_react_import ? :high : :medium,
+        auto_fixable: error_type == :missing_react_import
       }
     end
     
@@ -228,5 +297,50 @@ class Deployment::BuildErrorDetectorService
     
     # If we can't find a good starting point, return the filename
     File.basename(absolute_path)
+  end
+  
+  def extract_error_context(message)
+    context = {}
+    
+    # Extract closing tag name from mismatch errors
+    if match = message.match(/Unexpected closing '(.+)' tag does not match opening '(.+)' tag/)
+      context[:closing_tag] = match[1]
+      context[:opening_tag] = match[2]
+    end
+    
+    # Extract expected vs actual from other error types
+    if match = message.match(/Expected '(.+)' but got '(.+)'/)
+      context[:expected] = match[1]
+      context[:actual] = match[2]
+    end
+    
+    # Extract property names from property access errors
+    if match = message.match(/Property '(.+)' does not exist/)
+      context[:property_name] = match[1]
+    end
+    
+    context
+  end
+  
+  def auto_fixable_error?(error_type, message)
+    case error_type
+    when :jsx_unclosed_tag, :jsx_tag_mismatch
+      true # We have good heuristics for these
+    when :missing_semicolon, :missing_parenthesis
+      true # Simple syntax fixes
+    when :unterminated_string
+      true # Can usually be fixed by adding closing quote
+    when :missing_react_import
+      true # Can always be fixed by adding React import
+    when :jsx_expression_error
+      message.include?('className') || message.include?('style') # Common JSX attribute issues
+    when :undefined_property_access
+      false # Usually requires type definition changes
+    when :jsx_syntax_error
+      # Only if it's a simple JSX attribute issue
+      message.include?('className') || message.include?('class=')
+    else
+      false # Conservative approach for unknown error types
+    end
   end
 end
