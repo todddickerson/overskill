@@ -2,6 +2,26 @@ module Ai
   class TypescriptValidatorService
     # Common TypeScript/JavaScript syntax errors we can auto-fix
     QUOTE_PATTERNS = [
+      # JSX className with backslash before closing quote (most common pattern)
+      {
+        pattern: /className="([^"]*)\\">/,
+        replacement: 'className="\1">'
+      },
+      # Any JSX attribute with backslash before closing quote
+      {
+        pattern: /(\w+)="([^"]*)\\">/,
+        replacement: '\1="\2">'
+      },
+      # JSX attributes with double-escaped quotes
+      {
+        pattern: /(\w+)=\\"([^\\]*)\\">/,
+        replacement: '\1="\2">'
+      },
+      # Nested JSX attributes with escaped quotes (like span inside p)
+      {
+        pattern: /<(\w+)\s+className=\\"([^\\]*)\\"/,
+        replacement: '<\1 className="\2"'
+      },
       # Java System.out.println
       { 
         pattern: /"System\.out\.println\("([^"]*)"\);"/,
@@ -33,6 +53,8 @@ module Ai
         replacement: '"console.log(\'\1\');"'
       }
     ]
+
+    attr_reader :validation_errors, :fixed_files
 
     def initialize(app)
       @app = app
@@ -105,13 +127,35 @@ module Ai
           end
         end
         
-        # Fix escaped quotes that should use backslashes
-        line.gsub!(/"([^"]*)"([^,;}]*)"([^"]*)"/) do |match|
-          # This is a string containing quotes - escape them
-          first_part = $1
-          middle = $2
-          last_part = $3
-          "\"#{first_part}\\\"#{middle}\\\"#{last_part}\""
+        # JSX-specific fixes for common patterns that escaped the above
+        # Fix className with backslash before closing quote
+        line.gsub!(/(\w+)="([^"]*)\\"([^>]*)>/) do |match|
+          attr_name = $1
+          attr_value = $2
+          rest = $3
+          "#{attr_name}=\"#{attr_value}\"#{rest}>"
+        end
+        
+        # Fix JSX attributes with double-escaped quotes  
+        line.gsub!(/<(\w+)([^>]*)\s+(\w+)=\\"([^\\]*)\\"([^>]*)>/) do |match|
+          tag_name = $1
+          before_attr = $2
+          attr_name = $3
+          attr_value = $4
+          after_attr = $5
+          "<#{tag_name}#{before_attr} #{attr_name}=\"#{attr_value}\"#{after_attr}>"
+        end
+        
+        # Skip the generic quote fix for JSX content
+        unless line.include?('<') && line.include?('>')
+          # Fix escaped quotes that should use backslashes (only for non-JSX)
+          line.gsub!(/"([^"]*)"([^,;}]*)"([^"]*)"/) do |match|
+            # This is a string containing quotes - escape them
+            first_part = $1
+            middle = $2
+            last_part = $3
+            "\"#{first_part}\\\"#{middle}\\\"#{last_part}\""
+          end
         end
         
         if line != original_line
