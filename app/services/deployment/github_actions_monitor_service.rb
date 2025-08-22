@@ -10,9 +10,9 @@ class Deployment::GithubActionsMonitorService
   def monitor_deployment(max_wait_time: 10.minutes, check_interval: 30.seconds)
     Rails.logger.info "[GithubActionsMonitor] Starting workflow monitoring for app #{@app.id}"
     
-    # Get the latest workflow run for this repository
-    workflow_runs = get_workflow_runs
-    return { success: false, error: "No workflow runs found" } if workflow_runs.empty?
+    # Retry getting workflow runs for up to 3 minutes for new repos
+    workflow_runs = get_workflow_runs_with_retry(max_retry_time: 3.minutes)
+    return { success: false, error: "No workflow runs found after 3 minutes of retrying" } if workflow_runs.empty?
     
     latest_run = workflow_runs.first
     Rails.logger.info "[GithubActionsMonitor] Monitoring workflow run #{latest_run['id']} (#{latest_run['status']})"
@@ -57,26 +57,93 @@ class Deployment::GithubActionsMonitorService
   
   private
   
+  def get_workflow_runs_with_retry(max_retry_time: 3.minutes)
+    Rails.logger.info "[GithubActionsMonitor] Will retry getting workflow runs for up to #{max_retry_time}"
+    
+    start_time = Time.current
+    attempt = 0
+    delay = 10 # Start with 10 second delay
+    
+    while Time.current < start_time + max_retry_time
+      attempt += 1
+      Rails.logger.info "[GithubActionsMonitor] Attempt #{attempt} to get workflow runs"
+      
+      runs = get_workflow_runs
+      if runs.any?
+        Rails.logger.info "[GithubActionsMonitor] Found #{runs.count} workflow runs"
+        return runs
+      end
+      
+      # Calculate remaining time
+      elapsed = Time.current - start_time
+      remaining = max_retry_time - elapsed
+      
+      if remaining > delay
+        Rails.logger.info "[GithubActionsMonitor] No runs found, waiting #{delay}s before retry (#{remaining.to_i}s remaining)"
+        sleep delay
+        delay = [delay * 1.5, 30].min # Increase delay up to max 30s
+      else
+        Rails.logger.warn "[GithubActionsMonitor] Exhausted retry time after #{attempt} attempts"
+        break
+      end
+    end
+    
+    []
+  end
+  
   def get_workflow_runs
     Rails.logger.info "[GithubActionsMonitor] Fetching workflow runs for #{@app.repository_name}"
     
-    response = self.class.get(
-      "/repos/#{@app.repository_name}/actions/runs",
-      headers: {
-        'Authorization' => "token #{@github_auth.get_installation_token(@app.repository_name)}",
-        'Accept' => 'application/vnd.github.v3+json'
-      },
-      query: {
-        per_page: 5,
-        status: 'completed,in_progress,queued'
-      }
-    )
+    retries = 0
+    max_retries = 3
+    delay = 5 # Start with 5 second delay
     
-    if response.success?
-      response['workflow_runs'] || []
-    else
-      Rails.logger.error "[GithubActionsMonitor] Failed to fetch workflow runs: #{response.code} - #{response.body}"
-      []
+    begin
+      # Wait before first attempt if this is a new repo (created within last 2 minutes)
+      if @app.created_at > 2.minutes.ago && retries == 0
+        Rails.logger.info "[GithubActionsMonitor] New repo detected, waiting #{delay}s for GitHub to propagate permissions"
+        sleep delay
+      end
+      
+      response = self.class.get(
+        "/repos/#{@app.repository_name}/actions/runs",
+        headers: {
+          'Authorization' => "token #{@github_auth.get_installation_token(@app.repository_name)}",
+          'Accept' => 'application/vnd.github.v3+json'
+        },
+        query: {
+          per_page: 5,
+          status: 'completed,in_progress,queued'
+        }
+      )
+      
+      if response.success?
+        runs = response['workflow_runs'] || []
+        
+        # If no runs found but repo is very new, retry
+        if runs.empty? && @app.created_at > 1.minute.ago && retries < max_retries
+          raise "No runs found for new repo, retrying..."
+        end
+        
+        return runs
+      elsif response.code == 404 && retries < max_retries
+        raise "404 error, likely permissions not ready"
+      else
+        Rails.logger.error "[GithubActionsMonitor] Failed to fetch workflow runs: #{response.code} - #{response.body}"
+        return []
+      end
+      
+    rescue => e
+      retries += 1
+      if retries <= max_retries
+        Rails.logger.info "[GithubActionsMonitor] Retry #{retries}/#{max_retries} after #{delay}s: #{e.message}"
+        sleep delay
+        delay *= 2 # Exponential backoff
+        retry
+      else
+        Rails.logger.error "[GithubActionsMonitor] All retries exhausted: #{e.message}"
+        return []
+      end
     end
   end
   

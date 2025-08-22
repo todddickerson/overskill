@@ -3615,6 +3615,12 @@ module Ai
     end
     
     def store_generated_file(path, content)
+      # Validate and auto-fix TypeScript/JavaScript files before saving
+      if path.match?(/\.(ts|tsx|js|jsx)$/)
+        fixed_content = validate_and_fix_typescript(path, content)
+        content = fixed_content if fixed_content != content
+      end
+      
       app.app_files.create!(
         path: path,
         content: content,
@@ -3634,8 +3640,37 @@ module Ai
       end
     end
     
+    def validate_and_fix_typescript(path, content)
+      # Auto-fix common TypeScript/JavaScript syntax errors
+      fixed = content.dup
+      
+      # Fix unescaped quotes in string literals
+      # Pattern: strings containing code examples with quotes
+      fixed.gsub!(/"System\.out\.println\("([^"]*)"\);"/, '"System.out.println(\"\1\");"')
+      fixed.gsub!(/"std::cout\s*<<\s*"([^"]*)"([^"]*);"/,  '"std::cout << \"\1\"\2;"')
+      fixed.gsub!(/"fmt\.Println\("([^"]*)"\)"/, '"fmt.Println(\"\1\")"')
+      fixed.gsub!(/"println!\("([^"]*)"\);"/, '"println!(\"\1\");"')
+      
+      # Log if we made changes
+      if fixed != content
+        Rails.logger.info "[AppBuilderV5] Auto-fixed TypeScript syntax in #{path}"
+        Rails.logger.info "[AppBuilderV5] Fixed unescaped quotes in string literals"
+        
+        # Add system message about the fix
+        if @user_message
+          @app.app_chat_messages.create!(
+            role: 'system',
+            content: "🔧 Auto-fixed TypeScript syntax errors in #{path} (unescaped quotes)",
+            status: 'completed'
+          )
+        end
+      end
+      
+      fixed
+    end
+    
     def validate_typescript_file(file)
-      # TODO: Implement TypeScript validation
+      # Legacy method kept for compatibility
       { valid: true, errors: [] }
     end
     
