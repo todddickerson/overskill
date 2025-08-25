@@ -5,6 +5,9 @@
 class Deployment::GithubRepositoryService
   include HTTParty
   base_uri 'https://api.github.com'
+  
+  # Set timeouts to prevent hanging on large operations
+  default_timeout 120 # 2 minutes for large file operations
 
   def initialize(app)
     @app = app
@@ -243,7 +246,7 @@ class Deployment::GithubRepositoryService
     end
   end
   
-  # Commit multiple files atomically using GitHub Tree API
+  # Commit multiple files atomically using GitHub Tree API with retry logic
   def batch_commit_files(file_structure, message: nil)
     return { success: false, error: 'No repository created' } unless @app.repository_name
     
@@ -252,53 +255,78 @@ class Deployment::GithubRepositoryService
     # Generate appropriate commit message
     commit_message = message || generate_app_version_commit_message(file_structure)
     
-    Rails.logger.info "[GitHubRepositoryService] Creating atomic commit: #{commit_message}"
+    Rails.logger.info "[GitHubRepositoryService] Creating atomic commit with #{file_structure.size} files: #{commit_message}"
     
     begin
-      # Get current HEAD commit
-      ref_response = self.class.get("/repos/#{repo_full_name}/git/ref/heads/main", headers: self.class.headers)
+      # Get current HEAD commit with retry
+      ref_response = with_retry("get HEAD ref") do
+        self.class.get("/repos/#{repo_full_name}/git/ref/heads/main", 
+          headers: self.class.headers,
+          timeout: 30
+        )
+      end
+      
       unless ref_response.success?
         return { success: false, error: "Failed to get HEAD ref: #{ref_response.code}" }
       end
       
       head_sha = ref_response.parsed_response.dig('object', 'sha')
       
-      # Get current tree
-      head_commit_response = self.class.get("/repos/#{repo_full_name}/git/commits/#{head_sha}", headers: self.class.headers)
+      # Get current tree with retry
+      head_commit_response = with_retry("get HEAD commit") do
+        self.class.get("/repos/#{repo_full_name}/git/commits/#{head_sha}", 
+          headers: self.class.headers,
+          timeout: 30
+        )
+      end
+      
       unless head_commit_response.success?
         return { success: false, error: "Failed to get HEAD commit: #{head_commit_response.code}" }
       end
       
       base_tree_sha = head_commit_response.parsed_response.dig('tree', 'sha')
       
-      # Create blobs for each file
+      # Process files in batches to avoid overwhelming the API
       tree_items = []
-      file_structure.each do |path, content|
-        # Create blob
-        blob_response = self.class.post("/repos/#{repo_full_name}/git/blobs",
-          body: { content: content, encoding: 'utf-8' }.to_json,
-          headers: self.class.headers.merge('Content-Type' => 'application/json')
-        )
+      file_structure.each_slice(10) do |file_batch|
+        Rails.logger.info "[GitHubRepositoryService] Processing batch of #{file_batch.size} files..."
         
-        unless blob_response.success?
-          return { success: false, error: "Failed to create blob for #{path}: #{blob_response.code}" }
+        file_batch.each do |path, content|
+          # Create blob with retry
+          blob_response = with_retry("create blob for #{path}") do
+            self.class.post("/repos/#{repo_full_name}/git/blobs",
+              body: { content: content, encoding: 'utf-8' }.to_json,
+              headers: self.class.headers.merge('Content-Type' => 'application/json'),
+              timeout: 60
+            )
+          end
+          
+          unless blob_response.success?
+            return { success: false, error: "Failed to create blob for #{path}: #{blob_response.code}" }
+          end
+          
+          blob_sha = blob_response.parsed_response['sha']
+          
+          tree_items << {
+            path: path,
+            mode: '100644', # Regular file
+            type: 'blob',
+            sha: blob_sha
+          }
         end
         
-        blob_sha = blob_response.parsed_response['sha']
-        
-        tree_items << {
-          path: path,
-          mode: '100644', # Regular file
-          type: 'blob',
-          sha: blob_sha
-        }
+        # Small delay between batches to avoid rate limiting
+        sleep 0.5 if file_structure.size > 20
       end
       
-      # Create new tree
-      tree_response = self.class.post("/repos/#{repo_full_name}/git/trees",
-        body: { base_tree: base_tree_sha, tree: tree_items }.to_json,
-        headers: self.class.headers.merge('Content-Type' => 'application/json')
-      )
+      # Create new tree with retry
+      tree_response = with_retry("create tree") do
+        self.class.post("/repos/#{repo_full_name}/git/trees",
+          body: { base_tree: base_tree_sha, tree: tree_items }.to_json,
+          headers: self.class.headers.merge('Content-Type' => 'application/json'),
+          timeout: 90
+        )
+      end
       
       unless tree_response.success?
         return { success: false, error: "Failed to create tree: #{tree_response.code}" }
@@ -306,19 +334,22 @@ class Deployment::GithubRepositoryService
       
       new_tree_sha = tree_response.parsed_response['sha']
       
-      # Create commit
-      commit_response = self.class.post("/repos/#{repo_full_name}/git/commits",
-        body: {
-          message: commit_message,
-          tree: new_tree_sha,
-          parents: [head_sha],
-          author: {
-            name: 'OverSkill App Builder',
-            email: 'noreply@overskill.com'
-          }
-        }.to_json,
-        headers: self.class.headers.merge('Content-Type' => 'application/json')
-      )
+      # Create commit with retry
+      commit_response = with_retry("create commit") do
+        self.class.post("/repos/#{repo_full_name}/git/commits",
+          body: {
+            message: commit_message,
+            tree: new_tree_sha,
+            parents: [head_sha],
+            author: {
+              name: 'OverSkill App Builder',
+              email: 'noreply@overskill.com'
+            }
+          }.to_json,
+          headers: self.class.headers.merge('Content-Type' => 'application/json'),
+          timeout: 60
+        )
+      end
       
       unless commit_response.success?
         return { success: false, error: "Failed to create commit: #{commit_response.code}" }
@@ -326,11 +357,14 @@ class Deployment::GithubRepositoryService
       
       new_commit_sha = commit_response.parsed_response['sha']
       
-      # Update HEAD to point to new commit
-      update_ref_response = self.class.patch("/repos/#{repo_full_name}/git/refs/heads/main",
-        body: { sha: new_commit_sha }.to_json,
-        headers: self.class.headers.merge('Content-Type' => 'application/json')
-      )
+      # Update HEAD to point to new commit with retry
+      update_ref_response = with_retry("update HEAD ref") do
+        self.class.patch("/repos/#{repo_full_name}/git/refs/heads/main",
+          body: { sha: new_commit_sha }.to_json,
+          headers: self.class.headers.merge('Content-Type' => 'application/json'),
+          timeout: 30
+        )
+      end
       
       unless update_ref_response.success?
         return { success: false, error: "Failed to update HEAD: #{update_ref_response.code}" }
@@ -381,6 +415,32 @@ class Deployment::GithubRepositoryService
   end
   
   private
+  
+  # Helper method for retrying API calls with exponential backoff
+  def with_retry(operation_name, max_attempts: 3)
+    attempt = 0
+    last_error = nil
+    
+    while attempt < max_attempts
+      attempt += 1
+      begin
+        Rails.logger.info "[GitHubRepositoryService] Attempting #{operation_name} (attempt #{attempt}/#{max_attempts})"
+        result = yield
+        return result
+      rescue Net::ReadTimeout, Net::OpenTimeout, Errno::ECONNRESET, Errno::ETIMEDOUT => e
+        last_error = e
+        if attempt < max_attempts
+          wait_time = 2 ** attempt # Exponential backoff: 2, 4, 8 seconds
+          Rails.logger.warn "[GitHubRepositoryService] #{operation_name} timed out, retrying in #{wait_time}s: #{e.message}"
+          sleep(wait_time)
+        else
+          Rails.logger.error "[GitHubRepositoryService] #{operation_name} failed after #{max_attempts} attempts: #{e.message}"
+        end
+      end
+    end
+    
+    raise last_error || StandardError.new("Failed after #{max_attempts} attempts")
+  end
   
   def generate_app_version_commit_message(file_structure)
     file_count = file_structure.size

@@ -111,6 +111,26 @@ class DeployAppJob < ApplicationJob
     else
       Rails.logger.info "[DeployAppJob] Successfully synced #{sync_result[:files_pushed]} files to GitHub"
       
+      # Validate that key files were actually pushed to GitHub
+      validation_result = validate_github_files(app, github_service)
+      unless validation_result[:success]
+        Rails.logger.error "[DeployAppJob] GitHub validation failed: #{validation_result[:error]}"
+        broadcast_deployment_progress(app, 
+          status: 'failed', 
+          deployment_error: "GitHub sync validation failed: #{validation_result[:error]}",
+          deployment_steps: [
+            { name: 'Sync to GitHub', current: false, completed: false },
+            { name: 'Trigger GitHub Actions', current: false, completed: false },
+            { name: 'Deploy to Workers for Platforms', current: false, completed: false },
+            { name: 'Configure routing', current: false, completed: false }
+          ]
+        )
+        result = { success: false, error: validation_result[:error] }
+        return result
+      end
+      
+      Rails.logger.info "[DeployAppJob] GitHub files validated successfully"
+      
       # Update progress: GitHub sync completed, GitHub Actions will auto-deploy
       broadcast_deployment_progress(app, 
         progress: 50, 
@@ -262,6 +282,47 @@ class DeployAppJob < ApplicationJob
   end
   
   private
+  
+  def validate_github_files(app, github_service)
+    # Check that key files exist in the GitHub repository
+    repo_full_name = "#{ENV['GITHUB_ORG']}/#{app.repository_name}"
+    
+    # Key files to validate
+    key_files = [
+      '.github/workflows/deploy.yml',  # GitHub Actions workflow
+      'src/App.tsx',                   # Main app component
+      'package.json',                   # Dependencies
+      'index.html'                      # Entry point
+    ]
+    
+    missing_files = []
+    
+    key_files.each do |file_path|
+      begin
+        response = HTTParty.get(
+          "https://api.github.com/repos/#{repo_full_name}/contents/#{file_path}",
+          headers: {
+            'Authorization' => "Bearer #{github_service.instance_variable_get(:@github_token)}",
+            'Accept' => 'application/vnd.github.v3+json'
+          },
+          timeout: 10
+        )
+        
+        unless response.success?
+          missing_files << file_path
+        end
+      rescue => e
+        Rails.logger.error "[DeployAppJob] Error checking file #{file_path}: #{e.message}"
+        missing_files << file_path
+      end
+    end
+    
+    if missing_files.any?
+      { success: false, error: "Missing critical files in GitHub: #{missing_files.join(', ')}" }
+    else
+      { success: true }
+    end
+  end
   
   def generate_version_number(app)
     last_version = app.app_versions.order(created_at: :desc).first
