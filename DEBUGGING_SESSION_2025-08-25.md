@@ -98,6 +98,10 @@ Performed CleanupStuckMessagesJob in 79.54ms
 
 ## Files Modified
 - `config/initializers/sidekiq_cron.rb` - Temporarily disabled/re-enabled cron job during debugging
+- `app/jobs/deploy_app_job.rb:90` - Pass environment parameter to GitHub service
+- `app/services/deployment/github_repository_service.rb:234` - Accept environment parameter in push_file_structure  
+- `app/services/deployment/github_repository_service.rb:250` - Accept environment parameter in batch_commit_files
+- `app/services/deployment/github_repository_service.rb:445` - Add [production] tag to commit messages for production deployments
 
 ## Commands Used for Investigation
 ```bash
@@ -124,10 +128,13 @@ bundle exec sidekiq &
 if: github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[deploy:production]') || contains(github.event.head_commit.message, '[production]'))
 ```
 
-**Resolution Required**: 
-- Ensure commit messages for production deployments include `[deploy:production]` or `[production]`
-- Or modify the workflow to trigger production deployment differently
-- Current behavior: All deployments without these tags go to preview environment
+**Resolution Implemented** ✅:  
+- **Fixed**: Modified commit message generation to include `[production]` tag when deploying to production
+- **Code Changes**: 
+  - Updated `DeployAppJob` to pass environment parameter through to GitHub service
+  - Modified `GitHubRepositoryService.push_file_structure` to accept environment parameter
+  - Updated `generate_app_version_commit_message` to append `[production]` tag for production deployments
+- **Result**: Production deployments now correctly trigger production GitHub workflow
 
 **Deployment Targets**:
 - **Preview** (default): `https://preview-jzmvrj.overskill.app` 

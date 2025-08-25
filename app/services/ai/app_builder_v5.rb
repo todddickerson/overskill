@@ -858,6 +858,33 @@ module Ai
           # Continue with deployment even if R2 setup fails
         end
         
+        # Live Preview Infrastructure: Create instant preview environment (5-10s)
+        update_thinking_status("Creating live preview environment...")
+        begin
+          Rails.logger.info "[V5_FINALIZE] Creating preview environment for app #{app.id}"
+          
+          # Start file watcher for hot reload
+          Deployment::FileWatcherService.start_watching_app(app)
+          
+          # Always use real WFP preview service
+          Rails.logger.info "[V5_FINALIZE] Using real WFP preview service"
+          preview_service = Deployment::WfpPreviewService.new(app)
+          result = preview_service.create_preview_environment
+          
+          if result && result[:success]
+            Rails.logger.info "[V5_FINALIZE] WFP preview created successfully: #{result[:preview_url]}"
+            Rails.logger.info "[V5_FINALIZE] Deployment time: #{result[:deployment_time]}s"
+          else
+            error_msg = result ? result[:error] : "Unknown error"
+            Rails.logger.error "[V5_FINALIZE] WFP preview creation failed: #{error_msg}"
+          end
+          
+        rescue => e
+          Rails.logger.error "[V5_FINALIZE] Preview environment creation failed: #{e.message}"
+          Rails.logger.error "[V5_FINALIZE] Backtrace: #{e.backtrace.first(5).join("\n")}"
+          # Continue with deployment even if preview fails
+        end
+        
         # GitHub Migration Project: Setup repository with generated code BEFORE deployment
         if @use_repository_mode && !@app.using_repository_mode?
           update_thinking_status("Creating GitHub repository with generated code...")

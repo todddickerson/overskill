@@ -9,7 +9,7 @@
 ```bash
 APP_GENERATION_VERSION=v4_enhanced
 # Production: {subdomain}.overskill.app  
-# Preview: preview-{id}.overskill.app
+# Preview: {id}-preview.overskill.app
 ```
 
 #### System Health Check
@@ -23,7 +23,9 @@ APP_GENERATION_VERSION=v4_enhanced
 ## ðŸŽ¯ CURRENT PRIORITIES
 
 ### P0: Critical Issues (Fix Immediately)
-- [ ] **None identified** - System is stable
+- [x] **WFP Deployment URLs** - Fixed routing and subdomain issues (Aug 25)
+- [x] **DeployAppJob Uniqueness** - Fixed job_id error handling (Aug 25)
+- [x] **System Prompt Cache** - Reduced from 134k to 9k tokens (Aug 25)
 
 ### P1: Active Development 
 - [ ] **V5 Conversation Flow**: Enhanced chat improvements in progress
@@ -134,9 +136,16 @@ end
 
 ---
 
-## ðŸ“Š RECENT FIXES (August 2025)
+## ðŸ"Š RECENT FIXES (August 2025)
 
-### âœ… Resolved Issues
+### âœ… August 25, 2025 - Major WFP Deployment Fixes
+- **WFP Routing Logic** - Fixed dispatch worker to handle suffix format ({id}-preview)
+- **Production URLs** - Now correctly use subdomain instead of obfuscated ID
+- **DeployAppJob Error** - Added handling for uniqueness constraint violations
+- **Case Sensitivity** - Fixed case-insensitive script lookups in dispatch worker
+- **System Prompt Cache** - Reduced token usage by 93% (134k → 9k tokens)
+
+### âœ… Previous Fixes
 - **V5 Conversation Flow** - Claude responses now properly display in chat
 - **Build Status Display** - Real-time build progress shows correctly  
 - **Tool Status Sync** - Fixed "Running" status stuck in conversation

@@ -79,7 +79,9 @@ module Deployment
       track_deployment_analytics(script_name, namespace)
       
       # Create specific route for this app to preserve DNS for reserved subdomains
-      create_app_specific_route(script_name, environment)
+      # Don't let route creation failure affect the main deployment result
+      route_created = create_app_specific_route(script_name, environment)
+      Rails.logger.warn "Failed to create app-specific route for #{script_name}" unless route_created
       
       {
         success: true,
@@ -90,7 +92,8 @@ module Deployment
         worker_url: url,  # For compatibility with DeployAppJob
         deployment_url: url,  # Alternative field name
         environment: environment,
-        deployed_at: Time.current
+        deployed_at: Time.current,
+        route_created: route_created
       }
     end
     
@@ -245,7 +248,8 @@ module Deployment
         ['metadata', { 
           main_module: 'index.js',
           compatibility_date: '2024-01-01',
-          tags: generate_script_tags(metadata)
+          tags: generate_script_tags(metadata),
+          bindings: generate_customer_script_bindings
         }.to_json],
         ['index.js', script_content, { 
           filename: 'index.js',
@@ -331,19 +335,17 @@ module Deployment
     def generate_script_name(environment)
       return nil unless @app
       
-      # Use subdomain for production, obfuscated_id for preview/staging
+      # Generate script name WITHOUT environment prefix 
+      # The dispatch worker handles environment routing via namespace bindings
       case environment.to_sym
       when :production
         # Use subdomain for production (clean URLs like countmaster.overskill.app)
         @app.subdomain || @app.obfuscated_id.downcase
-      when :staging
-        # Use obfuscated_id for staging (internal use)
-        "staging-#{@app.obfuscated_id.downcase}"
-      when :preview
-        # Use obfuscated_id for preview (internal use)
-        "preview-#{@app.obfuscated_id.downcase}"
+      when :staging, :preview
+        # Use obfuscated_id for staging/preview (dispatch worker routes via namespace)
+        @app.obfuscated_id.downcase
       else
-        "preview-#{@app.obfuscated_id.downcase}"
+        @app.obfuscated_id.downcase
       end
     end
     
@@ -367,7 +369,18 @@ module Deployment
       
       # Generate both formats for migration flexibility
       wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
-      @subdomain_style_url = "https://#{script_name}.#{wfp_domain}" # Production custom domain for WFP apps
+      
+      # Add environment prefix to URL for dispatch worker routing
+      url_script_name = case environment.to_sym
+      when :staging
+        "staging-#{script_name}"
+      when :preview
+        "preview-#{script_name}"
+      else
+        script_name
+      end
+      
+      @subdomain_style_url = "https://#{url_script_name}.#{wfp_domain}" # Production custom domain for WFP apps
       @path_style_url = "#{dispatch_url}/app/#{script_name}" # Current workers.dev fallback
       
       # Return subdomain style URL (WFP apps domain is configured)
@@ -412,6 +425,50 @@ module Deployment
       end
       
       bindings
+    end
+    
+    def generate_customer_script_bindings
+      # Get the preview files KV namespace (matches WfpPreviewService)
+      namespace_title = "overskill-#{Rails.env}-preview-files"
+      namespace_id = get_or_create_kv_namespace(namespace_title)
+      
+      [
+        {
+          type: 'kv_namespace',
+          name: 'PREVIEW_FILES',
+          namespace_id: namespace_id
+        }
+      ]
+    end
+    
+    def get_or_create_kv_namespace(title)
+      # Check if namespace already exists
+      response = self.class.get(
+        "/accounts/#{@account_id}/storage/kv/namespaces",
+        headers: { 'Authorization' => "Bearer #{@api_token}" }
+      )
+      
+      if response.success?
+        existing = response['result'].find { |ns| ns['title'] == title }
+        return existing['id'] if existing
+      end
+      
+      # Create new namespace
+      response = self.class.post(
+        "/accounts/#{@account_id}/storage/kv/namespaces",
+        headers: {
+          'Authorization' => "Bearer #{@api_token}",
+          'Content-Type' => 'application/json'
+        },
+        body: { title: title }.to_json
+      )
+      
+      if response.success?
+        Rails.logger.info "[WFP] Created KV namespace: #{title} with ID #{response['result']['id']}"
+        response['result']['id']
+      else
+        raise "Failed to create KV namespace: #{response['errors']}"
+      end
     end
     
     def generate_dispatch_worker_script
@@ -497,15 +554,13 @@ module Deployment
               let environment = 'production';
               let scriptName = subdomain;
               
-              // Handle environment suffixes in subdomain (e.g., abc123-preview)
-              if (subdomain.endsWith('-preview')) {
+              // Handle environment PREFIXES in subdomain (e.g., preview-abc123)
+              if (subdomain.startsWith('preview-')) {
                 environment = 'preview';
-                scriptName = subdomain.replace(/-preview$/, '').toLowerCase();
-                scriptName = 'preview-' + scriptName; // Add prefix for namespace lookup
-              } else if (subdomain.endsWith('-staging')) {
+                scriptName = subdomain.replace(/^preview-/, '').toLowerCase();
+              } else if (subdomain.startsWith('staging-')) {
                 environment = 'staging';
-                scriptName = subdomain.replace(/-staging$/, '').toLowerCase();
-                scriptName = 'staging-' + scriptName; // Add prefix for namespace lookup
+                scriptName = subdomain.replace(/^staging-/, '').toLowerCase();
               } else {
                 // For production, convert to lowercase to match script names
                 scriptName = subdomain.toLowerCase();
