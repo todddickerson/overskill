@@ -144,8 +144,8 @@ gem "active_hash"
 # You can add any Ruby gems you need below. By keeping them separate from our gems above, you'll avoid the likelihood
 # that you run into a merge conflict in the future.
 
-gem 'omniauth-google-oauth2'
-gem 'omniauth-github'
+gem "omniauth-google-oauth2"
+gem "omniauth-github"
 # 🚅 super scaffolding will insert new oauth providers above this line.
 
 # OverSkill Platform Dependencies
@@ -320,4 +320,4 @@ group :production do
   # terser is used to compress assets during precompilation
   gem "terser"
 end
-gem 'supabase_api'
+gem "supabase_api"

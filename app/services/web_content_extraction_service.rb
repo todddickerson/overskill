@@ -24,6 +24,11 @@ class WebContentExtractionService
     @logger = Rails.logger
     @security_filter = Security::PromptInjectionFilter.new if defined?(Security::PromptInjectionFilter)
   end
+  
+  # ActiveSupport::Benchmarkable expects a logger method
+  def logger
+    @logger
+  end
 
   # Main method to extract content for LLM consumption
   def extract_for_llm(url, options = {})

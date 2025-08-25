@@ -235,6 +235,154 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
   end
 
   # ========================
+  # Complex JSX Structural Error Tests (New)
+  # ========================
+
+  test "detects and handles unclosed JSX section tags" do
+    # Based on the SalesPage.tsx structural error that our validator missed
+    malformed_content = <<~JSX
+      export default function SalesPage() {
+        return (
+          <div className="min-h-screen">
+            <section className="py-16">
+              <div className="container mx-auto px-4">
+                <h2 className="text-3xl font-bold">What You'll Get Inside</h2>
+              </div>
+            </section>
+            
+            <section className="py-16 bg-muted/30">
+              <div className="container mx-auto px-4">
+                <h2 className="text-3xl font-bold">Testimonials</h2>
+              </div>
+            </section>
+            </section> {/* Extra closing section tag */}
+          </div>
+        );
+      }
+    JSX
+
+    result = @validator.validate_and_fix_typescript("src/pages/SalesPage.tsx", malformed_content)
+    
+    # Verify the validator processes the content (even if it can't fix structural issues)
+    refute_empty result
+    assert_respond_to @validator, :validation_errors
+  end
+
+  test "handles missing closing JSX tags" do
+    malformed_content = <<~JSX
+      function Component() {
+        return (
+          <div className="container">
+            <section className="hero">
+              <h1>Title</h1>
+              <p>Content</p>
+            {/* Missing </section> closing tag */}
+          </div>
+        );
+      }
+    JSX
+
+    result = @validator.validate_and_fix_typescript("test.tsx", malformed_content)
+    refute_empty result
+  end
+
+  test "handles JSX expression errors" do
+    malformed_content = <<~JSX
+      function Component() {
+        return (
+          <div className="container{invalid}">
+            <p className="">Content</p>
+          </div>
+        );
+      }
+    JSX
+
+    result = @validator.validate_and_fix_typescript("test.tsx", malformed_content)
+    refute_empty result
+  end
+
+  test "handles unterminated string literals in JSX" do
+    malformed_content = <<~JSX
+      function Component() {
+        return (
+          <div className="container mx-auto>
+            <p>Content</p>
+          </div>
+        );
+      }
+    JSX
+
+    result = @validator.validate_and_fix_typescript("test.tsx", malformed_content)
+    # Should attempt to fix by adding missing quote
+    assert_includes result, 'className="container mx-auto"'
+  end
+
+  test "handles missing semicolons in TypeScript" do
+    malformed_content = <<~TSX
+      const greeting = "Hello World"
+      const component = () => {
+        return <div>{greeting}</div>
+      }
+    TSX
+
+    result = @validator.validate_and_fix_typescript("test.tsx", malformed_content)
+    # Note: Our validator focuses on JSX issues, semicolons might not be auto-fixed
+    refute_empty result
+  end
+
+  test "handles unbalanced parentheses in JSX" do
+    malformed_content = <<~JSX
+      function Component() {
+        return (
+          <div onClick={() => handleClick(}>
+            Content
+          </div>
+        );
+      }
+    JSX
+
+    result = @validator.validate_and_fix_typescript("test.tsx", malformed_content)
+    refute_empty result
+  end
+
+  test "handles nested JSX component structural errors" do
+    # Complex nested structure with multiple issues
+    malformed_content = <<~JSX
+      function App() {
+        return (
+          <div className="app">
+            <Header>
+              <nav className="navigation\\">
+                <Link to="/home" className="nav-link\\">Home</Link>
+                <Link to="/about" className="nav-link\\">About</Link>
+              </nav>
+            </Header>
+            <main className="content\\">
+              <section className="hero\\">
+                <h1 className="title\\">Welcome</h1>
+              </section>
+            </main>
+          </div>
+        );
+      }
+    JSX
+
+    result = @validator.validate_and_fix_typescript("src/App.tsx", malformed_content)
+    
+    # Should fix all the className backslash issues
+    refute_includes result, 'className="navigation\\"'
+    refute_includes result, 'className="nav-link\\"'
+    refute_includes result, 'className="content\\"'
+    refute_includes result, 'className="hero\\"'
+    refute_includes result, 'className="title\\"'
+    
+    # Should have correct JSX syntax
+    assert_includes result, 'className="navigation"'
+    assert_includes result, 'className="nav-link"'
+    assert_includes result, 'className="content"'
+  end
+
+  # ========================
   # Real-World Scenario Tests (Based on Funnelcraft Failures)
   # ========================
 

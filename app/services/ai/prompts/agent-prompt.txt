@@ -352,6 +352,8 @@ Common mermaid diagram types you can use:
       --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
    }
    ```
+
+   On new apps create a design system considering the type of app/site you are building, and update index.css to change out the defaults.
  
 3. **Create Component Variants for Special Cases:**
    ```tsx

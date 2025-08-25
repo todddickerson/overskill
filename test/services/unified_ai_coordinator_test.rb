@@ -2,9 +2,9 @@ require 'test_helper'
 
 class UnifiedAiCoordinatorTest < ActiveSupport::TestCase
   setup do
-    @team = teams(:one)
-    @user = users(:one)
-    @app = apps(:one)
+    @user = create(:user)
+    @team = @user.current_team || create(:team)
+    @app = create(:app, team: @team)
     @message = @app.app_chat_messages.create!(
       role: "user",
       content: "Add a contact form to my landing page",
