@@ -19,11 +19,13 @@ class Admin::MetricsController < ApplicationController
   private
   
   def authenticate_admin!
-    # Use your existing admin authentication
-    # redirect_to root_path unless current_user&.admin?
-    
-    # For now, ensure user is authenticated
+    # Ensure user is authenticated
     authenticate_user!
+    
+    # Verify admin status via SUPER_ADMIN_EMAIL
+    unless current_user&.email == ENV['SUPER_ADMIN_EMAIL']
+      redirect_to root_path, alert: "You must be an admin to access this page."
+    end
   end
   
   def fetch_token_metrics

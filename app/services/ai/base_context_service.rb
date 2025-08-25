@@ -221,41 +221,125 @@ module Ai
     
     private
     
-    # Get only files that are relevant for the current request
+    # Get only files that are relevant for the current request, including indirect dependencies
     def get_relevant_files(app, component_requirements, app_type)
       relevant_files = []
+      processed_files = Set.new
       
       # 1. ALWAYS include essential files that exist
       essential_files = ESSENTIAL_FILES.map { |path| 
         app.app_files.find_by(path: path) 
       }.compact
       relevant_files += essential_files
+      essential_files.each { |f| processed_files << f.path }
       
-      # 2. Include ONLY predicted components (max 5 to control token usage)
+      # 2. Include predicted components and their dependencies
       component_requirements.take(MAX_COMPONENTS_TO_LOAD).each do |component_name|
         component_file = app.app_files.find_by(path: "src/components/ui/#{component_name}.tsx")
-        relevant_files << component_file if component_file
+        if component_file && !processed_files.include?(component_file.path)
+          relevant_files << component_file
+          processed_files << component_file.path
+          
+          # Recursively include dependencies
+          deps = find_indirect_dependencies(app, component_file, processed_files)
+          relevant_files += deps
+          deps.each { |d| processed_files << d.path }
+        end
       end
       
       # 3. Include recently modified files (indication of active work)
       recently_modified = app.app_files.where('updated_at > ?', 1.hour.ago)
-                                       .where.not(path: ESSENTIAL_FILES)
-                                       .where.not('path LIKE ?', 'src/components/ui/%')
+                                       .where.not(path: processed_files.to_a)
                                        .limit(3)
       relevant_files += recently_modified
       
       # 4. Ensure we don't exceed reasonable limits
       unique_files = relevant_files.compact.uniq
-      if unique_files.count > 20  # Reasonable maximum
-        # Prioritize: essential files > components > recently modified
+      if unique_files.count > 25  # Increased limit to account for dependencies
+        Rails.logger.warn "[FILE_SELECTION] Too many files (#{unique_files.count}), prioritizing..."
+        # Prioritize: essential files > components > dependencies > recently modified
         unique_files = essential_files + 
-                      relevant_files.select { |f| f.path.include?('components/ui/') }.take(5) +
+                      relevant_files.select { |f| f.path.include?('components/ui/') }.take(8) +
                       recently_modified.take(3)
       end
       
-      Rails.logger.info "[FILE_SELECTION] Essential: #{essential_files.count}, Components: #{component_requirements.count}, Recent: #{recently_modified.count}"
+      Rails.logger.info "[FILE_SELECTION] Essential: #{essential_files.count}, Components: #{component_requirements.count}, Dependencies: #{processed_files.size - essential_files.count - component_requirements.count}, Recent: #{recently_modified.count}"
       
       unique_files.compact.uniq
+    end
+    
+    # Find indirect dependencies (helper files, shared components, etc.)
+    def find_indirect_dependencies(app, file, processed_files, max_depth = 2, current_depth = 0)
+      return [] if current_depth >= max_depth || !file.content
+      
+      dependencies = []
+      
+      # Parse import statements
+      imports = file.content.scan(/import\s+(?:\{[^}]+\}|\*\s+as\s+\w+|\w+)\s+from\s+['"]([^'"]+)['"]/).flatten
+      
+      imports.each do |import_path|
+        # Skip external dependencies
+        next if import_path.start_with?('node_modules') || !import_path.match?(/^\.\.?\/|^@\/|^~\//)
+        
+        # Resolve the import path
+        resolved_path = resolve_import_path(file.path, import_path)
+        
+        # Skip if already processed
+        next if processed_files.include?(resolved_path)
+        
+        # Find the dependency file
+        dep_file = app.app_files.find_by(path: resolved_path)
+        if dep_file
+          dependencies << dep_file
+          processed_files << resolved_path
+          
+          # Recursively find nested dependencies
+          nested_deps = find_indirect_dependencies(app, dep_file, processed_files, max_depth, current_depth + 1)
+          dependencies += nested_deps
+        else
+          Rails.logger.debug "[DEPENDENCY] Missing indirect dependency: #{resolved_path} (imported by #{file.path})"
+        end
+      end
+      
+      dependencies
+    end
+    
+    # Resolve import paths (handles relative paths and aliases)
+    def resolve_import_path(current_file, import_path)
+      if import_path.start_with?('./')
+        dir = File.dirname(current_file)
+        normalized = File.join(dir, import_path.sub('./', ''))
+        # Add extension if missing
+        add_typescript_extension(normalized)
+      elsif import_path.start_with?('../')
+        dir = File.dirname(current_file)
+        normalized = File.expand_path(File.join(dir, import_path))
+        add_typescript_extension(normalized)
+      elsif import_path.start_with?('@/')
+        # @ alias for src/
+        normalized = import_path.sub('@/', 'src/')
+        add_typescript_extension(normalized)
+      elsif import_path.start_with?('~/')
+        # ~ alias for lib/
+        normalized = import_path.sub('~/', 'src/lib/')
+        add_typescript_extension(normalized)
+      else
+        import_path
+      end
+    end
+    
+    # Add TypeScript extension if missing
+    def add_typescript_extension(path)
+      return path if path.match?(/\.(tsx?|jsx?|css|json)$/)
+      
+      # Try common extensions in order
+      %w[.tsx .ts .jsx .js].each do |ext|
+        test_path = "#{path}#{ext}"
+        return test_path if File.basename(test_path).start_with?('.')
+      end
+      
+      # Default to .tsx for components, .ts for others
+      path.include?('components') ? "#{path}.tsx" : "#{path}.ts"
     end
     
     # Add reference to available components without loading them all

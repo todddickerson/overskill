@@ -538,13 +538,17 @@ class DeployAppJob < ApplicationJob
   def validate_bundle_size!(app)
     total_size = calculate_bundle_size(app)
     
-    # Cloudflare Workers has 10MB limit
-    if total_size > 9.5  # 9.5MB safety margin
-      Rails.logger.error "[DeployAppJob] Bundle too large: #{total_size}MB (limit: 10MB)"
-      raise "Bundle size exceeds Cloudflare Workers 10MB limit: #{total_size}MB"
+    # Configurable bundle size limit with safety margin
+    max_bundle_size = ENV.fetch('WORKER_MAX_BUNDLE_SIZE_MB', '10').to_f
+    safety_margin = ENV.fetch('WORKER_BUNDLE_SAFETY_MARGIN_MB', '0.5').to_f
+    bundle_limit = max_bundle_size - safety_margin
+    
+    if total_size > bundle_limit
+      Rails.logger.error "[DeployAppJob] Bundle too large: #{total_size}MB (limit: #{bundle_limit}MB, max: #{max_bundle_size}MB)"
+      raise "Bundle size exceeds Cloudflare Workers limit: #{total_size.round(2)}MB (limit: #{bundle_limit}MB)"
     end
     
-    Rails.logger.info "[DeployAppJob] Bundle size OK: #{total_size}MB"
+    Rails.logger.info "[DeployAppJob] Bundle size OK: #{total_size}MB (limit: #{bundle_limit}MB)"
   end
   
   def calculate_bundle_size(app)
@@ -552,7 +556,12 @@ class DeployAppJob < ApplicationJob
     (total_bytes / 1_000_000.0).round(2)  # Convert to MB
   end
   
-  def resolve_import_path(current_file, import_path)
+  # Resolve import path, supporting custom TypeScript path aliases
+  # Default aliases match common TypeScript/Vite conventions
+  def resolve_import_path(current_file, import_path, aliases = nil)
+    # Default TypeScript path aliases if none provided
+    aliases ||= get_typescript_aliases
+    
     # Handle relative imports
     if import_path.start_with?('./')
       dir = File.dirname(current_file)
@@ -560,12 +569,50 @@ class DeployAppJob < ApplicationJob
     elsif import_path.start_with?('../')
       dir = File.dirname(current_file)
       File.expand_path(File.join(dir, import_path))
-    elsif import_path.start_with?('@/')
-      # Alias for src/
-      import_path.sub('@/', 'src/')
     else
-      # Absolute or node_modules import
-      import_path
+      # Check for custom aliases
+      matched_alias = aliases.keys.find { |a| import_path.start_with?("#{a}/") }
+      if matched_alias
+        import_path.sub(/^#{Regexp.escape(matched_alias)}\//, "#{aliases[matched_alias]}/")
+      else
+        # Absolute or node_modules import
+        import_path
+      end
     end
+  end
+  
+  # Get TypeScript path aliases from tsconfig.json if it exists
+  def get_typescript_aliases
+    tsconfig_file = @app.app_files.find_by(path: 'tsconfig.json')
+    
+    if tsconfig_file && tsconfig_file.content
+      begin
+        config = JSON.parse(tsconfig_file.content)
+        paths = config.dig('compilerOptions', 'paths') || {}
+        
+        # Convert tsconfig paths to simple alias mapping
+        aliases = {}
+        paths.each do |alias_pattern, target_paths|
+          # Extract alias name (remove /* suffix)
+          alias_name = alias_pattern.sub(/\/\*$/, '')
+          # Get first target path (remove /* suffix and ./ prefix)
+          target = target_paths.first&.sub(/\/\*$/, '')&.sub(/^\.\//, '') if target_paths.is_a?(Array)
+          
+          aliases[alias_name] = target if target
+        end
+        
+        # Always include common defaults if not specified
+        aliases['@'] ||= 'src'
+        aliases['~'] ||= 'src/lib'
+        aliases['#'] ||= 'src/components'
+        
+        return aliases
+      rescue JSON::ParserError => e
+        Rails.logger.warn "[DeployAppJob] Failed to parse tsconfig.json: #{e.message}"
+      end
+    end
+    
+    # Fallback to common defaults
+    { '@' => 'src', '~' => 'src/lib', '#' => 'src/components' }
   end
 end

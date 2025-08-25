@@ -18,39 +18,40 @@ module Ai
     def track_file_change(file_path, content)
       return false unless @redis
       
-      new_hash = Digest::SHA256.hexdigest(content)
-      cache_key = file_hash_key(file_path)
-      
-      # FIXED: Use Redis transaction to prevent race conditions
-      old_hash = nil
-      changed = false
-      
-      # Use Redis WATCH/MULTI/EXEC for atomic operation
-      @redis.watch(cache_key) do
+      begin
+        new_hash = Digest::SHA256.hexdigest(content)
+        cache_key = file_hash_key(file_path)
+        
+        # Get old hash and check if changed
         old_hash = @redis.get(cache_key)
         changed = (old_hash != new_hash)
         
         # Only update if value actually changed
         if changed
-          @redis.multi do |transaction|
-            transaction.setex(cache_key, HASH_TTL, new_hash)
-          end
-        else
-          @redis.unwatch
+          # setex is atomic - no need for transaction for single operation
+          @redis.setex(cache_key, HASH_TTL, new_hash)
+          
+          # Add to file index for fast lookups (replaces Redis.keys)
+          add_to_file_index(file_path)
+          
+          # Log the change
+          log_change(file_path, old_hash, new_hash)
+          
+          # Invalidate any cached prompts containing this file
+          invalidate_file_cache(file_path)
+          
+          Rails.logger.info "[FileChangeTracker] File changed: #{file_path} (app: #{@app_id})"
+        elsif old_hash.nil?
+          # New file - track it
+          @redis.setex(cache_key, HASH_TTL, new_hash)
+          add_to_file_index(file_path)
         end
-      end
-      
-      if changed
-        # Log the change (outside transaction for performance)
-        log_change(file_path, old_hash, new_hash)
         
-        # Invalidate any cached prompts containing this file
-        invalidate_file_cache(file_path)
-        
-        Rails.logger.info "[FileChangeTracker] File changed: #{file_path} (app: #{@app_id})"
+        changed
+      rescue Redis::BaseError => e
+        Rails.logger.error "[FileChangeTracker] Redis error tracking file change: #{e.message}"
+        false  # Return false on error to avoid breaking the flow
       end
-      
-      changed
     end
     
     # Track multiple file changes and return list of changed files
@@ -72,41 +73,51 @@ module Ai
     def get_changed_files_since(timestamp)
       return [] unless @redis
       
-      change_log_key = change_log_key()
-      
-      # Get changes from sorted set (scored by timestamp)
-      min_score = timestamp.to_f
-      max_score = "+inf"
-      
-      changes = @redis.zrangebyscore(change_log_key, min_score, max_score, with_scores: true)
-      
-      # Parse and return unique file paths
-      file_paths = changes.map do |entry, _score|
-        JSON.parse(entry)['file_path'] rescue nil
-      end.compact.uniq
-      
-      file_paths
+      begin
+        change_log_key = change_log_key()
+        
+        # Get changes from sorted set (scored by timestamp)
+        min_score = timestamp.to_f
+        max_score = "+inf"
+        
+        changes = @redis.zrangebyscore(change_log_key, min_score, max_score, with_scores: true)
+        
+        # Parse and return unique file paths
+        file_paths = changes.map do |entry, _score|
+          JSON.parse(entry)['file_path'] rescue nil
+        end.compact.uniq
+        
+        file_paths
+      rescue Redis::BaseError => e
+        Rails.logger.error "[FileChangeTracker] Redis error getting changed files: #{e.message}"
+        []
+      end
     end
     
     # Get change frequency for a file (changes per hour over last 24h)
     def get_change_frequency(file_path)
       return 0.0 unless @redis
       
-      change_log_key = change_log_key()
-      
-      # Count changes in last 24 hours
-      min_score = 24.hours.ago.to_f
-      max_score = Time.current.to_f
-      
-      changes = @redis.zrangebyscore(change_log_key, min_score, max_score)
-      
-      file_changes = changes.count do |entry|
-        parsed = JSON.parse(entry) rescue {}
-        parsed['file_path'] == file_path
+      begin
+        change_log_key = change_log_key()
+        
+        # Count changes in last 24 hours
+        min_score = 24.hours.ago.to_f
+        max_score = Time.current.to_f
+        
+        changes = @redis.zrangebyscore(change_log_key, min_score, max_score)
+        
+        file_changes = changes.count do |entry|
+          parsed = JSON.parse(entry) rescue {}
+          parsed['file_path'] == file_path
+        end
+        
+        # Return changes per hour
+        file_changes / 24.0
+      rescue Redis::BaseError => e
+        Rails.logger.error "[FileChangeTracker] Redis error getting change frequency: #{e.message}"
+        0.0
       end
-      
-      # Return changes per hour
-      file_changes / 24.0
     end
     
     # Check if a file has been recently modified (within threshold)
@@ -155,25 +166,31 @@ module Ai
     def invalidate_file_cache(file_path)
       return unless @redis
       
-      # Mark file as invalidated
-      invalidation_key = "cache_invalid:#{@app_id}:#{file_path}"
-      @redis.setex(invalidation_key, 5.minutes, Time.current.to_i)
-      
-      # Also invalidate any composite cache keys containing this file
-      pattern = "prompt_cache:#{@app_id}:*"
-      keys = @redis.keys(pattern)
-      
-      invalidated_count = 0
-      keys.each do |key|
-        # Check if this cache entry contains the changed file
-        cache_data = @redis.get(key)
-        if cache_data && cache_data.include?(file_path)
-          @redis.del(key)
-          invalidated_count += 1
+      begin
+        # Mark file as invalidated
+        invalidation_key = "cache_invalid:#{@app_id}:#{file_path}"
+        @redis.setex(invalidation_key, 5.minutes, Time.current.to_i)
+        add_to_invalidation_index(file_path)
+        
+        # Get prompt cache keys from index (avoids Redis.keys scan)
+        prompt_cache_index_key = "prompt_cache_index:#{@app_id}"
+        cache_keys = @redis.zrange(prompt_cache_index_key, 0, -1)
+        
+        invalidated_count = 0
+        cache_keys.each do |key|
+          # Check if this cache entry contains the changed file
+          cache_data = @redis.get(key)
+          if cache_data && cache_data.include?(file_path)
+            @redis.del(key)
+            @redis.zrem(prompt_cache_index_key, key)  # Remove from index
+            invalidated_count += 1
+          end
         end
+        
+        Rails.logger.info "[FileChangeTracker] Invalidated #{invalidated_count} cached prompts containing #{file_path}" if invalidated_count > 0
+      rescue Redis::BaseError => e
+        Rails.logger.error "[FileChangeTracker] Redis error invalidating cache: #{e.message}"
       end
-      
-      Rails.logger.info "[FileChangeTracker] Invalidated #{invalidated_count} cached prompts containing #{file_path}" if invalidated_count > 0
     end
     
     # Check if a file's cache is still valid
@@ -201,16 +218,26 @@ module Ai
     def clear_all_tracking
       return unless @redis
       
-      patterns = [
-        "file_hash:#{@app_id}:*",
-        "file_change_log:#{@app_id}",
-        "cache_invalid:#{@app_id}:*"
-      ]
+      # Clear using indexes instead of Redis.keys
+      file_index_key = "file_index:#{@app_id}"
+      invalidation_index_key = "invalidation_index:#{@app_id}"
+      prompt_cache_index_key = "prompt_cache_index:#{@app_id}"
       
-      patterns.each do |pattern|
-        keys = @redis.keys(pattern)
-        @redis.del(*keys) if keys.any?
+      # Get all tracked files from index
+      tracked_files = @redis.zrange(file_index_key, 0, -1)
+      tracked_files.each do |file_path|
+        @redis.del(file_hash_key(file_path))
       end
+      
+      # Get all invalidation keys from index
+      invalidations = @redis.zrange(invalidation_index_key, 0, -1)
+      invalidations.each do |file_path|
+        @redis.del("cache_invalid:#{@app_id}:#{file_path}")
+      end
+      
+      # Clear indexes themselves
+      @redis.del(file_index_key, invalidation_index_key, prompt_cache_index_key)
+      @redis.del(change_log_key)
       
       Rails.logger.info "[FileChangeTracker] Cleared all tracking data for app #{@app_id}"
     end
@@ -219,24 +246,33 @@ module Ai
     def get_stats
       return {} unless @redis
       
-      stats = {
-        total_tracked_files: @redis.keys("file_hash:#{@app_id}:*").count,
-        recent_changes_1h: get_changed_files_since(1.hour.ago).count,
-        recent_changes_5m: get_changed_files_since(5.minutes.ago).count,
-        invalidated_caches: @redis.keys("cache_invalid:#{@app_id}:*").count
-      }
-      
-      # Add stability distribution
-      all_files = @redis.keys("file_hash:#{@app_id}:*").map { |k| k.sub("file_hash:#{@app_id}:", "") }
-      categorized = categorize_files_by_stability(all_files)
-      
-      stats[:stability_distribution] = {
-        stable: categorized[:stable].count,
-        active: categorized[:active].count,
-        volatile: categorized[:volatile].count
-      }
-      
-      stats
+      begin
+        # Use indexes instead of Redis.keys for performance
+        file_index_key = "file_index:#{@app_id}"
+        invalidation_index_key = "invalidation_index:#{@app_id}"
+        
+        stats = {
+          total_tracked_files: @redis.zcard(file_index_key),
+          recent_changes_1h: get_changed_files_since(1.hour.ago).count,
+          recent_changes_5m: get_changed_files_since(5.minutes.ago).count,
+          invalidated_caches: @redis.zcard(invalidation_index_key)
+        }
+        
+        # Add stability distribution
+        all_files = @redis.zrange(file_index_key, 0, -1)
+        categorized = categorize_files_by_stability(all_files)
+        
+        stats[:stability_distribution] = {
+          stable: categorized[:stable].count,
+          active: categorized[:active].count,
+          volatile: categorized[:volatile].count
+        }
+        
+        stats
+      rescue Redis::BaseError => e
+        Rails.logger.error "[FileChangeTracker] Redis error getting stats: #{e.message}"
+        {}  # Return empty stats on error
+      end
     end
     
     private
@@ -247,6 +283,43 @@ module Ai
     
     def change_log_key
       "file_change_log:#{@app_id}"
+    end
+    
+    def add_to_file_index(file_path)
+      return unless @redis
+      
+      file_index_key = "file_index:#{@app_id}"
+      # Add with current timestamp as score for ordering
+      @redis.zadd(file_index_key, Time.current.to_f, file_path)
+      
+      # Set TTL on index
+      @redis.expire(file_index_key, CHANGE_LOG_TTL)
+    end
+    
+    def add_to_invalidation_index(file_path)
+      return unless @redis
+      
+      invalidation_index_key = "invalidation_index:#{@app_id}"
+      # Add with current timestamp as score
+      @redis.zadd(invalidation_index_key, Time.current.to_f, file_path)
+      
+      # Clean up old entries (older than 5 minutes)
+      min_score = 5.minutes.ago.to_f
+      @redis.zremrangebyscore(invalidation_index_key, "-inf", min_score)
+      
+      # Set TTL
+      @redis.expire(invalidation_index_key, 1.hour)
+    end
+    
+    def add_to_prompt_cache_index(cache_key)
+      return unless @redis
+      
+      prompt_cache_index_key = "prompt_cache_index:#{@app_id}"
+      @redis.zadd(prompt_cache_index_key, Time.current.to_f, cache_key)
+      
+      # Limit size and set TTL
+      @redis.zremrangebyrank(prompt_cache_index_key, 0, -1001)  # Keep last 1000
+      @redis.expire(prompt_cache_index_key, CHANGE_LOG_TTL)
     end
     
     def log_change(file_path, old_hash, new_hash)
