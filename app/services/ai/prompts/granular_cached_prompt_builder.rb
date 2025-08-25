@@ -50,7 +50,7 @@ module Ai
           block = build_cached_file_block(
             essential_files,
             "essential_files",
-            cache_ttl: "30m"
+            cache_ttl: "1h"
           )
           system_blocks << block
           block_metadata << extract_block_metadata(block, "essential")
