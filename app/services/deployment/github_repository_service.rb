@@ -550,8 +550,9 @@ class Deployment::GithubRepositoryService
     workflow_content = File.read(workflow_template_path)
     
     # Replace placeholders with actual app values
+    # Use app.subdomain for reliable subdomain URLs
     customized_workflow = workflow_content
-      .gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+      .gsub('{{APP_ID}}', @app.subdomain)
       .gsub('{{OWNER_ID}}', @app.team.users.first&.id.to_s || '1')
     
     # Add the workflow file to repository
@@ -594,8 +595,9 @@ class Deployment::GithubRepositoryService
       source_sha = source_response.parsed_response['sha']
       
       # Replace placeholders with actual app values
+      # Use app.subdomain for reliable subdomain URLs
       customized_workflow = workflow_content
-        .gsub('{{APP_ID}}', @app.obfuscated_id.downcase)
+        .gsub('{{APP_ID}}', @app.subdomain)
         .gsub('{{OWNER_ID}}', @app.team.users.first&.id.to_s || '1')
       
       # Create .github/workflows directory structure and add the file
