@@ -269,6 +269,7 @@ module Ai
     end
     
     # Find indirect dependencies (helper files, shared components, etc.)
+    # Focus on app-specific logic rather than generic UI components
     def find_indirect_dependencies(app, file, processed_files, max_depth = 2, current_depth = 0)
       return [] if current_depth >= max_depth || !file.content
       
@@ -280,6 +281,9 @@ module Ai
       imports.each do |import_path|
         # Skip external dependencies
         next if import_path.start_with?('node_modules') || !import_path.match?(/^\.\.?\/|^@\/|^~\//)
+        
+        # Skip generic UI components and utilities that AI already understands
+        next if should_exclude_dependency(import_path)
         
         # Resolve the import path
         resolved_path = resolve_import_path(file.path, import_path)
@@ -302,6 +306,32 @@ module Ai
       end
       
       dependencies
+    end
+    
+    # Determine if a dependency should be excluded from context
+    # Focus on app-specific logic, exclude generic UI components and utilities
+    def should_exclude_dependency(import_path)
+      # Exclude generic UI components (AI already knows these patterns)
+      return true if import_path.match?(%r{@/components/ui/})
+      
+      # Exclude common utility files (AI knows standard utils)
+      return true if import_path.match?(%r{@/lib/(utils|cn|clsx|class-names)})
+      
+      # Exclude type-only files
+      return true if import_path.match?(%r{@/types/|@/lib/types/})
+      
+      # Exclude generic hooks that don't contain business logic
+      return true if import_path.match?(%r{@/hooks/(use-[^/]+\.ts)$}) && 
+        %w[use-toast use-clipboard use-debounce use-local-storage use-media-query].any? { |hook| import_path.include?(hook) }
+      
+      # Include app-specific business logic files
+      return false if import_path.match?(%r{@/(pages|components|features|services|api|stores|contexts)/})
+      
+      # Include configuration files
+      return false if import_path.match?(%r{@/config/|@/constants/})
+      
+      # By default, include unless it matches exclusion patterns
+      false
     end
     
     # Resolve import paths (handles relative paths and aliases)
