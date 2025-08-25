@@ -36,18 +36,114 @@ module Ai
       'label' => %w[label text caption description title heading name]
     }.freeze
     
-    # App type to component mappings (fallback when prompt analysis isn't clear)
-    APP_TYPE_DEFAULTS = {
-      'todo' => %w[input checkbox button card label],
-      'landing' => %w[button card badge tabs separator],
-      'dashboard' => %w[card table chart select dropdown-menu],
-      'form' => %w[form input textarea select button],
-      'ecommerce' => %w[card button badge input select],
-      'blog' => %w[card button badge separator scroll-area],
-      'chat' => %w[input button card avatar scroll-area],
-      'analytics' => %w[card chart table select badge],
-      'settings' => %w[form input select switch button],
-      'profile' => %w[card avatar input button tabs]
+    # AI-powered component prediction patterns (replacing fixed app types)
+    # Based on research from Vercel v0, Lovable.dev, and modern AI app builders
+    INTENT_PATTERNS = {
+      # Administrative interfaces
+      admin: {
+        keywords: %w[admin administrative manage management control panel backend dashboard],
+        core_components: %w[sidebar navigation-menu table dropdown-menu],
+        conditional: {
+          'chart' => %w[analytics metrics data visualization reporting],
+          'form' => %w[settings configuration user management],
+          'badge' => %w[status permissions roles notifications]
+        }
+      },
+      
+      # SaaS/Business applications
+      saas: {
+        keywords: %w[saas software-as-a-service business enterprise platform solution],
+        core_components: %w[navigation-menu card table form button],
+        conditional: {
+          'sidebar' => %w[dashboard workspace multi-section],
+          'chart' => %w[analytics metrics insights reporting billing usage],
+          'tabs' => %w[settings configuration multi-view sections]
+        }
+      },
+      
+      # Data visualization & Analytics  
+      analytics: {
+        keywords: %w[chart graph analytics visualization data metrics reporting insights trends],
+        core_components: %w[chart card select badge],
+        conditional: {
+          'table' => %w[data list records rows],
+          'calendar' => %w[date time period range],
+          'dropdown-menu' => %w[filter options settings],
+          'sidebar' => %w[dashboard navigation sections]
+        }
+      },
+      
+      # Multi-section applications
+      workspace: {
+        keywords: %w[workspace dashboard home main-app multi-section navigation],
+        core_components: %w[sidebar navigation-menu card],
+        conditional: {
+          'tabs' => %w[sections views pages categories],
+          'table' => %w[list data items records],
+          'chart' => %w[overview metrics summary]
+        }
+      },
+      
+      # Form-heavy applications
+      forms: {
+        keywords: %w[form registration signup application survey questionnaire input],
+        core_components: %w[form input textarea select button],
+        conditional: {
+          'checkbox' => %w[agreement terms options multi-select],
+          'radio-group' => %w[choice option single-select],
+          'calendar' => %w[date appointment booking schedule]
+        }
+      }
+    }.freeze
+    
+    # Component dependencies - when one component is selected, others might be needed
+    COMPONENT_DEPENDENCIES = {
+      'sidebar' => %w[navigation-menu],  # Sidebars usually need navigation
+      'chart' => %w[card],  # Charts usually displayed in cards
+      'table' => %w[card],  # Tables usually in cards
+      'form' => %w[button input label],  # Forms need inputs and submit buttons
+      'calendar' => %w[button card],  # Calendars need navigation buttons
+      'dropdown-menu' => %w[button],  # Dropdowns triggered by buttons
+      'dialog' => %w[button card],  # Dialogs triggered by buttons
+      'sheet' => %w[button navigation-menu]  # Sheets often contain navigation
+    }.freeze
+    
+    # FIXED: Technical aliases for better prediction (handles metaphors and jargon)
+    TECHNICAL_ALIASES = {
+      # Technical jargon
+      'crud' => %w[form table button dialog input],
+      'crud interface' => %w[form table button dialog input dropdown-menu],
+      'data entry' => %w[form input textarea select button label],
+      'data grid' => %w[table card button dropdown-menu],
+      'data table' => %w[table card button dropdown-menu badge],
+      
+      # Metaphorical language
+      'command center' => %w[sidebar navigation-menu card table chart],
+      'control panel' => %w[sidebar navigation-menu form switch button],
+      'cockpit' => %w[sidebar chart card badge progress],
+      'hub' => %w[navigation-menu card button tabs],
+      'portal' => %w[navigation-menu card tabs button],
+      
+      # UI patterns
+      'wizard' => %w[form tabs button progress navigation-menu],
+      'stepper' => %w[form tabs button progress],
+      'kanban' => %w[card button badge dropdown-menu],
+      'kanban board' => %w[card button badge dropdown-menu scroll-area],
+      'timeline' => %w[card scroll-area badge separator],
+      'feed' => %w[card scroll-area button avatar],
+      
+      # Business terms
+      'invoice' => %w[table form button input select],
+      'checkout' => %w[form input button card progress],
+      'subscription' => %w[card button badge tabs form],
+      'billing' => %w[table card form input button],
+      'pricing' => %w[card badge button tabs],
+      
+      # Composite patterns
+      'admin dashboard' => %w[sidebar navigation-menu table chart card],
+      'user management' => %w[table form dialog button dropdown-menu],
+      'settings panel' => %w[form tabs switch button input],
+      'analytics dashboard' => %w[chart card table select badge]
     }.freeze
     
     # Maximum components to recommend (token optimization)
@@ -97,23 +193,23 @@ module Ai
         @analysis_reasoning << "Found #{imported_components.size} components from existing imports"
       end
       
-      # Step 3: Detect app type and add defaults if needed
-      @detected_app_type = detect_app_type_from_prompt
-      if components.size < 3 && @detected_app_type != 'unknown'
-        type_defaults = APP_TYPE_DEFAULTS[@detected_app_type] || []
-        components.concat(type_defaults)
-        @analysis_reasoning << "Added #{type_defaults.size} default components for #{@detected_app_type} app"
-      end
+      # Step 3: AI-powered intent analysis (replaces fixed app types)
+      intent_components = analyze_intent_patterns
+      components.concat(intent_components)
       
-      # Step 4: Add essential components that are almost always needed
+      # Step 4: Resolve component dependencies
+      dependency_components = resolve_component_dependencies(components)
+      components.concat(dependency_components)
+      
+      # Step 5: Add essential components that are almost always needed
       essential = determine_essential_components(components)
       components.concat(essential)
       
-      # Step 5: Deduplicate and prioritize
+      # Step 6: Deduplicate and prioritize
       prioritized = prioritize_components(components.uniq)
       
-      # Step 6: Limit to max components
-      final_components = prioritized.take(@max_components)
+      # Step 7: Limit to max components (with smart selection)
+      final_components = smart_component_selection(prioritized)
       
       Rails.logger.info "[ComponentAnalyzer] Prompt: #{@user_prompt[0..100]}..."
       Rails.logger.info "[ComponentAnalyzer] Detected app type: #{@detected_app_type}"
@@ -128,6 +224,17 @@ module Ai
     def analyze_prompt_keywords
       components = []
       
+      # FIXED: First check technical aliases for better matching
+      TECHNICAL_ALIASES.each do |alias_term, alias_components|
+        if @user_prompt.include?(alias_term)
+          components.concat(alias_components)
+          @analysis_reasoning << "Detected '#{alias_term}' pattern - added #{alias_components.join(', ')}"
+          # High confidence for explicit technical patterns
+          alias_components.each { |c| @confidence_scores[c] = 0.9 }
+        end
+      end
+      
+      # Then check individual component keywords
       COMPONENT_INDICATORS.each do |component, keywords|
         # Check if any keyword appears in the prompt
         if keywords.any? { |keyword| @user_prompt.include?(keyword) }
@@ -143,6 +250,95 @@ module Ai
       # Higher confidence if multiple keywords match
       matches = keywords.count { |keyword| @user_prompt.include?(keyword) }
       [matches * 0.3, 1.0].min  # Cap at 1.0
+    end
+    
+    # AI-powered intent analysis based on research findings
+    def analyze_intent_patterns
+      components = []
+      detected_intents = []
+      
+      INTENT_PATTERNS.each do |intent, config|
+        # Check if prompt matches this intent pattern
+        if config[:keywords].any? { |keyword| @user_prompt.include?(keyword) }
+          detected_intents << intent
+          
+          # Add core components for this intent
+          components.concat(config[:core_components])
+          
+          # Check conditional components
+          config[:conditional].each do |component, triggers|
+            if triggers.any? { |trigger| @user_prompt.include?(trigger) }
+              components << component
+              @confidence_scores[component] = (@confidence_scores[component] || 0) + 0.7
+            end
+          end
+          
+          @analysis_reasoning << "Detected #{intent} intent - added #{config[:core_components].join(', ')}"
+        end
+      end
+      
+      @detected_app_type = detected_intents.first&.to_s || 'general'
+      
+      # Handle complex multi-intent scenarios
+      if detected_intents.include?(:admin) && detected_intents.include?(:analytics)
+        # Admin + Analytics = Dashboard with sidebar and charts
+        components += %w[sidebar chart table card]
+        @analysis_reasoning << "Multi-intent: Admin + Analytics detected"
+      elsif detected_intents.include?(:saas) && detected_intents.include?(:analytics)
+        # SaaS + Analytics = Business intelligence interface
+        components += %w[sidebar chart navigation-menu]
+        @analysis_reasoning << "Multi-intent: SaaS + Analytics detected"
+      end
+      
+      components.uniq
+    end
+    
+    # Resolve component dependencies automatically
+    def resolve_component_dependencies(components)
+      dependency_components = []
+      
+      components.each do |component|
+        if COMPONENT_DEPENDENCIES[component]
+          dependencies = COMPONENT_DEPENDENCIES[component]
+          dependency_components.concat(dependencies)
+          @analysis_reasoning << "Added dependencies #{dependencies.join(', ')} for #{component}"
+        end
+      end
+      
+      dependency_components.uniq
+    end
+    
+    # Smart component selection based on priority and context
+    def smart_component_selection(components)
+      # Group components by importance
+      critical = components & %w[button input card form]
+      layout = components & %w[sidebar navigation-menu table chart]
+      interaction = components & %w[dropdown-menu dialog select tabs]
+      feedback = components & %w[alert toast badge skeleton]
+      
+      selected = []
+      
+      # Always include critical components
+      selected.concat(critical.take(2))
+      
+      # Add layout components based on intent
+      if @detected_app_type.in?(%w[admin saas workspace analytics])
+        selected.concat(layout.take(2))
+      else
+        selected.concat(layout.take(1))
+      end
+      
+      # Fill remaining slots with interaction components
+      remaining_slots = @max_components - selected.size
+      selected.concat(interaction.take([remaining_slots, 2].min))
+      
+      # Add feedback components if space available
+      remaining_slots = @max_components - selected.size
+      if remaining_slots > 0
+        selected.concat(feedback.take(remaining_slots))
+      end
+      
+      selected.uniq.take(@max_components)
     end
     
     def analyze_existing_imports
@@ -174,20 +370,22 @@ module Ai
     end
     
     def detect_app_type_from_prompt
-      # Check for app type indicators in order of specificity
-      return 'todo' if @user_prompt.match?(/todo|task|checklist|to-do/)
-      return 'dashboard' if @user_prompt.match?(/dashboard|analytics|metrics|admin|panel/)
-      return 'ecommerce' if @user_prompt.match?(/shop|store|product|cart|ecommerce|e-commerce|marketplace/)
-      return 'form' if @user_prompt.match?(/form|survey|registration|signup|sign-up|application/)
+      # This method is now primarily used for legacy compatibility
+      # The real app type detection happens in analyze_intent_patterns
+      
+      # Quick checks for common simple app types that don't need complex analysis
+      return 'todo' if @user_prompt.match?(/\b(todo|task|checklist|to-do)\b/)
       return 'landing' if @user_prompt.match?(/landing|marketing|hero|startup|homepage|website/)
       return 'blog' if @user_prompt.match?(/blog|article|post|content|writing|news/)
       return 'chat' if @user_prompt.match?(/chat|message|conversation|messenger|communication/)
-      return 'analytics' if @user_prompt.match?(/analytics|chart|graph|visualization|report/)
-      return 'settings' if @user_prompt.match?(/settings|preferences|configuration|options/)
-      return 'profile' if @user_prompt.match?(/profile|account|user|personal/)
+      return 'ecommerce' if @user_prompt.match?(/shop|store|product|cart|ecommerce|e-commerce|marketplace/)
       
-      # Return the explicitly provided type or unknown
-      @app_type || 'unknown'
+      # Complex app types are handled by analyze_intent_patterns
+      # This includes admin, saas, analytics, workspace scenarios
+      return @detected_app_type if @detected_app_type
+      
+      # Return the explicitly provided type or general
+      @app_type || 'general'
     end
     
     def determine_essential_components(already_selected)
