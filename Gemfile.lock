@@ -677,14 +677,19 @@ GEM
       zeitwerk (~> 2.6)
     rainbow (3.1.1)
     rake (13.3.0)
+    rake-compiler-dock (1.9.1)
     ransack (4.3.0)
       activerecord (>= 6.1.5)
       activesupport (>= 6.1.5)
       i18n
+    rb_sys (0.9.117)
+      rake-compiler-dock (= 1.9.1)
     rchardet (1.9.0)
     rdoc (6.14.2)
       erb
       psych (>= 4.0.0)
+    red-candle (1.2.2)
+      rb_sys
     redcarpet (3.6.1)
     redis (5.4.1)
       redis-client (>= 0.22.0)
@@ -944,6 +949,7 @@ DEPENDENCIES
   rails (~> 8.0.0)
   rails-erd
   rails_best_practices
+  red-candle (~> 1.2)
   redcarpet (~> 3.6)
   redis (~> 5.4.0)
   rouge (~> 4.1)

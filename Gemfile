@@ -321,3 +321,5 @@ group :production do
   gem "terser"
 end
 gem "supabase_api"
+
+gem "red-candle", "~> 1.2"

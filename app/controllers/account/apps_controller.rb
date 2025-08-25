@@ -209,6 +209,21 @@ class Account::AppsController < Account::ApplicationController
     begin
       # Queue deployment job with environment
       job = DeployAppJob.perform_later(@app.id, environment)
+      
+      # Handle case where job is rejected due to uniqueness constraint
+      if job == false
+        Rails.logger.warn "[Deploy] Deployment job already running for app #{@app.id}"
+        
+        respond_to do |format|
+          format.json { render json: { message: "Deployment already in progress", status: "deploying", environment: environment } }
+          format.turbo_stream do
+            render turbo_stream: turbo_stream.replace("deploy_status",
+              html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deployment already in progress...</span>})
+          end
+        end
+        return
+      end
+      
       Rails.logger.info "[Deploy] Successfully queued deployment job #{job.job_id} for app #{@app.id}"
 
       respond_to do |format|

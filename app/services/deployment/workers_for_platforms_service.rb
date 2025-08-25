@@ -334,7 +334,7 @@ module Deployment
       # Use subdomain for production, obfuscated_id for preview/staging
       case environment.to_sym
       when :production
-        # Use the app's subdomain slug for production URLs
+        # Use subdomain for production (clean URLs like countmaster.overskill.app)
         @app.subdomain || @app.obfuscated_id.downcase
       when :staging
         # Use obfuscated_id for staging (internal use)
@@ -497,11 +497,18 @@ module Deployment
               let environment = 'production';
               let scriptName = subdomain;
               
-              // Handle environment prefixes in subdomain
-              if (subdomain.startsWith('preview-')) {
+              // Handle environment suffixes in subdomain (e.g., abc123-preview)
+              if (subdomain.endsWith('-preview')) {
                 environment = 'preview';
-              } else if (subdomain.startsWith('staging-')) {
+                scriptName = subdomain.replace(/-preview$/, '').toLowerCase();
+                scriptName = 'preview-' + scriptName; // Add prefix for namespace lookup
+              } else if (subdomain.endsWith('-staging')) {
                 environment = 'staging';
+                scriptName = subdomain.replace(/-staging$/, '').toLowerCase();
+                scriptName = 'staging-' + scriptName; // Add prefix for namespace lookup
+              } else {
+                // For production, convert to lowercase to match script names
+                scriptName = subdomain.toLowerCase();
               }
               
               return { scriptName, environment, method: 'subdomain' };
