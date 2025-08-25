@@ -49,6 +49,17 @@ module Ai
       
       # No separate broadcaster needed - we'll use direct updates
       
+      # Analyze component requirements EARLY for context optimization
+      @component_analysis = Ai::ComponentRequirementsAnalyzer.analyze_with_confidence(
+        chat_message.content,
+        app ? app.app_files : []
+      )
+      @predicted_components = @component_analysis[:components]
+      @detected_app_type = @component_analysis[:app_type]
+      
+      Rails.logger.info "[V5_OPTIMIZATION] Predicted components: #{@predicted_components.join(', ')}"
+      Rails.logger.info "[V5_OPTIMIZATION] Detected app type: #{@detected_app_type}"
+      
       # Initialize agent components
       @prompt_service = Prompts::AgentPromptService.new(agent_variables)
       
@@ -3098,10 +3109,17 @@ module Ai
     # Add component requirements analysis to context
     def add_component_requirements_to_context(context_data)
       # Analyze the user's request to determine required components
-      requirements = ComponentRequirementsAnalyzer.analyze(
+      analysis = Ai::ComponentRequirementsAnalyzer.analyze_with_confidence(
         @chat_message.content,
-        @app.app_files.pluck(:path)
+        @app.app_files
       )
+      
+      Rails.logger.info "[V5_CACHE] Component analysis: #{analysis[:components].join(', ')}"
+      Rails.logger.info "[V5_CACHE] App type detected: #{analysis[:app_type]}"
+      
+      # Store for use in context building
+      @predicted_components = analysis[:components]
+      @detected_app_type = analysis[:app_type]
       
       # Add requirements to context as a helpful guide
       requirements_text = <<~REQUIREMENTS
@@ -3109,23 +3127,13 @@ module Ai
         ## Component Requirements Analysis
         Based on the user's request, you will likely need these components:
         
-        **App Type Detected**: #{requirements[:app_type] || 'general'}
+        **App Type Detected**: #{analysis[:app_type] || 'general'}
+        **Pre-loaded Components**: #{analysis[:components].join(', ')}
+        **Analysis Confidence**: #{analysis[:confidence].present? ? (analysis[:confidence].values.sum / analysis[:confidence].size * 100).round : 0}%
         
-        **Required Icons** (all from lucide-react):
-        #{requirements[:required_icons].join(', ')}
+        **Reasoning**: #{analysis[:reasoning].join('; ') if analysis[:reasoning]}
         
-        **Required shadcn/ui Components**:
-        #{requirements[:required_shadcn].join(', ')}
-        
-        **Suggested Section Components**:
-        #{requirements[:required_sections].join(', ')}
-        
-        **Recommended Import Template**:
-        ```typescript
-        #{requirements[:import_template]}
-        ```
-        
-        IMPORTANT: Use these imports as a starting point. Only use icons from the approved whitelist in the prompt.
+        IMPORTANT: The above components have been pre-loaded in your context. Use them as needed for the implementation.
       REQUIREMENTS
       
       # Append to context data
@@ -3175,8 +3183,12 @@ module Ai
       # Always include base context, even on first iteration
       context = {}
       
-      # Add base template files and essential context
-      base_context_service = Ai::BaseContextService.new(@app)
+      # Add base template files and essential context WITH component predictions
+      base_context_service = Ai::BaseContextService.new(@app, {
+        app_type: @detected_app_type,
+        component_requirements: @predicted_components,
+        load_components: true
+      })
       base_context = base_context_service.build_useful_context
       
       # Add existing app files context to prevent re-reading
