@@ -3148,24 +3148,28 @@ module Ai
     
     # Get template files for caching (long-form data goes first)
     def get_template_files_for_caching
-      # NOTE: Files might change between iterations if Claude modified them
-      # Only cache on first iteration or when we haven't modified files yet
-      return [] if @iteration_count > 1 && @agent_state[:generated_files].any?
-      
+      # FIXED: Don't disable caching after first iteration - use cache throughout conversation
+      # Cache key will include iteration count for proper invalidation when needed
       template_files = []
       
-      # Only include base template context on first iteration (before modifications)
-      if @iteration_count == 1
-        # Get the useful context which includes all template files
-        base_context_service = Ai::BaseContextService.new(@app)
-        useful_context = base_context_service.build_useful_context
+      # Include context based on what hasn't been modified yet
+      # This ensures we get cache benefits throughout the conversation
+      if @iteration_count <= 5  # Reasonable limit to prevent infinite caching
+        # Get the optimized complete context (consolidates useful + existing files)
+        base_context_service = Ai::BaseContextService.new(@app, {
+          app_type: @detected_app_type,
+          component_requirements: @predicted_components
+        })
+        complete_context = base_context_service.build_complete_context(@app, {
+          component_requirements: @predicted_components,
+          app_type: @detected_app_type
+        })
         
-        # Create a pseudo-file object for the template content
-        # This allows CachedPromptBuilder to handle it properly
-        if useful_context.present? && useful_context.length > 1000
+        # Create a pseudo-file object for the optimized context
+        if complete_context.present? && complete_context.length > 1000
           template_files << OpenStruct.new(
-            path: "template_context",
-            content: useful_context
+            path: "optimized_context",
+            content: complete_context
           )
         end
       end
@@ -3183,20 +3187,21 @@ module Ai
       # Always include base context, even on first iteration
       context = {}
       
-      # Add base template files and essential context WITH component predictions
+      # Add optimized complete context (replaces separate base + existing files context)
       base_context_service = Ai::BaseContextService.new(@app, {
         app_type: @detected_app_type,
         component_requirements: @predicted_components,
         load_components: true
       })
-      base_context = base_context_service.build_useful_context
       
-      # Add existing app files context to prevent re-reading
-      existing_files_context = base_context_service.build_existing_files_context(@app)
+      # Single optimized context method replaces the duplicate logic
+      complete_context = base_context_service.build_complete_context(@app, {
+        component_requirements: @predicted_components,
+        app_type: @detected_app_type
+      })
       
-      # Combine into useful-context section
-      context[:base_template_context] = base_context
-      context[:existing_files_context] = existing_files_context if existing_files_context.present?
+      # Use single context instead of two separate ones
+      context[:optimized_context] = complete_context if complete_context.present?
       
       # Add iteration-specific context if not first iteration
       if @iteration_count > 1
