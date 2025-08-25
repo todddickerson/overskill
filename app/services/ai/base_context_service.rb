@@ -193,18 +193,20 @@ module Ai
       
       final_context = context.join("\n")
       
-      # Log optimization results
+      # Log optimization results with accurate token counting
       context_size = final_context.length
-      token_estimate = context_size / 4
+      token_counter = TokenCountingService.new
+      actual_tokens = token_counter.count_tokens(final_context)
       
-      Rails.logger.info "[OPTIMIZATION] Complete context: #{context_size} chars (~#{token_estimate} tokens)"
+      Rails.logger.info "[OPTIMIZATION] Complete context: #{context_size} chars, #{actual_tokens} tokens (was estimating #{context_size / 4})"
       Rails.logger.info "[OPTIMIZATION] Files included: #{relevant_files.count}/#{app.app_files.count}"
       Rails.logger.info "[OPTIMIZATION] Reduction: #{((1 - relevant_files.count.to_f / app.app_files.count) * 100).round}%"
       
-      if token_estimate < 30_000
-        Rails.logger.info "[OPTIMIZATION] ✅ Target achieved: <30k tokens"
+      if actual_tokens < 30_000
+        Rails.logger.info "[OPTIMIZATION] ✅ Target achieved: #{actual_tokens}/30k tokens"
       else
-        Rails.logger.warn "[OPTIMIZATION] ⚠️ Still above target: #{token_estimate} tokens"
+        Rails.logger.warn "[OPTIMIZATION] ⚠️ Still above target: #{actual_tokens}/30k tokens"
+        # TODO: Implement token budget management in get_relevant_files
       end
       
       final_context
@@ -253,14 +255,52 @@ module Ai
                                        .limit(3)
       relevant_files += recently_modified
       
-      # 4. Ensure we don't exceed reasonable limits
+      # 4. Use token budget management instead of arbitrary file count limits
       unique_files = relevant_files.compact.uniq
-      if unique_files.count > 25  # Increased limit to account for dependencies
-        Rails.logger.warn "[FILE_SELECTION] Too many files (#{unique_files.count}), prioritizing..."
-        # Prioritize: essential files > components > dependencies > recently modified
-        unique_files = essential_files + 
-                      relevant_files.select { |f| f.path.include?('components/ui/') }.take(8) +
-                      recently_modified.take(3)
+      
+      # Create a temporary budget manager to estimate if we can include all files
+      temp_budget = TokenBudgetManager.new(:editing) # Use editing profile for existing apps
+      token_counter = TokenCountingService.new
+      
+      # Calculate total tokens if we included all files
+      total_estimated_tokens = unique_files.sum { |f| token_counter.count_file_tokens(f.content, f.path) }
+      available_budget = temp_budget.budget_for(:app_context) + temp_budget.budget_for(:component_context)
+      
+      if total_estimated_tokens > available_budget
+        Rails.logger.warn "[FILE_SELECTION] Files exceed token budget (#{total_estimated_tokens} > #{available_budget}), prioritizing..."
+        
+        # Prioritize by importance and select within budget
+        essential = unique_files.select { |f| ESSENTIAL_FILES.include?(f.path) }
+        components = unique_files.select { |f| f.path.include?('components/ui/') }
+        others = unique_files - essential - components
+        
+        # Always include essential files
+        budget_used = essential.sum { |f| token_counter.count_file_tokens(f.content, f.path) }
+        selected_files = essential.dup
+        remaining_budget = available_budget - budget_used
+        
+        # Add components within remaining budget
+        components.each do |file|
+          file_tokens = token_counter.count_file_tokens(file.content, file.path)
+          if budget_used + file_tokens <= available_budget
+            selected_files << file
+            budget_used += file_tokens
+          end
+        end
+        
+        # Add other files with remaining budget
+        others.each do |file|
+          file_tokens = token_counter.count_file_tokens(file.content, file.path)
+          if budget_used + file_tokens <= available_budget
+            selected_files << file
+            budget_used += file_tokens
+          end
+        end
+        
+        unique_files = selected_files
+        Rails.logger.info "[FILE_SELECTION] Selected #{unique_files.count} files within #{budget_used}/#{available_budget} token budget"
+      else
+        Rails.logger.info "[FILE_SELECTION] All #{unique_files.count} files fit within #{total_estimated_tokens}/#{available_budget} token budget"
       end
       
       Rails.logger.info "[FILE_SELECTION] Essential: #{essential_files.count}, Components: #{component_requirements.count}, Dependencies: #{processed_files.size - essential_files.count - component_requirements.count}, Recent: #{recently_modified.count}"
@@ -358,37 +398,46 @@ module Ai
       end
     end
     
-    # Add TypeScript extension if missing
+    # Add TypeScript extension if missing - check against actual app files
     def add_typescript_extension(path)
       return path if path.match?(/\.(tsx?|jsx?|css|json)$/)
       
-      # Try common extensions in order
+      # Try common extensions in order, checking if file actually exists in app
       %w[.tsx .ts .jsx .js].each do |ext|
         test_path = "#{path}#{ext}"
-        return test_path if File.basename(test_path).start_with?('.')
+        return test_path if @app&.app_files&.exists?(path: test_path)
       end
       
-      # Default to .tsx for components, .ts for others
+      # Default based on context if no file found
       path.include?('components') ? "#{path}.tsx" : "#{path}.ts"
     end
     
     # Add reference to available components without loading them all
     def add_available_components_reference(context)
-      context << ""
-      context << "## Available UI Components (shadcn/ui) - NOT Pre-loaded"
-      context << ""
-      context << "These components exist and can be imported as needed:"
-      context << ""
-      context << "**Form**: button, input, textarea, select, checkbox, radio-group, form, label"
-      context << "**Layout**: card, table, dialog, tabs, separator, scroll-area, sheet"
-      context << "**Navigation**: dropdown-menu, menubar, navigation-menu, breadcrumb"
-      context << "**Feedback**: alert, toast, badge, skeleton, progress, sonner"
-      context << "**Data**: avatar, accordion, collapsible, popover, tooltip, hover-card"
-      context << "**Advanced**: command, calendar, date-picker, carousel, chart, sidebar"
-      context << ""
-      context << "**Usage**: Import directly: `import { Button } from '@/components/ui/button'`"
-      context << "**Note**: Use os-view to read component files if needed for customization"
-      context << ""
+      content = add_available_components_reference_content()
+      context << content
+    end
+    
+    # Get components reference content (for budget management)
+    def add_available_components_reference_content
+      lines = []
+      lines << ""
+      lines << "## Available UI Components (shadcn/ui) - NOT Pre-loaded"
+      lines << ""
+      lines << "These components exist and can be imported as needed:"
+      lines << ""
+      lines << "**Form**: button, input, textarea, select, checkbox, radio-group, form, label"
+      lines << "**Layout**: card, table, dialog, tabs, separator, scroll-area, sheet"
+      lines << "**Navigation**: dropdown-menu, menubar, navigation-menu, breadcrumb"
+      lines << "**Feedback**: alert, toast, badge, skeleton, progress, sonner"
+      lines << "**Data**: avatar, accordion, collapsible, popover, tooltip, hover-card"
+      lines << "**Advanced**: command, calendar, date-picker, carousel, chart, sidebar"
+      lines << ""
+      lines << "**Usage**: Import directly: `import { Button } from '@/components/ui/button'`"
+      lines << "**Note**: Use os-view to read component files if needed for customization"
+      lines << ""
+      
+      lines.join("\n")
     end
     
     def detect_app_type
