@@ -34,6 +34,9 @@ class DeployAppJob < ApplicationJob
     Rails.logger.info "[DeployAppJob] Starting deployment for app #{app.id} to #{environment}"
     Rails.logger.info "[DeployAppJob] Repository: #{app.github_repo}, Name: #{app.repository_name}"
     
+    # FIXED: Validate deployment before proceeding
+    validate_deployment_readiness!(app)
+    
     # Update status to deploying
     app.update!(status: 'generating')
     
@@ -474,5 +477,95 @@ class DeployAppJob < ApplicationJob
     )
   rescue => e
     Rails.logger.error "[DeployAppJob] Failed to broadcast preview frame update: #{e.message}"
+  end
+  
+  private
+  
+  # Validate deployment is ready and safe
+  def validate_deployment_readiness!(app)
+    Rails.logger.info "[DeployAppJob] Validating deployment readiness..."
+    
+    # Check for missing dependencies
+    validate_all_dependencies_exist!(app)
+    
+    # Check bundle size
+    validate_bundle_size!(app)
+    
+    Rails.logger.info "[DeployAppJob] Deployment validation passed"
+  end
+  
+  def validate_all_dependencies_exist!(app)
+    missing_files = []
+    
+    # Check all import statements in app files
+    app.app_files.where(file_type: ['component', 'script']).each do |file|
+      next unless file.content
+      
+      # Find import statements
+      imports = file.content.scan(/import .+ from ['"](.+?)['"]/).flatten
+      
+      imports.each do |import_path|
+        # Resolve relative imports
+        resolved_path = resolve_import_path(file.path, import_path)
+        
+        # Check if file exists in app_files
+        unless resolved_path.start_with?('node_modules') || app.app_files.exists?(path: resolved_path)
+          missing_files << resolved_path
+        end
+      end
+    end
+    
+    if missing_files.any?
+      Rails.logger.warn "[DeployAppJob] Missing dependencies detected: #{missing_files.uniq.join(', ')}"
+      
+      # Try to load missing components from template
+      missing_files.uniq.each do |file_path|
+        if file_path.include?('components/ui/')
+          component_name = File.basename(file_path, '.tsx')
+          Rails.logger.info "[DeployAppJob] Auto-loading missing component: #{component_name}"
+          app.load_component_on_demand(component_name) if app.respond_to?(:load_component_on_demand)
+        end
+      end
+      
+      # Re-check after loading
+      still_missing = missing_files.select { |path| !app.app_files.exists?(path: path) }
+      if still_missing.any?
+        raise "Missing required files for deployment: #{still_missing.join(', ')}"
+      end
+    end
+  end
+  
+  def validate_bundle_size!(app)
+    total_size = calculate_bundle_size(app)
+    
+    # Cloudflare Workers has 10MB limit
+    if total_size > 9.5  # 9.5MB safety margin
+      Rails.logger.error "[DeployAppJob] Bundle too large: #{total_size}MB (limit: 10MB)"
+      raise "Bundle size exceeds Cloudflare Workers 10MB limit: #{total_size}MB"
+    end
+    
+    Rails.logger.info "[DeployAppJob] Bundle size OK: #{total_size}MB"
+  end
+  
+  def calculate_bundle_size(app)
+    total_bytes = app.app_files.sum { |f| f.content&.bytesize || 0 }
+    (total_bytes / 1_000_000.0).round(2)  # Convert to MB
+  end
+  
+  def resolve_import_path(current_file, import_path)
+    # Handle relative imports
+    if import_path.start_with?('./')
+      dir = File.dirname(current_file)
+      File.join(dir, import_path.sub('./', ''))
+    elsif import_path.start_with?('../')
+      dir = File.dirname(current_file)
+      File.expand_path(File.join(dir, import_path))
+    elsif import_path.start_with?('@/')
+      # Alias for src/
+      import_path.sub('@/', 'src/')
+    else
+      # Absolute or node_modules import
+      import_path
+    end
   end
 end

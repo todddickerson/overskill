@@ -34,17 +34,9 @@ module Ai
     #   # Status: badge.tsx, skeleton.tsx, switch.tsx
     # ].freeze
     
-    # NEW: App-type specific component mapping (load only what's needed)
-    APP_TYPE_COMPONENTS = {
-      'todo' => %w[input checkbox button card label],
-      'landing' => %w[button card badge tabs],
-      'dashboard' => %w[table select dropdown-menu avatar card],
-      'form' => %w[form input textarea select button label],
-      'ecommerce' => %w[card button badge input select],
-      'blog' => %w[card button badge separator],
-      'chat' => %w[input button card avatar scroll-area],
-      'default' => %w[button card input]  # Minimal fallback
-    }.freeze
+    # REMOVED: Replaced with AI-powered component prediction in ComponentRequirementsAnalyzer
+    # The analyzer now uses sophisticated intent analysis instead of fixed mappings
+    # This handles edge cases like 'admin app', 'SAAS app', 'graphing app' much better
     
     # Maximum components to load per request (token optimization)
     MAX_COMPONENTS_TO_LOAD = 5
@@ -107,15 +99,12 @@ module Ai
         components_to_load.each do |component_name|
           add_component_to_context(context, component_name)
         end
-      elsif @load_components && @app_type != 'default'
-        # Load app-type specific components
-        components = APP_TYPE_COMPONENTS[@app_type] || APP_TYPE_COMPONENTS['default']
-        if components.any?
-          context << "## Common Components for #{@app_type.capitalize} Apps"
-          context << "Import these components as needed (not pre-loaded to save tokens):"
-          context << components.map { |c| "`#{c}`" }.join(', ')
-          context << ""
-        end
+      elsif @load_components && @app_type != 'general'
+        # Show predicted components for this app type
+        context << "## Predicted Components for #{@app_type.capitalize} App Type"
+        context << "Based on AI analysis, these components are likely to be useful:"
+        context << @component_requirements.take(MAX_COMPONENTS_TO_LOAD).map { |c| "`#{c}`" }.join(', ')
+        context << ""
       end
       context << ""
       
@@ -145,41 +134,148 @@ module Ai
       final_context
     end
     
-    # Build context for existing app files (to prevent re-reading)
-    def build_existing_files_context(app)
-      return "" unless app&.app_files&.any?
+    # Build optimized context with only relevant files (REPLACES build_existing_files_context)
+    # This consolidates the duplicate logic and includes only essential + predicted files
+    def build_complete_context(app, options = {})
+      return build_useful_context unless app&.app_files&.any?
+      
+      component_requirements = options[:component_requirements] || []
+      app_type = options[:app_type] || detect_app_type
       
       context = []
+      context << "# useful-context"
       context << ""
-      context << "## Existing App Files (ACTUALLY IN THE APP)"
-      context << ""
-      context << "The following files ACTUALLY EXIST in this app and can be modified with os-line-replace:"
-      context << "IMPORTANT: Only these files can be modified with os-line-replace. Template files shown above are for reference only."
+      context << "Below are the ONLY relevant files for this request in this React + TypeScript + Tailwind app."
+      context << "These files exist in the app - use os-line-replace to modify them."
+      context << "DO NOT use os-view to read them again as they are shown below."
       context << ""
       
-      # Group files by directory for better organization
-      files_by_dir = app.app_files.order(:path).group_by { |f| ::File.dirname(f.path) }
+      # Get only the files that are actually relevant
+      relevant_files = get_relevant_files(app, component_requirements, app_type)
       
-      files_by_dir.each do |dir, files|
-        context << "### #{dir == '.' ? 'Root' : dir}/"
-        files.each do |file|
-          context << ""
-          context << "**#{file.path}** (#{file.file_type})"
-          context << "```#{get_file_extension(file.path)}"
-          # Add line numbers for consistent display with os-view/os-read
-          numbered_content = file.content.to_s.lines.map.with_index(1) do |line, num|
-            "#{num.to_s.rjust(4)}: #{line}"
-          end.join
-          context << numbered_content.rstrip
-          context << "```"
-          context << ""
+      Rails.logger.info "[OPTIMIZATION] Including #{relevant_files.count} relevant files (was #{app.app_files.count})"
+      
+      # Group relevant files by category for better organization
+      essential_files = relevant_files.select { |f| ESSENTIAL_FILES.include?(f.path) }
+      component_files = relevant_files.select { |f| f.path.include?('components/ui/') }
+      other_files = relevant_files - essential_files - component_files
+      
+      # Add essential files first
+      if essential_files.any?
+        context << "## Essential App Files"
+        essential_files.each do |file|
+          add_app_file_to_context(context, file, "Essential")
         end
       end
       
-      context.join("\n")
+      # Add predicted components
+      if component_files.any?
+        context << "## Predicted UI Components for This Request"
+        context << "Based on analysis, these components are likely needed:"
+        component_files.each do |file|
+          add_app_file_to_context(context, file, "Component")
+        end
+      end
+      
+      # Add other relevant files
+      if other_files.any?
+        context << "## Other Relevant Files"
+        other_files.each do |file|
+          add_app_file_to_context(context, file, "Modified")
+        end
+      end
+      
+      # Add available components reference (without loading them all)
+      add_available_components_reference(context)
+      
+      # Add app-specific context
+      add_app_specific_context(context)
+      
+      final_context = context.join("\n")
+      
+      # Log optimization results
+      context_size = final_context.length
+      token_estimate = context_size / 4
+      
+      Rails.logger.info "[OPTIMIZATION] Complete context: #{context_size} chars (~#{token_estimate} tokens)"
+      Rails.logger.info "[OPTIMIZATION] Files included: #{relevant_files.count}/#{app.app_files.count}"
+      Rails.logger.info "[OPTIMIZATION] Reduction: #{((1 - relevant_files.count.to_f / app.app_files.count) * 100).round}%"
+      
+      if token_estimate < 30_000
+        Rails.logger.info "[OPTIMIZATION] ✅ Target achieved: <30k tokens"
+      else
+        Rails.logger.warn "[OPTIMIZATION] ⚠️ Still above target: #{token_estimate} tokens"
+      end
+      
+      final_context
+    end
+    
+    # DEPRECATED: Use build_complete_context instead
+    # Keeping for backward compatibility during transition
+    def build_existing_files_context(app)
+      Rails.logger.warn "[DEPRECATED] build_existing_files_context called - use build_complete_context instead"
+      # Return empty string to break the 71k token inclusion
+      # This forces callers to use the optimized method
+      ""
     end
     
     private
+    
+    # Get only files that are relevant for the current request
+    def get_relevant_files(app, component_requirements, app_type)
+      relevant_files = []
+      
+      # 1. ALWAYS include essential files that exist
+      essential_files = ESSENTIAL_FILES.map { |path| 
+        app.app_files.find_by(path: path) 
+      }.compact
+      relevant_files += essential_files
+      
+      # 2. Include ONLY predicted components (max 5 to control token usage)
+      component_requirements.take(MAX_COMPONENTS_TO_LOAD).each do |component_name|
+        component_file = app.app_files.find_by(path: "src/components/ui/#{component_name}.tsx")
+        relevant_files << component_file if component_file
+      end
+      
+      # 3. Include recently modified files (indication of active work)
+      recently_modified = app.app_files.where('updated_at > ?', 1.hour.ago)
+                                       .where.not(path: ESSENTIAL_FILES)
+                                       .where.not('path LIKE ?', 'src/components/ui/%')
+                                       .limit(3)
+      relevant_files += recently_modified
+      
+      # 4. Ensure we don't exceed reasonable limits
+      unique_files = relevant_files.compact.uniq
+      if unique_files.count > 20  # Reasonable maximum
+        # Prioritize: essential files > components > recently modified
+        unique_files = essential_files + 
+                      relevant_files.select { |f| f.path.include?('components/ui/') }.take(5) +
+                      recently_modified.take(3)
+      end
+      
+      Rails.logger.info "[FILE_SELECTION] Essential: #{essential_files.count}, Components: #{component_requirements.count}, Recent: #{recently_modified.count}"
+      
+      unique_files.compact.uniq
+    end
+    
+    # Add reference to available components without loading them all
+    def add_available_components_reference(context)
+      context << ""
+      context << "## Available UI Components (shadcn/ui) - NOT Pre-loaded"
+      context << ""
+      context << "These components exist and can be imported as needed:"
+      context << ""
+      context << "**Form**: button, input, textarea, select, checkbox, radio-group, form, label"
+      context << "**Layout**: card, table, dialog, tabs, separator, scroll-area, sheet"
+      context << "**Navigation**: dropdown-menu, menubar, navigation-menu, breadcrumb"
+      context << "**Feedback**: alert, toast, badge, skeleton, progress, sonner"
+      context << "**Data**: avatar, accordion, collapsible, popover, tooltip, hover-card"
+      context << "**Advanced**: command, calendar, date-picker, carousel, chart, sidebar"
+      context << ""
+      context << "**Usage**: Import directly: `import { Button } from '@/components/ui/button'`"
+      context << "**Note**: Use os-view to read component files if needed for customization"
+      context << ""
+    end
     
     def detect_app_type
       return 'default' unless @app

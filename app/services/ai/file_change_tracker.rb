@@ -21,15 +21,27 @@ module Ai
       new_hash = Digest::SHA256.hexdigest(content)
       cache_key = file_hash_key(file_path)
       
-      # Get the previous hash
-      old_hash = @redis.get(cache_key)
-      changed = (old_hash != new_hash)
+      # FIXED: Use Redis transaction to prevent race conditions
+      old_hash = nil
+      changed = false
       
-      # Update the hash
-      @redis.setex(cache_key, HASH_TTL, new_hash)
+      # Use Redis WATCH/MULTI/EXEC for atomic operation
+      @redis.watch(cache_key) do
+        old_hash = @redis.get(cache_key)
+        changed = (old_hash != new_hash)
+        
+        # Only update if value actually changed
+        if changed
+          @redis.multi do |transaction|
+            transaction.setex(cache_key, HASH_TTL, new_hash)
+          end
+        else
+          @redis.unwatch
+        end
+      end
       
       if changed
-        # Log the change
+        # Log the change (outside transaction for performance)
         log_change(file_path, old_hash, new_hash)
         
         # Invalidate any cached prompts containing this file
