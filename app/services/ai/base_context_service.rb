@@ -11,7 +11,9 @@ module Ai
       "src/App.tsx",       # Routing structure - shows app architecture
       "src/main.tsx",      # React entry point - shows how app initializes
       "index.html",        # HTML template - shows app structure
-      "package.json"       # Dependencies - shows available libraries
+      "package.json",      # Dependencies - shows available libraries
+      "tailwind.config.ts", # Tailwind configuration
+      "vite.config.ts"     # Vite configuration
     ].freeze
     
     # ARCHIVED: Previously loaded files (moved to selective loading)
@@ -34,15 +36,24 @@ module Ai
     
     # NEW: App-type specific component mapping (load only what's needed)
     APP_TYPE_COMPONENTS = {
-      'todo' => %w[input checkbox button card],
+      'todo' => %w[input checkbox button card label],
       'landing' => %w[button card badge tabs],
-      'dashboard' => %w[table select dropdown-menu avatar],
-      'form' => %w[form input textarea select button],
+      'dashboard' => %w[table select dropdown-menu avatar card],
+      'form' => %w[form input textarea select button label],
+      'ecommerce' => %w[card button badge input select],
+      'blog' => %w[card button badge separator],
+      'chat' => %w[input button card avatar scroll-area],
       'default' => %w[button card input]  # Minimal fallback
     }.freeze
     
-    def initialize(app = nil)
+    # Maximum components to load per request (token optimization)
+    MAX_COMPONENTS_TO_LOAD = 5
+    
+    def initialize(app = nil, options = {})
       @app = app
+      @app_type = options[:app_type] || detect_app_type
+      @load_components = options[:load_components] != false  # Default true
+      @component_requirements = options[:component_requirements] || []
     end
     
     # Build useful-context section with base template files
@@ -68,28 +79,44 @@ module Ai
         context << "NOTE: No app context available yet."
       end
       
-      # COST OPTIMIZATION: UI components loaded selectively via ComponentRequirementsAnalyzer
+      # COST OPTIMIZATION: Only list components, don't load them
       context << "## Available UI Components (shadcn/ui)"
       context << ""
-      context << "The following components are available in the template and can be imported as needed:"
+      context << "The following UI components exist in the template and can be imported:"
       context << ""
       
-      # List available components without loading their full content
-      all_components = %w[
-        button card input textarea select checkbox radio-group form label
-        table dialog dropdown-menu tabs alert toast toaster badge skeleton switch
-        avatar accordion alert-dialog aspect-ratio breadcrumb calendar
-        carousel chart collapsible command context-menu data-table
-        date-picker drawer hover-card menubar navigation-menu
-        pagination popover progress radio-group resizable
-        scroll-area separator sheet sidebar slider sonner
-        toggle toggle-group tooltip
-      ]
-      
-      context << "**Available Components**: #{all_components.join(', ')}"
+      # Component categories for reference only
+      context << "**Form Components**: button, input, textarea, select, checkbox, radio-group, form, label"
+      context << "**Layout Components**: card, table, dialog, tabs, separator, scroll-area"
+      context << "**Navigation**: dropdown-menu, menubar, navigation-menu, breadcrumb"
+      context << "**Feedback**: alert, toast, badge, skeleton, progress"
+      context << "**Data Display**: avatar, accordion, collapsible, popover, tooltip"
+      context << "**Advanced**: command, data-table, calendar, date-picker, carousel"
       context << ""
-      context << "**Usage**: Import these directly without using os-view to read component files."
-      context << "**Example**: `import { Button } from '@/components/ui/button'`"
+      context << "**IMPORTANT**: DO NOT use os-view to read these component files."
+      context << "**Usage**: Import directly: `import { Button } from '@/components/ui/button'`"
+      context << ""
+      
+      # Selectively load only needed components if specified
+      if @load_components && @component_requirements.any?
+        context << "## Pre-loaded Components for This Request"
+        context << "Based on the user's request, these components are loaded:"
+        context << ""
+        
+        components_to_load = @component_requirements.take(MAX_COMPONENTS_TO_LOAD)
+        components_to_load.each do |component_name|
+          add_component_to_context(context, component_name)
+        end
+      elsif @load_components && @app_type != 'default'
+        # Load app-type specific components
+        components = APP_TYPE_COMPONENTS[@app_type] || APP_TYPE_COMPONENTS['default']
+        if components.any?
+          context << "## Common Components for #{@app_type.capitalize} Apps"
+          context << "Import these components as needed (not pre-loaded to save tokens):"
+          context << components.map { |c| "`#{c}`" }.join(', ')
+          context << ""
+        end
+      end
       context << ""
       
       # Add app-specific context if app exists
@@ -101,14 +128,18 @@ module Ai
       
       # COST MONITORING: Log context size for optimization tracking
       context_size = final_context.length
-      Rails.logger.info "[V5_COST] Context size: #{context_size} chars (target: <50k for optimization)"
+      token_estimate = context_size / 4  # Rough estimate: 4 chars per token
       
-      if context_size > 100_000
-        Rails.logger.error "[V5_COST] CONTEXT BLOAT: #{context_size} chars - urgent optimization needed"
-      elsif context_size > 50_000
-        Rails.logger.warn "[V5_COST] Context size warning: #{context_size} chars - consider further optimization"
+      Rails.logger.info "[CACHE_OPTIMIZATION] Context size: #{context_size} chars (~#{token_estimate} tokens)"
+      Rails.logger.info "[CACHE_OPTIMIZATION] Target: <30k chars (<7.5k tokens)"
+      Rails.logger.info "[CACHE_OPTIMIZATION] Components loaded: #{@component_requirements.size} of #{MAX_COMPONENTS_TO_LOAD} max"
+      
+      if context_size > 50_000
+        Rails.logger.error "[CACHE_OPTIMIZATION] ⚠️ CONTEXT BLOAT: #{context_size} chars - optimization failed!"
+      elsif context_size > 30_000
+        Rails.logger.warn "[CACHE_OPTIMIZATION] ⚠️ Context above target: #{context_size} chars"
       else
-        Rails.logger.info "[V5_COST] Context optimized: #{context_size} chars - good!"
+        Rails.logger.info "[CACHE_OPTIMIZATION] ✅ Context optimized: #{context_size} chars"
       end
       
       final_context
@@ -149,6 +180,46 @@ module Ai
     end
     
     private
+    
+    def detect_app_type
+      return 'default' unless @app
+      
+      # Handle both App objects and Hash objects
+      if @app.is_a?(App)
+        text = "#{@app.name} #{@app.description} #{@app.prompt}".downcase
+      elsif @app.is_a?(Hash)
+        # When @app is a hash (e.g., from context_data)
+        text = "#{@app[:name]} #{@app[:description]} #{@app[:prompt]}".downcase
+      else
+        return 'default'
+      end
+      
+      return 'todo' if text.match?(/todo|task|checklist/)
+      return 'landing' if text.match?(/landing|marketing|hero|startup/)
+      return 'dashboard' if text.match?(/dashboard|analytics|admin|metrics/)
+      return 'form' if text.match?(/form|survey|registration|application/)
+      return 'ecommerce' if text.match?(/shop|store|product|cart|ecommerce/)
+      return 'blog' if text.match?(/blog|article|post|content/)
+      return 'chat' if text.match?(/chat|message|conversation/)
+      
+      'default'
+    end
+    
+    def add_component_to_context(context, component_name)
+      # Only load the component if it exists in the app files
+      component_path = "src/components/ui/#{component_name}.tsx"
+      
+      if @app && (component_file = @app.app_files.find_by(path: component_path))
+        context << "### Component: #{component_name}"
+        context << "```typescript"
+        context << component_file.content
+        context << "```"
+        context << ""
+      else
+        # Component not yet copied to app - just reference it
+        context << "• **#{component_name}**: Available at `@/components/ui/#{component_name}`"
+      end
+    end
     
     def add_app_file_to_context(context, app_file, category)
       context << "## #{category}: #{app_file.path}"

@@ -8,6 +8,7 @@ module Ai
     class GranularCachedPromptBuilder < CachedPromptBuilder
       MAX_CACHE_BREAKPOINTS = 4
       MIN_TOKENS_FOR_CACHE = 1024  # Anthropic minimum
+      MIN_CHARS_FOR_CACHE = 4096  # ~1024 tokens at 4 chars/token
       
       attr_reader :app_id, :file_tracker
       
@@ -31,78 +32,77 @@ module Ai
         # Log categorization for debugging
         log_file_categorization(file_groups)
         
-        # Block 1: Core stable files (1 hour cache)
-        # These rarely change - config, templates, shared components
-        if file_groups[:stable].any? && should_cache_group?(file_groups[:stable])
-          block = build_cached_file_block(
-            file_groups[:stable],
-            "stable_core_files",
-            cache_ttl: "1h"
-          )
-          system_blocks << block
-          block_metadata << extract_block_metadata(block, "stable")
-        end
-        
-        # Block 2: Semi-stable files (30 min cache)  
-        # Library files, dependencies that change occasionally
-        if file_groups[:semi_stable].any? && should_cache_group?(file_groups[:semi_stable])
-          block = build_cached_file_block(
-            file_groups[:semi_stable],
-            "library_dependencies",
-            cache_ttl: "30m"
-          )
-          system_blocks << block
-          block_metadata << extract_block_metadata(block, "semi_stable")
-        end
-        
-        # Block 3: Active development files (5 min cache)
-        # App logic that changes frequently but not every request
-        if file_groups[:active].any? && should_cache_group?(file_groups[:active])
-          block = build_cached_file_block(
-            file_groups[:active],
-            "app_logic",
-            cache_ttl: "5m"
-          )
-          system_blocks << block
-          block_metadata << extract_block_metadata(block, "active")
-        end
-        
-        # Block 4: Recently changed files (no cache)
-        # Files that were just modified - always send fresh
-        if file_groups[:volatile].any?
-          block = build_uncached_file_block(
-            file_groups[:volatile],
-            "recently_changed"
-          )
-          system_blocks << block
-          block_metadata << extract_block_metadata(block, "volatile")
-        end
-        
-        # Add base prompt if we have room
-        if system_blocks.length < MAX_CACHE_BREAKPOINTS && @base_prompt.present?
+        # Block 1: Base prompt and instructions (1 hour cache)
+        # Agent prompt rarely changes during a session
+        if @base_prompt.present? && @base_prompt.length > MIN_CHARS_FOR_CACHE
           system_blocks << {
             type: "text",
             text: @base_prompt,
             cache_control: { type: "ephemeral", ttl: "1h" }
           }
-          block_metadata << { type: "base_prompt", cached: true }
-        elsif @base_prompt.present?
-          # Append to last block if no room for separate breakpoint
-          system_blocks.last[:text] += "\n\n#{@base_prompt}"
+          block_metadata << { type: "base_prompt", cached: true, ttl: "1h" }
         end
         
-        # Add dynamic context (never cached)
-        if @context_data.any?
-          context_block = {
-            type: "text",
-            text: build_useful_context
-          }
+        # Block 2: Essential files (30 min cache)
+        # Core files like index.css, App.tsx, main.tsx
+        essential_files = file_groups[:stable] + file_groups[:semi_stable]
+        if essential_files.any? && should_cache_group?(essential_files)
+          block = build_cached_file_block(
+            essential_files,
+            "essential_files",
+            cache_ttl: "30m"
+          )
+          system_blocks << block
+          block_metadata << extract_block_metadata(block, "essential")
+        end
+        
+        # Block 3: Predicted UI components (5 min cache)
+        # Components selected based on user request
+        component_files = file_groups[:active].select { |f| f.path.include?('components/ui/') }
+        if component_files.any? && should_cache_group?(component_files)
+          block = build_cached_file_block(
+            component_files,
+            "predicted_components",
+            cache_ttl: "5m"
+          )
+          system_blocks << block
+          block_metadata << extract_block_metadata(block, "components")
+        end
+        
+        # Block 4: Dynamic context (no cache)
+        # Recently changed files and user-specific content
+        dynamic_files = file_groups[:volatile] + file_groups[:active].reject { |f| f.path.include?('components/ui/') }
+        if dynamic_files.any? || @context_data.any?
+          dynamic_content = []
           
-          # Merge with last block if at max breakpoints
-          if system_blocks.length >= MAX_CACHE_BREAKPOINTS
-            system_blocks.last[:text] += "\n\n#{context_block[:text]}"
-          else
-            system_blocks << context_block
+          if dynamic_files.any?
+            dynamic_content << format_files_as_context(dynamic_files, "dynamic_files")
+          end
+          
+          if @context_data.any?
+            dynamic_content << build_useful_context
+          end
+          
+          if dynamic_content.any?
+            system_blocks << {
+              type: "text",
+              text: dynamic_content.join("\n\n")
+            }
+            block_metadata << extract_block_metadata({ text: dynamic_content.join }, "dynamic")
+          end
+        end
+        
+        # Ensure we don't exceed max breakpoints
+        if system_blocks.length > MAX_CACHE_BREAKPOINTS
+          # Merge the last blocks if we exceed limit
+          Rails.logger.warn "[GRANULAR_CACHE] Merging blocks to stay within #{MAX_CACHE_BREAKPOINTS} limit"
+          while system_blocks.length > MAX_CACHE_BREAKPOINTS
+            last_block = system_blocks.pop
+            system_blocks.last[:text] += "\n\n#{last_block[:text]}"
+            # Remove cache control from merged block if dynamic content was added
+            if last_block[:cache_control].nil?
+              system_blocks.last.delete(:cache_control)
+            end
           end
         end
         
@@ -241,27 +241,25 @@ module Ai
         # Only cache if group is large enough to benefit
         total_size = files.sum { |f| f.content.length }
         
-        # Estimate tokens (roughly 3.5 chars per token)
-        estimated_tokens = total_size / 3.5
-        
-        estimated_tokens >= MIN_TOKENS_FOR_CACHE
+        # Use character threshold for simpler calculation
+        total_size >= MIN_CHARS_FOR_CACHE
       end
       
       def is_stable_file?(path)
-        # Config, templates, shared components
-        path.match?(%r{^(config/|lib/|templates/|shared/|app/templates/)}) ||
+        # Config and core template files that rarely change
+        path.match?(/^(package\.json|tailwind\.config\.ts|vite\.config\.ts|tsconfig\.json)$/) ||
         path.match?(/\.(lock|gemspec)$/)
       end
       
       def is_library_file?(path)
-        # Dependencies, vendor code
-        path.match?(%r{^(node_modules/|vendor/|packages/)}) ||
-        path.match?(/package\.json$|Gemfile$/)
+        # Essential files that change occasionally  
+        path.match?(/^src\/(index\.css|main\.tsx|App\.tsx)$/) ||
+        path.match?(/^index\.html$/)
       end
       
       def is_app_logic?(path)
-        # Application code
-        path.match?(%r{^(app/|src/|components/)}) &&
+        # UI components and pages that might be needed
+        path.match?(%r{^src/(components/ui/|pages/)}) &&
         !path.match?(/\.(test|spec)\./)
       end
       

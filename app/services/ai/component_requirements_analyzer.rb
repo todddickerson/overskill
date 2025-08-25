@@ -1,177 +1,241 @@
+# frozen_string_literal: true
+
 module Ai
-  # Analyzes user requirements to determine required components upfront
-  # This prevents missing import errors by pre-determining what will be needed
+  # Analyzes user prompts to determine which UI components are actually needed
+  # Reduces token usage by 90%+ by loading only 3-5 components instead of all 52
   class ComponentRequirementsAnalyzer
+    # Component keywords mapping - what words in prompts indicate which components
+    COMPONENT_INDICATORS = {
+      'button' => %w[button click submit action cta call-to-action press tap],
+      'input' => %w[input field text enter type form fillout fill-out search filter],
+      'textarea' => %w[textarea message comment description multiline paragraph notes],
+      'select' => %w[select dropdown choose option picker menu choice],
+      'checkbox' => %w[checkbox check tick toggle option multi-select tasks todo],
+      'radio-group' => %w[radio option choice single-select exclusive],
+      'form' => %w[form submit registration signup sign-up login application contact],
+      'card' => %w[card box container panel section block tile product item],
+      'table' => %w[table grid data list rows columns spreadsheet records],
+      'dialog' => %w[dialog modal popup overlay window prompt confirm alert],
+      'tabs' => %w[tabs tab navigation sections categories pages views],
+      'badge' => %w[badge tag label chip status indicator count new],
+      'alert' => %w[alert notification warning error info message banner notice],
+      'toast' => %w[toast notification popup message temporary feedback success],
+      'avatar' => %w[avatar profile picture user image icon photo account],
+      'accordion' => %w[accordion collapse expand faq questions answers collapsible],
+      'calendar' => %w[calendar date picker schedule appointment booking event],
+      'chart' => %w[chart graph analytics metrics visualization data plot statistics],
+      'dropdown-menu' => %w[menu dropdown options actions context settings more],
+      'progress' => %w[progress loading bar percentage completion status upload],
+      'skeleton' => %w[skeleton loading placeholder shimmer loader waiting],
+      'slider' => %w[slider range adjust control volume brightness value],
+      'switch' => %w[switch toggle on/off enable disable setting preference],
+      'tooltip' => %w[tooltip hint help info hover popup explanation],
+      'separator' => %w[separator divider line break section hr border divide],
+      'scroll-area' => %w[scroll scrollable overflow list feed timeline long],
+      'sheet' => %w[sheet drawer sidebar panel slide-in menu navigation],
+      'label' => %w[label text caption description title heading name]
+    }.freeze
     
-    # Common app patterns and their required components/icons
-    APP_PATTERNS = {
-      'landing' => {
-        icons: %w[Menu X ChevronDown ArrowRight Check Star Zap Crown Shield Lock Globe Mail Phone MapPin],
-        shadcn: %w[button card badge accordion tabs dialog sheet],
-        sections: %w[HeroSection FeaturesSection PricingSection CTASection FAQSection TestimonialsSection]
-      },
-      'saas' => {
-        icons: %w[Menu X Check Shield Lock CreditCard DollarSign Zap Crown Rocket Star Award Trophy TrendingUp],
-        shadcn: %w[button card badge tabs dialog sheet toast alert],
-        sections: %w[HeroSection FeaturesSection PricingSection CTASection FAQSection SocialProofSection]
-      },
-      'dashboard' => {
-        icons: %w[Menu X Home User Users Settings Bell Search Filter Calendar ChevronDown ChevronRight BarChart TrendingUp],
-        shadcn: %w[button card badge tabs dialog sheet select dropdown-menu avatar],
-        sections: %w[Sidebar Header StatsCards RecentActivity]
-      },
-      'todo' => {
-        icons: %w[Plus Trash Edit Check X Circle CheckCircle Clock Calendar Filter],
-        shadcn: %w[button card checkbox input label dialog sheet],
-        sections: %w[TaskList TaskForm TaskFilters]
-      },
-      'ecommerce' => {
-        icons: %w[ShoppingCart Package CreditCard Heart Star Search Filter ChevronDown Plus Minus],
-        shadcn: %w[button card badge dialog sheet select input],
-        sections: %w[ProductGrid ProductCard CartDrawer CheckoutForm]
-      },
-      'blog' => {
-        icons: %w[Calendar Clock User Tag Share Heart Bookmark ArrowRight],
-        shadcn: %w[button card badge avatar],
-        sections: %w[BlogList BlogCard BlogPost AuthorBio]
-      },
-      'portfolio' => {
-        icons: %w[Github Linkedin Twitter Mail Globe ExternalLink ArrowRight],
-        shadcn: %w[button card badge tabs],
-        sections: %w[HeroSection ProjectsGrid AboutSection ContactForm]
-      },
-      'chat' => {
-        icons: %w[Send User Users Plus Paperclip Smile Phone Video Settings],
-        shadcn: %w[button card input avatar scroll-area],
-        sections: %w[ChatList MessageThread MessageInput UserList]
-      },
-      'form' => {
-        icons: %w[Check X AlertCircle Info Upload],
-        shadcn: %w[button card input label select checkbox radio-group textarea form],
-        sections: %w[FormContainer FormFields ValidationMessages]
-      },
-      'analytics' => {
-        icons: %w[TrendingUp TrendingDown BarChart LineChart PieChart Download Filter Calendar],
-        shadcn: %w[button card select date-picker tabs],
-        sections: %w[MetricsCards ChartsGrid DataTable DateRangePicker]
-      }
-    }
+    # App type to component mappings (fallback when prompt analysis isn't clear)
+    APP_TYPE_DEFAULTS = {
+      'todo' => %w[input checkbox button card label],
+      'landing' => %w[button card badge tabs separator],
+      'dashboard' => %w[card table chart select dropdown-menu],
+      'form' => %w[form input textarea select button],
+      'ecommerce' => %w[card button badge input select],
+      'blog' => %w[card button badge separator scroll-area],
+      'chat' => %w[input button card avatar scroll-area],
+      'analytics' => %w[card chart table select badge],
+      'settings' => %w[form input select switch button],
+      'profile' => %w[card avatar input button tabs]
+    }.freeze
     
-    # Keywords that trigger specific component requirements
-    KEYWORD_TRIGGERS = {
-      'payment' => { icons: %w[CreditCard DollarSign Shield Lock], shadcn: %w[form input] },
-      'auth' => { icons: %w[User Lock Mail Key], shadcn: %w[form input button] },
-      'social' => { icons: %w[Github Twitter Linkedin Facebook Instagram Youtube], shadcn: %w[button] },
-      'upload' => { icons: %w[Upload Cloud File Image], shadcn: %w[button dialog] },
-      'search' => { icons: %w[Search Filter X], shadcn: %w[input button] },
-      'notification' => { icons: %w[Bell Mail AlertCircle Check], shadcn: %w[toast alert badge] },
-      'settings' => { icons: %w[Settings User Lock Key], shadcn: %w[tabs form switch] },
-      'navigation' => { icons: %w[Menu X ChevronDown ChevronRight Home], shadcn: %w[navigation-menu sheet] },
-      'media' => { icons: %w[Play Pause Volume Image Video Camera], shadcn: %w[button slider] },
-      'calendar' => { icons: %w[Calendar Clock ChevronLeft ChevronRight], shadcn: %w[calendar date-picker] },
-      'team' => { icons: %w[Users UserPlus UserMinus Shield], shadcn: %w[avatar card] },
-      'chart' => { icons: %w[BarChart LineChart PieChart TrendingUp], shadcn: %w[card] },
-      'table' => { icons: %w[Filter Sort ChevronUp ChevronDown], shadcn: %w[table] },
-      'modal' => { icons: %w[X], shadcn: %w[dialog sheet] },
-      'clickfunnels' => { icons: %w[Zap Crown Shield Check Star Award TrendingUp], shadcn: %w[button card badge] },
-      'high convert' => { icons: %w[Zap Shield Check Star Crown Trophy], shadcn: %w[button card badge] }
-    }
+    # Maximum components to recommend (token optimization)
+    MAX_COMPONENTS = 5
     
-    def self.analyze(user_prompt, existing_files = [])
-      new(user_prompt, existing_files).analyze
+    class << self
+      def analyze(user_prompt, existing_files = [], options = {})
+        analyzer = new(user_prompt, existing_files, options)
+        analyzer.required_components
+      end
+      
+      def analyze_with_confidence(user_prompt, existing_files = [], options = {})
+        analyzer = new(user_prompt, existing_files, options)
+        {
+          components: analyzer.required_components,
+          confidence: analyzer.confidence_scores,
+          app_type: analyzer.detected_app_type,
+          reasoning: analyzer.analysis_reasoning
+        }
+      end
     end
     
-    def initialize(user_prompt, existing_files = [])
-      @prompt = user_prompt.downcase
+    attr_reader :user_prompt, :existing_files, :detected_app_type, 
+                :confidence_scores, :analysis_reasoning
+    
+    def initialize(user_prompt, existing_files = [], options = {})
+      @user_prompt = user_prompt.to_s.downcase
       @existing_files = existing_files
-      @required_icons = Set.new
-      @required_shadcn = Set.new
-      @required_sections = Set.new
+      @app_type = options[:app_type]
+      @max_components = options[:max_components] || MAX_COMPONENTS
+      @confidence_scores = {}
+      @analysis_reasoning = []
     end
     
-    def analyze
-      # Detect app type from prompt
-      app_type = detect_app_type
+    def required_components
+      components = []
       
-      # Add base requirements for detected app type
-      if app_type && APP_PATTERNS[app_type]
-        pattern = APP_PATTERNS[app_type]
-        @required_icons.merge(pattern[:icons])
-        @required_shadcn.merge(pattern[:shadcn])
-        @required_sections.merge(pattern[:sections])
+      # Step 1: Analyze prompt for explicit component mentions
+      prompt_components = analyze_prompt_keywords
+      components.concat(prompt_components)
+      @analysis_reasoning << "Found #{prompt_components.size} components from prompt keywords"
+      
+      # Step 2: Check existing files for component imports
+      if @existing_files.any?
+        imported_components = analyze_existing_imports
+        components.concat(imported_components)
+        @analysis_reasoning << "Found #{imported_components.size} components from existing imports"
       end
       
-      # Add keyword-triggered requirements
-      KEYWORD_TRIGGERS.each do |keyword, requirements|
-        if @prompt.include?(keyword.to_s)
-          @required_icons.merge(requirements[:icons]) if requirements[:icons]
-          @required_shadcn.merge(requirements[:shadcn]) if requirements[:shadcn]
-        end
+      # Step 3: Detect app type and add defaults if needed
+      @detected_app_type = detect_app_type_from_prompt
+      if components.size < 3 && @detected_app_type != 'unknown'
+        type_defaults = APP_TYPE_DEFAULTS[@detected_app_type] || []
+        components.concat(type_defaults)
+        @analysis_reasoning << "Added #{type_defaults.size} default components for #{@detected_app_type} app"
       end
       
-      # Always include common UI icons
-      @required_icons.merge(%w[Menu X ChevronDown Check Plus Minus])
+      # Step 4: Add essential components that are almost always needed
+      essential = determine_essential_components(components)
+      components.concat(essential)
       
-      # Always include common shadcn components
-      @required_shadcn.merge(%w[button card])
+      # Step 5: Deduplicate and prioritize
+      prioritized = prioritize_components(components.uniq)
       
-      {
-        app_type: app_type,
-        required_icons: @required_icons.to_a.sort,
-        required_shadcn: @required_shadcn.to_a.sort,
-        required_sections: @required_sections.to_a.sort,
-        import_template: generate_import_template
-      }
+      # Step 6: Limit to max components
+      final_components = prioritized.take(@max_components)
+      
+      Rails.logger.info "[ComponentAnalyzer] Prompt: #{@user_prompt[0..100]}..."
+      Rails.logger.info "[ComponentAnalyzer] Detected app type: #{@detected_app_type}"
+      Rails.logger.info "[ComponentAnalyzer] Required components: #{final_components.join(', ')}"
+      Rails.logger.info "[ComponentAnalyzer] Reasoning: #{@analysis_reasoning.join('; ')}"
+      
+      final_components
     end
     
     private
     
-    def detect_app_type
-      return 'landing' if @prompt.match?(/landing|homepage|website|portfolio|agency/)
-      return 'saas' if @prompt.match?(/saas|software as a service|subscription/)
-      return 'dashboard' if @prompt.match?(/dashboard|admin|analytics|metrics/)
-      return 'todo' if @prompt.match?(/todo|task|checklist/)
-      return 'ecommerce' if @prompt.match?(/ecommerce|shop|store|product|cart/)
-      return 'blog' if @prompt.match?(/blog|article|post|content/)
-      return 'chat' if @prompt.match?(/chat|message|conversation/)
-      return 'form' if @prompt.match?(/form|survey|questionnaire/)
-      return 'analytics' if @prompt.match?(/analytics|chart|graph|report/)
-      return 'landing' # Default to landing page
+    def analyze_prompt_keywords
+      components = []
+      
+      COMPONENT_INDICATORS.each do |component, keywords|
+        # Check if any keyword appears in the prompt
+        if keywords.any? { |keyword| @user_prompt.include?(keyword) }
+          components << component
+          @confidence_scores[component] = calculate_keyword_confidence(component, keywords)
+        end
+      end
+      
+      components
     end
     
-    def generate_import_template
-      template = []
+    def calculate_keyword_confidence(component, keywords)
+      # Higher confidence if multiple keywords match
+      matches = keywords.count { |keyword| @user_prompt.include?(keyword) }
+      [matches * 0.3, 1.0].min  # Cap at 1.0
+    end
+    
+    def analyze_existing_imports
+      components = []
       
-      # React imports
-      template << "import React, { useState, useEffect } from 'react';"
-      
-      # Icon imports (chunked for readability)
-      if @required_icons.any?
-        icon_chunks = @required_icons.each_slice(5).to_a
-        icon_chunks.each do |chunk|
-          template << "import { #{chunk.join(', ')} } from 'lucide-react';"
+      @existing_files.each do |file|
+        # Skip non-code files
+        next unless file.respond_to?(:path) && file.path.match?(/\.(tsx?|jsx?)$/)
+        next unless file.respond_to?(:content)
+        
+        content = file.content.to_s
+        
+        # Look for component imports
+        import_regex = /import\s+{[^}]+}\s+from\s+['"]@\/components\/ui\/(\w+)['"]/
+        content.scan(import_regex) do |match|
+          components << match[0]
+        end
+        
+        # Also check for inline component usage
+        COMPONENT_INDICATORS.keys.each do |component|
+          component_tag = component.split('-').map(&:capitalize).join
+          if content.match?(/<#{component_tag}[\s>]/)
+            components << component
+          end
         end
       end
       
-      # Shadcn imports
-      @required_shadcn.each do |component|
-        case component
-        when 'card'
-          template << "import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';"
-        when 'dialog'
-          template << "import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';"
-        when 'sheet'
-          template << "import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';"
-        when 'tabs'
-          template << "import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';"
-        when 'form'
-          template << "import { useForm } from 'react-hook-form';"
-        else
-          template << "import { #{component.split('-').map(&:capitalize).join} } from '@/components/ui/#{component}';"
+      components.uniq
+    end
+    
+    def detect_app_type_from_prompt
+      # Check for app type indicators in order of specificity
+      return 'todo' if @user_prompt.match?(/todo|task|checklist|to-do/)
+      return 'dashboard' if @user_prompt.match?(/dashboard|analytics|metrics|admin|panel/)
+      return 'ecommerce' if @user_prompt.match?(/shop|store|product|cart|ecommerce|e-commerce|marketplace/)
+      return 'form' if @user_prompt.match?(/form|survey|registration|signup|sign-up|application/)
+      return 'landing' if @user_prompt.match?(/landing|marketing|hero|startup|homepage|website/)
+      return 'blog' if @user_prompt.match?(/blog|article|post|content|writing|news/)
+      return 'chat' if @user_prompt.match?(/chat|message|conversation|messenger|communication/)
+      return 'analytics' if @user_prompt.match?(/analytics|chart|graph|visualization|report/)
+      return 'settings' if @user_prompt.match?(/settings|preferences|configuration|options/)
+      return 'profile' if @user_prompt.match?(/profile|account|user|personal/)
+      
+      # Return the explicitly provided type or unknown
+      @app_type || 'unknown'
+    end
+    
+    def determine_essential_components(already_selected)
+      essential = []
+      
+      # Button is almost always needed unless already selected
+      unless already_selected.include?('button')
+        if @user_prompt.match?(/click|action|submit|save|create|delete|update/)
+          essential << 'button'
+          @analysis_reasoning << "Added button as essential component"
         end
       end
       
-      template.join("\n")
+      # Card is common for layouts unless already selected
+      unless already_selected.include?('card')
+        if @user_prompt.match?(/display|show|list|grid|layout|organize/)
+          essential << 'card'
+          @analysis_reasoning << "Added card for layout structure"
+        end
+      end
+      
+      # Input is needed for any user input unless already selected
+      unless already_selected.include?('input')
+        if @user_prompt.match?(/enter|type|search|filter|name|email|password/)
+          essential << 'input'
+          @analysis_reasoning << "Added input for user data entry"
+        end
+      end
+      
+      essential
+    end
+    
+    def prioritize_components(components)
+      # Priority order based on usage frequency and importance
+      priority_order = %w[
+        button input card form select
+        table textarea checkbox label badge
+        tabs dropdown-menu dialog alert avatar
+        toast accordion calendar chart radio-group
+        skeleton progress slider switch tooltip
+        separator scroll-area sheet popover breadcrumb
+      ]
+      
+      # Sort components by priority
+      components.sort_by do |component|
+        index = priority_order.index(component)
+        index || 999  # Put unknown components at the end
+      end
     end
   end
 end
