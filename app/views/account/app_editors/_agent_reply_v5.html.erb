@@ -1,8 +1,10 @@
 <%# V5 Agent Reply Partial - Single container that updates via save & broadcast %>
 <div id="app_chat_message_<%= message.id %>" 
      class="mb-4 agent-reply-container"
-     data-controller="agent-reply state-preserving"
+     data-controller="agent-reply state-preserving tool-streaming"
      data-agent-reply-message-id-value="<%= message.id %>"
+     data-tool-streaming-message-id-value="<%= message.id %>"
+     data-tool-streaming-app-id-value="<%= message.app.id %>"
      data-state-preserving-target="container">
   
   <div class="flex items-start space-x-2">

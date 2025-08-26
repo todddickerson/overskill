@@ -63,7 +63,55 @@ async function fixTailwindClasses() {
   }
 }
 
-// 2. Validate JSX/TSX syntax using TypeScript compiler
+// 2. Validate CSS syntax and auto-fix common issues
+async function validateCSSFiles() {
+  console.log(`${colors.blue}🔍 Validating CSS files for syntax errors...${colors.reset}`);
+  
+  const cssFiles = await glob('src/**/*.css');
+  let cssValid = true;
+  
+  for (const file of cssFiles) {
+    const content = fs.readFileSync(file, 'utf8');
+    
+    // Check for brace matching
+    const openBraces = (content.match(/{/g) || []).length;
+    const closeBraces = (content.match(/}/g) || []).length;
+    
+    if (openBraces !== closeBraces) {
+      console.log(`${colors.red}  ❌ CSS brace mismatch in ${file}: ${openBraces} open, ${closeBraces} close${colors.reset}`);
+      
+      // Try to fix by removing extra closing braces at the end
+      if (closeBraces > openBraces) {
+        const lines = content.split('\n');
+        let removed = 0;
+        
+        // Work backwards from the end
+        for (let i = lines.length - 1; i >= 0 && (closeBraces - removed) > openBraces; i--) {
+          if (lines[i].trim() === '}') {
+            lines.splice(i, 1);
+            removed++;
+          }
+        }
+        
+        if (removed > 0) {
+          fs.writeFileSync(file, lines.join('\n'));
+          console.log(`${colors.green}  ✅ Auto-fixed ${removed} extra closing brace(s) in ${file}${colors.reset}`);
+          fixedCount += removed;
+        } else {
+          cssValid = false;
+          hasErrors = true;
+        }
+      } else {
+        cssValid = false;
+        hasErrors = true;
+      }
+    }
+  }
+  
+  return cssValid;
+}
+
+// 3. Validate JSX/TSX syntax using TypeScript compiler
 async function validateJSXSyntax() {
   console.log(`${colors.blue}🔍 Validating JSX/TSX syntax using TypeScript compiler...${colors.reset}`);
   
@@ -376,6 +424,7 @@ async function main() {
   try {
     // Phase 1: Run initial validation to detect issues
     console.log(`${colors.blue}📋 Phase 1: Initial validation${colors.reset}`);
+    await validateCSSFiles();           // Check for CSS syntax errors (NEW!)
     await validateJSXSyntax();          // Check for TypeScript errors
     await runESLintValidation();        // Check for linting issues
     

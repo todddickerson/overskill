@@ -1746,6 +1746,15 @@ module Ai
       
       Rails.logger.info "[V5_TOOLS] Executing #{tool_calls.size} tools with incremental UI updates"
       
+      # Initialize simple tool streamer for real-time updates
+      streaming_enabled = true # Feature flag for streaming
+      Rails.logger.info "[V5_DEBUG] Streaming enabled: #{streaming_enabled}"
+      tool_streamer = streaming_enabled ? Ai::SimpleToolStreamer.new(@assistant_message, @app) : nil
+      Rails.logger.info "[V5_DEBUG] Tool streamer created: #{tool_streamer.present?}"
+      
+      # Start tools execution tracking
+      tool_streamer&.start_tools_execution(tool_calls)
+      
       # Execute ALL tool calls and collect results with incremental UI updates
       tool_calls.each_with_index do |tool_call, index|
         tool_name = tool_call['function']['name']
@@ -1753,16 +1762,36 @@ module Ai
         tool_id = tool_call['id']
         
         Rails.logger.info "[V5_TOOLS] Executing #{tool_name} (#{index + 1}/#{tool_calls.size}) with args: #{tool_args.keys.join(', ')}"
+        Rails.logger.info "[V5_DEBUG] About to execute tool, tool_streamer: #{tool_streamer.class.name rescue 'nil'}"
         
         # Execute the tool with proper error handling
         result = begin
-          execute_single_tool(tool_name, tool_args)
+          if tool_streamer
+            Rails.logger.info "[V5_DEBUG] Using tool streamer for #{tool_name}"
+            # Update status to running
+            tool_streamer.update_tool_status(tool_name, 'running')
+            
+            # Execute the actual tool
+            tool_result = execute_single_tool(tool_name, tool_args)
+            
+            # Update status based on result
+            if tool_result.is_a?(Hash) && tool_result[:error]
+              tool_streamer.update_tool_status(tool_name, 'error', tool_result[:error])
+            else
+              tool_streamer.update_tool_status(tool_name, 'complete')
+            end
+            
+            tool_result
+          else
+            Rails.logger.info "[V5_DEBUG] Using standard execution for #{tool_name}"
+            execute_single_tool(tool_name, tool_args)
+          end
         rescue StandardError => e
           Rails.logger.error "[V5_TOOLS] Tool execution failed: #{tool_name} - #{e.message}"
           Rails.logger.error e.backtrace.first(5).join("\n")
           
-          # Ensure status is updated to error on exception
-          update_tool_status_to_error(tool_name, tool_args['file_path'], e.message)
+          # Update streamer status to error on exception
+          tool_streamer&.update_tool_status(tool_name, 'error', e.message)
           
           # Return error result
           { error: "Tool execution failed: #{e.message}" }
@@ -1994,9 +2023,17 @@ module Ai
       @tool_service.line_offset_tracker = line_offset_tracker if @tool_service
       Rails.logger.info "[V5_TOOLS] Created LineOffsetTracker for batch of #{tool_calls.size} tool calls"
       
-      tool_calls.each do |tool_call|
+      # Initialize streaming executor if enabled
+      streaming_enabled = true # Can be feature flagged later
+      Rails.logger.info "[V5_DEBUG] Streaming enabled: #{streaming_enabled}"
+      streaming_executor = streaming_enabled ? Ai::StreamingToolExecutor.new(@assistant_message, @app, @iteration_count) : nil
+      Rails.logger.info "[V5_DEBUG] Streaming executor created: #{streaming_executor.present?}"
+      
+      tool_calls.each_with_index do |tool_call, tool_index|
         tool_name = tool_call['function']['name']
         tool_args = JSON.parse(tool_call['function']['arguments'])
+        
+        Rails.logger.info "[V5_DEBUG] Processing tool: #{tool_name}, streaming_executor present: #{streaming_executor.present?}"
         
         log_claude_event("TOOL_EXECUTE_START", {
           tool: tool_name,
@@ -2012,13 +2049,29 @@ module Ai
           next
         end
         
-        # Update UI with tool execution
+        # Update UI with tool execution - mark as running
         add_tool_call(tool_name, file_path: tool_args['file_path'], status: 'running')
         
-        # Execute with proper error handling through centralized tool service
-        # All tool implementations are in app/services/ai/ai_tool_service.rb
+        # Flush pending tools immediately for real-time updates
+        flush_pending_tool_calls
+        broadcast_message_update # Trigger immediate UI update
+        
+        # Execute with streaming or standard execution
+        Rails.logger.info "[V5_DEBUG] About to execute tool, streaming_executor: #{streaming_executor.class.name rescue 'nil'}"
         result = begin
-          case tool_name
+          if streaming_executor
+            Rails.logger.info "[V5_DEBUG] Using streaming executor for #{tool_name}"
+            # Use streaming executor for real-time updates
+            streaming_result = streaming_executor.execute_with_streaming(
+              { 'name' => tool_name, 'arguments' => tool_args },
+              tool_index
+            )
+            Rails.logger.info "[V5_DEBUG] Streaming result: #{streaming_result.inspect[0..100]}"
+            streaming_result
+          else
+            Rails.logger.info "[V5_DEBUG] Using standard execution for #{tool_name}"
+            # Fallback to standard execution
+            case tool_name
           when 'os-write'
             @tool_service.write_file(tool_args['file_path'], tool_args['content'])
           when 'os-view', 'os-read'
@@ -2070,6 +2123,7 @@ module Ai
             Rails.logger.error "=" * 60
             { error: "Unknown tool: #{tool_name}" }
           end
+          end # End of streaming_executor if-else
         rescue StandardError => e
           Rails.logger.error "[V5_TOOLS] Tool execution failed in process_tool_calls: #{tool_name} - #{e.message}"
           Rails.logger.error e.backtrace.first(5).join("\n")
@@ -3915,8 +3969,11 @@ module Ai
       updated_flow.each_with_index do |item, idx|
         next unless item['type'] == 'tools'
         
-        if item['calls'].present?
-          item['calls'].each do |tool|
+        # Support both 'calls' (legacy) and 'tools' (SimpleToolStreamer) arrays
+        tools_array = item['calls'] || item['tools'] || []
+        
+        if tools_array.present?
+          tools_array.each do |tool|
             # Log what we're comparing
             Rails.logger.debug "[V5_FLOW_UPDATE] Checking tool: name=#{tool['name']} vs #{tool_name}, file=#{tool['file_path']} vs #{file_path}"
             
@@ -3946,9 +4003,21 @@ module Ai
         # Reassign to trigger ActiveRecord change detection for JSONB field
         @assistant_message.conversation_flow = updated_flow
         @assistant_message.save!
-        Rails.logger.info "[V5_FLOW_UPDATE] Successfully saved updated conversation_flow"
+        Rails.logger.info "[V5_FLOW_UPDATE] ✅ Updated conversation_flow for #{tool_name}(#{file_path}) -> #{new_status}"
+        
+        # Broadcast UI update for real-time streaming
+        broadcast_message_update
       else
-        Rails.logger.warn "[V5_FLOW_UPDATE] No matching tool found to update in conversation_flow"
+        Rails.logger.warn "[V5_FLOW_UPDATE] ❌ No matching tool found to update in conversation_flow for #{tool_name}(#{file_path})"
+        
+        # Debug: show what tools we actually have
+        if @assistant_message.conversation_flow.present?
+          @assistant_message.conversation_flow.each do |item|
+            next unless item['type'] == 'tools'
+            tools_array = item['tools'] || item['calls'] || []
+            Rails.logger.debug "[V5_FLOW_UPDATE] Available tools: #{tools_array.map { |t| "#{t['name']}(#{t['file_path']})" }.join(', ')}"
+          end
+        end
       end
     end
     

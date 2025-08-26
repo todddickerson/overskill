@@ -87,7 +87,7 @@ module Ai
     
     # Detect content type from file extension
     def detect_content_type_from_path(file_path)
-      ext = File.extname(file_path).downcase
+      ext = ::File.extname(file_path).downcase
       case ext
       when '.tsx', '.ts', '.jsx', '.js', '.py', '.rb', '.php', '.go', '.rs'
         :code

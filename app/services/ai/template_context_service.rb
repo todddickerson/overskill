@@ -11,7 +11,8 @@ module Ai
       "tailwind.config.ts",    # Design system configuration
       "vite.config.ts",        # Build configuration
       "src/App.tsx",          # Routing and app structure
-      "src/main.tsx"          # Application entry point
+      "src/main.tsx",         # Application entry point
+      "src/lib/supabase.ts"   # Database client exports (critical for imports)
     ].freeze
     
     # Optional template files - included if they exist and budget allows
@@ -20,6 +21,18 @@ module Ai
       "index.html",           # HTML template
       "tsconfig.json"         # TypeScript configuration
     ].freeze
+    
+    # UI Components available in the template
+    # These are pre-installed shadcn/ui components ready to use
+    UI_COMPONENTS_MANIFEST = {
+      "Forms" => ["button", "input", "textarea", "select", "checkbox", "radio-group", "switch", "slider", "date-picker", "form", "label"],
+      "Layout" => ["card", "separator", "aspect-ratio", "scroll-area", "resizable"],
+      "Navigation" => ["navigation-menu", "breadcrumb", "dropdown-menu", "menubar", "context-menu", "command", "tabs"],
+      "Data Display" => ["table", "badge", "avatar", "calendar", "chart", "carousel", "accordion", "collapsible"],
+      "Feedback" => ["alert", "alert-dialog", "dialog", "drawer", "popover", "tooltip", "toast", "progress", "skeleton", "sonner"],
+      "Typography" => ["heading", "text", "code", "blockquote"],
+      "Overlays" => ["sheet", "hover-card"]
+    }.freeze
     
     def initialize(template_base = nil)
       @template_base = template_base || default_template_base
@@ -137,6 +150,15 @@ module Ai
       lines << "- Import UI components from `@/components/ui/`"
       lines << "- Import utilities from `@/lib/`"
       lines << ""
+      lines << "**Available UI Components (Pre-installed shadcn/ui):**"
+      lines << ""
+      UI_COMPONENTS_MANIFEST.each do |category, components|
+        lines << "• **#{category}**: #{components.join(', ')}"
+      end
+      lines << ""
+      lines << "All components are TypeScript-ready and styled with Tailwind CSS."
+      lines << "Import example: `import { Button } from '@/components/ui/button'`"
+      lines << ""
       lines << "**Component Patterns**:"
       lines << "- Use functional components with TypeScript"
       lines << "- Follow React hooks patterns for state management"
@@ -189,7 +211,7 @@ module Ai
     end
     
     def get_file_extension(file_path)
-      ext = File.extname(file_path).downcase
+      ext = ::File.extname(file_path).downcase
       case ext
       when '.tsx', '.ts'
         'typescript'

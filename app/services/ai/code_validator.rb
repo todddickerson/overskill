@@ -246,7 +246,7 @@ class Ai::CodeValidator
   def self.validate_file(content, file_path)
     return content if content.blank?
     
-    case File.extname(file_path)
+    case ::File.extname(file_path)
     when '.css'
       validate_and_fix_css(content)
     when '.jsx', '.tsx'

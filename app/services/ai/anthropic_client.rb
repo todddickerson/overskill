@@ -31,6 +31,14 @@ module Ai
     end
     
     base_uri base_uri_for_helicone
+    
+    # CRITICAL: Set HTTParty timeout globally for all requests
+    # This prevents Net::ReadTimeout errors on long-running tool responses
+    default_timeout 500  # 8.3 minutes for complex tool-heavy generations (user confirmed needed)
+    
+    # Additional timeout settings for better control
+    open_timeout 30  # Time to establish connection
+    read_timeout 500 # Time to read response (matching default_timeout)
 
     MODELS = {
       claude_sonnet_4: "claude-sonnet-4-20250514",
@@ -122,12 +130,12 @@ module Ai
       end
       
       {
-        headers: headers,
-        timeout: 300  # 5 minute timeout for complex generations
+        headers: headers
+        # Timeout is now set globally at class level to prevent Net::ReadTimeout
       }
     end
 
-    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: false, thinking_budget: nil)
+    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: false, thinking_budget: nil, stream: false)
       model_id = MODELS[model] || model
       
       # Calculate optimal max_tokens if not provided
@@ -169,6 +177,9 @@ module Ai
         temperature: temperature,
         max_tokens: max_tokens
       }
+      
+      # Enable streaming only when explicitly requested
+      body[:stream] = true if stream
       
       # Add system message as top-level parameter if present
       # Supports both string and array format for prompt caching
@@ -322,7 +333,7 @@ module Ai
       response_data
     end
 
-    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: true, thinking_budget: nil)
+    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: true, thinking_budget: nil, stream: false)
       model_id = MODELS[model] || model
       
       # Calculate optimal max_tokens if not provided
@@ -359,6 +370,9 @@ module Ai
         temperature: temperature,
         max_tokens: max_tokens
       }
+      
+      # Enable streaming only when explicitly requested for tool execution
+      body[:stream] = true if stream
       
       # Add system message as top-level parameter if present
       # Supports both string and array format for prompt caching
