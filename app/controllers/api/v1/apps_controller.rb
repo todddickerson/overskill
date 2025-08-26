@@ -36,6 +36,45 @@ if defined?(Api::V1::ApplicationController)
     def destroy
       @app.destroy
     end
+    
+    # POST /api/v1/apps/:id/create_preview_environment
+    def create_preview_environment
+      begin
+        Rails.logger.info "[API] Creating preview environment for app #{@app.id}"
+        
+        # Check if preview environment already exists and is ready
+        if @app.preview_status == 'ready' && @app.preview_url.present?
+          return render json: {
+            success: true,
+            message: 'Preview environment already exists',
+            preview_url: @app.preview_url,
+            websocket_url: @app.preview_websocket_url,
+            status: @app.preview_status,
+            provisioned_at: @app.preview_provisioned_at
+          }
+        end
+        
+        # Queue preview environment creation
+        CreatePreviewEnvironmentJob.perform_async(@app.id, current_user.id)
+        
+        # Start file watcher for hot reload
+        Deployment::FileWatcherService.start_watching_app(@app)
+        
+        render json: {
+          success: true,
+          message: 'Preview environment creation started',
+          status: 'creating',
+          estimated_time: '5-10 seconds'
+        }
+        
+      rescue => e
+        Rails.logger.error "[API] Preview environment creation failed: #{e.message}"
+        render json: {
+          success: false,
+          error: e.message
+        }, status: :internal_server_error
+      end
+    end
 
     private
 

@@ -54,6 +54,31 @@ module Ai
       }
     ]
 
+    # Component prop validation rules
+    BUTTON_VARIANTS = %w[default destructive outline secondary ghost link]
+    BUTTON_SIZES = %w[default sm lg icon]
+    
+    COMPONENT_PROP_FIXES = [
+      # Fix invalid Button variants
+      {
+        pattern: /(<Button[^>]*\s+variant=")(?:cta|hero|primary|large)(")/,
+        replacement: '\1default\2',
+        description: 'Fixed invalid Button variant to default'
+      },
+      # Fix invalid Button sizes
+      {
+        pattern: /(<Button[^>]*\s+size=")(?:xl|extra-large|big)(")/,
+        replacement: '\1lg\2',
+        description: 'Fixed invalid Button size to lg'
+      },
+      # Fix common Button prop combinations
+      {
+        pattern: /(<Button[^>]*\s+variant="cta"[^>]*\s+size="xl")/,
+        replacement: '\1',
+        description: 'Fixed invalid Button variant and size combination'
+      }
+    ]
+
     attr_reader :validation_errors, :fixed_files
 
     def initialize(app)
@@ -127,6 +152,17 @@ module Ai
           end
         end
         
+        # Apply component prop fixes
+        COMPONENT_PROP_FIXES.each do |fix|
+          if line =~ fix[:pattern]
+            old_line = line.dup
+            line.gsub!(fix[:pattern], fix[:replacement])
+            if line != old_line
+              Rails.logger.info "[TypescriptValidator] #{fix[:description]} on line #{index + 1}"
+            end
+          end
+        end
+        
         # JSX-specific fixes for common patterns that escaped the above
         # Fix className with backslash before closing quote
         line.gsub!(/(\w+)="([^"]*)\\"([^>]*)>/) do |match|
@@ -194,6 +230,33 @@ module Ai
               type: 'unescaped_quotes',
               content: line.strip,
               suggestion: suggest_fix(line)
+            }
+          end
+        end
+        
+        # Check for invalid Button component props
+        if line.include?('<Button')
+          # Check for invalid variants
+          if line =~ /variant="(cta|hero|primary|large)"/
+            variant = $1
+            errors << {
+              file: filepath,
+              line: index + 1,
+              type: 'invalid_button_variant',
+              content: line.strip,
+              suggestion: "Replace variant=\"#{variant}\" with one of: #{BUTTON_VARIANTS.join(', ')}"
+            }
+          end
+          
+          # Check for invalid sizes
+          if line =~ /size="(xl|extra-large|big)"/
+            size = $1
+            errors << {
+              file: filepath,
+              line: index + 1,
+              type: 'invalid_button_size',
+              content: line.strip,
+              suggestion: "Replace size=\"#{size}\" with one of: #{BUTTON_SIZES.join(', ')}"
             }
           end
         end

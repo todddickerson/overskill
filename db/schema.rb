@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_21_155503) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_25_162214) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -537,6 +537,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_21_155503) do
     t.text "file_sync_error"
     t.datetime "file_sync_attempted_at"
     t.text "file_sync_stats"
+    t.string "preview_websocket_url"
+    t.string "preview_status"
+    t.text "preview_error"
+    t.decimal "preview_deployment_time"
+    t.datetime "preview_provisioned_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"

@@ -90,7 +90,7 @@ class DeployAppJob < ApplicationJob
       Rails.logger.info "[DeployAppJob] Including workflow file in push to activate GitHub Actions"
     end
     
-    sync_result = github_service.push_file_structure(file_structure)
+    sync_result = github_service.push_file_structure(file_structure, environment)
     
     unless sync_result[:success]
       # Broadcast sync failure with detailed error

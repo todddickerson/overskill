@@ -42,6 +42,10 @@ shallow do
         resources :app_security_policies
         resources :app_audit_logs
         resources :app_env_vars
+        
+        member do
+          post :create_preview_environment
+        end
       end
     end
     

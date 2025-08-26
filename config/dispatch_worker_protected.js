@@ -68,10 +68,12 @@ function isReservedSubdomain(hostname) {
 }
 
 function parseAppRouting(hostname, path) {
-  // Method 1: Subdomain routing (overskill.com custom domain)
-  // Examples: abc123.overskill.com, preview-abc123.overskill.com
-  if (hostname.endsWith('.overskill.com')) {
-    const subdomain = hostname.replace('.overskill.com', '');
+  // Method 1: Subdomain routing (overskill.com OR overskill.app custom domain)
+  // Examples: abc123.overskill.com, preview-abc123.overskill.app
+  const isOverskillDomain = hostname.endsWith('.overskill.com') || hostname.endsWith('.overskill.app');
+  
+  if (isOverskillDomain) {
+    const subdomain = hostname.replace('.overskill.com', '').replace('.overskill.app', '');
     
     if (subdomain === 'overskill' || subdomain === 'www') {
       return { scriptName: null }; // Landing page
@@ -160,9 +162,9 @@ function generateLandingPage(request, env) {
     
     <div class="routing">
       <strong>🔀 Supported App URL Formats:</strong><br/>
-      • Production: https://{app-id}.overskill.com<br/>
-      • Preview: https://preview-{app-id}.overskill.com<br/>
-      • Staging: https://staging-{app-id}.overskill.com<br/>
+      • Production: https://{app-id}.overskill.app or .overskill.com<br/>
+      • Preview: https://preview-{app-id}.overskill.app or .overskill.com<br/>
+      • Staging: https://staging-{app-id}.overskill.app or .overskill.com<br/>
       • Fallback: https://dispatch-worker.workers.dev/app/{app-id}
     </div>
     

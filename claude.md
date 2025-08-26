@@ -86,14 +86,24 @@ bin/super scaffold crud Project Team title:text_field description:trix_editor
 ```
 
 ## ðŸ"Š Current Development Plans
-<!-- Rails Development Planner maintains this section -->
-- **WFP_IMPLEMENTATION_PLAN.md** - âœ… Complete (50k+ app architecture)
-- **DEVELOPER_EXPERIENCE_ENHANCEMENT_PLAN.md** - âœ… Phase 2.2 Complete
-- **COMPREHENSIVE_WFP_IMPLEMENTATION_PLAN.md** - âš¡ Live preview + tool streaming
-- **docs/testing/** - âœ… AI testing framework complete
+<!-- Active Implementation Plan -->
+### ðŸŽ¯ PRIMARY FOCUS: COMPREHENSIVE_WFP_IMPLEMENTATION_PLAN.md
+- **Phase 1**: Live Preview Infrastructure (5-10s provisioning)
+- **Phase 2**: Real-time Tool Streaming (sub-100ms latency)  
+- **Phase 3**: 50K+ App Scale Architecture ($0.007/app/month)
+
+### âœ… Completed Plans (August 25, 2025)
+- **System Prompt Cache Optimization** - Reduced tokens by 93% (134k â†' 9k)
+- **WFP Deployment** - Fixed routing, URLs now working correctly
+- **Developer Experience Enhancement** - Golden flow testing operational
+- **docs/testing/** - AI testing framework complete
 - **AI_CONTEXT_OPTIMIZATION_ARCHITECTURE.md** - âœ… Complete (75% cost reduction achieved)
 
-## ðŸ¤– AI Context Optimization (NEW)
+### ðŸ"š Archived Plans
+- Previous WFP plans moved to `docs/archive/`
+- Multi-agent coordination moved to `docs/future/`
+
+## ðŸ¤– AI Context Optimization
 **Architecture**: 6 specialized services replacing monolithic system
 - **ContextOrchestrator**: Hierarchical context assembly with Anthropic caching
 - **TemplateContextService**: 5 essential files (1-hour cache) vs 84 previously  
