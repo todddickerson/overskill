@@ -322,9 +322,28 @@ module Ai
         # Try to recover by finding the pattern in nearby lines
         if result[:error].include?("Search pattern does not match")
           @logger.info "[AiToolService] Attempting to find pattern in nearby lines..."
+          
+          # Track failures per file
+          @line_replace_failures ||= {}
+          @line_replace_failures[file_path] ||= 0
+          @line_replace_failures[file_path] += 1
+          
+          # After 3 failures on the same file, suggest os-write
+          if @line_replace_failures[file_path] >= 3
+            @logger.warn "[AiToolService] Multiple line-replace failures (#{@line_replace_failures[file_path]}) on #{file_path}, suggesting os-write"
+            return {
+              success: false,
+              error: "Multiple line-replace failures on this file. The line numbers appear to be incorrect.",
+              suggestion: "Use os-write to replace the entire file content instead of line-based replacement.",
+              failure_count: @line_replace_failures[file_path]
+            }
+          end
+          
           recovered_result = attempt_fuzzy_line_replacement(file, search_pattern, first_line, last_line, replacement)
           if recovered_result[:success]
             @logger.info "[AiToolService] Successfully recovered using fuzzy matching"
+            # Reset failure count on success
+            @line_replace_failures[file_path] = 0
             return recovered_result
           end
         end
@@ -345,7 +364,7 @@ module Ai
       # Normalize the search pattern for comparison
       normalized_search = search_pattern.strip.downcase.gsub(/\s+/, ' ')
       
-      # Search within a window
+      # IMPROVEMENT 1: First try window-based search
       start_search = [original_first_line - window_size, 1].max
       end_search = [original_last_line + window_size, file_lines.size].min
       
@@ -370,6 +389,34 @@ module Ai
         end
       end
       
+      # IMPROVEMENT 2: If window-based search fails, try content-based search across entire file
+      if !best_match && search_pattern.length > 20
+        @logger.info "[AiToolService] Window-based search failed, attempting content-based search across entire file"
+        
+        # Try to find exact or near-exact match anywhere in the file
+        search_lines = search_pattern.lines
+        if search_lines.any?
+          first_search_line = search_lines.first.strip
+          
+          file_lines.each_with_index do |line, idx|
+            if line.strip.include?(first_search_line) || calculate_similarity(line.strip.downcase, first_search_line.downcase) > 0.8
+              # Found potential start, check if rest matches
+              expected_lines = search_lines.length
+              actual_content = file_lines[idx, expected_lines].join
+              
+              score = calculate_similarity(normalized_search, actual_content.strip.downcase.gsub(/\s+/, ' '))
+              
+              if score > 0.65 # Lower threshold for content-based search
+                best_match = { start: idx + 1, end: idx + expected_lines, content: actual_content }
+                best_score = score
+                @logger.info "[AiToolService] Found content-based match at lines #{best_match[:start]}-#{best_match[:end]} with #{(best_score * 100).round}% similarity"
+                break
+              end
+            end
+          end
+        end
+      end
+      
       if best_match
         @logger.info "[AiToolService] Found fuzzy match at lines #{best_match[:start]}-#{best_match[:end]} with #{(best_score * 100).round}% similarity"
         
@@ -385,8 +432,19 @@ module Ai
         result[:fuzzy_match_used] = true if result[:success]
         result
       else
+        # IMPROVEMENT 3: Provide helpful context about what's actually at those lines
+        actual_content = file_lines[(original_first_line - 1)..[original_last_line - 1, file_lines.size - 1].min].join
+        actual_preview = actual_content.lines.first(3).join.strip[0..100] rescue ""
+        
         @logger.warn "[AiToolService] Could not find fuzzy match for pattern"
-        { success: false, error: "Could not find pattern in file (even with fuzzy matching)" }
+        @logger.warn "[AiToolService] Actual content at lines #{original_first_line}-#{original_last_line}: #{actual_preview}..."
+        
+        { 
+          success: false, 
+          error: "Could not find pattern in file. The content at lines #{original_first_line}-#{original_last_line} is different from expected.",
+          actual_content_preview: actual_preview,
+          suggestion: "Consider using os-view to check the file content first, or use os-write to replace the entire file."
+        }
       end
     end
     
