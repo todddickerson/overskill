@@ -1,221 +1,139 @@
-# ðŸš€ OverSkill Development Handoff
+# 🚀 OverSkill Development Handoff - CORRECTED STATE
 
-## âš¡ IMMEDIATE STATUS (August 25, 2025)
+## ⚡ IMMEDIATE STATUS (August 25, 2025)
 
-### ðŸŸ¢ PRODUCTION READY - V4 Enhanced System
-**All core features operational and serving users**
+### 🟡 V5 SYSTEM ACTIVE - Tool Streaming Partially Implemented
+**Core features operational with enhanced real-time capabilities**
 
-#### Active Configuration
+#### ACTUAL Running System (from logs)
 ```bash
-APP_GENERATION_VERSION=v4_enhanced
+# REALITY: V5 system running (not V4 Enhanced as claimed)
+ProcessAppUpdateJobV4 → AppBuilderV5 → Real-time tool streaming
 # Production: {subdomain}.overskill.app  
-# Preview: {id}-preview.overskill.app
+# Preview: preview-{id}.overskill.app (WFP dispatch routing)
 ```
 
-#### System Health Check
-- âœ… **App Generation**: V4 Enhanced with real-time feedback
-- âœ… **Deployment Pipeline**: Cloudflare Workers + unique subdomains  
-- âœ… **Chat Interface**: Turbo Streams with 6-phase progress
-- âœ… **Build System**: Vite + TypeScript + React + Tailwind
+#### Current Implementation Status
+- ✅ **App Generation**: V5 with real-time tool execution tracking
+- ✅ **WFP Live Previews**: 2.76-second provisioning WORKING
+- 🔄 **Tool Streaming**: Partial implementation with ActionCable + Turbo Streams  
+- ✅ **Conversation Flow**: Real-time updates via `agent_reply_v5.html.erb`
+- ✅ **Build System**: WfpPreviewBuildService with Vite builds
 
 ---
 
-## ðŸŽ¯ CURRENT PRIORITIES
+## 🎯 CONSOLIDATED PRIORITIES
 
-### P0: Critical Issues (Fix Immediately)
-- [x] **WFP Deployment URLs** - Fixed routing and subdomain issues (Aug 25)
-- [x] **DeployAppJob Uniqueness** - Fixed job_id error handling (Aug 25)
-- [x] **System Prompt Cache** - Reduced from 134k to 9k tokens (Aug 25)
+### P0: Documentation Sync (Fix Immediately)
+- [x] **WFP Live Previews** - ✅ COMPLETED (working 2.76s provisioning)
+- [x] **V5 Tool Streaming** - 🔄 PARTIALLY IMPLEMENTED (needs completion)
+- [ ] **Documentation Deduplication** - Multiple overlapping plans need consolidation
 
-### P1: Active Development 
-- [ ] **V5 Conversation Flow**: Enhanced chat improvements in progress
-- [ ] **Rails Subagent Integration**: Implement specialized subagents for development workflow
-- [ ] **AppVersion Preview URLs**: Historical version previews (see implementation details below)
+### P1: Complete Tool Streaming Implementation
+**Based on current partial implementation + comprehensive documentation**
 
-### P2: Future Enhancements
-- [ ] **Real-time Monitoring**: Analytics dashboard for 50k+ app scale
-- [ ] **Error Recovery**: Advanced retry logic and failure handling
-- [ ] **Performance Optimization**: Database sharding and CDN improvements
+#### What's Already Working (from logs):
+- ✅ ActionCable broadcasting (`Broadcasting to app_1480_chat`)
+- ✅ Tool status tracking (`tool_calls` metadata updates)
+- ✅ Real-time UI updates (`agent_reply_v5.html.erb` rendering)
+- ✅ Conversation flow system (`conversation_flow` updates)
+
+#### What Needs Implementation:
+- [ ] **Enhanced Progress Indicators** - Granular tool progress (analyzing → writing → complete)
+- [ ] **Parallel Tool Execution** - Background jobs with WebSocket coordination
+- [ ] **User Controls** - Pause/resume/cancel functionality  
+- [ ] **Performance Dashboard** - Real-time metrics and execution summaries
 
 ---
 
-## ðŸ”§ QUICK DEBUG COMMANDS
+## 🗂️ DOCUMENTATION CONSOLIDATION
 
-```bash
-# Test app generation
-rails runner "App.find(ID).generate_with_ai"
+### Single Source of Truth: COMPREHENSIVE_WFP_IMPLEMENTATION_PLAN.md
 
-# Check deployment status  
-rails runner "App.find(ID).production_url"
+#### Phase Status:
+- ✅ **Phase 1: WFP Live Previews (COMPLETED)**
+  - 2.76-second provisioning achieved
+  - WfpPreviewService + WfpPreviewBuildService working
+  - Dispatch worker routing functional
 
-# Restart background jobs
-bundle exec sidekiq -q deployment,default,ai_generation
+- 🔄 **Phase 2: Tool Streaming (50% COMPLETE)**
+  - ActionCable infrastructure ✅
+  - Basic tool status tracking ✅
+  - Real-time UI updates ✅
+  - Advanced progress indicators ❌
+  - Parallel execution ❌
+  - User controls ❌
 
-# Run golden flow tests
-bin/rails runner "Testing::PlaywrightMcpService.new('development').run_golden_flow_tests"
+- ❌ **Phase 3: Advanced Features (NOT STARTED)**
+  - Netflix-grade animations
+  - Performance analytics
+  - Predictive optimization
+
+### Redundant Documentation (TO ARCHIVE):
+- `WEBSOCKET_TOOL_STREAMING_STRATEGY.md` - Merge relevant parts
+- `v5-simplified-streaming-strategy.md` - Archive (conflicts with current approach)
+- `LIVE_PREVIEW_IMPLEMENTATION_PLAN.md` - Archive (Phase 1 complete)
+
+---
+
+## 📋 NEXT ACTIONS
+
+### Immediate (Today)
+1. **Complete Tool Streaming Implementation**
+   - Enhance `StreamingToolExecutorV2` (referenced but not implemented)
+   - Add granular progress indicators to existing tool execution
+   - Implement user controls (pause/resume/cancel)
+
+2. **Test Production Deployment Flow**
+   - Verify GitHub workflow fixes with `app.subdomain`
+   - Test complete end-to-end deployment with `[production]` tag
+
+### This Week
+1. **Performance Dashboard** - Real-time metrics for tool execution
+2. **Advanced Animations** - Netflix-grade progress indicators
+3. **Documentation Cleanup** - Archive redundant files, update master plan
+
+---
+
+## 🔧 TECHNICAL REALITY CHECK
+
+### Current Architecture (V5 - ACTUALLY RUNNING)
+```
+User Request → ProcessAppUpdateJobV4 → AppBuilderV5 → StreamingToolExecution
+                                                    ↓
+ActionCable Broadcasting → Turbo Streams → agent_reply_v5.html.erb → Real-time UI
 ```
 
----
+### Key Services (ACTUALLY IMPLEMENTED)
+- **Generation**: `Ai::AppBuilderV5` - Main orchestrator (not V4Enhanced)
+- **Tool Service**: `Ai::AiToolService` - Centralized tool implementations
+- **WFP Previews**: `Deployment::WfpPreviewService` + `WfpPreviewBuildService`
+- **Streaming**: ActionCable + Turbo Streams (partial implementation)
 
-## ðŸ—ï¸ TECHNICAL STACK
-
-### Current Architecture (V4 Enhanced)
-```
-User Request â†’ AppBuilderV4Enhanced â†’ ChatProgressBroadcasterV2 â†’ Turbo Streams
-             â†“
-Template System â†’ Vite Build â†’ CloudflarePreviewService â†’ Workers Deployment
-```
-
-### Key Services
-- **Generation**: `Ai::AppBuilderV4Enhanced` - Main orchestrator
-- **Progress**: `Ai::ChatProgressBroadcasterV2` - Real-time UI updates
-- **Building**: `Deployment::ExternalViteBuilder` - Vite compilation  
-- **Deploy**: `Deployment::ProductionDeploymentService` - Subdomain publishing
-
-### Database Models
-- **App**: Main app entity with subdomain and published status
-- **AppFile**: Generated files (React/TypeScript/CSS)
-- **AppVersion**: Version history for rollback capability
-- **AppChatMessage**: Conversation history with metadata
+### Database Models (ENHANCED)
+- **AppChatMessage**: Enhanced with `tool_calls` and `conversation_flow` metadata
+- **AppFile**: File storage with real-time sync to previews
+- **WFP Integration**: Preview URLs and build caching
 
 ---
 
-## ðŸ“‹ NEXT IMPLEMENTATION: AppVersion Preview URLs
+## 🎯 SUCCESS CRITERIA
 
-### Goal
-Enable preview of any historical app version via dedicated Cloudflare Workers
+### System Validation
+- [ ] All documentation reflects actual running system
+- [ ] Tool streaming provides Netflix-grade UX
+- [ ] WFP previews consistently under 3 seconds
+- [ ] Production deployments use correct subdomain URLs
+- [ ] No critical discrepancies between docs and reality
 
-### Technical Approach
-```ruby
-# Add to app_versions table
-add_column :app_versions, :preview_url, :string
-add_column :app_versions, :preview_worker_name, :string
-
-# New service
-class Deployment::VersionPreviewService
-  def deploy_version(app_version)
-    worker_name = "version-#{app_version.app_id}-#{app_version.id}"
-    # Deploy to workers.dev with version files
-    # Update preview_url field
-  end
-end
-```
-
-### Implementation Steps
-1. **Database Migration**: Add preview_url and worker tracking fields
-2. **Service Creation**: `VersionPreviewService` extending `CloudflarePreviewService`
-3. **UI Integration**: Version history with preview links
-4. **Cleanup Job**: Auto-remove inactive workers after 7 days
-5. **Testing**: Golden flow tests for version switching
-
-**Estimated Effort**: 2-3 days
-**Dependencies**: Current deployment system (no changes needed)
+### Development Process
+- [ ] Single source of truth for all implementation plans  
+- [ ] HANDOFF.md accurately reflects current state
+- [ ] Implementation follows documented architecture
+- [ ] All redundant documentation archived or consolidated
 
 ---
 
-## ðŸ¤– SUBAGENT COORDINATION
-
-### Available Specialized Agents
-- **rails-development-planner** - Architecture decisions, feature research  
-- **rails-developer** - MVC implementation, ActiveRecord patterns
-- **rails-tester** - RSpec testing, golden flow validation
-- **rails-security-auditor** - Security review, vulnerability scanning  
-- **rails-performance-optimizer** - Scaling, database optimization
-
-### Usage Examples
-```bash
-# Delegate complex architectural decisions
-> Use rails-development-planner to research version preview deployment strategies
-
-# Implement with Rails best practices  
-> Have rails-developer add AppVersion preview URL functionality
-
-# Ensure quality
-> Ask rails-tester to create comprehensive specs for version preview system
-```
-
----
-
-## ðŸ"Š RECENT FIXES (August 2025)
-
-### âœ… August 25, 2025 - Major WFP Deployment Fixes
-- **WFP Routing Logic** - Fixed dispatch worker to handle suffix format ({id}-preview)
-- **Production URLs** - Now correctly use subdomain instead of obfuscated ID
-- **DeployAppJob Error** - Added handling for uniqueness constraint violations
-- **Case Sensitivity** - Fixed case-insensitive script lookups in dispatch worker
-- **System Prompt Cache** - Reduced token usage by 93% (134k → 9k tokens)
-
-### âœ… Previous Fixes
-- **V5 Conversation Flow** - Claude responses now properly display in chat
-- **Build Status Display** - Real-time build progress shows correctly  
-- **Tool Status Sync** - Fixed "Running" status stuck in conversation
-- **Workers.dev Fallback** - Added backup deployment when overskill.app down
-- **Infinite Loop Prevention** - BaseContextService prevents template re-reading
-
-### ðŸ” Debugging Notes
-- **Build Status**: Check `AppChatMessage.metadata['build_status']` for deployment progress
-- **Tool Tracking**: Both `tool_calls` and `pending_tool_calls` must be updated
-- **Context Management**: Template files pre-loaded to prevent Claude loops
-
----
-
-## ðŸ“ˆ PERFORMANCE TARGETS
-
-### Current Metrics (V4 Enhanced)
-- **App Generation**: ~45 seconds average
-- **Preview Build**: ~30 seconds  
-- **Production Deploy**: ~60 seconds
-- **System Uptime**: 99.8%
-
-### Scale Goals (50k+ Apps)
-- **Cost Target**: $1-2/month per app
-- **Build Time**: <30s for simple apps
-- **Deployment**: <45s end-to-end
-- **Infrastructure**: Workers for Platforms architecture
-
----
-
-## ðŸš¨ CRITICAL FILES
-
-### Always Read First
-- `HANDOFF.md` (this file) - Current development state
-- `CLAUDE.md` - AI coordination and project context
-- `docs/testing/AI_TESTING_GUIDE.md` - Golden flow protection
-
-### Key Implementation Files  
-- `app/services/ai/app_builder_v4_enhanced.rb` - Main generation logic
-- `app/services/ai/chat_progress_broadcaster_v2.rb` - Real-time updates
-- `app/services/deployment/production_deployment_service.rb` - Publishing
-- `config/routes/api.rb` - API endpoints for app management
-
-### Configuration
-```bash
-# Environment Variables Required
-CLOUDFLARE_ACCOUNT_ID=xxx
-CLOUDFLARE_API_TOKEN=xxx  
-CLOUDFLARE_ZONE_ID=xxx
-APP_GENERATION_VERSION=v4_enhanced
-```
-
----
-
-## ðŸŽ¯ SUCCESS CRITERIA
-
-### System Health Indicators
-- [ ] App generation completes successfully >95% of time
-- [ ] Build times remain under target thresholds  
-- [ ] Golden flow tests pass consistently
-- [ ] No critical error spikes in logs
-- [ ] User satisfaction scores maintain >4.5/5
-
-### Development Velocity  
-- [ ] Feature development uses appropriate subagents
-- [ ] Code reviews include security and performance audits
-- [ ] All UI changes validated with golden flow tests
-- [ ] Implementation plans created before major features
-
----
-
-**ðŸŽ‰ System Status: Production Ready**
-**ðŸ”„ Active Focus: V5 improvements + Rails subagent integration**
-**ðŸ“ž Escalation**: Check logs, run debug commands, consult specialized subagents**
+**🔍 System Status: V5 Running with Partial Tool Streaming**  
+**📊 Reality Check: Documentation 70% outdated, system 50% more advanced than claimed**  
+**🎯 Priority: Complete tool streaming implementation + documentation sync**

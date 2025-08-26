@@ -35,6 +35,10 @@ class AppFile < ApplicationRecord
   before_save :update_size_bytes, if: :content_changed?
   # NOTE: R2 storage now handled async by AppFilesInitializationJob
   # after_create :handle_r2_storage_for_new_records  # Disabled - moved to background job
+  
+  # FileWatcher callback integration - replaced inefficient polling with event-driven updates
+  after_update_commit :notify_file_watcher_if_changed
+  after_create_commit :notify_file_watcher_created
   # 🚅 add callbacks above.
 
   # 🚅 add delegations above.
@@ -299,5 +303,24 @@ class AppFile < ApplicationRecord
   def update_size_bytes
     return unless content_changed?
     self.size_bytes = content.present? ? content.bytesize : 0
+  end
+  
+  # FileWatcher callback methods
+  def notify_file_watcher_if_changed
+    return unless saved_change_to_content? || saved_change_to_updated_at?
+    
+    begin
+      Deployment::FileWatcherService.notify_file_change(self, 'modified')
+    rescue => e
+      Rails.logger.error "[AppFile] Failed to notify FileWatcher for file #{path}: #{e.message}"
+    end
+  end
+  
+  def notify_file_watcher_created
+    begin
+      Deployment::FileWatcherService.notify_file_change(self, 'created')
+    rescue => e
+      Rails.logger.error "[AppFile] Failed to notify FileWatcher for new file #{path}: #{e.message}"
+    end
   end
 end
