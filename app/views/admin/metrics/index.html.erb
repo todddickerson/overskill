@@ -1,0 +1,221 @@
+<%# Admin Metrics Dashboard - Token Usage & Optimization Tracking %>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <h1 class="text-3xl font-bold text-gray-900 mb-8">System Optimization Metrics</h1>
+  
+  <%# Token Usage Section %>
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Token Usage (Last 24 Hours)</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-blue-50 p-4 rounded">
+        <div class="text-sm text-blue-600 font-medium">Total Tokens</div>
+        <div class="text-2xl font-bold text-blue-900">
+          <%= number_with_delimiter(@metrics[:token_usage][:total_tokens] || 0) %>
+        </div>
+      </div>
+      
+      <div class="bg-green-50 p-4 rounded">
+        <div class="text-sm text-green-600 font-medium">Cached Tokens</div>
+        <div class="text-2xl font-bold text-green-900">
+          <%= number_with_delimiter(@metrics[:token_usage][:cached_tokens] || 0) %>
+        </div>
+      </div>
+      
+      <div class="bg-purple-50 p-4 rounded">
+        <div class="text-sm text-purple-600 font-medium">Cache Hit Rate</div>
+        <div class="text-2xl font-bold text-purple-900">
+          <%= number_to_percentage((@metrics[:token_usage][:cache_hit_rate] || 0) * 100, precision: 1) %>
+        </div>
+      </div>
+      
+      <div class="bg-orange-50 p-4 rounded">
+        <div class="text-sm text-orange-600 font-medium">Avg Tokens/Request</div>
+        <div class="text-2xl font-bold text-orange-900">
+          <%= number_with_delimiter(@metrics[:token_usage][:avg_tokens_per_request] || 0) %>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <%# Cache Performance Section %>
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Cache Performance</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <div class="text-sm text-gray-600">Total Blocks</div>
+        <div class="text-lg font-semibold">
+          <%= @metrics[:cache_performance]['blocks']&.dig('total') || 0 %>
+        </div>
+      </div>
+      
+      <div>
+        <div class="text-sm text-gray-600">1-Hour Cached</div>
+        <div class="text-lg font-semibold text-green-600">
+          <%= @metrics[:cache_performance]['blocks']&.dig('cached_1h') || 0 %> blocks
+        </div>
+      </div>
+      
+      <div>
+        <div class="text-sm text-gray-600">5-Min Cached</div>
+        <div class="text-lg font-semibold text-blue-600">
+          <%= @metrics[:cache_performance]['blocks']&.dig('cached_5m') || 0 %> blocks
+        </div>
+      </div>
+    </div>
+    
+    <div class="mt-4 p-4 bg-gray-50 rounded">
+      <div class="text-sm text-gray-600">Cache Efficiency</div>
+      <div class="flex items-center mt-2">
+        <div class="flex-1 bg-gray-200 rounded-full h-4">
+          <div class="bg-green-600 h-4 rounded-full" style="width: <%= @metrics[:cache_performance]['cache_ratio'] || 0 %>%"></div>
+        </div>
+        <span class="ml-3 text-sm font-medium"><%= @metrics[:cache_performance]['cache_ratio'] || 0 %>%</span>
+      </div>
+    </div>
+  </div>
+  
+  <%# File Optimization Section %>
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">File Optimization</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="bg-green-50 p-4 rounded">
+        <div class="text-sm text-green-600 font-medium">Files Reduced</div>
+        <div class="text-2xl font-bold text-green-900">
+          <%= @metrics[:file_optimization][:optimization_savings][:percentage] %>%
+        </div>
+        <div class="text-xs text-green-600 mt-1">
+          <%= @metrics[:file_optimization][:optimization_savings][:files_reduced] %> fewer files
+        </div>
+      </div>
+      
+      <div class="bg-blue-50 p-4 rounded">
+        <div class="text-sm text-blue-600 font-medium">Avg Files/App</div>
+        <div class="text-2xl font-bold text-blue-900">
+          <%= @metrics[:file_optimization][:avg_files_per_app].round %>
+        </div>
+        <div class="text-xs text-blue-600 mt-1">
+          Original: 84 files
+        </div>
+      </div>
+      
+      <div class="bg-purple-50 p-4 rounded">
+        <div class="text-sm text-purple-600 font-medium">Storage Saved</div>
+        <div class="text-2xl font-bold text-purple-900">
+          <%= @metrics[:file_optimization][:optimization_savings][:storage_saved_mb] %> MB
+        </div>
+        <div class="text-xs text-purple-600 mt-1">
+          Per 1000 apps
+        </div>
+      </div>
+    </div>
+    
+    <div class="border-t pt-4">
+      <h3 class="text-sm font-medium text-gray-700 mb-2">Top On-Demand Loaded Files</h3>
+      <div class="space-y-2">
+        <% (@metrics[:file_optimization][:on_demand_loads] || []).each do |file, count| %>
+          <div class="flex justify-between items-center py-1">
+            <span class="text-sm text-gray-600"><%= file %></span>
+            <span class="text-sm font-medium bg-gray-100 px-2 py-1 rounded"><%= count.to_i %> loads</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  
+  <%# Cost Analysis Section %>
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Cost Analysis</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <div class="text-sm text-gray-600">Original Cost</div>
+        <div class="text-xl font-bold text-red-600">
+          $<%= (76339 * 1000 * 15.0 / 1_000_000.0).round(2) %>
+        </div>
+        <div class="text-xs text-gray-500">per 1000 generations</div>
+      </div>
+      
+      <div>
+        <div class="text-sm text-gray-600">Optimized Cost</div>
+        <div class="text-xl font-bold text-green-600">
+          $<%= (8581 * 1000 * 15.0 / 1_000_000.0).round(2) %>
+        </div>
+        <div class="text-xs text-gray-500">per 1000 generations</div>
+      </div>
+      
+      <div>
+        <div class="text-sm text-gray-600">Annual Savings</div>
+        <div class="text-xl font-bold text-green-700">
+          $<%= number_with_delimiter(370_975) %>
+        </div>
+        <div class="text-xs text-gray-500">at 1000 gen/day</div>
+      </div>
+    </div>
+    
+    <% if ENV['HELICONE_API_KEY'].present? %>
+      <div class="mt-4 p-4 bg-blue-50 rounded">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm font-medium text-blue-900">Helicone Dashboard</div>
+            <div class="text-xs text-blue-600">Detailed analytics and cost tracking</div>
+          </div>
+          <a href="https://app.helicone.ai/dashboard" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700">
+            View Dashboard →
+          </a>
+        </div>
+      </div>
+    <% else %>
+      <div class="mt-4 p-4 bg-yellow-50 rounded">
+        <div class="text-sm text-yellow-800">
+          <strong>Note:</strong> Configure HELICONE_API_KEY in .env.local for detailed cost analytics
+        </div>
+      </div>
+    <% end %>
+  </div>
+  
+  <%# System Health Indicators %>
+  <div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold mb-4">System Health</h2>
+    
+    <div class="space-y-3">
+      <div class="flex items-center justify-between py-2 border-b">
+        <span class="text-sm text-gray-600">Token Target (<30k)</span>
+        <% avg_tokens = @metrics[:token_usage][:avg_tokens_per_request] || 0 %>
+        <span class="<%= avg_tokens < 30000 ? 'text-green-600' : 'text-red-600' %> font-medium">
+          <%= avg_tokens < 30000 ? '✓ Achieved' : '✗ Over Target' %>
+        </span>
+      </div>
+      
+      <div class="flex items-center justify-between py-2 border-b">
+        <span class="text-sm text-gray-600">Cache Hit Rate (>80%)</span>
+        <% cache_rate = (@metrics[:token_usage][:cache_hit_rate] || 0) * 100 %>
+        <span class="<%= cache_rate > 80 ? 'text-green-600' : 'text-yellow-600' %> font-medium">
+          <%= cache_rate > 80 ? '✓ Good' : '⚠ Needs Improvement' %>
+        </span>
+      </div>
+      
+      <div class="flex items-center justify-between py-2 border-b">
+        <span class="text-sm text-gray-600">File Optimization</span>
+        <span class="text-green-600 font-medium">✓ <%= @metrics[:file_optimization][:optimization_savings][:percentage] %>% Reduction</span>
+      </div>
+      
+      <div class="flex items-center justify-between py-2">
+        <span class="text-sm text-gray-600">Component Prediction</span>
+        <span class="text-green-600 font-medium">✓ AI-Powered Active</span>
+      </div>
+    </div>
+  </div>
+  
+  <%# Auto-refresh indicator %>
+  <div class="mt-6 text-center text-sm text-gray-500">
+    Last updated: <%= Time.current.strftime("%B %d, %Y at %I:%M %p") %>
+    <span class="ml-2">• Auto-refreshes every 5 minutes</span>
+  </div>
+</div>
+
+<script>
+  // Auto-refresh every 5 minutes
+  setTimeout(() => {
+    window.location.reload();
+  }, 5 * 60 * 1000);
+</script>

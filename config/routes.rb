@@ -29,6 +29,11 @@ Rails.application.routes.draw do
   # Admin analytics dashboard (protected)
   authenticate :user, ->(user) { user.email == ENV["SUPER_ADMIN_EMAIL"] } do
     mount AhoyCaptain::Engine, at: "/admin/analytics"
+    
+    # System optimization metrics dashboard
+    namespace :admin do
+      resources :metrics, only: [:index]
+    end
   end
 
   namespace :webhooks do
