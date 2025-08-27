@@ -225,7 +225,7 @@
           <% message.conversation_flow.each_with_index do |item, idx| %>
             <% if item['type'] == 'tools' %>
               <%# Accumulate consecutive tool entries %>
-              <% current_tools.concat(item['calls'] || item['tool_calls'] || []) %>
+              <% current_tools.concat(item['tools'] || item['calls'] || item['tool_calls'] || []) %>
               <%# Check if next item is also tools, if not, flush %>
               <% next_item = message.conversation_flow[idx + 1] %>
               <% if !next_item || next_item['type'] != 'tools' %>

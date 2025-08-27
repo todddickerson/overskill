@@ -763,7 +763,14 @@ module Ai
       
       begin
         uri = URI(source_url)
-        response = Net::HTTP.get_response(uri)
+        # Add timeout to prevent hanging
+        response = Net::HTTP.start(uri.host, uri.port, 
+                                  use_ssl: uri.scheme == 'https',
+                                  open_timeout: 10,
+                                  read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          http.request(request)
+        end
         
         if response.is_a?(Net::HTTPSuccess)
           content = response.body.force_encoding('UTF-8')
@@ -1032,13 +1039,14 @@ module Ai
           return nil
         end
         
-        # Fetch file from GitHub template repository
+        # Fetch file from GitHub template repository with timeout
         response = HTTParty.get(
           "https://api.github.com/repos/Overskill-apps/overskill-vite-template/contents/#{file_path}",
           headers: {
             'Authorization' => "Bearer #{token}",
             'Accept' => 'application/vnd.github.v3+json'
-          }
+          },
+          timeout: 15
         )
         
         if response.code == 200

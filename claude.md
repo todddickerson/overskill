@@ -32,7 +32,15 @@
 - **Context7 MCP** - Documentation lookups and knowledge base
 - **Rails MCP** - Rails-specific commands and patterns (if available)
 
-## ðŸ“‹ Quick Commands
+## 🚀 Streaming Tool Execution (FIXED)
+**Real-time parallel tool execution with UI feedback - OPERATIONAL!**
+- **Documentation**: `docs/STREAMING_TOOL_EXECUTION_COMPLETE_GUIDE.md`
+- **Critical Fix Applied**: AppBuilderV5 handles `stop_reason='stop'` (lines 1681-1759)
+- **Timeout Bug Fixed**: StreamingToolCoordinator preserves successful tool statuses
+- **Success Indicator**: `[V5_TOOLS] STREAMING FIX: Found N tool calls with stop_reason='stop'`
+- **Monitor**: `tail -f log/development.log | grep -E "STREAMING|V5_TOOLS|COORDINATOR"`
+
+## ðŸ"‹ Quick Commands
 ```bash
 # Golden flow testing (PROTECT CORE WORKFLOWS)
 bin/rails runner "Testing::PlaywrightMcpService.new('development').run_golden_flow_tests"

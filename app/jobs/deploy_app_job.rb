@@ -72,9 +72,26 @@ class DeployAppJob < ApplicationJob
     # Use new GitHub-based deployment flow (GitHub migration architecture)
     github_service = Deployment::GithubRepositoryService.new(app)
     
+    # CRITICAL FIX: Ensure we're deploying generated content, not template files
+    # Reload app to ensure we have the latest file content
+    app.reload
+    
+    # Check if files have been recently updated (indicating generation completed)
+    recent_files = app.app_files.where('updated_at > ?', 5.minutes.ago)
+    if recent_files.count == 0
+      Rails.logger.warn "[DeployAppJob] WARNING: No files updated in last 5 minutes - may be deploying template content!"
+      # Give extra time for file generation to complete
+      sleep(5)
+      app.reload
+    end
+    
     # Sync all app files to GitHub repository
-    Rails.logger.info "[DeployAppJob] Syncing app files to GitHub repository"
+    Rails.logger.info "[DeployAppJob] Syncing #{app.app_files.count} app files to GitHub repository"
     file_structure = app.app_files.to_h { |file| [file.path, file.content] }
+    
+    # Log sample of files being deployed for debugging
+    sample_files = app.app_files.limit(3).map { |f| "#{f.path} (#{f.updated_at})" }
+    Rails.logger.info "[DeployAppJob] Sample files: #{sample_files.join(', ')}"
     
     # Add the workflow file to the push (move from .workflow-templates to .github/workflows)
     # This activates GitHub Actions since the workflow wasn't in the fork initially

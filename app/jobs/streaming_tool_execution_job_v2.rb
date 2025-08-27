@@ -12,6 +12,9 @@ class StreamingToolExecutionJobV2 < ApplicationJob
     @tool_index = tool_index
     @iteration_count = iteration_count
     
+    # Handle both string and symbol keys for compatibility
+    tool_call = tool_call.deep_stringify_keys if tool_call.is_a?(Hash)
+    
     tool_name = tool_call['function']['name']
     tool_args = JSON.parse(tool_call['function']['arguments']) rescue {}
     

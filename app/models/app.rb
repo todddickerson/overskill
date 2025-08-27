@@ -297,8 +297,8 @@ class App < ApplicationRecord
 
     # Trigger job unless explicitly told not to (e.g., when controller handles it)
     unless skip_job_trigger
-      Rails.logger.info "[App] Triggering V5 orchestrator for message ##{message.id}"
-      ProcessAppUpdateJobV5.perform_later(message) # V5 wrapper delegates to V4
+      Rails.logger.info "[App] Triggering V5 orchestrator for message ##{assistant_message.id}"
+      ProcessAppUpdateJobV5.perform_later(assistant_message) # V5 wrapper delegates to V4 - FIXED: Use assistant_message not user message
     end
     
     # Update status

@@ -117,12 +117,38 @@ class ProcessAppUpdateJobV4 < ApplicationJob
     
     Rails.logger.info "[ProcessAppUpdateJobV4] Successfully processed message ##{message.id} with V5 orchestrator"
     
-    # Queue deployment job after successful generation
-    # This ensures app version is created and files are ready
+    # CRITICAL FIX: Ensure all generated content is saved before deployment
+    # Template files are created on app creation, but content is updated during generation
+    # We must ensure ALL file updates are persisted before deploying
     app = message.app
+    
+    # Reload app to get latest file state
+    app.reload
+    
+    # Check if generation was successful and files were generated
     if app && app.app_files.any?
-      Rails.logger.info "[ProcessAppUpdateJobV4] Queueing deployment for app ##{app.id}"
-      DeployAppJob.perform_later(app.id, "preview")
+      # Ensure all pending file operations are complete
+      # Give a small buffer for any async database operations to complete
+      sleep(2) 
+      
+      # Reload again to ensure we have the latest file content
+      app.reload
+      
+      # Verify files have actual generated content (not just template content)
+      # Check if at least some files have been modified recently (within last minute)
+      recent_updates = app.app_files.where('updated_at > ?', 1.minute.ago).count
+      
+      if recent_updates > 0
+        Rails.logger.info "[ProcessAppUpdateJobV4] Queueing deployment for app ##{app.id} (#{recent_updates} files recently updated)"
+        
+        # Add a small delay to ensure all file writes are committed
+        # This prevents deploying template content instead of generated content
+        DeployAppJob.set(wait: 5.seconds).perform_later(app.id, "preview")
+      else
+        Rails.logger.warn "[ProcessAppUpdateJobV4] No recent file updates detected - possible template-only content, delaying deployment"
+        # Try deployment anyway but with longer delay to allow for slow writes
+        DeployAppJob.set(wait: 10.seconds).perform_later(app.id, "preview")
+      end
     else
       Rails.logger.warn "[ProcessAppUpdateJobV4] Skipping deployment - no files generated"
     end

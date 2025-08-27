@@ -47,7 +47,15 @@ Rails.application.configure do
   config.active_support.report_deprecations = false
 
   # Replace the default in-process memory cache store with a durable alternative.
-  # config.cache_store = :mem_cache_store
+  # Using Redis cache for V2 coordinator and better performance
+  config.cache_store = :redis_cache_store, { 
+    url: ENV['REDIS_URL'],
+    namespace: 'overskill_cache',
+    expires_in: 60.minutes,
+    race_condition_ttl: 5.seconds,
+    compress: true,
+    compress_threshold: 1.kilobyte
+  }
 
   # Replace the default in-process and non-durable queuing backend for Active Job.
   # config.active_job.queue_adapter = :resque
@@ -168,4 +176,7 @@ Rails.application.configure do
   # ✅ YOUR APPLICATION'S CONFIGURATION
   # If you need to customize your application's configuration, this is the place to do it. This helps avoid merge
   # conflicts in the future when Rails or Bullet Train update their own default settings.
+  
+  # Incremental Tool Streaming - Enable async tool execution for better performance
+  ENV['INCREMENTAL_TOOL_STREAMING'] ||= 'true'
 end

@@ -1,5 +1,6 @@
 web: bin/rails server -p 3000
 worker: bundle exec sidekiq -t 25
+extra_workers: bundle exec sidekiq -t 25
 js: THEME=light yarn js
 light-css: THEME=light yarn light:build:css
 light-mailer-css: THEME=light yarn light:build:mailer:css

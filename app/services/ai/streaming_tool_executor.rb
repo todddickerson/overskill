@@ -14,7 +14,12 @@ class Ai::StreamingToolExecutor
     tool_name = tool_call['name'] || tool_call['function']['name']
     tool_args = tool_call['arguments'] || tool_call['function']['arguments']
     
-    Rails.logger.info "[STREAMING] Starting tool execution: #{tool_name}"
+    # Parse arguments if they're a JSON string
+    if tool_args.is_a?(String)
+      tool_args = JSON.parse(tool_args) rescue {}
+    end
+    
+    Rails.logger.info "[STREAMING] Starting tool execution: #{tool_name} with args: #{tool_args.inspect}"
     
     # Mark tool as running and broadcast
     update_tool_status(tool_name, tool_args['file_path'], 'running')
@@ -43,7 +48,14 @@ class Ai::StreamingToolExecutor
       update_tool_status(tool_name, tool_args['file_path'], 'complete')
       broadcast_update
       
-      result
+      # Ensure we return a proper result structure
+      if result.nil?
+        { success: true, content: "Tool #{tool_name} completed" }
+      elsif result.is_a?(Hash) && result[:error]
+        result # Already has error structure
+      else
+        result # Return as-is if properly structured
+      end
       
     rescue => e
       Rails.logger.error "[STREAMING] Tool execution failed: #{e.message}"
@@ -161,14 +173,25 @@ class Ai::StreamingToolExecutor
 
   def execute_generic_tool(tool_call)
     tool_name = tool_call['name'] || tool_call['function']['name']
-    tool_args = tool_call['arguments'] || tool_call['function']['arguments']
+    tool_args = tool_call['arguments'] || tool_call['function']['arguments'] || {}
     
-    Rails.logger.info "[STREAMING] Executing generic tool: #{tool_name}"
+    # Parse arguments if they're a JSON string
+    if tool_args.is_a?(String)
+      tool_args = JSON.parse(tool_args) rescue {}
+    end
+    
+    Rails.logger.info "[STREAMING] Executing generic tool: #{tool_name} with args: #{tool_args.inspect}"
     
     # Try to find and execute the tool method
-    if @tool_service.respond_to?(tool_name.underscore)
-      @tool_service.send(tool_name.underscore, *tool_args.values)
+    method_name = tool_name.underscore.gsub('-', '_')
+    
+    if @tool_service.respond_to?(method_name)
+      # Pass arguments as hash, not splat - most tool methods expect a hash
+      result = @tool_service.send(method_name, tool_args)
+      Rails.logger.info "[STREAMING] Generic tool #{tool_name} returned: #{result.inspect}"
+      result
     else
+      Rails.logger.error "[STREAMING] Unknown tool method: #{method_name}"
       { error: "Unknown tool: #{tool_name}" }
     end
   end
@@ -185,12 +208,18 @@ class Ai::StreamingToolExecutor
     updated_flow.reverse.each do |item|
       next unless item['type'] == 'tools'
       
-      tool_calls = item['calls'] || item['tool_calls'] || []
-      tool_calls.each do |tool|
-        if tool['name'] == tool_name && tool['file_path'] == file_path
+      # FIXED: Use 'tools' key to match StreamingToolCoordinator structure
+      tools = item['tools'] || []
+      tools.each do |tool|
+        # Match by name (and optionally file_path if present)
+        if tool['name'] == tool_name && (file_path.nil? || tool['file_path'] == file_path || tool.dig('args', 'file_path') == file_path)
           tool['status'] = status
           tool['error'] = error_msg if error_msg
           tool['updated_at'] = Time.current.iso8601
+          # Set result if completing with error
+          if status == 'complete' && error_msg
+            tool['result'] = { error: error_msg }
+          end
           break
         end
       end

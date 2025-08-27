@@ -1,4 +1,4 @@
-:concurrency: 5
+:concurrency: 10
 staging:
   :concurrency: 5
 production:
@@ -8,6 +8,7 @@ production:
   - ai_generation
   - ai_naming
   - ai_processing
+  - tools
   - deployment
   - preview_updates
   - default

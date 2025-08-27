@@ -177,6 +177,8 @@ module Ai
     def handle_content_block_start(block, index)
       return unless block
       
+      Rails.logger.info "[INCREMENTAL_STREAMER] content_block_start: type=#{block["type"]}, sse_index=#{index}"
+      
       case block["type"]
       when "tool_use"
         # NEW TOOL DETECTED - Dispatch callback immediately!
@@ -191,12 +193,13 @@ module Ai
           name: block["name"],
           id: block["id"],
           input_json: "",
-          index: @current_tool_index
+          index: @current_tool_index,
+          sse_block_index: index  # CRITICAL: Track the SSE content block index!
         }
         
         @current_tool_index += 1
         
-        Rails.logger.info "[INCREMENTAL_STREAMER] Tool detected: #{tool_info[:name]} (#{tool_info[:id]})"
+        Rails.logger.info "[INCREMENTAL_STREAMER] Tool detected: #{tool_info[:name]} (#{tool_info[:id]}) at SSE index #{index}"
         @callbacks[:on_tool_start]&.call(tool_info)
         
       when "text"
@@ -215,9 +218,17 @@ module Ai
       case delta["type"]
       when "input_json_delta"
         # Accumulate tool input JSON
-        tool_id = find_tool_id_by_index(index)
-        if tool_id && @tool_buffers[tool_id]
-          @tool_buffers[tool_id][:input_json] += delta["partial_json"] || ""
+        json_chunk = delta["partial_json"] || ""
+        Rails.logger.info "[INCREMENTAL_STREAMER] input_json_delta for SSE index #{index}: #{json_chunk.length} chars"
+        
+        # Find tool by SSE block index
+        tool_entry = @tool_buffers.find { |id, data| data[:sse_block_index] == index }
+        if tool_entry
+          tool_id, tool_data = tool_entry
+          @tool_buffers[tool_id][:input_json] += json_chunk
+          Rails.logger.info "[INCREMENTAL_STREAMER] Accumulated #{@tool_buffers[tool_id][:input_json].length} chars for tool #{tool_data[:name]}"
+        else
+          Rails.logger.warn "[INCREMENTAL_STREAMER] No tool buffer found for SSE index #{index}"
         end
         
       when "text_delta"
@@ -235,15 +246,21 @@ module Ai
     end
     
     def handle_content_block_stop(index)
+      Rails.logger.info "[INCREMENTAL_STREAMER] content_block_stop for index #{index}"
+      Rails.logger.info "[INCREMENTAL_STREAMER] Current tool_buffers: #{@tool_buffers.keys.inspect}"
+      
       # Check if this is a tool completion
       tool_id = find_tool_id_by_index(index)
+      Rails.logger.info "[INCREMENTAL_STREAMER] Found tool_id: #{tool_id.inspect} for index #{index}"
       
       if tool_id && @tool_buffers[tool_id]
         tool_data = @tool_buffers[tool_id]
+        Rails.logger.info "[INCREMENTAL_STREAMER] Tool buffer data: name=#{tool_data[:name]}, json_length=#{tool_data[:input_json]&.length}"
         
         begin
           # Parse the complete tool input
           input_json = JSON.parse(tool_data[:input_json])
+          Rails.logger.info "[INCREMENTAL_STREAMER] Successfully parsed JSON for tool #{tool_data[:name]}"
           
           # Build complete tool call
           tool_call = {
@@ -278,7 +295,14 @@ module Ai
     def find_tool_id_by_index(index)
       # SSE events use index to reference content blocks
       # We need to map this back to our tool_id
-      @tool_buffers.values.find { |t| t[:index] == index }&.dig(:id)
+      # NOTE: The index from SSE is the global content block index, not our tool index
+      Rails.logger.info "[INCREMENTAL_STREAMER] Searching for tool with SSE block index #{index}"
+      @tool_buffers.each do |tool_id, data|
+        Rails.logger.info "[INCREMENTAL_STREAMER]   Buffer #{tool_id}: tool_index=#{data[:index]}, sse_block_index=#{data[:sse_block_index]}"
+      end
+      
+      # We need to track the SSE block index when creating the tool
+      @tool_buffers.find { |id, data| data[:sse_block_index] == index }&.first
     end
     
     def finalize_stream

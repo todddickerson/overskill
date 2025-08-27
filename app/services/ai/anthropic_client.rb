@@ -158,14 +158,19 @@ module Ai
         end
       end
 
-      # Separate system message from other messages for Anthropic API
+      # Handle system messages - preserve cache optimizations while fixing caching
       system_message = nil
       api_messages = []
       
       messages.each do |msg|
         if msg[:role] == "system"
-          # Support both string and array format for system prompts (for caching)
-          system_message = msg[:content]
+          if msg[:cache_control]
+            # System message has cache_control - keep it in messages array for proper caching
+            api_messages << msg
+          else
+            # Regular system message - use legacy system parameter
+            system_message = msg[:content]
+          end
         else
           api_messages << msg
         end
@@ -300,7 +305,7 @@ module Ai
       
       response = retry_result[:result]
       result = response.parsed_response
-      usage = result.dig("usage")
+      usage = result.is_a?(Hash) ? result.dig("usage") : nil
 
       # Log cache statistics if available
       if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
@@ -318,7 +323,7 @@ module Ai
 
       response_data = {
         success: true,
-        content: result.dig("content", 0, "text"),
+        content: result.is_a?(Hash) ? result.dig("content", 0, "text") : nil,
         usage: usage,
         model: model_id,
         cache_performance: extract_cache_performance(usage)
@@ -331,6 +336,13 @@ module Ai
       end
 
       response_data
+    end
+
+    # Incremental streaming method that dispatches tools as they arrive
+    # Rather than waiting for the complete response
+    def stream_chat_with_tools_incremental(messages, tools, callbacks = {}, options = {})
+      streamer = IncrementalToolStreamer.new(self)
+      streamer.stream_chat_with_tools(messages, tools, callbacks, options)
     end
 
     def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: true, thinking_budget: nil, stream: false)
@@ -346,14 +358,19 @@ module Ai
         messages = apply_cache_breakpoints(messages, cache_breakpoints)
       end
 
-      # Separate system message from other messages for Anthropic API
+      # Handle system messages - preserve cache optimizations while fixing caching  
       system_message = nil
       api_messages = []
       
       messages.each do |msg|
         if msg[:role] == "system"
-          # Support both string and array format for system prompts (for caching)
-          system_message = msg[:content]
+          if msg[:cache_control]
+            # System message has cache_control - keep it in messages array for proper caching
+            api_messages << msg
+          else
+            # Regular system message - use legacy system parameter
+            system_message = msg[:content]
+          end
         else
           api_messages << msg
         end
@@ -514,7 +531,7 @@ module Ai
       
       response = retry_result[:result]
       result = response.parsed_response
-      usage = result.dig("usage")
+      usage = result.is_a?(Hash) ? result.dig("usage") : nil
       
       if usage && ENV["VERBOSE_AI_LOGGING"] == "true"
         cache_creation_tokens = usage["cache_creation_input_tokens"] || 0
@@ -529,43 +546,133 @@ module Ai
         Rails.logger.info "[AI] Anthropic tools usage#{helicone_status} - Input: #{regular_input_tokens}, Output: #{output_tokens}, Cache Created: #{cache_creation_tokens}, Cache Read: #{cache_read_tokens}, Cost: $#{cost}, Savings: $#{cache_savings}"
       end
 
-      # Extract tool calls and thinking blocks from Anthropic's response format
+      # FIXED: Handle both streaming and non-streaming response formats
       tool_calls = []
       thinking_blocks = []
-      content_blocks = result.dig("content") || []
+      text_content = ""
+      stop_reason = nil
       
-      content_blocks.each do |block|
-        case block["type"]
-        when "tool_use"
-          tool_calls << {
-            "id" => block["id"],
-            "type" => "function",
-            "function" => {
-              "name" => block["name"],
-              "arguments" => block["input"].to_json
+      if stream
+        # STREAMING RESPONSE FORMAT: Process streamed response chunks
+        Rails.logger.info "[AnthropicClient] Processing streaming response format"
+        
+        if result.is_a?(String)
+          # Streaming responses may come as concatenated JSON lines
+          lines = result.split("\n").select { |line| line.strip.start_with?("data:") }
+          
+          lines.each do |line|
+            begin
+              json_data = line.sub(/^data:\s*/, "").strip
+              next if json_data == "[DONE]" || json_data.empty?
+              
+              chunk = JSON.parse(json_data)
+              
+              # Handle different chunk types  
+              case chunk["type"]
+              when "content_block_start"
+                block = chunk.dig("content_block")
+                if block&.dig("type") == "tool_use"
+                  # Start of a tool use block
+                  tool_calls << {
+                    "id" => block["id"],
+                    "type" => "function", 
+                    "function" => {
+                      "name" => block["name"],
+                      "arguments" => "" # Will be built incrementally
+                    },
+                    "partial_input" => ""
+                  }
+                end
+              when "content_block_delta"
+                delta = chunk.dig("delta")
+                if delta&.dig("type") == "input_json_delta" && tool_calls.any?
+                  # Add to the partial input of the last tool call
+                  tool_calls.last["partial_input"] += delta["partial_json"] || ""
+                elsif delta&.dig("type") == "text_delta"
+                  text_content += delta["text"] || ""
+                end
+              when "content_block_stop"
+                # Finalize the last tool call if it exists
+                if tool_calls.any? && tool_calls.last["partial_input"]
+                  begin
+                    full_input = JSON.parse(tool_calls.last["partial_input"])
+                    tool_calls.last["function"]["arguments"] = full_input.to_json
+                    tool_calls.last.delete("partial_input")
+                  rescue JSON::ParserError => e
+                    Rails.logger.error "[AnthropicClient] Failed to parse tool input: #{e.message}"
+                    tool_calls.pop # Remove invalid tool call
+                  end
+                end
+              when "message_stop"
+                stop_reason = chunk["stop_reason"] || "stop"
+              end
+              
+            rescue JSON::ParserError => e
+              Rails.logger.error "[AnthropicClient] Failed to parse streaming chunk: #{e.message}"
+              next
+            end
+          end
+          
+        elsif result.is_a?(Hash) && result["content"]
+          # Fallback: Treat as regular response format
+          content_blocks = result["content"] || []
+          stop_reason = result["stop_reason"]
+          
+          content_blocks.each do |block|
+            case block["type"]
+            when "tool_use"
+              tool_calls << {
+                "id" => block["id"],
+                "type" => "function",
+                "function" => {
+                  "name" => block["name"],
+                  "arguments" => block["input"].to_json
+                }
+              }
+            when "text"
+              text_content += block["text"] || ""
+            end
+          end
+        end
+        
+        Rails.logger.info "[AnthropicClient] Streaming response parsed: #{tool_calls.size} tools, #{text_content.length} chars content"
+        
+      else
+        # NON-STREAMING RESPONSE FORMAT: Standard processing
+        Rails.logger.debug "[AnthropicClient] Processing non-streaming response format" if ENV["VERBOSE_AI_LOGGING"] == "true"
+        
+        content_blocks = result.is_a?(Hash) ? (result.dig("content") || []) : []
+        stop_reason = result.is_a?(Hash) ? result.dig("stop_reason") : nil
+        
+        content_blocks.each do |block|
+          case block["type"]
+          when "tool_use"
+            tool_calls << {
+              "id" => block["id"],
+              "type" => "function",
+              "function" => {
+                "name" => block["name"],
+                "arguments" => block["input"].to_json
+              }
             }
-          }
-        when "thinking"
-          thinking_blocks << {
-            "type" => "thinking",
-            "thinking" => block["thinking"],  # CORRECT: Use 'thinking' not 'content'!
-            "signature" => block["signature"]  # Preserve cryptographic signature
-          }
+          when "thinking"
+            thinking_blocks << {
+              "type" => "thinking",
+              "thinking" => block["thinking"],  # CORRECT: Use 'thinking' not 'content'!
+              "signature" => block["signature"]  # Preserve cryptographic signature
+            }
+          when "text"
+            text_content += block["text"] || ""
+          end
         end
       end
-
-      # Extract text content
-      text_content = content_blocks
-        .select { |block| block["type"] == "text" }
-        .map { |block| block["text"] }
-        .join("\n")
 
       {
         success: true,
         content: text_content,
         tool_calls: tool_calls,
         thinking_blocks: thinking_blocks,
-        stop_reason: result.dig("stop_reason"),  # CRITICAL: Add stop_reason for proper tool handling
+        stop_reason: stop_reason,
         usage: usage,
         model: model_id,
         cache_performance: extract_cache_performance(usage)

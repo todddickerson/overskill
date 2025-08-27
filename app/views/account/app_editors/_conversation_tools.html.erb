@@ -41,17 +41,30 @@
             </span>
           <% end %>
           
-          <% if tool['status'] == 'error' %>
+          <% case tool['status'] %>
+          <% when 'error' %>
             <span class="text-red-500 ml-2">
               <i class="fas fa-times-circle"></i> Failed
             </span>
-          <% elsif tool['status'] == 'running' %>
+          <% when 'running' %>
             <span class="text-yellow-500 ml-2">
-              <i class="fas fa-spinner fa-spin"></i> Running
+              <i class="fas fa-spinner fa-spin"></i> Executing
+            </span>
+          <% when 'queued' %>
+            <span class="text-blue-500 ml-2">
+              <i class="fas fa-clock"></i> Queued
+            </span>
+          <% when 'pending' %>
+            <span class="text-gray-400 ml-2">
+              <i class="fas fa-hourglass-start"></i> Pending
+            </span>
+          <% when 'complete' %>
+            <span class="text-green-500 ml-2">
+              <i class="fas fa-check-circle"></i> Complete
             </span>
           <% else %>
-            <span class="text-green-500 ml-2">
-              <i class="fas fa-check-circle"></i>
+            <span class="text-gray-500 ml-2">
+              <i class="fas fa-question-circle"></i> <%= tool['status'] || 'Unknown' %>
             </span>
           <% end %>
         </div>

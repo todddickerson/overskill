@@ -53,20 +53,33 @@ module Ai
       
       Rails.logger.info "[SIMPLE_STREAMER] Updating #{tool_name}: #{status}"
       
-      # CRITICAL: Add tool call to message.tool_calls for database persistence
-      @message.tool_calls << {
-        'name' => tool_name,
-        'status' => status,
-        'error' => error_msg,
-        'timestamp' => Time.current.iso8601
-      }
+      # CRITICAL FIX: Only append to tool_calls for tracking purposes, not for each status update
+      # This array is for debugging/audit trail only
+      if status == 'complete' || status == 'error'
+        @message.tool_calls << {
+          'name' => tool_name,
+          'status' => status,
+          'error' => error_msg,
+          'timestamp' => Time.current.iso8601
+        }
+      end
       
       # Find and update the tools entry in conversation_flow
       flow = @message.conversation_flow.deep_dup
       tools_entry = flow.reverse.find { |item| item['type'] == 'tools' }
       
       if tools_entry
-        tool = tools_entry['tools']&.find { |t| t['name'] == tool_name }
+        # CRITICAL FIX: Find the right tool by matching status
+        # When updating to 'running', find the first 'pending' tool with this name
+        # When updating to 'complete', find the first 'running' tool with this name
+        tool = if status == 'running'
+          tools_entry['tools']&.find { |t| t['name'] == tool_name && t['status'] == 'pending' }
+        elsif status == 'complete' || status == 'error'
+          tools_entry['tools']&.find { |t| t['name'] == tool_name && t['status'] == 'running' }
+        else
+          tools_entry['tools']&.find { |t| t['name'] == tool_name }
+        end
+        
         if tool
           tool['status'] = status
           tool['started_at'] = Time.current.iso8601 if status == 'running'
@@ -82,27 +95,23 @@ module Ai
           
           # Always persist to database immediately (both tool_calls and conversation_flow)
           @message.update!(conversation_flow: flow, tool_calls: @message.tool_calls)
-          @pending_changes = true
           
-          # Broadcast periodically or on completion
-          should_broadcast = (Time.current - @last_broadcast_time) >= @broadcast_interval ||
-                           %w[complete error].include?(status) ||
-                           tools_entry['status'] == 'completed'
-          
-          if should_broadcast
-            broadcast_update("Tool #{tool_name} #{status}")
-            @last_broadcast_time = Time.current
-            @pending_changes = false
-          end
+          # ALWAYS broadcast immediately for real-time updates
+          # This ensures the UI shows the correct state as soon as it changes
+          broadcast_update("Tool #{tool_name} #{status}")
+          @last_broadcast_time = Time.current
+          @pending_changes = false
+        else
+          Rails.logger.warn "[SIMPLE_STREAMER] Could not find tool #{tool_name} with appropriate status to update to #{status}"
         end
       end
     end
 
-    # Add progress message for current tool (buffered)
+    # Add progress message for current tool (immediate broadcast)
     def add_progress_message(tool_name, message)
       Rails.logger.info "[SIMPLE_STREAMER] Progress for #{tool_name}: #{message}"
       
-      # Update tool with progress message without constant broadcasting
+      # Update tool with progress message
       flow = @message.conversation_flow.deep_dup
       tools_entry = flow.reverse.find { |item| item['type'] == 'tools' }
       
@@ -112,15 +121,12 @@ module Ai
           tool['progress'] = message
           tool['progress_updated_at'] = Time.current.iso8601
           @message.update!(conversation_flow: flow)
-          @pending_changes = true
+          
+          # ALWAYS broadcast immediately for real-time progress
+          broadcast_update("#{tool_name}: #{message}")
+          @last_broadcast_time = Time.current
+          @pending_changes = false
         end
-      end
-      
-      # Only broadcast if enough time has passed
-      if (Time.current - @last_broadcast_time) >= @broadcast_interval
-        broadcast_update("#{tool_name}: #{message}")
-        @last_broadcast_time = Time.current
-        @pending_changes = false
       end
     end
 
