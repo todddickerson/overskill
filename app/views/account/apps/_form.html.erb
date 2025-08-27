@@ -57,7 +57,7 @@
         
         <%# Hidden fields with defaults %>
         <%= form.hidden_field :creator_id, value: current_membership.id %>
-        <%= form.hidden_field :status, value: "generating" %>
+        <%= form.hidden_field :status, value: "draft" %>
         <%= form.hidden_field :visibility, value: "private" %>
       <% else %>
         <%# For existing apps, show all fields %>

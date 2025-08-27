@@ -31,6 +31,10 @@ module Ai
         Rails.logger.info "[V5_GITHUB] Repository mode enabled for app ##{@app.id}"
       end
       
+      # Initialize incremental streaming feature flag
+      @incremental_streaming_enabled = ENV['INCREMENTAL_TOOL_STREAMING'] == 'true'
+      Rails.logger.info "[V5_INIT] Incremental streaming: #{@incremental_streaming_enabled ? 'ENABLED' : 'disabled'}"
+      
       # Initialize centralized tool service for cleaner architecture
       # All tool implementations are now in AiToolService for better maintainability
       # See app/services/ai/ai_tool_service.rb for tool implementations
@@ -76,6 +80,10 @@ module Ai
       
       # Initialize file change tracker for granular caching
       @file_tracker = FileChangeTracker.new(@app.id)
+      
+      # Configure streaming mode for tools and API calls
+      @streaming_enabled = true # Feature flag for streaming tools execution 
+      @api_streaming_enabled = true # API streaming enabled for monitoring verification
       
       # Initialize state
       @agent_state = {
@@ -1539,6 +1547,13 @@ module Ai
 
     # CRITICAL FIX: Implement proper tool calling cycle according to Anthropic docs
     def execute_tool_calling_cycle(client, messages, tools, helicone_session)
+      # Check if incremental streaming is enabled
+      if @incremental_streaming_enabled
+        Rails.logger.info "[V5_INCREMENTAL] Using incremental tool streaming"
+        return execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session)
+      end
+      
+      # Fallback to traditional streaming
       conversation_messages = messages.dup
       tool_cycles = 0
       max_tool_cycles = 30  # Prevent infinite loops
@@ -1574,6 +1589,7 @@ module Ai
             conversation_messages,
             tools,
             model: :claude_sonnet_4,
+            stream: @api_streaming_enabled,
             use_cache: true,
             temperature: 0.7,
             max_tokens: 48000,
@@ -1674,18 +1690,84 @@ module Ai
           break
           
         when 'stop', 'end_turn'
-          # Claude finished normally
-          Rails.logger.info "[V5_TOOLS] Claude completed response normally"
-          
-          # Add text content to conversation_flow if present and not already added
-          if response[:content].present? && !content_added_to_flow
-            add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
-            Rails.logger.info "[V5_TOOLS] Added final text content to conversation_flow"
-          elsif content_added_to_flow
-            Rails.logger.info "[V5_TOOLS] Skipped adding text content - already added before tools"
+          # CRITICAL FIX: API streaming sets stop_reason='stop' even with tool calls
+          # Check for tool calls even when stop_reason is 'stop'
+          if response[:tool_calls].present?
+            Rails.logger.info "[V5_TOOLS] STREAMING FIX: Found #{response[:tool_calls].size} tool calls with stop_reason='stop'"
+            
+            # CRITICAL: Add text content to conversation_flow BEFORE tools
+            if response[:content].present?
+              add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+              content_added_to_flow = true  # Mark that we've added this response content
+              Rails.logger.info "[V5_TOOLS] Added text content to conversation_flow before tools"
+            end
+            
+            # CRITICAL: Add Claude's tool_use message to conversation history FIRST
+            assistant_message = {
+              role: 'assistant',
+              content: build_assistant_content_with_tools(response)
+            }
+            conversation_messages << assistant_message
+            
+            # Log the assistant message structure for verification
+            if ENV["VERBOSE_AI_LOGGING"] == "true"
+              Rails.logger.info "[V5_TOOLS] Assistant tool_use message added:"
+              assistant_message[:content].each do |block|
+                if block[:type] == 'tool_use'
+                  Rails.logger.info "  - tool_use: id=#{block[:id]}, name=#{block[:name]}"
+                end
+              end
+            end
+            
+            # Execute all tool calls and collect results
+            tool_results = execute_and_format_tool_results(response[:tool_calls])
+            
+            # CRITICAL: Add tool results as user message with correct formatting
+            # Tool results MUST come FIRST in content array (per Anthropic docs)
+            user_message = {
+              role: 'user',
+              content: tool_results  # All tool results in single message
+            }
+            conversation_messages << user_message
+            
+            # Log the user message structure for verification
+            if ENV["VERBOSE_AI_LOGGING"] == "true"
+              Rails.logger.info "[V5_TOOLS] User tool_result message added:"
+              user_message[:content].each do |block|
+                if block[:type] == 'tool_result'
+                  Rails.logger.info "  - tool_result: tool_use_id=#{block[:tool_use_id]}, has_content=#{block[:content].present?}"
+                end
+              end
+              Rails.logger.info "[V5_TOOLS] Conversation now has #{conversation_messages.size} messages"
+            end
+            
+            tool_cycles += 1
+            
+            # Safety check for infinite tool loops
+            if tool_cycles >= max_tool_cycles
+              Rails.logger.warn "[V5_TOOLS] Max tool cycles reached (#{max_tool_cycles})"
+              # Create a response indicating we hit the limit
+              response[:content] = "I've completed multiple rounds of file operations. The app structure has been updated." if response[:content].blank?
+              response[:stop_reason] = 'max_tool_cycles'
+              break
+            end
+            
+            # Continue the loop to get Claude's next response
+            next
+          else
+            # Claude finished normally without tool calls
+            Rails.logger.info "[V5_TOOLS] Claude completed response normally without tool calls"
+            
+            # Add text content to conversation_flow if present and not already added
+            if response[:content].present? && !content_added_to_flow
+              add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+              Rails.logger.info "[V5_TOOLS] Added final text content to conversation_flow"
+            elsif content_added_to_flow
+              Rails.logger.info "[V5_TOOLS] Skipped adding text content - already added before tools"
+            end
+            
+            break
           end
-          
-          break
           
         else
           Rails.logger.warn "[V5_TOOLS] Unknown stop reason: #{stop_reason}"
@@ -1737,6 +1819,321 @@ module Ai
       content_blocks
     end
 
+    # Check if deployment should be triggered after incremental completion
+    def trigger_deployment_if_ready
+      Rails.logger.info "[V5_INCREMENTAL] Checking if deployment should be triggered"
+      
+      # Check if app has files ready for deployment
+      if @app.app_files.any?
+        Rails.logger.info "[V5_INCREMENTAL] App has #{@app.app_files.count} files, triggering deployment"
+        
+        # Update status to trigger deployment
+        @app.update(status: 'ready_to_deploy')
+        
+        # Trigger deployment job
+        if @deploy_preview
+          deploy_preview_if_ready
+        else
+          deploy_app
+        end
+      else
+        Rails.logger.warn "[V5_INCREMENTAL] No files found, skipping deployment"
+      end
+    end
+    
+    # Continue incremental conversation after async tools complete
+    def continue_incremental_conversation(messages, iteration_count = 0)
+      @iteration_count = iteration_count
+      
+      Rails.logger.info "[V5_INCREMENTAL] Continuing conversation after async tool completion"
+      
+      # Reinitialize client and continue the conversation
+      client = Ai::AnthropicClient.instance
+      tools = Ai::AiToolService.tools_for_chat_with_claude
+      helicone_session = SecureRandom.uuid
+      
+      # Continue the tool calling cycle
+      result = execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session)
+      
+      # Handle the result
+      if result[:async_execution]
+        Rails.logger.info "[V5_INCREMENTAL] Another async execution started"
+      else
+        Rails.logger.info "[V5_INCREMENTAL] Conversation completed"
+        
+        # Trigger deployment if this was the final response
+        if result[:content].present? && !result[:tool_calls]&.any?
+          trigger_deployment_if_ready
+        end
+      end
+      
+      result
+    rescue => e
+      Rails.logger.error "[V5_INCREMENTAL] Error continuing conversation: #{e.message}"
+      Rails.logger.error e.backtrace.first(5).join("\n")
+      
+      # Update app status on error
+      @app.update(status: 'error')
+    end
+    
+    # NEW: Incremental tool streaming implementation
+    # Tools are dispatched AS they arrive in the stream, not after completion
+    def execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session)
+      conversation_messages = messages.dup
+      tool_cycles = 0
+      max_tool_cycles = 30
+      response = nil
+      content_added_to_flow = false
+      
+      Rails.logger.info "[V5_INCREMENTAL] Starting incremental tool calling cycle"
+      
+      loop do
+        content_added_to_flow = false
+        
+        # Initialize incremental coordinator for this cycle
+        coordinator = Ai::IncrementalToolCoordinator.new(@assistant_message, @app, @iteration_count)
+        execution_id = coordinator.initialize_incremental_execution
+        
+        # Track tools as they arrive incrementally
+        dispatched_tools = []
+        text_content = ""
+        thinking_blocks = []
+        
+        Rails.logger.info "[V5_INCREMENTAL] Cycle #{tool_cycles + 1}: Starting stream with incremental dispatch"
+        
+        begin
+          # Use incremental streaming with immediate tool dispatch
+          callbacks = {
+            on_tool_start: ->(tool_info) {
+              Rails.logger.info "[V5_INCREMENTAL] Tool detected: #{tool_info[:name]} at index #{tool_info[:index]}"
+              
+              # Update UI immediately to show tool appearing
+              coordinator.broadcast_tool_detected(execution_id, tool_info)
+            },
+            
+            on_tool_complete: ->(tool_call) {
+              Rails.logger.info "[V5_INCREMENTAL] Tool ready: #{tool_call[:function][:name]}"
+              
+              # CRITICAL: Dispatch to Sidekiq IMMEDIATELY
+              tool_index = coordinator.dispatch_tool_incrementally(execution_id, tool_call)
+              
+              # Track for conversation history
+              dispatched_tools << {
+                index: tool_index,
+                call: tool_call,
+                dispatched_at: Time.current
+              }
+              
+              Rails.logger.info "[V5_INCREMENTAL] Tool #{tool_index} dispatched immediately!"
+            },
+            
+            on_text: ->(text_chunk) {
+              text_content += text_chunk
+              # Could stream text to UI in real-time here
+            },
+            
+            on_thinking: ->(thinking_block) {
+              thinking_blocks << thinking_block
+            },
+            
+            on_complete: ->(result) {
+              Rails.logger.info "[V5_INCREMENTAL] Stream complete. Stop reason: #{result[:stop_reason]}"
+              Rails.logger.info "[V5_INCREMENTAL] #{dispatched_tools.size} tools already executing"
+              
+              response = result.merge(
+                tool_calls: dispatched_tools.map { |t| t[:call] },
+                content: text_content,
+                thinking_blocks: thinking_blocks
+              )
+            },
+            
+            on_error: ->(error) {
+              # Handle both hash and exception formats for safety
+              error_message = error.is_a?(Hash) ? error[:message] : error.message
+              Rails.logger.error "[V5_INCREMENTAL] Stream error: #{error_message}"
+              raise StandardError.new("Incremental streaming failed: #{error_message}")
+            }
+          }
+          
+          options = {
+            model: :claude_sonnet_4,
+            temperature: 0.7,
+            max_tokens: 48000,
+            helicone_session: helicone_session
+          }
+          
+          client.stream_chat_with_tools_incremental(
+            conversation_messages,
+            tools,
+            callbacks,
+            options
+          )
+          
+        rescue => e
+          log_claude_event("INCREMENTAL_STREAM_ERROR", {
+            error: e.message,
+            class: e.class.name,
+            dispatched_tools: dispatched_tools.size
+          })
+          raise e
+        end
+        
+        # Handle response based on stop reason
+        stop_reason = response[:stop_reason] || 'stop'
+        
+        case stop_reason
+        when 'tool_use'
+          # Tools are already dispatched and running!
+          if dispatched_tools.any?
+            Rails.logger.info "[V5_INCREMENTAL] #{dispatched_tools.size} tools already executing"
+            
+            # Add text content to flow before tools
+            if response[:content].present?
+              add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+              content_added_to_flow = true
+            end
+            
+            # Add assistant message with tool calls to conversation
+            assistant_message = {
+              role: 'assistant',
+              content: build_assistant_content_with_tools(response)
+            }
+            conversation_messages << assistant_message
+            
+            # ASYNC: Don't wait! Schedule completion check instead
+            coordinator.finalize_tool_count(execution_id, dispatched_tools.size)
+            
+            Rails.logger.info "[V5_INCREMENTAL] Scheduling async completion check for #{dispatched_tools.size} tools"
+            
+            # Schedule job to check completion and continue conversation
+            IncrementalToolCompletionJob.perform_later(
+              @assistant_message.id,
+              execution_id,
+              conversation_messages,
+              @iteration_count || 0
+            )
+            
+            # Return immediately - tools are executing in background
+            Rails.logger.info "[V5_INCREMENTAL] Returning immediately - tools executing asynchronously"
+            return response.merge(
+              tool_cycles: tool_cycles,
+              async_execution: true,
+              execution_id: execution_id
+            )
+            
+            # Add tool results as user message
+            user_message = {
+              role: 'user',
+              content: tool_results
+            }
+            conversation_messages << user_message
+            
+            tool_cycles += 1
+            
+            # Safety check
+            if tool_cycles >= max_tool_cycles
+              Rails.logger.warn "[V5_INCREMENTAL] Max tool cycles reached (#{max_tool_cycles})"
+              response[:content] = "I've completed multiple rounds of file operations. The app structure has been updated." if response[:content].blank?
+              response[:stop_reason] = 'max_tool_cycles'
+              break
+            end
+            
+            # Continue the conversation loop
+            next
+          else
+            Rails.logger.warn "[V5_INCREMENTAL] Stop reason 'tool_use' but no tools dispatched"
+            break
+          end
+          
+        when 'stop', 'end_turn'
+          # Check for tool calls even with stop reason (API streaming quirk)
+          if dispatched_tools.any?
+            Rails.logger.info "[V5_INCREMENTAL] Found #{dispatched_tools.size} tools with stop_reason='#{stop_reason}'"
+            
+            # Same flow as tool_use case above
+            if response[:content].present?
+              add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+              content_added_to_flow = true
+            end
+            
+            assistant_message = {
+              role: 'assistant',
+              content: build_assistant_content_with_tools(response)
+            }
+            conversation_messages << assistant_message
+            
+            # ASYNC: Same as tool_use case - don't wait!
+            coordinator.finalize_tool_count(execution_id, dispatched_tools.size)
+            
+            Rails.logger.info "[V5_INCREMENTAL] Stop with tools - scheduling async completion"
+            
+            IncrementalToolCompletionJob.perform_later(
+              @assistant_message.id,
+              execution_id,
+              conversation_messages,
+              @iteration_count || 0
+            )
+            
+            return response.merge(
+              tool_cycles: tool_cycles,
+              async_execution: true,
+              execution_id: execution_id
+            )
+            
+            tool_cycles += 1
+            
+            if tool_cycles >= max_tool_cycles
+              Rails.logger.warn "[V5_INCREMENTAL] Max tool cycles reached"
+              response[:content] = "I've completed multiple rounds of file operations. The app structure has been updated." if response[:content].blank?
+              response[:stop_reason] = 'max_tool_cycles'
+              break
+            end
+            
+            next
+          else
+            # Normal completion without tools
+            Rails.logger.info "[V5_INCREMENTAL] Completed normally without tools"
+            
+            if response[:content].present? && !content_added_to_flow
+              add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
+            end
+            
+            break
+          end
+          
+        else
+          Rails.logger.warn "[V5_INCREMENTAL] Unknown stop reason: #{stop_reason}"
+          break
+        end
+      end
+      
+      # Return final response
+      if response.nil?
+        Rails.logger.error "[V5_INCREMENTAL] No response available"
+        { success: false, error: "No response from incremental streaming", tool_cycles: tool_cycles }
+      else
+        response.merge(tool_cycles: tool_cycles, incremental_streaming: true)
+      end
+    end
+    
+    # Format tool results from incremental execution
+    def format_incremental_tool_results(dispatched_tools, tool_results_raw)
+      formatted_results = []
+      
+      dispatched_tools.each_with_index do |dispatched_tool, index|
+        tool_call = dispatched_tool[:call]
+        result_data = tool_results_raw[index] || { 'status' => 'error', 'error' => 'No result available' }
+        
+        formatted_results << {
+          type: 'tool_result',
+          tool_use_id: tool_call[:id],
+          content: result_data['status'] == 'success' ? result_data['result'] : "Error: #{result_data['error']}"
+        }
+      end
+      
+      formatted_results
+    end
+
     # Execute tools and format results according to Anthropic specs
     def execute_and_format_tool_results(tool_calls)
       tool_results = []
@@ -1746,100 +2143,91 @@ module Ai
       
       Rails.logger.info "[V5_TOOLS] Executing #{tool_calls.size} tools with incremental UI updates"
       
-      # Initialize simple tool streamer for real-time updates
-      streaming_enabled = true # Feature flag for streaming
-      Rails.logger.info "[V5_DEBUG] Streaming enabled: #{streaming_enabled}"
-      tool_streamer = streaming_enabled ? Ai::SimpleToolStreamer.new(@assistant_message, @app) : nil
-      Rails.logger.info "[V5_DEBUG] Tool streamer created: #{tool_streamer.present?}"
+      # Use simple streaming tool coordinator for immediate parallel execution
+      Rails.logger.info "[V5_TOOLS] Streaming tool execution enabled: #{@streaming_enabled}"
       
-      # Start tools execution tracking
-      tool_streamer&.start_tools_execution(tool_calls)
-      
-      # Execute ALL tool calls and collect results with incremental UI updates
-      tool_calls.each_with_index do |tool_call, index|
-        tool_name = tool_call['function']['name']
-        tool_args = JSON.parse(tool_call['function']['arguments'])
-        tool_id = tool_call['id']
+      if @streaming_enabled
+        # Launch all tools immediately as parallel Sidekiq jobs and wait for completion
+        # Using V2 coordinator with Rails.cache and deployment trigger
+        coordinator = Ai::StreamingToolCoordinatorV2.new(@assistant_message, @iteration_count)
+        tool_results = coordinator.execute_tools_in_parallel(tool_calls)
         
-        Rails.logger.info "[V5_TOOLS] Executing #{tool_name} (#{index + 1}/#{tool_calls.size}) with args: #{tool_args.keys.join(', ')}"
-        Rails.logger.info "[V5_DEBUG] About to execute tool, tool_streamer: #{tool_streamer.class.name rescue 'nil'}"
-        
-        # Execute the tool with proper error handling
-        result = begin
-          if tool_streamer
-            Rails.logger.info "[V5_DEBUG] Using tool streamer for #{tool_name}"
-            # Update status to running
-            tool_streamer.update_tool_status(tool_name, 'running')
-            
-            # Execute the actual tool
-            tool_result = execute_single_tool(tool_name, tool_args)
-            
-            # Update status based on result
-            if tool_result.is_a?(Hash) && tool_result[:error]
-              tool_streamer.update_tool_status(tool_name, 'error', tool_result[:error])
-            else
-              tool_streamer.update_tool_status(tool_name, 'complete')
-            end
-            
-            tool_result
-          else
-            Rails.logger.info "[V5_DEBUG] Using standard execution for #{tool_name}"
-            execute_single_tool(tool_name, tool_args)
-          end
-        rescue StandardError => e
-          Rails.logger.error "[V5_TOOLS] Tool execution failed: #{tool_name} - #{e.message}"
-          Rails.logger.error e.backtrace.first(5).join("\n")
-          
-          # Update streamer status to error on exception
-          tool_streamer&.update_tool_status(tool_name, 'error', e.message)
-          
-          # Return error result
-          { error: "Tool execution failed: #{e.message}" }
-        end
-        
-        # Format result according to Anthropic tool_result spec
-        tool_result_block = {
-          type: 'tool_result',
-          tool_use_id: tool_id  # CRITICAL: Must match the id from tool_use block
-        }
-        
-        # Validation: Ensure tool_id is present
-        if tool_id.blank?
-          Rails.logger.error "[V5_TOOLS] Missing tool_id for tool_result! Tool: #{tool_name}"
-          tool_id = "missing_id_#{SecureRandom.hex(8)}"
-          tool_result_block[:tool_use_id] = tool_id
-        end
-        
-        if result[:error]
-          tool_result_block[:content] = result[:error]
-          tool_result_block[:is_error] = true
-        else
-          # Format successful result
-          if result[:content].is_a?(String)
-            tool_result_block[:content] = result[:content]
-          else
-            # Convert complex results to JSON string
-            tool_result_block[:content] = result.to_json
-          end
-        end
-        
-        tool_results << tool_result_block
-        
-        # 🔥 INCREMENTAL UI UPDATE: Flush tools incrementally for better UX
-        if should_flush_incrementally?(index, tool_calls.size)
-          Rails.logger.info "[V5_TOOLS] Flushing #{@pending_tool_calls.size} tools to UI (#{index + 1}/#{tool_calls.size} completed)"
-          flush_pending_tool_calls
-          broadcast_message_update  # Trigger real-time UI update
-        end
+        Rails.logger.info "[V5_TOOLS] #{tool_calls.size} tools executed in parallel, received real results"
+      else
+        # Fallback to synchronous execution
+        Rails.logger.info "[V5_TOOLS] Using synchronous tool execution"
+        tool_results = execute_tools_synchronously(tool_calls)
       end
-      
-      # Flush any remaining pending tool calls (safety net)
-      flush_pending_tool_calls
       
       # CRITICAL: Return array of tool_result blocks (they must come first in content array)
       tool_results
     end
 
+    # Initialize tools section in conversation_flow for parallel execution
+    def initialize_tools_in_conversation_flow(tool_calls)
+      flow = @assistant_message.conversation_flow || []
+      
+      # Check if tools entry already exists
+      existing_tools = flow.reverse.find { |item| item['type'] == 'tools' }
+      
+      if existing_tools.nil?
+        tools_entry = {
+          'type' => 'tools',
+          'status' => 'executing',
+          'started_at' => Time.current.iso8601,
+          'tools' => tool_calls.map.with_index do |tool_call, index|
+            tool_args = JSON.parse(tool_call['function']['arguments']) rescue {}
+            {
+              'id' => index + 1,
+              'name' => tool_call['function']['name'],
+              'args' => extract_display_args(tool_args),
+              'status' => 'pending',
+              'started_at' => nil,
+              'completed_at' => nil,
+              'error' => nil
+            }
+          end
+        }
+        flow << tools_entry
+        @assistant_message.conversation_flow = flow
+        @assistant_message.save!
+        broadcast_message_update
+      end
+    end
+    
+    # Fallback method for synchronous tool execution
+    def execute_tools_synchronously(tool_calls)
+      tool_results = []
+      
+      tool_calls.each_with_index do |tool_call, index|
+        tool_name = tool_call['function']['name']
+        tool_args = JSON.parse(tool_call['function']['arguments'])
+        tool_id = tool_call['id']
+        
+        Rails.logger.info "[V5_TOOLS] Synchronous execution: #{tool_name}"
+        
+        # Execute the tool synchronously
+        result = execute_single_tool(tool_name, tool_args)
+        
+        # Format result according to Anthropic tool_result spec
+        tool_result_block = {
+          type: 'tool_result',
+          tool_use_id: tool_id
+        }
+        
+        if result[:error]
+          tool_result_block[:content] = result[:error]
+          tool_result_block[:is_error] = true
+        else
+          tool_result_block[:content] = result[:content] || "Tool completed successfully"
+        end
+        
+        tool_results << tool_result_block
+      end
+      
+      tool_results
+    end
+    
     # Execute a single tool and return result in consistent format
     def execute_single_tool(tool_name, tool_args)
       log_claude_event("TOOL_EXECUTE_START", {
@@ -2024,9 +2412,8 @@ module Ai
       Rails.logger.info "[V5_TOOLS] Created LineOffsetTracker for batch of #{tool_calls.size} tool calls"
       
       # Initialize streaming executor if enabled
-      streaming_enabled = true # Can be feature flagged later
-      Rails.logger.info "[V5_DEBUG] Streaming enabled: #{streaming_enabled}"
-      streaming_executor = streaming_enabled ? Ai::StreamingToolExecutor.new(@assistant_message, @app, @iteration_count) : nil
+      Rails.logger.info "[V5_DEBUG] Streaming enabled: #{@streaming_enabled}"
+      streaming_executor = @streaming_enabled ? Ai::StreamingToolExecutor.new(@assistant_message, @app, @iteration_count) : nil
       Rails.logger.info "[V5_DEBUG] Streaming executor created: #{streaming_executor.present?}"
       
       tool_calls.each_with_index do |tool_call, tool_index|
@@ -4205,6 +4592,38 @@ module Ai
     def add_to_conversation_flow(type:, content: nil, tool_calls: nil, iteration: nil)
       @assistant_message.conversation_flow ||= []
       
+      # CRITICAL FIX: Check if a tools entry already exists (created by SimpleToolStreamer)
+      # If it does, update it instead of creating a duplicate
+      if type == 'tools'
+        existing_tools_entry = @assistant_message.conversation_flow.reverse.find { |item| item['type'] == 'tools' }
+        
+        if existing_tools_entry && tool_calls.present?
+          Rails.logger.info "[V5_FLOW] Updating existing tools entry instead of creating duplicate"
+          
+          # Update the existing entry's calls/tools array
+          # Use 'tools' key for consistency with SimpleToolStreamer
+          existing_tools_entry['tools'] ||= []
+          
+          # Append new tool calls to existing ones
+          tool_calls.each do |tc|
+            # Find if this tool already exists and update it, or add new
+            existing_tool = existing_tools_entry['tools'].find { |t| t['name'] == tc['name'] && t['file_path'] == tc['file_path'] }
+            if existing_tool
+              existing_tool.merge!(tc)
+            else
+              existing_tools_entry['tools'] << tc
+            end
+          end
+          
+          # Must reassign array for ActiveRecord to detect change
+          @assistant_message.conversation_flow = @assistant_message.conversation_flow.deep_dup
+          @assistant_message.save!
+          
+          Rails.logger.info "[V5_FLOW] Updated tools in existing entry, total tools: #{existing_tools_entry['tools'].size}"
+          return
+        end
+      end
+      
       flow_entry = {
         'type' => type,
         'iteration' => iteration || @iteration_count,
@@ -4218,7 +4637,8 @@ module Ai
         flow_entry['content'] = content
         flow_entry['thinking_blocks'] = content.is_a?(Hash) ? content['thinking_blocks'] : nil
       when 'tools'
-        flow_entry['calls'] = tool_calls || []
+        # CRITICAL FIX: Use 'tools' instead of 'calls' for consistency with SimpleToolStreamer
+        flow_entry['tools'] = tool_calls || []
       when 'status'
         flow_entry['content'] = content
       when 'error'
