@@ -58,6 +58,14 @@ module Ai
             
             # Process complete SSE events
             while (event_end = stream_buffer.index("\n\n"))
+              Rails.logger.debug "[INCREMENTAL_STREAMER] Processing SSE event, event_end: #{event_end.inspect}"
+              
+              # Safety check for nil event_end (should never happen due to while condition)
+              if event_end.nil?
+                Rails.logger.error "[INCREMENTAL_STREAMER] event_end is nil, breaking loop"
+                break
+              end
+              
               event_data = stream_buffer[0...event_end]
               stream_buffer = stream_buffer[event_end + 2..-1]
               
@@ -222,11 +230,15 @@ module Ai
         Rails.logger.info "[INCREMENTAL_STREAMER] input_json_delta for SSE index #{index}: #{json_chunk.length} chars"
         
         # Find tool by SSE block index
-        tool_entry = @tool_buffers.find { |id, data| data[:sse_block_index] == index }
+        tool_entry = @tool_buffers.find { |id, data| data&.[](:sse_block_index) == index }
         if tool_entry
           tool_id, tool_data = tool_entry
-          @tool_buffers[tool_id][:input_json] += json_chunk
-          Rails.logger.info "[INCREMENTAL_STREAMER] Accumulated #{@tool_buffers[tool_id][:input_json].length} chars for tool #{tool_data[:name]}"
+          if @tool_buffers[tool_id] && @tool_buffers[tool_id][:input_json]
+            @tool_buffers[tool_id][:input_json] += json_chunk
+            Rails.logger.info "[INCREMENTAL_STREAMER] Accumulated #{@tool_buffers[tool_id][:input_json].length} chars for tool #{tool_data[:name]}"
+          else
+            Rails.logger.error "[INCREMENTAL_STREAMER] Tool buffer corrupted for #{tool_id}: #{@tool_buffers[tool_id].inspect}"
+          end
         else
           Rails.logger.warn "[INCREMENTAL_STREAMER] No tool buffer found for SSE index #{index}"
         end
@@ -255,7 +267,12 @@ module Ai
       
       if tool_id && @tool_buffers[tool_id]
         tool_data = @tool_buffers[tool_id]
-        Rails.logger.info "[INCREMENTAL_STREAMER] Tool buffer data: name=#{tool_data[:name]}, json_length=#{tool_data[:input_json]&.length}"
+        if tool_data
+          Rails.logger.info "[INCREMENTAL_STREAMER] Tool buffer data: name=#{tool_data[:name]}, json_length=#{tool_data[:input_json]&.length}"
+        else
+          Rails.logger.error "[INCREMENTAL_STREAMER] Tool data is nil for tool_id: #{tool_id}"
+          return
+        end
         
         begin
           # Parse the complete tool input
@@ -298,11 +315,15 @@ module Ai
       # NOTE: The index from SSE is the global content block index, not our tool index
       Rails.logger.info "[INCREMENTAL_STREAMER] Searching for tool with SSE block index #{index}"
       @tool_buffers.each do |tool_id, data|
-        Rails.logger.info "[INCREMENTAL_STREAMER]   Buffer #{tool_id}: tool_index=#{data[:index]}, sse_block_index=#{data[:sse_block_index]}"
+        if data
+          Rails.logger.info "[INCREMENTAL_STREAMER]   Buffer #{tool_id}: tool_index=#{data[:index]}, sse_block_index=#{data[:sse_block_index]}"
+        else
+          Rails.logger.warn "[INCREMENTAL_STREAMER]   Buffer #{tool_id}: data is nil"
+        end
       end
       
       # We need to track the SSE block index when creating the tool
-      @tool_buffers.find { |id, data| data[:sse_block_index] == index }&.first
+      @tool_buffers.find { |id, data| data&.[](:sse_block_index) == index }&.first
     end
     
     def finalize_stream

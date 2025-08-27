@@ -158,6 +158,13 @@ module Ai
       
       # Atomic increment, returns the new value
       index = Rails.cache.increment(index_key, 1, initial: 0, expires_in: 10.minutes)
+      
+      # Safety check for nil cache response
+      if index.nil?
+        Rails.logger.error "[INCREMENTAL_COORDINATOR] Cache increment returned nil for #{index_key}"
+        return 0  # Fallback to first index
+      end
+      
       index - 1  # Convert to 0-based index
     end
     
@@ -213,10 +220,14 @@ module Ai
       tools_entry['tools'][tool_index] = {
         'name' => tool_call[:function][:name],
         'arguments' => parsed_args,
+        'file_path' => parsed_args['file_path'],  # CRITICAL: Include file_path for UI identification
         'status' => status,
         'index' => tool_index,
         'added_at' => Time.current.iso8601
       }
+      
+      # Debug logging for file_path inclusion
+      Rails.logger.info "[INCREMENTAL_DEBUG] Added tool to flow: name=#{tool_call[:function][:name]}, file_path=#{parsed_args['file_path']}, index=#{tool_index}"
       
       @message.update_columns(
         conversation_flow: flow,

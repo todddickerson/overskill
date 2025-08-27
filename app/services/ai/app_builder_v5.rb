@@ -4202,18 +4202,37 @@ module Ai
     def create_assistant_message
       # Find existing assistant placeholder created by App#initiate_generation!
       # This ensures Action Cable updates work from the start
+      # Use a more relaxed time window to handle timing issues (within 5 seconds)
+      Rails.logger.debug "[V5_DEBUG] @chat_message.created_at: #{@chat_message.created_at.inspect}"
+      
+      # Safety check for nil created_at
+      if @chat_message.created_at.nil?
+        Rails.logger.error "[V5_ERROR] @chat_message.created_at is nil! Message ID: #{@chat_message.id}"
+        search_time = Time.current - 5.seconds
+      else
+        search_time = @chat_message.created_at - 5.seconds
+      end
+      
+      Rails.logger.debug "[V5_DEBUG] Searching for assistant messages >= #{search_time}"
+      
       existing_assistant = @app.app_chat_messages
         .where(role: 'assistant')
-        .where('created_at > ?', @chat_message.created_at)
+        .where('created_at >= ?', search_time)
         .where(status: 'executing')
+        .order(created_at: :desc)
         .first
       
       if existing_assistant
         Rails.logger.info "[V5_INIT] Using existing assistant placeholder ##{existing_assistant.id}"
+        Rails.logger.debug "[V5_DEBUG] Placeholder created at: #{existing_assistant.created_at}, chat message at: #{@chat_message.created_at}"
         existing_assistant
       else
+        # Log why we couldn't find a placeholder
+        Rails.logger.warn "[V5_INIT] No placeholder found, creating new assistant message"
+        Rails.logger.debug "[V5_DEBUG] Searched for assistant messages after #{search_time}"
+        Rails.logger.debug "[V5_DEBUG] Found assistant messages: #{@app.app_chat_messages.where(role: 'assistant').pluck(:id, :created_at, :status).inspect}"
+        
         # Fallback: create new message if none exists
-        Rails.logger.info "[V5_INIT] Creating new assistant message (no placeholder found)"
         AppChatMessage.create!(
           app: @app,
           user: @chat_message.user,

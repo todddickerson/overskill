@@ -26,10 +26,12 @@ module Ai
         status: "executing", 
         started_at: Time.current.iso8601,
         tools: tool_calls.map.with_index do |tool_call, index|
+          args = extract_ui_essential_args(tool_call['arguments'] || tool_call.dig('function', 'arguments'))
           {
             id: index + 1,
             name: tool_call['name'] || tool_call.dig('function', 'name'),
-            args: extract_ui_essential_args(tool_call['arguments'] || tool_call.dig('function', 'arguments')),
+            args: args,
+            file_path: args['file_path'],  # CRITICAL: Include file_path for UI identification
             status: "pending",
             started_at: nil,
             completed_at: nil,
@@ -37,6 +39,12 @@ module Ai
           }
         end
       }
+      
+      # Debug logging for file_path inclusion
+      Rails.logger.info "[SIMPLE_STREAMER_DEBUG] Tools section created with #{tools_entry[:tools].size} tools"
+      tools_entry[:tools].each_with_index do |tool, idx|
+        Rails.logger.info "[SIMPLE_STREAMER_DEBUG] Tool #{idx}: name=#{tool[:name]}, file_path=#{tool[:file_path]}"
+      end
       
       # Append to conversation_flow and save both fields
       flow = @message.conversation_flow || []
