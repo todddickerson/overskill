@@ -164,8 +164,22 @@ module Ai
         return # Don't continue processing
         
       rescue => e
-        Rails.logger.error "[V5_CRITICAL] AppBuilderV5 execute! failed: #{e.message}"
-        Rails.logger.error e.backtrace.first(10).join("\n")
+        Rails.logger.error "[V5_CRITICAL] AppBuilderV5 execute! failed: #{e.class.name}: #{e.message}"
+        Rails.logger.error "[V5_CRITICAL] FULL STACK TRACE:"
+        e.backtrace.each_with_index do |line, i|
+          Rails.logger.error "[V5_CRITICAL]   #{i.to_s.rjust(2)}: #{line}"
+        end
+        
+        # Special handling for nil access errors
+        if e.message.include?("undefined method `[]'") || e.message.include?("undefined method `dig'")
+          Rails.logger.error "[V5_CRITICAL] *** CRITICAL NIL ACCESS ERROR ***"
+          Rails.logger.error "[V5_CRITICAL] This is the main error we're investigating!"
+          Rails.logger.error "[V5_CRITICAL] Error occurred in: #{e.backtrace.first}"
+          Rails.logger.error "[V5_CRITICAL] Current iteration: #{@iteration_count}"
+          Rails.logger.error "[V5_CRITICAL] App ID: #{@app.id}" if @app
+          Rails.logger.error "[V5_CRITICAL] Message ID: #{@assistant_message.id}" if @assistant_message
+        end
+        
         handle_error(e)
         return # CRITICAL: Don't continue to finalize_app_generation after error
       end
@@ -298,8 +312,25 @@ module Ai
         end
         
       rescue => e
-        Rails.logger.error "[V5_SIMPLE] Error in simple flow: #{e.message}"
-        add_loop_message("Error during generation: #{e.message}", type: 'error')
+        Rails.logger.error "[V5_SIMPLE] Error in simple flow: #{e.class.name}: #{e.message}"
+        Rails.logger.error "[V5_SIMPLE] FULL STACK TRACE:"
+        e.backtrace.each_with_index do |line, i|
+          Rails.logger.error "[V5_SIMPLE]   #{i.to_s.rjust(2)}: #{line}"
+        end
+        
+        # Enhanced error message based on error type
+        if e.message.include?("undefined method `[]'")
+          Rails.logger.error "[V5_SIMPLE] *** NIL ACCESS ERROR DETECTED ***"
+          Rails.logger.error "[V5_SIMPLE] This is the undefined method [] for nil error we're tracking"
+          error_msg = "Critical error: Trying to access array/hash element on nil value. Location: #{e.backtrace.first}"
+        elsif e.is_a?(NoMethodError)
+          Rails.logger.error "[V5_SIMPLE] *** NO METHOD ERROR ***"
+          error_msg = "Method error: #{e.message}"
+        else
+          error_msg = "Error during generation: #{e.message}"
+        end
+        
+        add_loop_message(error_msg, type: 'error')
         @completion_status = :failed  # Mark as failed to prevent deployment
         raise e
       end
@@ -1807,12 +1838,36 @@ module Ai
       # Add tool_use blocks
       if response[:tool_calls]&.any?
         response[:tool_calls].each do |tool_call|
-          content_blocks << {
-            type: 'tool_use',
-            id: tool_call['id'],
-            name: tool_call['function']['name'],
-            input: JSON.parse(tool_call['function']['arguments'])
-          }
+          # CRITICAL NIL SAFETY: Validate tool_call structure before accessing
+          next unless tool_call.is_a?(Hash) && tool_call['function'].is_a?(Hash)
+          
+          function_name = tool_call['function']['name']
+          function_args = tool_call['function']['arguments']
+          
+          unless function_name && function_args
+            Rails.logger.error "[V5_CRITICAL] *** TOOL PROCESSING ERROR *** Missing function name or arguments: #{tool_call.inspect}"
+            next
+          end
+          
+          begin
+            parsed_input = JSON.parse(function_args)
+            content_blocks << {
+              type: 'tool_use',
+              id: tool_call['id'],
+              name: function_name,
+              input: parsed_input
+            }
+            Rails.logger.debug "[V5_CRITICAL] Successfully processed tool: #{function_name}"
+          rescue JSON::ParserError => e
+            Rails.logger.error "[V5_CRITICAL] JSON parsing failed for tool #{function_name}: #{e.message}"
+            # Add tool anyway with raw arguments
+            content_blocks << {
+              type: 'tool_use',
+              id: tool_call['id'],
+              name: function_name,
+              input: function_args
+            }
+          end
         end
       end
       
@@ -4617,19 +4672,36 @@ module Ai
         existing_tools_entry = @assistant_message.conversation_flow.reverse.find { |item| item['type'] == 'tools' }
         
         if existing_tools_entry && tool_calls.present?
-          Rails.logger.info "[V5_FLOW] Updating existing tools entry instead of creating duplicate"
+          Rails.logger.info "[V5_FLOW_DEBUG] BEFORE MERGE: existing tools count: #{existing_tools_entry['tools']&.size || 0}"
+          existing_tools_entry['tools']&.each_with_index do |tool, i|
+            Rails.logger.info "[V5_FLOW_DEBUG]   Existing[#{i}]: #{tool['name']} | #{tool['file_path']} | #{tool['status']}"
+          end
+          
+          Rails.logger.info "[V5_FLOW_DEBUG] INCOMING tool_calls count: #{tool_calls.size}"
+          tool_calls.each_with_index do |tc, i|
+            Rails.logger.info "[V5_FLOW_DEBUG]   Incoming[#{i}]: #{tc['name']} | #{tc['file_path']} | #{tc['status']}"
+          end
           
           # Update the existing entry's calls/tools array
           # Use 'tools' key for consistency with SimpleToolStreamer
           existing_tools_entry['tools'] ||= []
+          original_count = existing_tools_entry['tools'].size
           
           # Append new tool calls to existing ones
-          tool_calls.each do |tc|
-            # Find if this tool already exists and update it, or add new
-            existing_tool = existing_tools_entry['tools'].find { |t| t['name'] == tc['name'] && t['file_path'] == tc['file_path'] }
+          tool_calls.each_with_index do |tc, incoming_index|
+            # CRITICAL FIX: Don't merge based on name+file_path - this can cause data loss
+            # Instead, use a more specific identifier or always append
+            existing_tool = existing_tools_entry['tools'].find { |t| 
+              t['name'] == tc['name'] && 
+              t['file_path'] == tc['file_path'] &&
+              t['index'] == tc['index']  # Include index to be more specific
+            }
+            
             if existing_tool
+              Rails.logger.info "[V5_FLOW_DEBUG] MERGING tool #{incoming_index}: #{tc['name']} (found existing with index #{existing_tool['index']})"
               existing_tool.merge!(tc)
             else
+              Rails.logger.info "[V5_FLOW_DEBUG] APPENDING new tool #{incoming_index}: #{tc['name']}"
               existing_tools_entry['tools'] << tc
             end
           end
@@ -4638,7 +4710,11 @@ module Ai
           @assistant_message.conversation_flow = @assistant_message.conversation_flow.deep_dup
           @assistant_message.save!
           
-          Rails.logger.info "[V5_FLOW] Updated tools in existing entry, total tools: #{existing_tools_entry['tools'].size}"
+          Rails.logger.info "[V5_FLOW_DEBUG] AFTER MERGE: total tools: #{existing_tools_entry['tools'].size} (was #{original_count})"
+          existing_tools_entry['tools'].each_with_index do |tool, i|
+            Rails.logger.info "[V5_FLOW_DEBUG]   Final[#{i}]: #{tool['name']} | #{tool['file_path']} | #{tool['status']} | index:#{tool['index']}"
+          end
+          
           return
         end
       end

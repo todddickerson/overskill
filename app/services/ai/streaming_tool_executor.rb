@@ -11,18 +11,51 @@ class Ai::StreamingToolExecutor
   end
 
   def execute_with_streaming(tool_call, tool_index)
-    tool_name = tool_call['name'] || tool_call['function']['name']
-    tool_args = tool_call['arguments'] || tool_call['function']['arguments']
+    # Handle nil tool_call safety
+    unless tool_call.is_a?(Hash)
+      Rails.logger.error "[STREAMING] *** NIL SAFETY *** tool_call is not a hash: #{tool_call.inspect}"
+      raise "Invalid tool call format"
+    end
     
-    # Parse arguments if they're a JSON string
+    # Safe access with nil checks - handle both string and symbol keys
+    tool_name = nil
+    tool_args = nil
+    
+    # Try direct name first (string and symbol)
+    if tool_call['name'] || tool_call[:name]
+      tool_name = tool_call['name'] || tool_call[:name]
+      tool_args = tool_call['arguments'] || tool_call[:arguments]
+    # Try function.name (string keys)
+    elsif tool_call['function'].is_a?(Hash)
+      tool_name = tool_call['function']['name']  
+      tool_args = tool_call['function']['arguments']
+    # Try function.name (symbol keys) - DEBUG SHOWS {:function=>{:name=>"os-write"}}
+    elsif tool_call[:function].is_a?(Hash)
+      tool_name = tool_call[:function][:name] || tool_call[:function]['name']
+      tool_args = tool_call[:function][:arguments] || tool_call[:function]['arguments']
+    else
+      Rails.logger.error "[STREAMING] *** NIL SAFETY *** Cannot find tool name in: #{tool_call.inspect}"
+      raise "Cannot extract tool name from tool call"
+    end
+    
+    unless tool_name
+      Rails.logger.error "[STREAMING] *** NIL SAFETY *** tool_name is nil after extraction"
+      raise "Tool name is required"
+    end
+    
+    # Parse arguments if they're a JSON string, ensure it's a hash
     if tool_args.is_a?(String)
       tool_args = JSON.parse(tool_args) rescue {}
     end
     
+    # Ensure tool_args is a hash for safe access
+    tool_args = {} unless tool_args.is_a?(Hash)
+    
     Rails.logger.info "[STREAMING] Starting tool execution: #{tool_name} with args: #{tool_args.inspect}"
     
-    # Mark tool as running and broadcast
-    update_tool_status(tool_name, tool_args['file_path'], 'running')
+    # Mark tool as running and broadcast - safe file_path access
+    file_path = tool_args.is_a?(Hash) ? tool_args['file_path'] : nil
+    update_tool_status(tool_name, file_path, 'running')
     broadcast_update
     
     begin
@@ -44,8 +77,9 @@ class Ai::StreamingToolExecutor
         execute_generic_tool(tool_call)
       end
       
-      # Mark as complete and broadcast
-      update_tool_status(tool_name, tool_args['file_path'], 'complete')
+      # Mark as complete and broadcast - safe file_path access  
+      file_path = tool_args.is_a?(Hash) ? tool_args['file_path'] : nil
+      update_tool_status(tool_name, file_path, 'complete')
       broadcast_update
       
       # Ensure we return a proper result structure
@@ -59,7 +93,9 @@ class Ai::StreamingToolExecutor
       
     rescue => e
       Rails.logger.error "[STREAMING] Tool execution failed: #{e.message}"
-      update_tool_status(tool_name, tool_args['file_path'], 'error', e.message)
+      # Safe file_path access for error case
+      file_path = tool_args.is_a?(Hash) ? tool_args['file_path'] : nil
+      update_tool_status(tool_name, file_path, 'error', e.message)
       broadcast_update
       { error: "Tool execution failed: #{e.message}" }
     end

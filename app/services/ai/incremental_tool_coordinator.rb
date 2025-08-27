@@ -38,15 +38,23 @@ module Ai
     def dispatch_tool_incrementally(execution_id, tool_call)
       tool_index = allocate_next_tool_index(execution_id)
       
+      # CRITICAL: Validate index uniqueness before proceeding
+      state_key = cache_key(execution_id, 'state')
+      state = Rails.cache.read(state_key)
+      
+      if state && state['tools'][tool_index.to_s]
+        Rails.logger.error "[INCREMENTAL_COORDINATOR] *** INDEX CONFLICT *** Tool index #{tool_index} already exists for execution #{execution_id}"
+        # Find next available index
+        tool_index = find_next_available_index(execution_id, state, tool_index)
+        Rails.logger.warn "[INCREMENTAL_COORDINATOR] Using alternative index #{tool_index} for #{tool_call[:function][:name]}"
+      end
+      
       Rails.logger.info "[INCREMENTAL_COORDINATOR] Dispatching tool #{tool_index}: #{tool_call[:function][:name]}"
       
       # Add to conversation flow immediately
       add_tool_to_flow_incrementally(execution_id, tool_index, tool_call, 'queued')
       
       # Update state
-      state_key = cache_key(execution_id, 'state')
-      state = Rails.cache.read(state_key)
-      
       if state
         state['dispatched_count'] += 1
         state['tools'][tool_index.to_s] = {
@@ -57,14 +65,9 @@ module Ai
         Rails.cache.write(state_key, state, expires_in: 10.minutes)
       end
       
-      # Enqueue job IMMEDIATELY
-      StreamingToolExecutionJobV2.perform_later(
-        @message.id,
-        execution_id,
-        tool_index,
-        tool_call,
-        @iteration_count || 0
-      )
+      # Execute tool DIRECTLY via incremental streaming (no background jobs!)
+      Rails.logger.info "[INCREMENTAL_COORDINATOR] *** FIXED *** Direct execution instead of V2 background jobs"
+      execute_tool_directly(execution_id, tool_index, tool_call)
       
       # Broadcast UI update
       broadcast_tool_update(execution_id, tool_index, 'queued')
@@ -150,22 +153,89 @@ module Ai
       Rails.logger.error "[INCREMENTAL_COORDINATOR] Tool detected broadcast failed: #{e.message}"
     end
     
+    # Public methods needed by IncrementalToolCompletionJob
+    public
+    
+    
+    # Finalize incremental execution (called by completion job)
+    def finalize_incremental_execution(execution_id, state)
+      Rails.logger.info "[INCREMENTAL_COORDINATOR] Finalizing execution #{execution_id}"
+      
+      # Clean up cache entries
+      cleanup_execution(execution_id, state)
+      
+      # Mark in database if needed
+      @message.update_columns(
+        processing_status: 'completed',
+        updated_at: Time.current
+      )
+    end
+    
+    # Handle timeout for incremental execution
+    def handle_incremental_timeout(execution_id, state)
+      Rails.logger.warn "[INCREMENTAL_COORDINATOR] Handling timeout for #{execution_id}"
+      
+      # Mark incomplete tools as failed
+      if state && state['tools']
+        state['tools'].each do |index, tool|
+          if tool && %w[pending running].include?(tool['status'])
+            update_tool_status_direct(execution_id, index.to_i, 'error', 'Timeout')
+          end
+        end
+      end
+      
+      # Clean up
+      cleanup_execution(execution_id, state)
+    end
+    
     private
     
-    # Allocate next available tool index atomically
+    # Allocate next available tool index atomically with robust retry
     def allocate_next_tool_index(execution_id)
       index_key = cache_key(execution_id, 'next_index')
       
-      # Atomic increment, returns the new value
-      index = Rails.cache.increment(index_key, 1, initial: 0, expires_in: 10.minutes)
-      
-      # Safety check for nil cache response
-      if index.nil?
-        Rails.logger.error "[INCREMENTAL_COORDINATOR] Cache increment returned nil for #{index_key}"
-        return 0  # Fallback to first index
+      # Retry mechanism for cache failures (CRITICAL FIX)
+      3.times do |attempt|
+        index = Rails.cache.increment(index_key, 1, initial: 0, expires_in: 10.minutes)
+        
+        if index.present?
+          allocated_index = index - 1  # Convert to 0-based index
+          Rails.logger.info "[INCREMENTAL_COORDINATOR] Allocated tool index #{allocated_index} (attempt #{attempt + 1})"
+          return allocated_index
+        end
+        
+        Rails.logger.warn "[INCREMENTAL_COORDINATOR] Cache increment attempt #{attempt + 1} failed for #{index_key}"
+        sleep(0.05) if attempt < 2  # Brief pause before retry
       end
       
-      index - 1  # Convert to 0-based index
+      # Final fallback with execution-specific atomic counter
+      fallback_key = "#{execution_id}_fallback_counter"
+      fallback_index = Rails.cache.fetch(fallback_key, expires_in: 10.minutes) { 0 }
+      Rails.cache.increment(fallback_key, 1, expires_in: 10.minutes)
+      
+      Rails.logger.error "[INCREMENTAL_COORDINATOR] *** CRITICAL *** Using fallback index #{fallback_index} for execution #{execution_id}"
+      
+      fallback_index
+    end
+    
+    # Find next available index when conflicts occur
+    def find_next_available_index(execution_id, state, starting_index)
+      # Start from the next index after the conflict
+      candidate_index = starting_index + 1
+      
+      # Search for available slot (max 50 to prevent infinite loops)
+      50.times do
+        unless state['tools'][candidate_index.to_s]
+          Rails.logger.info "[INCREMENTAL_COORDINATOR] Found available index #{candidate_index} (conflict resolution)"
+          return candidate_index
+        end
+        candidate_index += 1
+      end
+      
+      # If we couldn't find a slot, use timestamp-based index
+      timestamp_index = (Time.current.to_f * 1000).to_i % 10000
+      Rails.logger.error "[INCREMENTAL_COORDINATOR] Using timestamp-based index #{timestamp_index} (emergency fallback)"
+      timestamp_index
     end
     
     # Add empty tools section that will be populated incrementally
@@ -346,19 +416,6 @@ module Ai
       Rails.logger.error "[INCREMENTAL_COORDINATOR] Broadcast failed: #{e.message}"
     end
     
-    # Get current execution state
-    def get_execution_state(execution_id)
-      Rails.cache.read(cache_key(execution_id, 'state'))
-    end
-    
-    # Public method for async job to collect results
-    def collect_results_for_execution(execution_id)
-      state = get_execution_state(execution_id)
-      return [] unless state
-      
-      dispatched = state['dispatched_count'] || 0
-      collect_results(execution_id, dispatched)
-    end
     
     # Check if tools are still running (non-blocking)
     def tools_still_running?(execution_id)
@@ -369,6 +426,102 @@ module Ai
       completed = state['completed_count'] || 0
       
       dispatched > 0 && completed < dispatched
+    end
+    
+    # Execute tool directly inline (no background jobs!)
+    def execute_tool_directly(execution_id, tool_index, tool_call)
+      # Debug tool_call structure first
+      Rails.logger.info "[INCREMENTAL_DIRECT] *** DEBUG *** Tool call structure: #{tool_call.inspect}"
+      
+      # Extract name using string or symbol keys - the debug shows symbol keys are used
+      tool_name = tool_call['name'] || tool_call[:name] || 
+                  tool_call.dig('function', 'name') || tool_call.dig(:function, :name)
+      
+      # Also try the :function hash directly since debug shows {:function=>{:name=>"os-write"}}
+      if tool_name.nil? && tool_call[:function].is_a?(Hash)
+        tool_name = tool_call[:function][:name] || tool_call[:function]['name']
+      end
+      
+      Rails.logger.info "[INCREMENTAL_DIRECT] Executing tool #{tool_index} directly: #{tool_name}"
+      
+      # Update status to running
+      update_tool_status_direct(execution_id, tool_index, 'running')
+      
+      begin
+        # Use same executor as V2 jobs but run it directly
+        executor = Ai::StreamingToolExecutor.new(@message, @app, @iteration_count || 0)
+        result = executor.execute_with_streaming(tool_call, tool_index)
+        
+        Rails.logger.info "[INCREMENTAL_DIRECT] Tool #{tool_call[:function][:name]} completed successfully"
+        
+        # Report completion directly (no V2 coordinator needed)
+        tool_completed_direct(execution_id, tool_index, result, nil)
+        
+      rescue => e
+        Rails.logger.error "[INCREMENTAL_DIRECT] Failed #{tool_call[:function][:name]} (#{tool_index}): #{e.message}"
+        Rails.logger.error e.backtrace.first(5).join("\n")
+        
+        # Report error directly  
+        tool_completed_direct(execution_id, tool_index, nil, e.message)
+      end
+    end
+    
+    # Update tool status directly in flow and cache
+    def update_tool_status_direct(execution_id, tool_index, status)
+      # Update cache state
+      state_key = cache_key(execution_id, 'state')
+      state = Rails.cache.read(state_key)
+      if state && state['tools'][tool_index.to_s]
+        state['tools'][tool_index.to_s]['status'] = status
+        Rails.cache.write(state_key, state, expires_in: 10.minutes)
+      end
+      
+      # Update conversation flow
+      @message.reload
+      flow = @message.conversation_flow.deep_dup
+      tools_entry = flow.reverse.find { |item| 
+        item['type'] == 'tools' && item['execution_id'] == execution_id 
+      }
+      
+      if tools_entry && tools_entry['tools'][tool_index]
+        tools_entry['tools'][tool_index]['status'] = status
+        @message.update_columns(conversation_flow: flow, updated_at: Time.current)
+      end
+      
+      # Broadcast update
+      broadcast_tool_update(execution_id, tool_index, status)
+    end
+    
+    # Handle tool completion directly (replaces V2 coordinator callback)
+    def tool_completed_direct(execution_id, tool_index, result, error)
+      status = error ? 'error' : 'complete'
+      
+      # Store result in cache (same as V2)
+      result_data = {
+        'status' => error ? 'error' : 'success',
+        'result' => result,
+        'error' => error,
+        'completed_at' => Time.current.to_f
+      }
+      
+      Rails.cache.write(
+        cache_key(execution_id, "tool_#{tool_index}_result"),
+        result_data,
+        expires_in: 5.minutes
+      )
+      
+      # Update completion count
+      state_key = cache_key(execution_id, 'state')
+      state = Rails.cache.read(state_key)
+      if state
+        state['completed_count'] = (state['completed_count'] || 0) + 1
+        Rails.cache.write(state_key, state, expires_in: 10.minutes)
+      end
+      
+      # Update UI status
+      update_tool_status_direct(execution_id, tool_index, status)
+      
+      Rails.logger.info "[INCREMENTAL_DIRECT] Tool #{tool_index} marked as #{status}"
     end
     
     # Dispatch tools and return immediately (truly async)

@@ -485,8 +485,16 @@ class Ai::StreamingToolCoordinatorV2
       
       case completion_data['status']
       when 'complete'
-        result = completion_data['result'] || {}
-        tool_result_block[:content] = result[:content] || "Tool #{tool_name} completed successfully"
+        # CRITICAL FIX: Proper nil safety for result access
+        result = completion_data['result']
+        if result.is_a?(Hash) && result[:content]
+          tool_result_block[:content] = result[:content]
+        elsif result.is_a?(Hash) && result['content']
+          tool_result_block[:content] = result['content']
+        else
+          tool_result_block[:content] = "Tool #{tool_name} completed successfully"
+        end
+        Rails.logger.debug "[V2_COORDINATOR_FIX] Tool #{index} result processed: #{result.class}, has_content: #{result.is_a?(Hash) && (result[:content] || result['content'])}"
       when 'error'
         tool_result_block[:content] = completion_data['error'] || "Tool execution failed"
         tool_result_block[:is_error] = true

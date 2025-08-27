@@ -1,6 +1,6 @@
 # Handles continuation after incremental tools complete asynchronously
 class IncrementalToolCompletionJob < ApplicationJob
-  queue_as :ai
+  queue_as :tools
   
   def perform(message_id, execution_id, conversation_messages, iteration_count = 0)
     @message = AppChatMessage.find(message_id)
