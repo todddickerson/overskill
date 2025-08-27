@@ -112,12 +112,23 @@ class IncrementalToolCompletionJob < ApplicationJob
       
       result = results_raw[index]
       
-      formatted << {
-        type: 'tool_result',
-        tool_use_id: tool['id'] || "tool_#{index}",
-        content: result['result'] || result['error'] || 'No result available',
-        is_error: result['status'] == 'error'
-      }
+      # Handle nil result (tool might not have completed)
+      if result.nil?
+        Rails.logger.warn "[INCREMENTAL_COMPLETION] No result found for tool at index #{index}"
+        formatted << {
+          type: 'tool_result',
+          tool_use_id: tool['id'] || "tool_#{index}",
+          content: 'Tool execution incomplete',
+          is_error: true
+        }
+      else
+        formatted << {
+          type: 'tool_result',
+          tool_use_id: tool['id'] || "tool_#{index}",
+          content: result['result'] || result['error'] || 'No result available',
+          is_error: result['status'] == 'error'
+        }
+      end
     end
     
     formatted
