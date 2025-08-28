@@ -218,28 +218,36 @@
       <%# 2. Conversation Flow - Interleaved messages and tool calls %>
       <% if message.conversation_flow.present? && message.conversation_flow.any? %>
         <div class="space-y-3 mb-3">
+          <%# Sort conversation flow by timestamp to ensure chronological order %>
+          <% sorted_flow = message.conversation_flow.sort_by { |item| item['timestamp'] || '1970-01-01T00:00:00Z' } %>
+          
           <%# Group consecutive tool entries %>
           <% grouped_flow = [] %>
           <% current_tools = [] %>
+          <% current_tools_timestamp = nil %>
           
-          <% message.conversation_flow.each_with_index do |item, idx| %>
+          <% sorted_flow.each_with_index do |item, idx| %>
             <% if item['type'] == 'tools' %>
+              <%# Store timestamp of first tool in group %>
+              <% current_tools_timestamp ||= item['timestamp'] %>
               <%# Accumulate consecutive tool entries %>
               <% current_tools.concat(item['tools'] || item['calls'] || item['tool_calls'] || []) %>
               <%# Check if next item is also tools, if not, flush %>
-              <% next_item = message.conversation_flow[idx + 1] %>
+              <% next_item = sorted_flow[idx + 1] %>
               <% if !next_item || next_item['type'] != 'tools' %>
                 <%# Flush accumulated tools %>
                 <% if current_tools.any? %>
-                  <% grouped_flow << { 'type' => 'grouped_tools', 'calls' => current_tools, 'iteration' => item['iteration'] } %>
+                  <% grouped_flow << { 'type' => 'grouped_tools', 'calls' => current_tools, 'iteration' => item['iteration'], 'timestamp' => current_tools_timestamp } %>
                   <% current_tools = [] %>
+                  <% current_tools_timestamp = nil %>
                 <% end %>
               <% end %>
             <% else %>
               <%# Flush any pending tools before adding non-tool item %>
               <% if current_tools.any? %>
-                <% grouped_flow << { 'type' => 'grouped_tools', 'calls' => current_tools } %>
+                <% grouped_flow << { 'type' => 'grouped_tools', 'calls' => current_tools, 'timestamp' => current_tools_timestamp } %>
                 <% current_tools = [] %>
+                <% current_tools_timestamp = nil %>
               <% end %>
               <% grouped_flow << item %>
             <% end %>

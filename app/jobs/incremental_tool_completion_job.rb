@@ -59,7 +59,11 @@ class IncrementalToolCompletionJob < ApplicationJob
       item['type'] == 'tools' && item['execution_id'] == @execution_id 
     }
     
-    return unless tools_entry
+    if tools_entry.nil?
+      Rails.logger.error "[INCREMENTAL_COMPLETION] Could not find tools entry for execution_id: #{@execution_id}"
+      Rails.logger.error "[INCREMENTAL_COMPLETION] Available execution_ids: #{flow.select{|i| i['type'] == 'tools'}.map{|i| i['execution_id']}.inspect}"
+      return
+    end
     
     # Format tool results for Claude
     tool_results = format_tool_results(tools_entry['tools'], tool_results_raw)
@@ -108,34 +112,52 @@ class IncrementalToolCompletionJob < ApplicationJob
   def format_tool_results(tools, results_raw)
     formatted = []
     
+    Rails.logger.info "[INCREMENTAL_COMPLETION] Formatting #{tools.count} tool results"
+    
     tools.each_with_index do |tool, index|
-      next unless tool
+      if tool.nil?
+        Rails.logger.warn "[INCREMENTAL_COMPLETION] Tool at index #{index} is nil, skipping"
+        next
+      end
       
       result = results_raw[index]
+      tool_id = tool['id']
+      
+      Rails.logger.info "[INCREMENTAL_COMPLETION] Tool #{index}: name=#{tool['name']}, id=#{tool_id.inspect}"
       
       # Handle nil result (tool might not have completed)
       if result.nil?
         Rails.logger.warn "[INCREMENTAL_COMPLETION] No result found for tool at index #{index}"
-        formatted << {
-          type: 'tool_result',
-          tool_use_id: tool['id'] || "tool_#{index}",
-          content: 'Tool execution incomplete',
-          is_error: true
-        }
+        
+        # CRITICAL: Only add tool_result if we have a valid tool_use_id
+        if tool_id.present?
+          formatted << {
+            type: 'tool_result',
+            tool_use_id: tool_id,
+            content: 'Tool execution incomplete'
+          }
+        else
+          Rails.logger.error "[INCREMENTAL_COMPLETION] Cannot create tool_result without tool_use_id for tool at index #{index}"
+        end
       else
         # Ensure content is always a string for Claude API
         content = result['result'] || result['error'] || 'No result available'
         content = content.is_a?(String) ? content : content.to_json
         
-        formatted << {
-          type: 'tool_result',
-          tool_use_id: tool['id'] || "tool_#{index}",
-          content: content,
-          is_error: result['status'] == 'error'
-        }
+        # CRITICAL: Only add tool_result if we have a valid tool_use_id
+        if tool_id.present?
+          formatted << {
+            type: 'tool_result',
+            tool_use_id: tool_id,
+            content: content
+          }
+        else
+          Rails.logger.error "[INCREMENTAL_COMPLETION] Cannot create tool_result without tool_use_id for tool: #{tool['name']}"
+        end
       end
     end
     
+    Rails.logger.info "[INCREMENTAL_COMPLETION] Formatted #{formatted.count} tool results (some may have been skipped due to missing IDs)"
     formatted
   end
 end

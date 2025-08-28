@@ -2312,7 +2312,6 @@ module Ai
         
         if result[:error]
           tool_result_block[:content] = result[:error]
-          tool_result_block[:is_error] = true
         else
           tool_result_block[:content] = result[:content] || "Tool completed successfully"
         end

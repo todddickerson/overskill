@@ -497,10 +497,8 @@ class Ai::StreamingToolCoordinatorV2
         Rails.logger.debug "[V2_COORDINATOR_FIX] Tool #{index} result processed: #{result.class}, has_content: #{result.is_a?(Hash) && (result[:content] || result['content'])}"
       when 'error'
         tool_result_block[:content] = completion_data['error'] || "Tool execution failed"
-        tool_result_block[:is_error] = true
       else
         tool_result_block[:content] = "Tool #{tool_name} status unknown"
-        tool_result_block[:is_error] = true
       end
       
       tool_results << tool_result_block
