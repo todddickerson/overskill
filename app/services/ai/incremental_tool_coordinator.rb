@@ -215,8 +215,10 @@ module Ai
       end
       
       # Check for deployment trigger
+      # NOTE: Deployment is handled by AppBuilderV5 after all conversation cycles complete
+      # No deployment needed at individual tool completion level
       if all_tools_successful_incremental?(execution_id, state)
-        trigger_deployment_if_needed
+        Rails.logger.info "[INCREMENTAL_COORDINATOR] All tools successful - deployment will be handled by AppBuilderV5"
       end
       
       # Cleanup

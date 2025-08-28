@@ -2035,8 +2035,20 @@ module Ai
               Rails.logger.info "[V5_INCREMENTAL] Stream complete. Stop reason: #{result[:stop_reason]}"
               Rails.logger.info "[V5_INCREMENTAL] #{dispatched_tools.size} tools already executing"
               
+              # CRITICAL: Convert tool_call keys to strings for compatibility with build_assistant_content_with_tools
+              stringified_tool_calls = dispatched_tools.map do |t|
+                tool_call = t[:call]
+                {
+                  'id' => tool_call[:id],
+                  'function' => {
+                    'name' => tool_call[:function][:name],
+                    'arguments' => tool_call[:function][:arguments]
+                  }
+                }
+              end
+              
               response = result.merge(
-                tool_calls: dispatched_tools.map { |t| t[:call] },
+                tool_calls: stringified_tool_calls,
                 content: text_content,
                 thinking_blocks: thinking_blocks
               )
@@ -2089,10 +2101,18 @@ module Ai
             end
             
             # Add assistant message with tool calls to conversation
+            assistant_content = build_assistant_content_with_tools(response)
             assistant_message = {
               role: 'assistant',
-              content: build_assistant_content_with_tools(response)
+              content: assistant_content
             }
+            
+            # Log the assistant content structure for debugging
+            Rails.logger.info "[V5_INCREMENTAL] Assistant message content structure:"
+            Rails.logger.info "[V5_INCREMENTAL] - Text blocks: #{assistant_content.select { |b| b[:type] == 'text' }.size}"
+            Rails.logger.info "[V5_INCREMENTAL] - Tool use blocks: #{assistant_content.select { |b| b[:type] == 'tool_use' }.size}"
+            Rails.logger.info "[V5_INCREMENTAL] - Tool IDs: #{assistant_content.select { |b| b[:type] == 'tool_use' }.map { |b| b[:id] }.join(', ')}"
+            
             conversation_messages << assistant_message
             
             # ASYNC: Don't wait! Schedule completion check instead
