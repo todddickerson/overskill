@@ -77,18 +77,30 @@ class Ai::StreamingToolExecutor
         execute_generic_tool(tool_call)
       end
       
-      # Mark as complete and broadcast - safe file_path access  
+      # Check if result has an error before marking complete
       file_path = tool_args.is_a?(Hash) ? tool_args['file_path'] : nil
-      update_tool_status(tool_name, file_path, 'complete')
-      broadcast_update
       
-      # Ensure we return a proper result structure
-      if result.nil?
-        { success: true, content: "Tool #{tool_name} completed" }
-      elsif result.is_a?(Hash) && result[:error]
-        result # Already has error structure
+      # Check for error in multiple formats (some tools return { error: ... }, others { success: false, error: ... })
+      has_error = (result.is_a?(Hash) && (result[:error] || (result[:success] == false && result[:error])))
+      
+      if has_error
+        # Tool returned an error - don't mark as complete
+        error_msg = result[:error] || "Tool execution failed"
+        Rails.logger.info "[STREAMING] Tool #{tool_name} failed with error: #{error_msg}"
+        update_tool_status(tool_name, file_path, 'error', error_msg)
+        broadcast_update
+        result # Return error structure
       else
-        result # Return as-is if properly structured
+        # Only mark as complete if there was no error
+        update_tool_status(tool_name, file_path, 'complete')
+        broadcast_update
+        
+        # Ensure we return a proper result structure
+        if result.nil?
+          { success: true, content: "Tool #{tool_name} completed" }
+        else
+          result # Return as-is if properly structured
+        end
       end
       
     rescue => e
