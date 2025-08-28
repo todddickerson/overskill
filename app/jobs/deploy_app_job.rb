@@ -3,6 +3,12 @@ class DeployAppJob < ApplicationJob
 
   queue_as :deployment
   
+  # FIX: Add Sidekiq retry configuration for deployment timeouts
+  sidekiq_options retry: 3, dead: false if defined?(Sidekiq)
+  
+  # Timeout for overall deployment process
+  DEPLOYMENT_TIMEOUT = 10.minutes
+  
   # Prevent duplicate deployments for the same app
   # Lock until the job completes (successfully or with error)
   unique :until_executed, lock_ttl: 10.minutes, on_conflict: :log
@@ -34,6 +40,20 @@ class DeployAppJob < ApplicationJob
     Rails.logger.info "[DeployAppJob] Starting deployment for app #{app.id} to #{environment}"
     Rails.logger.info "[DeployAppJob] Repository: #{app.github_repo}, Name: #{app.repository_name}"
     
+    # FIX: Wrap deployment in timeout handler
+    begin
+      Timeout::timeout(DEPLOYMENT_TIMEOUT) do
+        perform_deployment(app, environment)
+      end
+    rescue Timeout::Error => e
+      handle_deployment_timeout(app, environment)
+      raise # Let Sidekiq retry
+    end
+  end
+  
+  private
+  
+  def perform_deployment(app, environment)
     # FIXED: Validate deployment before proceeding
     validate_deployment_readiness!(app)
     
@@ -631,5 +651,69 @@ class DeployAppJob < ApplicationJob
     
     # Fallback to common defaults
     { '@' => 'src', '~' => 'src/lib', '#' => 'src/components' }
+  end
+  
+  # FIX: Handle deployment timeout gracefully
+  def handle_deployment_timeout(app, environment)
+    Rails.logger.error "[DeployAppJob] TIMEOUT: Deployment exceeded #{DEPLOYMENT_TIMEOUT / 60} minutes for app #{app.id}"
+    
+    # Update app status
+    app.update!(status: 'error')
+    
+    # Find latest assistant message to update
+    latest_message = app.app_chat_messages
+      .where(role: 'assistant')
+      .order(created_at: :desc)
+      .first
+    
+    if latest_message
+      # Update message status
+      latest_message.update!(
+        status: 'failed',
+        metadata: (latest_message.metadata || {}).merge(
+          error: 'Deployment timeout',
+          deployment_status: 'timeout',
+          timeout_at: Time.current.iso8601
+        )
+      )
+      
+      # Broadcast timeout to UI
+      broadcast_deployment_progress(app,
+        status: 'failed',
+        deployment_error: "Deployment timed out after #{DEPLOYMENT_TIMEOUT / 60} minutes. Will retry automatically.",
+        deployment_steps: [
+          { name: 'Deployment', current: false, completed: false },
+          { name: 'Timeout', current: true, completed: false }
+        ]
+      )
+      
+      # Clean up any stuck conversation flow entries
+      if latest_message.conversation_flow.present?
+        flow = latest_message.conversation_flow
+        flow.each do |entry|
+          if entry['type'] == 'tools' && entry['status'] == 'streaming'
+            entry['status'] = 'timeout'
+            entry['error'] = 'Deployment timeout'
+          end
+        end
+        latest_message.update!(conversation_flow: flow)
+      end
+    end
+    
+    # Log for monitoring
+    Rails.logger.error "[DeployAppJob] Deployment timeout details:"
+    Rails.logger.error "  App ID: #{app.id}"
+    Rails.logger.error "  Environment: #{environment}"
+    Rails.logger.error "  App Name: #{app.name}"
+    Rails.logger.error "  Files Count: #{app.app_files.count}"
+    Rails.logger.error "  Repository: #{app.github_repo}"
+    
+    # Clean up any stuck Redis state
+    Rails.cache.redis.then do |redis|
+      pattern = "deployment:#{app.id}:*"
+      keys = redis.keys(pattern)
+      redis.del(*keys) if keys.any?
+      Rails.logger.info "[DeployAppJob] Cleaned up #{keys.count} Redis deployment keys"
+    end
   end
 end

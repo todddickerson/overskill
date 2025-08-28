@@ -19,6 +19,7 @@ module Ai
       @start_time = Time.current
       @iteration_count = 0
       @completion_status = :active
+      @last_flow_timestamp = nil  # Track timestamp for conversation flow ordering
       
       # Initialize security filter
       @security_filter = Security::PromptInjectionFilter.new
@@ -1900,6 +1901,26 @@ module Ai
       @iteration_count = iteration_count
       
       Rails.logger.info "[V5_INCREMENTAL] Continuing conversation after async tool completion"
+      
+      # CRITICAL FIX: Find and reuse the existing assistant message to prevent splitting
+      # Look for the most recent assistant message that is still processing
+      @assistant_message = @app.app_chat_messages
+        .where(role: 'assistant')
+        .where(status: ['processing', 'executing'])
+        .order(created_at: :desc)
+        .first
+      
+      if @assistant_message.nil?
+        Rails.logger.error "[V5_INCREMENTAL] No existing assistant message found! Creating new one"
+        @assistant_message = @app.app_chat_messages.create!(
+          role: 'assistant',
+          content: '',
+          status: 'processing',
+          conversation_flow: []
+        )
+      else
+        Rails.logger.info "[V5_INCREMENTAL] Reusing existing assistant message ##{@assistant_message.id}"
+      end
       
       # Initialize prompt service if not already initialized
       if @prompt_service.nil?
@@ -4793,10 +4814,22 @@ module Ai
         end
       end
       
+      # FIX: Add small delay between conversation flow entries to ensure unique timestamps
+      # This prevents ordering ambiguity when tools and messages are logged simultaneously
+      if @last_flow_timestamp && (Time.current.to_f - @last_flow_timestamp) < 0.001
+        # If less than 1ms has passed, add a small delay
+        sleep(0.1)  # 100ms delay ensures clear chronological ordering
+        Rails.logger.debug "[V5_FLOW] Added 100ms delay for timestamp ordering"
+      end
+      
+      # Use ISO8601 with millisecond precision for better granularity
+      current_timestamp = Time.current.iso8601(3)
+      @last_flow_timestamp = Time.current.to_f
+      
       flow_entry = {
         'type' => type,
         'iteration' => iteration || @iteration_count,
-        'timestamp' => Time.current.iso8601
+        'timestamp' => current_timestamp
       }
       
       Rails.logger.info "[V5_FLOW] Adding to conversation_flow: type=#{type}, flow_size=#{@assistant_message.conversation_flow.size}"
