@@ -65,9 +65,10 @@ class IncrementalToolCompletionJob < ApplicationJob
     tool_results = format_tool_results(tools_entry['tools'], tool_results_raw)
     
     # Add tool results to conversation and continue
+    # Tool results should be individual content items in the user message
     user_message = {
       role: 'user',
-      content: tool_results
+      content: tool_results  # This is already an array of properly formatted tool_result objects
     }
     
     updated_messages = @conversation_messages + [user_message]
@@ -122,10 +123,14 @@ class IncrementalToolCompletionJob < ApplicationJob
           is_error: true
         }
       else
+        # Ensure content is always a string for Claude API
+        content = result['result'] || result['error'] || 'No result available'
+        content = content.is_a?(String) ? content : content.to_json
+        
         formatted << {
           type: 'tool_result',
           tool_use_id: tool['id'] || "tool_#{index}",
-          content: result['result'] || result['error'] || 'No result available',
+          content: content,
           is_error: result['status'] == 'error'
         }
       end

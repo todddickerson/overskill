@@ -288,38 +288,7 @@
           <% end %>
         </div>
         
-      <%# Fallback to old structure for backwards compatibility %>
-      <% elsif message.loop_messages.any? %>
-        <div class="space-y-3 mb-3">
-          <% message.loop_messages.each_with_index do |loop_msg, index| %>
-            <div class="agent-loop-message" 
-                 id="loop_message_<%= message.id %>_<%= index %>"
-                 data-iteration="<%= loop_msg['iteration'] || 0 %>">
-              
-              <% case loop_msg['type'] %>
-              <% when 'status' %>
-                <%# Status update (e.g., "Analyzing requirements...") %>
-                <div class="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
-                  <i class="fas fa-info-circle"></i>
-                  <span><%= loop_msg['content'] %></span>
-                </div>
-                
-              <% when 'error' %>
-                <%# Error message %>
-                <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
-                  <i class="fas fa-exclamation-triangle"></i>
-                  <span><%= loop_msg['content'] %></span>
-                </div>
-                
-              <% else %>
-                <%# Regular markdown content %>
-                <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
-                  <%= render_markdown(loop_msg['content']) %>
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
+      <%# Direct fallback to content if no conversation_flow %>
       <% elsif message.content.present? %>
         <%# Fallback to regular content if no loop messages %>
         <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 mb-3">
@@ -327,85 +296,11 @@
         </div>
       <% end %>
       
-      <%# 3. Tool Calls - Only show if not using conversation_flow %>
-      <% if message.tool_calls.any? && message.conversation_flow.blank? %>
-        <details class="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-                 data-state-preserving-target="details"
-                 data-details-id="tools_<%= message.id %>"
-                 data-action="toggle->state-preserving#detailsToggled">
-          <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <i class="fas fa-tools"></i>
-              <span><%= pluralize(message.tool_calls.count, 'tool') %> used</span>
-            </div>
-            <span class="text-xs text-blue-600 dark:text-blue-400" data-state-preserving-target="toggleText" data-show-text="Show All" data-hide-text="Hide">Show All</span>
-          </summary>
-          
-          <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
-            <% message.tool_calls.each do |tool| %>
-              <div class="flex items-start space-x-2 text-xs">
-                <%# Tool icon based on tool name %>
-                <% icon_class = case tool['name']
-                  when /write|create/ then 'fa-file-circle-plus text-green-500'
-                  when /edit|update|replace/ then 'fa-pen-to-square text-blue-500'
-                  when /delete|remove/ then 'fa-trash text-red-500'
-                  when /search|find/ then 'fa-magnifying-glass text-purple-500'
-                  when /read|view/ then 'fa-eye text-gray-500'
-                  when /image/ then 'fa-image text-indigo-500'
-                  when /web/ then 'fa-globe text-cyan-500'
-                  else 'fa-gear text-gray-500'
-                end %>
-                <i class="fas <%= icon_class %> mt-0.5"></i>
-                
-                <div class="flex-1">
-                  <span class="font-medium text-gray-700 dark:text-gray-300">
-                    <%= tool['name'].to_s.gsub(/^os-/, '').humanize %>
-                  </span>
-                  
-                  <% if tool['file_path'].present? %>
-                    <span class="text-gray-500 dark:text-gray-400 ml-1">
-                      [<%= tool['file_path'] %>]
-                    </span>
-                  <% end %>
-                  
-                  <% if tool['status'] == 'error' %>
-                    <span class="text-red-500 ml-2">
-                      <i class="fas fa-times-circle"></i> Failed
-                    </span>
-                  <% elsif tool['status'] == 'running' %>
-                    <span class="text-yellow-500 ml-2">
-                      <i class="fas fa-spinner fa-spin"></i> Running
-                    </span>
-                  <% else %>
-                    <span class="text-green-500 ml-2">
-                      <i class="fas fa-check-circle"></i>
-                    </span>
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
-          </div>
-        </details>
-      <% end %>
-      
-      <%# 4. App Version Card - Only shows if code was generated %>
+      <%# App Version Card - Only shows if code was generated %>
       <% if message.is_code_generation && message.app_version.present? %>
         <%= render "account/app_editors/unified_version_card", 
             message: message, 
             next_version_number: nil %>
-      <% end %>
-
-      <%# 1. Thinking Status - Shows when agent is processing %>
-      <% if message.thinking_status.present? && message.loop_messages.sum { |msg| msg.to_s.length } > 300 %>
-        <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-          <i class="fas fa-brain text-blue-500 animate-pulse"></i>
-          <span class="thinking-text"><%= message.thinking_status %></span>
-          <% if message.thought_for_seconds.present? %>
-            <span class="text-xs text-gray-500">
-              (Thought for <%= pluralize(message.thought_for_seconds, 'second') %>)
-            </span>
-          <% end %>
-        </div>
       <% end %>
       
       <%# Status indicator for completed/failed messages %>

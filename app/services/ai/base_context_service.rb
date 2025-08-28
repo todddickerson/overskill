@@ -85,8 +85,11 @@ module Ai
       context << "**Data Display**: avatar, accordion, collapsible, popover, tooltip"
       context << "**Advanced**: command, data-table, calendar, date-picker, carousel"
       context << ""
+      context << "**CRITICAL**: These UI components ALREADY EXIST in the template. DO NOT create new component files in src/components/ui/."
       context << "**IMPORTANT**: DO NOT use os-view to read these component files."
-      context << "**Usage**: Import directly: `import { Button } from '@/components/ui/button'`"
+      context << "**IMPORTANT**: DO NOT use os-write to create new UI component files (e.g., button.tsx, card.tsx, badge.tsx, etc.)."
+      context << "**Usage**: Import existing components directly: `import { Button } from '@/components/ui/button'`"
+      context << "If you need a component that's listed above, simply import it - it already exists!"
       context << ""
       
       # Selectively load only needed components if specified
@@ -433,8 +436,10 @@ module Ai
       lines << "**Data**: avatar, accordion, collapsible, popover, tooltip, hover-card"
       lines << "**Advanced**: command, calendar, date-picker, carousel, chart, sidebar"
       lines << ""
-      lines << "**Usage**: Import directly: `import { Button } from '@/components/ui/button'`"
-      lines << "**Note**: Use os-view to read component files if needed for customization"
+      lines << "**CRITICAL**: These UI components ALREADY EXIST in the template. DO NOT create new files for them."
+      lines << "**Usage**: Import existing components directly: `import { Button } from '@/components/ui/button'`"
+      lines << "**IMPORTANT**: DO NOT use os-write to create new UI component files (e.g., button.tsx, card.tsx, etc.)"
+      lines << "**Note**: Only use os-view to read component files if you need to understand their props for customization"
       lines << ""
       
       lines.join("\n")

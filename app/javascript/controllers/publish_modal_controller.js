@@ -333,7 +333,7 @@ export default class extends Controller {
   
   async pollDeploymentStatus(button, originalContent) {
     let attempts = 0
-    const maxAttempts = 30 // 30 attempts = 60 seconds max
+    const maxAttempts = 240 // 240 attempts = 480 seconds max
     
     const poll = async () => {
       attempts++

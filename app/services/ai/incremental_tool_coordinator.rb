@@ -156,19 +156,24 @@ module Ai
     # Public methods needed by IncrementalToolCompletionJob
     public
     
+    # Get execution state for completion job
+    def get_execution_state(execution_id)
+      Rails.cache.read(cache_key(execution_id, 'state'))
+    end
     
-    # Finalize incremental execution (called by completion job)
-    def finalize_incremental_execution(execution_id, state)
-      Rails.logger.info "[INCREMENTAL_COORDINATOR] Finalizing execution #{execution_id}"
+    # Collect results for an execution
+    def collect_results_for_execution(execution_id)
+      state = get_execution_state(execution_id)
+      return [] unless state && state['tools']
       
-      # Clean up cache entries
-      cleanup_execution(execution_id, state)
+      results = []
+      state['tools'].each do |index, tool|
+        tool_result_key = cache_key(execution_id, "tool_#{index}_result")
+        result = Rails.cache.read(tool_result_key)
+        results[index.to_i] = result if result
+      end
       
-      # Mark in database if needed
-      @message.update_columns(
-        processing_status: 'completed',
-        updated_at: Time.current
-      )
+      results
     end
     
     # Handle timeout for incremental execution
@@ -186,6 +191,36 @@ module Ai
       
       # Clean up
       cleanup_execution(execution_id, state)
+    end
+    
+    # Finalize execution when all tools complete (moved to public for IncrementalToolCompletionJob)
+    def finalize_incremental_execution(execution_id, state)
+      @message.reload
+      flow = @message.conversation_flow.deep_dup
+      
+      tools_entry = flow.reverse.find { |item| 
+        item['type'] == 'tools' && item['execution_id'] == execution_id 
+      }
+      
+      if tools_entry
+        tools_entry['status'] = 'complete'
+        tools_entry['expanded'] = false
+        tools_entry['final_count'] = state['dispatched_count']
+        tools_entry['completed_at'] = Time.current.iso8601
+        
+        @message.update_columns(
+          conversation_flow: flow,
+          updated_at: Time.current
+        )
+      end
+      
+      # Check for deployment trigger
+      if all_tools_successful_incremental?(execution_id, state)
+        trigger_deployment_if_needed
+      end
+      
+      # Cleanup
+      cleanup_cache(execution_id)
     end
     
     private
@@ -288,6 +323,7 @@ module Ai
       end
       
       tools_entry['tools'][tool_index] = {
+        'id' => tool_call[:id],  # CRITICAL: Preserve tool ID for Claude API
         'name' => tool_call[:function][:name],
         'arguments' => parsed_args,
         'file_path' => parsed_args['file_path'],  # CRITICAL: Include file_path for UI identification
@@ -307,35 +343,6 @@ module Ai
       broadcast_update("Tool added to flow incrementally")
     end
     
-    # Finalize execution when all tools complete
-    def finalize_incremental_execution(execution_id, state)
-      @message.reload
-      flow = @message.conversation_flow.deep_dup
-      
-      tools_entry = flow.reverse.find { |item| 
-        item['type'] == 'tools' && item['execution_id'] == execution_id 
-      }
-      
-      if tools_entry
-        tools_entry['status'] = 'complete'
-        tools_entry['expanded'] = false
-        tools_entry['final_count'] = state['dispatched_count']
-        tools_entry['completed_at'] = Time.current.iso8601
-        
-        @message.update_columns(
-          conversation_flow: flow,
-          updated_at: Time.current
-        )
-      end
-      
-      # Check for deployment trigger
-      if all_tools_successful_incremental?(execution_id, state)
-        trigger_deployment_if_needed
-      end
-      
-      # Cleanup
-      cleanup_cache(execution_id)
-    end
     
     # Check if all incrementally dispatched tools succeeded
     def all_tools_successful_incremental?(execution_id, state)
@@ -467,12 +474,13 @@ module Ai
     end
     
     # Update tool status directly in flow and cache
-    def update_tool_status_direct(execution_id, tool_index, status)
+    def update_tool_status_direct(execution_id, tool_index, status, error_message = nil)
       # Update cache state
       state_key = cache_key(execution_id, 'state')
       state = Rails.cache.read(state_key)
       if state && state['tools'][tool_index.to_s]
         state['tools'][tool_index.to_s]['status'] = status
+        state['tools'][tool_index.to_s]['error'] = error_message if error_message
         Rails.cache.write(state_key, state, expires_in: 10.minutes)
       end
       
@@ -485,6 +493,7 @@ module Ai
       
       if tools_entry && tools_entry['tools'][tool_index]
         tools_entry['tools'][tool_index]['status'] = status
+        tools_entry['tools'][tool_index]['error'] = error_message if error_message
         @message.update_columns(conversation_flow: flow, updated_at: Time.current)
       end
       
@@ -518,10 +527,10 @@ module Ai
         Rails.cache.write(state_key, state, expires_in: 10.minutes)
       end
       
-      # Update UI status
-      update_tool_status_direct(execution_id, tool_index, status)
+      # Update UI status with error if present
+      update_tool_status_direct(execution_id, tool_index, status, error)
       
-      Rails.logger.info "[INCREMENTAL_DIRECT] Tool #{tool_index} marked as #{status}"
+      Rails.logger.info "[INCREMENTAL_DIRECT] Tool #{tool_index} marked as #{status}#{error ? " with error: #{error}" : ""}"
     end
     
     # Dispatch tools and return immediately (truly async)

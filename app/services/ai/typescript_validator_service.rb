@@ -2,6 +2,21 @@ module Ai
   class TypescriptValidatorService
     # Common TypeScript/JavaScript syntax errors we can auto-fix
     QUOTE_PATTERNS = [
+      # Ternary operator with incorrectly escaped quotes (handles backslash before quote)
+      {
+        pattern: /\?\s*"([^"]*?)\\+"\s*:\s*\\+"([^"]*?)"/,
+        replacement: '? "\1" : "\2"'
+      },
+      # Simple ternary with escaped quotes at the end of strings
+      {
+        pattern: /"([^"]*?)\\"\s*:\s*\\"([^"]*?)"/,
+        replacement: '"\1" : "\2"'
+      },
+      # Handle escaped quotes in ternary expressions within function calls
+      {
+        pattern: /(\w+\()([^)]*?)\?\s*"([^"]*?)\\"\s*:\s*\\"([^"]*?)"([^)]*?\))/,
+        replacement: '\1\2? "\3" : "\4"\5'
+      },
       # JSX className with backslash before closing quote (most common pattern)
       {
         pattern: /className="([^"]*)\\">/,
@@ -46,6 +61,11 @@ module Ai
       { 
         pattern: /"print\("([^"]*)"\)"/,
         replacement: '"print(\'\1\')"'
+      },
+      # Fix double-escaped quotes (\\") to single escape (\")
+      {
+        pattern: /([^\\])\\\\"([^"]*?)\\\\"/,
+        replacement: '\1\"\2\"'
       },
       # Generic console.log
       { 
@@ -152,6 +172,27 @@ module Ai
           end
         end
         
+        # Comprehensive fix for ternary operator with escaped quotes
+        if line.include?('?') && line.include?(':')
+          # First pass: Fix the pattern ? "text\" : \"text"
+          line.gsub!(/\?\s*"([^"]*?)\\"\s*:\s*\\"([^"]*?)"/, '? "\1" : "\2"')
+          
+          # Second pass: Fix remaining escaped quotes in ternary context
+          # Fix pattern: "text\" followed by : (end of first option)
+          line.gsub!(/"([^"]*?)\\"\s*:/, '"\1" :')
+          
+          # Fix pattern: : \"text" (start of second option)
+          line.gsub!(/:\s*\\"([^"]*?)"/, ': "\1"')
+          
+          # Fix trailing \" at the end of a ternary expression
+          # This handles cases like: "text\"); or "text\"}
+          line.gsub!(/(".*?)\\("[\s\)\};,])/, '\1\2')
+          
+          # Fix any remaining \"text patterns (for nested ternaries)
+          # This catches cases like: b ? \"Second\"
+          line.gsub!(/([?:]\s*)\\"([^"]*?)"/, '\1"\2"')
+        end
+        
         # Apply component prop fixes
         COMPONENT_PROP_FIXES.each do |fix|
           if line =~ fix[:pattern]
@@ -182,17 +223,8 @@ module Ai
           "<#{tag_name}#{before_attr} #{attr_name}=\"#{attr_value}\"#{after_attr}>"
         end
         
-        # Skip the generic quote fix for JSX content
-        unless line.include?('<') && line.include?('>')
-          # Fix escaped quotes that should use backslashes (only for non-JSX)
-          line.gsub!(/"([^"]*)"([^,;}]*)"([^"]*)"/) do |match|
-            # This is a string containing quotes - escape them
-            first_part = $1
-            middle = $2
-            last_part = $3
-            "\"#{first_part}\\\"#{middle}\\\"#{last_part}\""
-          end
-        end
+        # Skip the generic quote fix entirely - it's causing more problems than it solves
+        # The specific patterns above should handle all the cases we need
         
         if line != original_line
           lines_fixed << { line_num: index + 1, from: original_line.strip, to: line.strip }

@@ -225,9 +225,7 @@ module Ai
         raise e
       end
     end
-    
-    private
-    
+        
     def execute_until_complete
       Rails.logger.info "[V5_LOOP] Starting execute_until_complete"
       
@@ -273,13 +271,14 @@ module Ai
           # For continuations, just use the raw message
           @chat_message.content
         else
+          # NOTE: This runs for new apps only, anything needed for 'starting new apps' with hard enforcement should be done in the prompt
           # For initial app generation, add instructions to name the app and generate a logo
           enhanced_message = @chat_message.content + "\n\n"
-          enhanced_message += "IMPORTANT: As part of creating this app:\n"
+          enhanced_message += "<system-reminder>IMPORTANT: As part of creating this app:\n"
           enhanced_message += "1. Use the 'rename-app' tool to give the app an appropriate name based on its purpose\n"
           enhanced_message += "2. After naming, use the 'generate-new-app-logo' tool to create a logo that matches the app's theme\n"
           enhanced_message += "3. Choose a logo style that fits the app's purpose (modern, professional, playful, etc.)\n"
-          enhanced_message += "\nThese should be done early in the generation process, after understanding the app's requirements."
+          enhanced_message += "\nThese should be done early in the generation process, after understanding the app's requirements.</system-reminder>"
           enhanced_message
         end
         
@@ -1902,9 +1901,21 @@ module Ai
       
       Rails.logger.info "[V5_INCREMENTAL] Continuing conversation after async tool completion"
       
+      # Initialize prompt service if not already initialized
+      if @prompt_service.nil?
+        agent_vars = {
+          app_id: @app.id,
+          user_prompt: @chat_message.content,
+          template_path: Rails.root.join("app/services/ai/templates/overskill_20250728"),
+          iteration_limit: MAX_ITERATIONS,
+          features: []  # Basic features for continuation
+        }
+        @prompt_service = Prompts::AgentPromptService.new(agent_vars)
+      end
+      
       # Reinitialize client and continue the conversation
       client = Ai::AnthropicClient.instance
-      tools = Ai::AiToolService.tools_for_chat_with_claude
+      tools = @prompt_service.generate_tools
       helicone_session = SecureRandom.uuid
       
       # Continue the tool calling cycle
@@ -1938,12 +1949,13 @@ module Ai
       tool_cycles = 0
       max_tool_cycles = 30
       response = nil
-      content_added_to_flow = false
+      # Remove this variable as we'll use content_state per loop iteration
       
       Rails.logger.info "[V5_INCREMENTAL] Starting incremental tool calling cycle"
       
       loop do
-        content_added_to_flow = false
+        # Use hash to make it mutable within lambdas (Ruby closure workaround)
+        content_state = { added: false }
         
         # Initialize incremental coordinator for this cycle
         coordinator = Ai::IncrementalToolCoordinator.new(@assistant_message, @app, @iteration_count)
@@ -1955,6 +1967,22 @@ module Ai
         thinking_blocks = []
         
         Rails.logger.info "[V5_INCREMENTAL] Cycle #{tool_cycles + 1}: Starting stream with incremental dispatch"
+        
+        # Pre-add text entry to conversation_flow to ensure correct ordering
+        text_entry_index = nil
+        if !content_state[:added]
+          # Add placeholder text entry that will be updated as content streams in
+          add_to_conversation_flow(
+            type: 'message',
+            content: '',
+            iteration: @iteration_count
+          )
+          # Track the index of this text entry
+          text_entry_index = (@assistant_message.conversation_flow || []).length - 1
+          content_state[:added] = true
+          content_state[:index] = text_entry_index
+          Rails.logger.info "[V5_INCREMENTAL] Pre-added text entry at index #{text_entry_index}"
+        end
         
         begin
           # Use incremental streaming with immediate tool dispatch
@@ -1984,7 +2012,19 @@ module Ai
             
             on_text: ->(text_chunk) {
               text_content += text_chunk
-              # Could stream text to UI in real-time here
+              Rails.logger.info "[V5_INCREMENTAL] Text chunk received, total length: #{text_content.length}"
+              
+              # Update the pre-added text entry at the specific index
+              if text_chunk.present? && content_state[:added] && content_state[:index]
+                # Update the text entry at the tracked index
+                if @assistant_message.conversation_flow && @assistant_message.conversation_flow[content_state[:index]]
+                  @assistant_message.conversation_flow[content_state[:index]]['content'] = text_content
+                  @assistant_message.conversation_flow[content_state[:index]]['updated_at'] = Time.current.iso8601
+                  @assistant_message.save!
+                  broadcast_conversation_update
+                  Rails.logger.info "[V5_INCREMENTAL] Updated text at index #{content_state[:index]} (#{text_content.length} chars)"
+                end
+              end
             },
             
             on_thinking: ->(thinking_block) {
@@ -2042,10 +2082,10 @@ module Ai
           if dispatched_tools.any?
             Rails.logger.info "[V5_INCREMENTAL] #{dispatched_tools.size} tools already executing"
             
-            # Add text content to flow before tools
-            if response[:content].present?
+            # Add text content to flow only if not already added during streaming
+            if response[:content].present? && !content_state[:added]
               add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
-              content_added_to_flow = true
+              content_state[:added] = true
             end
             
             # Add assistant message with tool calls to conversation
@@ -2106,9 +2146,9 @@ module Ai
             Rails.logger.info "[V5_INCREMENTAL] Found #{dispatched_tools.size} tools with stop_reason='#{stop_reason}'"
             
             # Same flow as tool_use case above
-            if response[:content].present?
+            if response[:content].present? && !content_state[:added]
               add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
-              content_added_to_flow = true
+              content_state[:added] = true
             end
             
             assistant_message = {
@@ -2149,7 +2189,7 @@ module Ai
             # Normal completion without tools
             Rails.logger.info "[V5_INCREMENTAL] Completed normally without tools"
             
-            if response[:content].present? && !content_added_to_flow
+            if response[:content].present? && !content_state[:added]
               add_loop_message(response[:content], type: 'content', thinking_blocks: response[:thinking_blocks])
             end
             
@@ -3459,8 +3499,8 @@ module Ai
 
       # If not a discussion and appears to be a change request, append the instruction
       if !is_discussion
-        user_content = "#{user_content} \n\n Think ahead around tool calling needs, and update all necessary files in one response."
-        Rails.logger.info "[V5_PROMPT] Appended batch update instruction to user prompt"
+        user_content = "#{user_content} <system-reminder>Think ahead around tool calling needs, and update all necessary APPLICATION files in one response. IMPORTANT: Use existing UI components from @/components/ui/ - DO NOT create new UI component files (button.tsx, card.tsx, etc.) as they already exist in the template. IMPORTANT: If you need to update the UI, use the existing UI components from @/components/ui/ - DO NOT create new UI component files (button.tsx, card.tsx, etc.) as they already exist in the template.</system-reminder>"
+        Rails.logger.info "[V5_PROMPT] Appended batch update instruction to user prompt with component clarification"
       end
       
       messages << { role: 'user', content: user_content }
@@ -4295,7 +4335,6 @@ module Ai
           content: 'Thinking..', # Required field
           status: 'executing',
           iteration_count: 0,
-          loop_messages: [],
           tool_calls: [],
           conversation_flow: [],
           thinking_status: "Initializing Overskill AI...",
@@ -4308,6 +4347,24 @@ module Ai
       @assistant_message.thinking_status = status
       @assistant_message.thought_for_seconds = seconds
       @assistant_message.save!
+    end
+    
+    # Helper to update the last text content entry during streaming
+    def update_last_text_content(new_content)
+      return unless @assistant_message.conversation_flow.present?
+      
+      # Find the last content entry and update it
+      @assistant_message.conversation_flow.reverse_each do |entry|
+        if entry['type'] == 'content'
+          entry['content'] = new_content
+          entry['updated_at'] = Time.current.iso8601
+          break
+        end
+      end
+      
+      # Save and broadcast the update
+      @assistant_message.save!
+      broadcast_conversation_update
     end
     
     def add_loop_message(content, type: 'content', thinking_blocks: nil)
@@ -4326,12 +4383,11 @@ module Ai
             'signature' => block['signature'] || block[:signature] || "sig_#{SecureRandom.hex(8)}"
           }
           
-          @assistant_message.loop_messages << thinking_message
           
           # Add to conversation_flow for display
           add_to_conversation_flow(
             type: 'thinking',
-            content: thinking_message
+            content: thinking_content  # Pass just the content string, not the whole message hash
           )
           
           Rails.logger.info "[V5_THINKING] Added thinking block to conversation flow (#{thinking_content.length} chars)"
@@ -4347,12 +4403,11 @@ module Ai
           'timestamp' => Time.current.iso8601
         }
         
-        @assistant_message.loop_messages << loop_message
         
         # Also add to conversation_flow for interleaved display
         add_to_conversation_flow(
           type: type == 'status' ? 'status' : 'message',
-          content: loop_message
+          content: content  # Pass just the content string, not the whole message hash
         )
       end
       
@@ -4923,6 +4978,23 @@ module Ai
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast incremental message update: #{e.message}"
     end
 
+    # Broadcast conversation update for real-time text streaming
+    def broadcast_conversation_update
+      return unless @assistant_message && @app
+      
+      Rails.logger.info "[V5_BROADCAST] Broadcasting conversation update for text streaming"
+      
+      # Broadcast the updated message to show streaming text
+      Turbo::StreamsChannel.broadcast_replace_to(
+        "app_#{@app.id}_chat",
+        target: "app_chat_message_#{@assistant_message.id}",
+        partial: "account/app_editors/agent_reply_v5",
+        locals: { message: @assistant_message, app: @app }
+      )
+    rescue => e
+      Rails.logger.error "[V5_BROADCAST] Failed to broadcast conversation update: #{e.message}"
+    end
+    
     # Broadcast preview frame update when app is deployed
     def broadcast_preview_frame_update
       return unless @app&.preview_url.present?

@@ -1,11 +1,18 @@
-# 🚀 OverSkill Development Handoff - STREAMING TOOL EXECUTION (V2 FIXED)
+# 🚀 OverSkill Development Handoff - INCREMENTAL TOOL STREAMING FIXED
 
-## ⚡ IMMEDIATE STATUS (August 27, 2025 - CACHE FIX APPLIED)
+## ⚡ IMMEDIATE STATUS (August 28, 2025 - CONVERSATION FLOW FIX APPLIED)
 
-### 🟢 STREAMING TOOL COORDINATOR V2 - CACHE ISSUE RESOLVED  
-**Fixed cache state persistence issue preventing deployment triggers. Database fallback added.**
+### 🟢 INCREMENTAL TOOL STREAMING - TEXT DISPLAY FIXED  
+**Fixed double-nested content issue in conversation_flow preventing proper text display.**
 
-#### Latest Critical Fix (August 27):
+#### Latest Critical Fix (August 28):
+```bash
+❌ Text showing only "I'll create" → ✅ Full text content displays properly
+❌ Content double-nested as hash → ✅ Content stored as plain string
+❌ Text not streaming incrementally → ✅ Text updates during tool execution
+```
+
+#### Previous Critical Fix (August 27):
 ```bash
 ❌ Cache state returning nil → ✅ Database fallback when cache fails
 ❌ Cleanup deleting state early → ✅ Read state before deletion
@@ -21,6 +28,30 @@
 ❌ Format Incompatibility → ✅ Compatible with existing StreamingToolExecutor
 ❌ No Error Handling → ✅ Graceful timeouts and Sidekiq failure recovery
 ```
+
+---
+
+## 🔍 AUGUST 28 FINDINGS
+
+### Issue 1: Text Content Not Displaying Properly (FIXED)
+- **Problem**: Text showing only "I'll create" instead of full response
+- **Root Cause**: `add_loop_message` passing entire hash to conversation_flow instead of content string
+- **Files Fixed**: 
+  - `app/services/ai/app_builder_v5.rb:4373` - Thinking content
+  - `app/services/ai/app_builder_v5.rb:4393` - Message content
+- **Solution**: Pass content string directly, not the wrapper hash
+
+### Issue 2: Text Appearing After Tools (FIXED)
+- **Problem**: Text content appeared AFTER tools in conversation_flow, breaking UI order
+- **Root Cause**: Text was added to conversation_flow only after first chunk arrived, while tools were added immediately
+- **Files Fixed**:
+  - `app/services/ai/app_builder_v5.rb:1970-1984` - Pre-add text entry placeholder
+  - `app/services/ai/app_builder_v5.rb:2012-2026` - Update text at specific index
+- **Solution**: Pre-create text entry in conversation_flow before streaming starts, then update it at its index
+- **Test Scripts**: 
+  - `scripts/test_conversation_flow_fix.rb` - Check structure
+  - `scripts/test_text_ordering.rb` - Verify order
+  - `scripts/test_incremental_streaming_full.rb` - Full integration test
 
 ---
 
