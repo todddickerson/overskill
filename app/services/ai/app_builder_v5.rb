@@ -1025,15 +1025,21 @@ module Ai
         ]
       )
       
-      # NOTE: DeployAppJob will be queued after app version creation
-      # This ensures proper sequencing and version tracking
+      # FIX: Actually queue the DeployAppJob now that generation is complete
+      # The comment was misleading - we need to trigger deployment here
+      Rails.logger.info "[V5_DEPLOY] Queueing DeployAppJob for app #{@app.id}"
       
-      Rails.logger.info "[V5_DEPLOY] Generation complete, deployment will be queued after version creation"
+      # Queue deployment with a small delay to ensure all database writes are committed
+      job = DeployAppJob.set(wait: 5.seconds).perform_later(@app.id, "production")
+      job_id = job.job_id if job.respond_to?(:job_id)
       
-      # Return success - deployment happens after version creation
+      Rails.logger.info "[V5_DEPLOY] DeployAppJob queued with ID: #{job_id}"
+      
+      # Return success with job ID for tracking
       {
         success: true,
-        message: "Generation complete",
+        message: "Generation complete, deployment queued",
+        job_id: job_id,
         preview_url: @app.preview_url # Return existing URL if available
       }
     rescue => e
