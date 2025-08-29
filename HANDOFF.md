@@ -1,6 +1,24 @@
-# 🚀 OverSkill Development Handoff - INCREMENTAL TOOL STREAMING FIXED
+# 🚀 OverSkill Development Handoff - DEPLOYMENT ISSUES INVESTIGATED
 
-## ⚡ IMMEDIATE STATUS (August 28, 2025 - CONVERSATION FLOW FIX APPLIED)
+## ⚡ IMMEDIATE STATUS (August 29, 2025 - DEPLOYMENT INVESTIGATION COMPLETE)
+
+### 🔴 DEPLOYMENT ISSUES FOUND - PARTIAL FIX APPLIED
+
+#### App jWbgQN (FIXED)
+- **Problem**: App generated but never deployed
+- **Root Cause**: DeployAppJob never enqueued in AppBuilderV5
+- **Fix Applied**: Added `DeployAppJob.perform_later` in line 1028-1044
+- **Status**: ✅ App now deployed at https://jwbgqn.overskill.app
+
+#### App ePopYJ (PARTIALLY FIXED)  
+- **Problem 1**: Preview shows template, production shows correct content
+- **Root Cause**: CloudFlare WFP preview namespace issue (not deployment)
+- **Status**: ❌ Requires CloudFlare API access to fix
+- **Problem 2**: GitHub monitor service couldn't find workflow runs
+- **Root Cause**: Timing issue - monitor checked before workflow started
+- **Status**: ⚠️ Needs timeout increase in monitor service
+
+**Documentation**: See `docs/DEPLOYMENT_FIX_JWBGQN.md` and `docs/DEPLOYMENT_ISSUE_EPOPYJ.md`
 
 ### 🟢 INCREMENTAL TOOL STREAMING - TEXT DISPLAY FIXED  
 **Fixed double-nested content issue in conversation_flow preventing proper text display.**
