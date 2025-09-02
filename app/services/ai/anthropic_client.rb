@@ -239,9 +239,28 @@ module Ai
         response = self.class.post("/v1/messages", request_options)
         
         unless response.success?
-          error_details = response.parsed_response["error"] || {}
-          error_message = error_details["message"] || "HTTP #{response.code}"
-          error_type = error_details["type"] || "unknown_error"
+          # Check if response is HTML (like Cloudflare errors)
+          response_body = response.body rescue ""
+          if response_body.include?('<html') || response_body.include?('<!DOCTYPE') || response_body.include?('Worker exceeded resource limits')
+            Rails.logger.error "[AnthropicClient] Received HTML error response: #{response_body[0..500]}"
+            
+            error_message = if response_body.include?('Worker exceeded resource limits')
+              "The AI service temporarily exceeded resource limits. Please try again in a moment."
+            elsif response_body.include?('Cloudflare')
+              "Service temporarily unavailable. Please try again."
+            else
+              "An unexpected error occurred (HTTP #{response.code}). Please try again."
+            end
+            
+            error_details = { "message" => error_message }
+            error_type = "service_error"
+          else
+            # Try to parse JSON error response
+            error_details = response.parsed_response["error"] rescue {}
+            error_details ||= {}
+            error_message = error_details["message"] || "HTTP #{response.code}"
+            error_type = error_details["type"] || "unknown_error"
+          end
           
           Rails.logger.error "[AnthropicClient] API Error Response:"
           Rails.logger.error "  Type: #{error_type}"
@@ -461,9 +480,28 @@ module Ai
         response = self.class.post("/v1/messages", request_options)
         
         unless response.success?
-          error_details = response.parsed_response["error"] || {}
-          error_message = error_details["message"] || "HTTP #{response.code}"
-          error_type = error_details["type"] || "unknown_error"
+          # Check if response is HTML (like Cloudflare errors)
+          response_body = response.body rescue ""
+          if response_body.include?('<html') || response_body.include?('<!DOCTYPE') || response_body.include?('Worker exceeded resource limits')
+            Rails.logger.error "[AnthropicClient] Received HTML error response: #{response_body[0..500]}"
+            
+            error_message = if response_body.include?('Worker exceeded resource limits')
+              "The AI service temporarily exceeded resource limits. Please try again in a moment."
+            elsif response_body.include?('Cloudflare')
+              "Service temporarily unavailable. Please try again."
+            else
+              "An unexpected error occurred (HTTP #{response.code}). Please try again."
+            end
+            
+            error_details = { "message" => error_message }
+            error_type = "service_error"
+          else
+            # Try to parse JSON error response
+            error_details = response.parsed_response["error"] rescue {}
+            error_details ||= {}
+            error_message = error_details["message"] || "HTTP #{response.code}"
+            error_type = error_details["type"] || "unknown_error"
+          end
           
           Rails.logger.error "[AnthropicClient] API Error Response:"
           Rails.logger.error "  Type: #{error_type}"

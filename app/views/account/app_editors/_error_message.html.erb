@@ -1,0 +1,37 @@
+<%# Error message partial for broadcasting errors to the chat UI %>
+<div class="mb-4">
+  <div class="flex items-start space-x-2">
+    <%# OverSkill Logo %>
+    <%= image_tag "overskill-logo.svg", 
+        alt: "OverSkill", 
+        class: "w-6 h-6 flex-shrink-0 mt-0.5" %>
+    
+    <div class="flex-1">
+      <div class="flex items-center space-x-2 mb-2">
+        <span class="text-gray-900 dark:text-white font-overskill-bold text-base">overskill</span>
+      </div>
+      
+      <%# Error message content %>
+      <div class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+        <div class="flex items-center space-x-2">
+          <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+          <span class="text-sm text-red-700 dark:text-red-300">
+            <%# Clean up HTML errors from Cloudflare/proxies %>
+            <% cleaned_message = if message.include?('<html') || message.include?('<!DOCTYPE') || message.include?('Worker exceeded resource limits')
+                if message.include?('Worker exceeded resource limits')
+                  "The AI service temporarily exceeded resource limits. Please try again in a moment."
+                elsif message.include?('Cloudflare')
+                  "Service temporarily unavailable. Please try again."
+                else
+                  "An unexpected error occurred. Please try again."
+                end
+              else
+                message
+              end %>
+            <%= cleaned_message %>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

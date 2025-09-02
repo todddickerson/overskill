@@ -68,8 +68,44 @@ class IncrementalToolCompletionJob < ApplicationJob
     # Format tool results for Claude
     tool_results = format_tool_results(tools_entry['tools'], tool_results_raw)
     
+    # CRITICAL FIX: The conversation_messages already contain the assistant's message with tool_use blocks
+    # We need to ensure that the tool_result blocks immediately follow the tool_use blocks
+    # The last message in conversation_messages should be the assistant's message with tool_use
+    
+    # Log conversation structure for debugging
+    Rails.logger.info "[INCREMENTAL_COMPLETION] Conversation structure before adding tool results:"
+    @conversation_messages.each_with_index do |msg, i|
+      Rails.logger.info "[INCREMENTAL_COMPLETION]   Message #{i}: role=#{msg[:role]}"
+      if msg[:content].is_a?(Array)
+        msg[:content].each_with_index do |content_item, j|
+          if content_item[:type] == 'tool_use'
+            Rails.logger.info "[INCREMENTAL_COMPLETION]     Content[#{j}]: tool_use - id=#{content_item[:id]}, name=#{content_item[:name]}"
+          elsif content_item[:type] == 'tool_result'
+            Rails.logger.info "[INCREMENTAL_COMPLETION]     Content[#{j}]: tool_result - tool_use_id=#{content_item[:tool_use_id]}"
+          else
+            Rails.logger.info "[INCREMENTAL_COMPLETION]     Content[#{j}]: #{content_item[:type] || 'text'}"
+          end
+        end
+      elsif msg[:content].is_a?(String)
+        Rails.logger.info "[INCREMENTAL_COMPLETION]     Content: text (#{msg[:content].length} chars)"
+      end
+    end
+    
+    # Check if the last message is an assistant message with tool_use blocks
+    if @conversation_messages.last && @conversation_messages.last[:role] == 'assistant'
+      Rails.logger.info "[INCREMENTAL_COMPLETION] Last message is assistant with tool_use blocks"
+      # The conversation is correctly structured - assistant's tool_use followed by our tool_results
+    else
+      Rails.logger.warn "[INCREMENTAL_COMPLETION] Unexpected conversation structure - last message is not assistant"
+    end
+    
     # Add tool results to conversation and continue
     # Tool results should be individual content items in the user message
+    Rails.logger.info "[INCREMENTAL_COMPLETION] Adding #{tool_results.size} tool results:"
+    tool_results.each_with_index do |result, i|
+      Rails.logger.info "[INCREMENTAL_COMPLETION]   Tool result #{i}: tool_use_id=#{result[:tool_use_id]}"
+    end
+    
     user_message = {
       role: 'user',
       content: tool_results  # This is already an array of properly formatted tool_result objects

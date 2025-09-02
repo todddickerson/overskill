@@ -326,6 +326,22 @@ module Ai
         elsif e.is_a?(NoMethodError)
           Rails.logger.error "[V5_SIMPLE] *** NO METHOD ERROR ***"
           error_msg = "Method error: #{e.message}"
+        elsif e.message.include?("<html") || e.message.include?("<!DOCTYPE") || e.message.include?("<!--")
+          Rails.logger.error "[V5_SIMPLE] *** HTML ERROR RESPONSE DETECTED ***"
+          
+          # Try to extract meaningful error from HTML
+          if e.message.include?("Worker exceeded resource limits")
+            error_msg = "API Error: Worker exceeded resource limits. The request was too large or complex. Please try a simpler request."
+          elsif e.message.include?("anthropic.helicone.ai")
+            error_msg = "API Error: Request failed at proxy layer. Please try again in a moment."
+          elsif e.message.include?("502") || e.message.include?("Bad Gateway")
+            error_msg = "API Error: Service temporarily unavailable (502 Bad Gateway). Please try again."
+          elsif e.message.include?("503") || e.message.include?("Service Unavailable")
+            error_msg = "API Error: Service temporarily unavailable (503). Please try again."
+          else
+            # Generic HTML error - don't show raw HTML
+            error_msg = "API Error: Received invalid response from server. Please try again."
+          end
         else
           error_msg = "Error during generation: #{e.message}"
         end
@@ -1910,11 +1926,29 @@ module Ai
       
       # CRITICAL FIX: Find and reuse the existing assistant message to prevent splitting
       # Look for the most recent assistant message that is still processing
+      # CRITICAL FIX 2: Also check for recently completed messages that might be part of ongoing conversation
       @assistant_message = @app.app_chat_messages
         .where(role: 'assistant')
         .where(status: ['processing', 'executing'])
         .order(created_at: :desc)
         .first
+      
+      # If no processing/executing message, check if there's a very recent completed one (within 5 seconds)
+      # This handles the case where a message was marked completed between tool cycles
+      if @assistant_message.nil?
+        recent_completed = @app.app_chat_messages
+          .where(role: 'assistant')
+          .where(status: 'completed')
+          .where('created_at > ?', 30.seconds.ago)
+          .order(created_at: :desc)
+          .first
+        
+        if recent_completed && recent_completed.conversation_flow.present?
+          Rails.logger.info "[V5_INCREMENTAL] Found recently completed message ##{recent_completed.id}, reusing it"
+          @assistant_message = recent_completed
+          @assistant_message.update!(status: 'executing')  # Resume execution
+        end
+      end
       
       if @assistant_message.nil?
         Rails.logger.error "[V5_INCREMENTAL] No existing assistant message found! Creating new one"
@@ -2085,7 +2119,23 @@ module Ai
               # Handle both hash and exception formats for safety
               error_message = error.is_a?(Hash) ? error[:message] : error.message
               Rails.logger.error "[V5_INCREMENTAL] Stream error: #{error_message}"
-              raise StandardError.new("Incremental streaming failed: #{error_message}")
+              
+              # Clean up HTML error responses before raising
+              clean_message = if error_message.include?("<html") || error_message.include?("<!DOCTYPE")
+                if error_message.include?("Worker exceeded resource limits")
+                  "Worker exceeded resource limits"
+                elsif error_message.include?("502") || error_message.include?("Bad Gateway")
+                  "Service temporarily unavailable (502)"
+                elsif error_message.include?("503") || error_message.include?("Service Unavailable")
+                  "Service temporarily unavailable (503)"
+                else
+                  "Invalid server response"
+                end
+              else
+                error_message
+              end
+              
+              raise StandardError.new("Incremental streaming failed: #{clean_message}")
             }
           }
           
@@ -4589,18 +4639,38 @@ module Ai
     end
     
     def finalize_with_app_version(app_version)
+      # Preserve conversation flow before updating
+      preserved_flow = @assistant_message.conversation_flow
+      
       @assistant_message.app_version = app_version
       @assistant_message.is_code_generation = true
       @assistant_message.status = 'completed'
       @assistant_message.thinking_status = nil
+      
+      # Ensure conversation_flow is preserved during finalization
+      @assistant_message.conversation_flow = preserved_flow if preserved_flow.present?
+      
       @assistant_message.save!
+      
+      # Broadcast the final update
+      broadcast_message_update
     end
     
     def mark_as_discussion_only
+      # Preserve conversation flow before updating
+      preserved_flow = @assistant_message.conversation_flow
+      
       @assistant_message.is_code_generation = false
       @assistant_message.status = 'completed'
       @assistant_message.thinking_status = nil
+      
+      # Ensure conversation_flow is preserved during finalization
+      @assistant_message.conversation_flow = preserved_flow if preserved_flow.present?
+      
       @assistant_message.save!
+      
+      # Broadcast the final update
+      broadcast_message_update
     end
     
     # Create AppVersion for generated code - tracks changes from previous version
@@ -4846,7 +4916,16 @@ module Ai
         flow_entry['thinking_blocks'] = content.is_a?(Hash) ? content['thinking_blocks'] : nil
       when 'tools'
         # CRITICAL FIX: Use 'tools' instead of 'calls' for consistency with SimpleToolStreamer
-        flow_entry['tools'] = tool_calls || []
+        # CRITICAL FIX: Don't add empty tool arrays - they cause consecutive assistant messages
+        tools_to_add = tool_calls || []
+        if tools_to_add.empty?
+          Rails.logger.warn "[V5_FLOW] Skipping empty tools entry - would cause consecutive assistant messages"
+          # Don't add the flow entry, but continue with the method to avoid breaking streaming
+          @assistant_message.save! if @assistant_message.changed?
+          Rails.logger.info "[V5_FLOW] Skipped empty tools, conversation_flow size remains: #{@assistant_message.conversation_flow.size}"
+          return  # Exit early but after saving any pending changes
+        end
+        flow_entry['tools'] = tools_to_add
       when 'status'
         flow_entry['content'] = content
       when 'error'

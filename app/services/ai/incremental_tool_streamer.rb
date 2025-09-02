@@ -484,6 +484,28 @@ module Ai
     
     def handle_error_response(response)
       error_body = response.body rescue ""
+      
+      # Check if error is HTML (like Cloudflare errors)
+      if error_body.include?('<html') || error_body.include?('<!DOCTYPE')
+        Rails.logger.error "[INCREMENTAL_STREAMER] Received HTML error response: #{error_body[0..500]}"
+        
+        # Extract meaningful error from HTML if possible
+        error_message = if error_body.include?('Worker exceeded resource limits')
+          "The AI service temporarily exceeded resource limits. Please try again in a moment."
+        elsif error_body.include?('Cloudflare')
+          "Service temporarily unavailable. Please try again."
+        else
+          "An unexpected error occurred. Please try again."
+        end
+        
+        @callbacks[:on_error]&.call({
+          code: response.code,
+          message: error_message,
+          type: "service_error"
+        })
+        return
+      end
+      
       error = begin
         JSON.parse(error_body)
       rescue

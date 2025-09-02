@@ -287,10 +287,22 @@
               </div>
               
             <% when 'error' %>
-              <%# Error message %>
+              <%# Error message - clean up HTML errors from Cloudflare/proxies %>
+              <% error_content = flow_item['content'] || '' %>
+              <% cleaned_error = if error_content.include?('<html') || error_content.include?('<!DOCTYPE') || error_content.include?('Worker exceeded resource limits')
+                  if error_content.include?('Worker exceeded resource limits')
+                    "The AI service temporarily exceeded resource limits. Please try again in a moment."
+                  elsif error_content.include?('Cloudflare')
+                    "Service temporarily unavailable. Please try again."
+                  else
+                    "An unexpected error occurred. Please try again."
+                  end
+                else
+                  error_content
+                end %>
               <div class="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
                 <i class="fas fa-exclamation-triangle"></i>
-                <span><%= flow_item['content'] %></span>
+                <span><%= cleaned_error %></span>
               </div>
             <% end %>
           <% end %>
