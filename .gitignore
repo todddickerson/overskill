@@ -112,3 +112,4 @@ playwright-report/
 coverage/
 *.har
 *.log
+bullet_train*
