@@ -19,7 +19,10 @@ end
 
 file_type = ARGV.shift
 theme = ARGV.shift
-gem_path = `bundle show bullet_train-themes-#{theme} 2> /dev/null`.chomp
+# Use bundle info --path and ensure we only get the first line
+# RubyGems 3.7.1 seems to output the path twice in some contexts
+gem_path_output = `bundle info --path bullet_train-themes-#{theme} 2> /dev/null`
+gem_path = gem_path_output.split("\n").first.to_s.chomp
 
 file_path, fallback_file_path = case file_type
 when "tailwind-config"
