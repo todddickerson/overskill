@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-bin/link
+# Skip bin/link if symlinks already exist to avoid errors
+if [ ! -L "bullet_train-1.26.0" ]; then
+  bin/link
+fi
 
 if [ -x "$(command -v overmind)" ]
 then
