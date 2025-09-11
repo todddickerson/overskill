@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_25_162214) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_09_180729) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -251,9 +251,26 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_162214) do
     t.string "rollback_version_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "build_started_at"
+    t.datetime "build_completed_at"
+    t.integer "build_duration_seconds"
+    t.datetime "deploy_started_at"
+    t.datetime "deploy_completed_at"
+    t.integer "deploy_duration_seconds"
+    t.text "error_message"
+    t.jsonb "error_details"
+    t.string "build_log_url"
+    t.integer "bundle_size_bytes"
+    t.integer "files_count"
+    t.integer "worker_script_size_bytes"
+    t.integer "cold_start_duration_ms"
+    t.index ["app_id", "created_at"], name: "index_app_deployments_on_app_id_and_created_at"
+    t.index ["app_id", "environment", "status"], name: "index_app_deployments_on_app_id_and_environment_and_status"
     t.index ["app_id", "environment"], name: "index_app_deployments_on_app_id_and_environment"
     t.index ["app_id"], name: "index_app_deployments_on_app_id"
     t.index ["deployed_at"], name: "index_app_deployments_on_deployed_at"
+    t.index ["status"], name: "index_app_deployments_on_status"
   end
 
   create_table "app_domains", force: :cascade do |t|
@@ -542,6 +559,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_162214) do
     t.text "preview_error"
     t.decimal "preview_deployment_time"
     t.datetime "preview_provisioned_at"
+    t.datetime "processing_started_at"
+    t.datetime "processing_completed_at"
+    t.datetime "last_processed_at"
     t.index ["creator_id"], name: "index_apps_on_creator_id"
     t.index ["database_shard_id", "shard_app_id"], name: "index_apps_on_database_shard_id_and_shard_app_id", unique: true
     t.index ["database_shard_id"], name: "index_apps_on_database_shard_id"

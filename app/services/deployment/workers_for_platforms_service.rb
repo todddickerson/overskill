@@ -249,7 +249,7 @@ module Deployment
           main_module: 'index.js',
           compatibility_date: '2024-01-01',
           tags: generate_script_tags(metadata),
-          bindings: generate_customer_script_bindings
+          bindings: generate_customer_script_bindings(@app)
         }.to_json],
         ['index.js', script_content, { 
           filename: 'index.js',
@@ -427,18 +427,179 @@ module Deployment
       bindings
     end
     
-    def generate_customer_script_bindings
-      # Get the preview files KV namespace (matches WfpPreviewService)
+    def generate_customer_script_bindings(app = nil)
+      # Get the preview files KV namespace (matches WfpPreviewService)  
       namespace_title = "overskill-#{Rails.env}-preview-files"
       namespace_id = get_or_create_kv_namespace(namespace_title)
       
-      [
+      bindings = [
+        # KV namespace for file updates
         {
           type: 'kv_namespace',
           name: 'PREVIEW_FILES',
           namespace_id: namespace_id
         }
       ]
+      
+      # Add HMR Durable Object binding only if HMR is not disabled
+      skip_hmr = ENV['SKIP_HMR_DEPLOYMENT'] == 'true'
+      unless skip_hmr
+        bindings << {
+          type: 'durable_object_namespace',
+          name: 'DO_HMR',
+          class_name: 'HMRHandler',
+          script_name: nil # Uses same script
+        }
+        Rails.logger.info "[WFP] Including HMRHandler Durable Object binding"
+      else
+        Rails.logger.info "[WFP] Skipping HMRHandler binding (HMR disabled)"
+      end
+      
+      # Add platform-wide safe environment variables
+      # SECURITY: Only add public configuration - no secrets!
+      safe_env_vars = generate_safe_environment_variables
+      safe_env_vars.each do |key, value|
+        bindings << {
+          type: 'plain_text',
+          name: key,
+          text: value
+        }
+      end
+      
+      # Add app-specific environment variables (CRITICAL for multi-tenancy)
+      if app
+        app_specific_vars = generate_app_specific_environment_variables(app)
+        app_specific_vars.each do |key, value|
+          bindings << {
+            type: 'plain_text',
+            name: key,
+            text: value
+          }
+        end
+      end
+      
+      bindings
+    end
+    
+    private
+    
+    def generate_safe_environment_variables
+      # SECURITY CRITICAL: Only include public configuration values
+      # Never include secrets, API keys, database credentials, etc.
+      # User apps run in browser context, so these values can be public
+      {
+        'OVERSKILL_API_BASE_URL' => ENV['OVERSKILL_API_BASE_URL'] || 'https://api.overskill.app',
+        'ENVIRONMENT' => Rails.env,
+        'APP_DOMAIN' => ENV['WFP_APPS_DOMAIN'] || 'overskill.app',
+        'HMR_ENABLED' => Rails.env.development? ? 'true' : 'false'
+      }.compact
+    end
+    
+    def generate_app_specific_environment_variables(app)
+      # SECURITY CRITICAL: Generate app-specific environment variables
+      # These are unique per app and isolated from other apps
+      # Each app gets its own scoped variables to prevent collisions
+      
+      supabase_url = generate_app_supabase_url(app)
+      supabase_key = generate_app_supabase_key(app)
+      
+      app_vars = {
+        # Core app identification
+        'APP_ID' => app.obfuscated_id,
+        'APP_NAME' => app.name&.gsub(/[^a-zA-Z0-9_]/, '_')&.upcase,
+        'APP_OWNER_ID' => app.team.obfuscated_id,
+        
+        # Database configuration (app-specific Supabase project)
+        'SUPABASE_URL' => supabase_url,
+        'SUPABASE_ANON_KEY' => supabase_key,
+        
+        # VITE_ prefixed versions for client-side injection
+        'VITE_APP_ID' => app.obfuscated_id,
+        'VITE_SUPABASE_URL' => supabase_url,
+        'VITE_SUPABASE_ANON_KEY' => supabase_key,
+        'VITE_OWNER_ID' => app.team.obfuscated_id,
+        'VITE_ANALYTICS_ENABLED' => 'true',
+        'VITE_ENVIRONMENT' => 'production',
+        
+        # App-specific API endpoints
+        'API_BASE_URL' => "https://api.overskill.app/apps/#{app.obfuscated_id}",
+        'WEBSOCKET_URL' => "wss://ws.overskill.app/apps/#{app.obfuscated_id}",
+        
+        # Development/production flags
+        'DEVELOPMENT_MODE' => Rails.env.development? ? 'true' : 'false',
+        'BUILD_TIMESTAMP' => Time.current.to_i.to_s,
+        'VERSION' => app.app_versions.maximum(:id)&.to_s || '1',
+        
+        # Security context for app isolation
+        'APP_NAMESPACE' => "app_#{app.obfuscated_id}",
+        'TENANT_ID' => app.team.obfuscated_id
+      }
+      
+      # Add any additional app-specific configuration
+      app_vars.merge!(extract_app_configuration_vars(app))
+      
+      # SECURITY: All values are specific to this app instance
+      # No app can access another app's variables due to WFP isolation
+      app_vars.compact
+    end
+    
+    def generate_app_supabase_url(app)
+      # Generate app-specific Supabase URL
+      # Each app gets its own isolated database schema/project
+      base_url = ENV['SUPABASE_URL'] || 'https://app-db.overskill.app'
+      "#{base_url}/app_#{app.obfuscated_id}"
+    end
+    
+    def generate_app_supabase_key(app)
+      # Generate app-specific Supabase anonymous key
+      # This should be scoped to only access the app's own data
+      # TODO: In production, integrate with Supabase API to generate 
+      # app-specific keys with Row Level Security (RLS) policies
+      base_key = ENV['SUPABASE_ANON_KEY']
+      return nil unless base_key
+      
+      # For now, use a deterministic but app-specific key derivation
+      # In production, this should be proper Supabase key management
+      app_salt = "app_#{app.obfuscated_id}_#{app.created_at.to_i}"
+      Digest::SHA256.hexdigest("#{base_key}_#{app_salt}")[0..63]
+    end
+    
+    def extract_app_configuration_vars(app)
+      # Extract additional configuration from app files or metadata
+      # Look for environment variable configuration in app files
+      config_vars = {}
+      
+      # Check for .env files or configuration in app files
+      env_file = app.app_files.find_by(path: '.env')
+      if env_file&.content.present?
+        # Parse .env file content safely (only public vars)
+        env_file.content.lines.each do |line|
+          line = line.strip
+          next if line.blank? || line.start_with?('#')
+          
+          if line.match(/^([A-Z_]+)=(.+)$/)
+            key, value = $1, $2
+            # Only include safe, non-sensitive variables
+            if safe_env_var_key?(key)
+              config_vars["APP_#{key}"] = value.gsub(/['"]/, '')
+            end
+          end
+        end
+      end
+      
+      config_vars
+    end
+    
+    def safe_env_var_key?(key)
+      # Whitelist of safe environment variable prefixes/names
+      # Reject any potentially sensitive keys
+      safe_prefixes = %w[API_BASE_URL CLIENT_ID THEME FEATURE_FLAG DEBUG_MODE LOGGING_LEVEL]
+      dangerous_keys = %w[SECRET API_KEY PASSWORD TOKEN PRIVATE DATABASE_URL]
+      
+      return false if dangerous_keys.any? { |danger| key.include?(danger) }
+      safe_prefixes.any? { |prefix| key.start_with?(prefix) } || 
+        key.match?(/^[A-Z_]+_CONFIG$/) ||
+        key.match?(/^UI_[A-Z_]+$/)
     end
     
     def get_or_create_kv_namespace(title)

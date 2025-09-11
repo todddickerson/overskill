@@ -24,8 +24,8 @@ export default class extends Controller {
     document.body.style.overflow = "" // Re-enable scrolling
     this.clearErrors()
     
-    // Navigate back to generator page
-    window.location.href = '/'
+    // Don't navigate away - let the modal close naturally
+    // The redirect will be handled by the login/signup controllers
   }
   
   switchToLogin(event) {
@@ -76,7 +76,9 @@ export default class extends Controller {
   
   handleBackdropClick(event) {
     // Close modal if clicking on the backdrop (not the modal content)
-    if (event.target === this.modalTarget) {
+    // Check if click is on the backdrop element or the outer container
+    if (event.target === event.currentTarget || 
+        event.target.classList.contains('bg-opacity-75')) {
       this.close()
     }
   }

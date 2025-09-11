@@ -1023,9 +1023,113 @@ module Ai
       end
     end
     
-    # Queue deployment via DeployAppJob instead of synchronous deployment
+    # Queue deployment via DeployAppJob or use fast preview with EdgePreviewService
     def deploy_app
-      Rails.logger.info "[V5_DEPLOY] Queueing deployment job for app #{@app.id}"
+      Rails.logger.info "[V5_DEPLOY] Starting deployment for app #{@app.id}"
+      
+      # Fast preview is now the default (can be disabled by setting FAST_PREVIEW_ENABLED=false)
+      if ENV['FAST_PREVIEW_ENABLED'] != 'false'
+        Rails.logger.info "[V5_FAST_DEPLOY] Using EdgePreviewService for instant preview deployment (default)"
+        deploy_fast_preview
+      else
+        Rails.logger.info "[V5_DEPLOY] Using legacy standard deployment pipeline (FAST_PREVIEW_ENABLED=false)"
+        deploy_standard
+      end
+    end
+    
+    # Fast preview deployment using EdgePreviewService (5-10s)
+    def deploy_fast_preview
+      Rails.logger.info "[V5_FAST_DEPLOY] Starting fast preview deployment for app #{@app.id}"
+      
+      # Broadcast initial fast deployment progress
+      broadcast_deployment_progress(
+        status: 'deploying',
+        progress: 10,
+        phase: 'Initializing fast preview...',
+        deployment_type: 'fast_preview',
+        deployment_steps: [
+          { name: 'Bundle with Vite', current: true, completed: false },
+          { name: 'Deploy to Edge', current: false, completed: false },
+          { name: 'Enable HMR', current: false, completed: false }
+        ]
+      )
+      
+      begin
+        # Use EdgePreviewService for instant deployment
+        service = EdgePreviewService.new(@app)
+        
+        # Build and deploy in one step
+        broadcast_deployment_progress(
+          status: 'deploying',
+          progress: 40,
+          phase: 'Building with Vite...',
+          deployment_steps: [
+            { name: 'Bundle with Vite', current: true, completed: false },
+            { name: 'Deploy to Edge', current: false, completed: false },
+            { name: 'Enable HMR', current: false, completed: false }
+          ]
+        )
+        
+        result = service.deploy_preview do |progress|
+          # Update progress during deployment
+          broadcast_deployment_progress(
+            status: 'deploying',
+            progress: 40 + (progress * 0.4).to_i,
+            phase: 'Deploying to edge...',
+            deployment_steps: [
+              { name: 'Bundle with Vite', current: false, completed: true },
+              { name: 'Deploy to Edge', current: true, completed: false },
+              { name: 'Enable HMR', current: false, completed: false }
+            ]
+          )
+        end
+        
+        if result[:success]
+          @app.update!(
+            preview_url: result[:preview_url],
+            status: 'ready'
+          )
+          
+          # Final success broadcast
+          broadcast_deployment_progress(
+            status: 'deployed',
+            progress: 100,
+            phase: 'Preview ready with HMR!',
+            deployment_url: result[:preview_url],
+            deployment_steps: [
+              { name: 'Bundle with Vite', current: false, completed: true },
+              { name: 'Deploy to Edge', current: false, completed: true },
+              { name: 'Enable HMR', current: false, completed: true }
+            ]
+          )
+          
+          Rails.logger.info "[V5_FAST_DEPLOY] Successfully deployed to #{result[:preview_url]} in #{result[:deploy_time_ms]}ms"
+          
+          # Queue GitHub sync as a non-blocking background job
+          GitHubSyncJob.set(wait: 5.seconds).perform_later(@app.id) if defined?(GitHubSyncJob)
+          
+          {
+            success: true,
+            message: "Fast preview deployed in #{result[:deploy_time_ms]}ms",
+            preview_url: result[:preview_url]
+          }
+        else
+          raise "Fast deployment failed: #{result[:error]}"
+        end
+        
+      rescue => e
+        Rails.logger.error "[V5_FAST_DEPLOY] Error: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+        
+        # Fall back to standard deployment
+        Rails.logger.info "[V5_FAST_DEPLOY] Falling back to standard deployment"
+        deploy_standard
+      end
+    end
+    
+    # Standard deployment via DeployAppJob (3-5 minutes)
+    def deploy_standard
+      Rails.logger.info "[V5_DEPLOY] Queueing standard deployment job for app #{@app.id}"
       
       # Broadcast initial deployment progress
       broadcast_deployment_progress(

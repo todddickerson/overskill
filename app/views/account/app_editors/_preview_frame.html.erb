@@ -32,10 +32,20 @@
       </div>
     </div>
     
+    <!-- HMR Client Integration for Fast Preview (enabled by default) -->
+    <% if app.preview_url.present? && ENV['FAST_PREVIEW_ENABLED'] != 'false' %>
+      <script>
+        window.APP_ID = '<%= app.id %>';
+        window.HMR_ENABLED = true;
+        window.PREVIEW_URL = '<%= app.preview_url %>';
+      </script>
+    <% end %>
+    
     <!-- Preview Content Area -->  
     <div class="flex-1 relative p-4 box-border min-h-0">
       <div class="h-full bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden"
-           data-preview-device-target="container">
+           data-preview-device-target="container"
+           <%= "data-controller='hmr' data-hmr-app-id-value='#{app.id}'" if app.preview_url.present? && ENV['FAST_PREVIEW_ENABLED'] != 'false' %>>
         <% if app.preview_url.present? %>
           <% # For deployed apps with Cloudflare URL, use the preview URL with optional path %>
           <% preview_src = app.preview_url %>

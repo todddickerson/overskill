@@ -45,19 +45,37 @@ class AppGenerationJob < ApplicationJob
       return
     end
 
-    # Use V3 Optimized orchestrator - the best and tested version
-    # Create a chat message to trigger the orchestrator
+    # FIXED: Use ProcessAppUpdateJobV5 - the current active pipeline
+    # V3 Orchestrator was removed as it doesn't exist
+    # Pipeline: AppGenerationJob → ProcessAppUpdateJobV5 → AppBuilderV5
+    
+    # Create a chat message to trigger the generation
     message = app.app_chat_messages.create!(
       role: "user",
       content: app_generation.prompt || app.prompt || "Generate the app based on the requirements",
       message_type: "generation_request"
     )
     
-    orchestrator = Ai::AppUpdateOrchestratorV3Optimized.new(message)
-    result = orchestrator.execute!
+    # Create assistant placeholder for V5 builder to update
+    assistant_message = app.app_chat_messages.create!(
+      role: "assistant",
+      content: " ",
+      user: message.user,
+      status: "executing",
+      iteration_count: 0,
+      thinking_status: "Initializing app generation..."
+    )
     
-    # Convert orchestrator result to expected format
-    result = { success: true } if result != false
+    # Process synchronously to maintain job flow and error handling
+    # ProcessAppUpdateJobV5 delegates directly to AppBuilderV5
+    begin
+      job = ProcessAppUpdateJobV5.new
+      job.perform(assistant_message)
+      result = { success: true }
+    rescue => e
+      Rails.logger.error "[AppGenerationJob] Failed to process: #{e.message}"
+      result = { success: false, error: e.message }
+    end
 
     if result[:success]
       Rails.logger.info "[AppGenerationJob] Successfully generated app ##{app.id}"

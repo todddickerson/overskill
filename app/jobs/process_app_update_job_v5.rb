@@ -1,5 +1,8 @@
-# ProcessAppUpdateJobV5 - Wrapper for V4 to avoid confusion
-# This simply delegates to ProcessAppUpdateJobV4 which uses app_builder_v5
+# ProcessAppUpdateJobV5 - Current active job for AI app updates
+# This is the ONLY version in use - V3 and V4 have been removed
+# Pipeline: User Message → This Job → AppBuilderV5 → File Creation
+#
+# DO NOT create V6 or resurrect old versions - this is the single source of truth
 class ProcessAppUpdateJobV5 < ApplicationJob
   queue_as :ai_processing
 
@@ -17,8 +20,32 @@ class ProcessAppUpdateJobV5 < ApplicationJob
     
     Rails.logger.info "[ProcessAppUpdateJobV5] Processing message ##{message.id} directly with AppBuilderV5"
     
-    # Process directly with AppBuilderV5 instead of delegating to avoid race conditions
-    service = Ai::AppBuilderV5.new(message)
-    service.execute!
+    # Track processing state in database (Rails best practice)
+    app = message.app
+    app.update!(
+      status: 'processing',
+      processing_started_at: Time.current
+    )
+    
+    # Process directly with AppBuilderV5 - our single AI builder service
+    begin
+      service = Ai::AppBuilderV5.new(message)
+      result = service.execute!
+      
+      # Update completion state
+      app.update!(
+        status: result ? 'generated' : 'failed',
+        processing_completed_at: Time.current
+      )
+      
+      result
+    rescue => e
+      Rails.logger.error "[ProcessAppUpdateJobV5] Error: #{e.message}"
+      app.update!(
+        status: 'failed',
+        processing_completed_at: Time.current
+      )
+      raise
+    end
   end
 end

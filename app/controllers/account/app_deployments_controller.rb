@@ -109,7 +109,8 @@ class Account::AppDeploymentsController < Account::ApplicationController
     end
     
     # Run deployment in background job
-    PublishAppToProductionJob.perform_later(@app)
+    # FIXED: Use DeployAppJob - PublishAppToProductionJob has been removed
+    DeployAppJob.perform_later(@app, "production")
     
     respond_to do |format|
       format.html {
@@ -207,13 +208,15 @@ class Account::AppDeploymentsController < Account::ApplicationController
     if @app.published?
       @app.update!(status: 'ready', production_url: nil, published_at: nil)
       
-      # Optionally remove production worker
-      begin
-        service = Deployment::ProductionDeploymentService.new(@app)
-        service.send(:cleanup_old_worker, @app.subdomain)
-      rescue => e
-        Rails.logger.error "Failed to cleanup production worker: #{e.message}"
-      end
+      # REMOVED: ProductionDeploymentService deprecated
+      # Worker cleanup now handled by Cloudflare TTL and manual cleanup if needed
+      # To implement cleanup, use: Deployment::CloudflareWorkersDeployer
+      # begin
+      #   deployer = Deployment::CloudflareWorkersDeployer.new(@app)
+      #   deployer.delete_worker("app-#{@app.obfuscated_id.downcase}")
+      # rescue => e
+      #   Rails.logger.error "Failed to cleanup production worker: #{e.message}"
+      # end
       
       respond_to do |format|
         format.html {

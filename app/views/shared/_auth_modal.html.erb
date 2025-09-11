@@ -88,7 +88,8 @@
 
         <!-- Login Form -->
         <div data-auth-modal-target="loginForm" class="mt-6 <%= local_assigns[:show_signup] ? 'hidden' : '' %>">
-          <%= form_with url: user_session_path, 
+          <%= form_with scope: :user,
+                        url: user_session_path, 
                         local: true,
                         data: { turbo_frame: "auth_modal" },
                         class: "space-y-4" do |f| %>
@@ -178,7 +179,8 @@
 
         <!-- Signup Form -->
         <div data-auth-modal-target="signupForm" class="mt-6 <%= local_assigns[:show_signup] ? '' : 'hidden' %>">
-          <%= form_with url: user_registration_path,
+          <%= form_with scope: :user,
+                        url: user_registration_path,
                         local: true,
                         data: { turbo_frame: "auth_modal" },
                         class: "space-y-4" do |f| %>

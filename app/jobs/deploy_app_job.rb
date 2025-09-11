@@ -57,6 +57,18 @@ class DeployAppJob < ApplicationJob
     # FIXED: Validate deployment before proceeding
     validate_deployment_readiness!(app)
     
+    # Rails Best Practice: Track deployment state in database
+    # Create AppDeployment record for this deployment
+    @deployment = AppDeployment.create_for_environment!(
+      app: app,
+      environment: environment,
+      deployment_id: SecureRandom.uuid,
+      commit_sha: get_latest_commit_sha(app)
+    )
+    
+    # Start build phase tracking
+    @deployment.start_build!
+    
     # Update status to deploying
     app.update!(status: 'generating')
     
@@ -88,6 +100,9 @@ class DeployAppJob < ApplicationJob
         { name: 'Setup environment', current: false, completed: false }
       ]
     )
+    
+    # Track build start time in database
+    build_start_time = Time.current
     
     # Use new GitHub-based deployment flow (GitHub migration architecture)
     github_service = Deployment::GithubRepositoryService.new(app)
@@ -171,6 +186,16 @@ class DeployAppJob < ApplicationJob
       
       Rails.logger.info "[DeployAppJob] GitHub files validated successfully"
       
+      # Mark build as complete, deployment starting
+      @deployment.complete_build!
+      
+      # Track build metrics
+      bundle_size = calculate_bundle_size(app)
+      @deployment.track_build_metrics(
+        (bundle_size * 1_000_000).to_i,  # Convert MB to bytes
+        app.app_files.count
+      )
+      
       # Update progress: GitHub sync completed, GitHub Actions will auto-deploy
       broadcast_deployment_progress(app, 
         progress: 50, 
@@ -223,6 +248,9 @@ class DeployAppJob < ApplicationJob
     
     if result[:success]
       Rails.logger.info "Successfully deployed app #{app.id} to #{environment}"
+      
+      # Mark deployment as successfully completed
+      @deployment.complete_deployment!(result[:worker_url] || result[:deployment_url])
       
       # Update app URLs based on deployment type
       if environment == "preview"
@@ -296,6 +324,12 @@ class DeployAppJob < ApplicationJob
     else
       Rails.logger.error "Failed to deploy app #{app.id}: #{result[:error]}"
       
+      # Track deployment failure in database
+      @deployment.fail_deployment!(
+        result[:error],
+        result.slice(:workflow_run_id, :error_logs, :fix_attempted)
+      )
+      
       app.update!(status: 'failed')
       
       # Broadcast deployment failure
@@ -307,7 +341,15 @@ class DeployAppJob < ApplicationJob
       broadcast_deployment_update(app, 'failed', result[:error])
     end
   rescue => e
-    Rails.logger.error "Deployment job failed for app #{app_id}: #{e.message}"
+    Rails.logger.error "Deployment job failed for app #{app.id}: #{e.message}"
+    
+    # Track unexpected failure in database if deployment record exists
+    if @deployment
+      @deployment.fail_deployment!(
+        "Unexpected error: #{e.message}",
+        { backtrace: e.backtrace.first(10) }
+      )
+    end
     
     app&.update!(status: 'failed')
     
@@ -480,6 +522,20 @@ class DeployAppJob < ApplicationJob
       worker_url: deployment_url,
       deployment_url: deployment_url
     }
+  end
+  
+  def get_latest_commit_sha(app)
+    # Get the latest commit SHA from GitHub if available
+    return nil unless app.github_repo.present?
+    
+    begin
+      github_service = Deployment::GithubRepositoryService.new(app)
+      repo_info = github_service.get_repository_info
+      repo_info[:default_branch_sha]
+    rescue => e
+      Rails.logger.warn "[DeployAppJob] Could not fetch commit SHA: #{e.message}"
+      nil
+    end
   end
   
   def generate_expected_deployment_url(app, environment)
@@ -656,6 +712,14 @@ class DeployAppJob < ApplicationJob
   # FIX: Handle deployment timeout gracefully
   def handle_deployment_timeout(app, environment)
     Rails.logger.error "[DeployAppJob] TIMEOUT: Deployment exceeded #{DEPLOYMENT_TIMEOUT / 60} minutes for app #{app.id}"
+    
+    # Track timeout failure in database
+    if @deployment
+      @deployment.fail_deployment!(
+        "Deployment timed out after #{DEPLOYMENT_TIMEOUT / 60} minutes",
+        { timeout_at: Time.current.iso8601 }
+      )
+    end
     
     # Update app status
     app.update!(status: 'error')

@@ -1,15 +1,27 @@
-# AppDeployment Model - Tracks multi-environment deployments
+# AppDeployment Model - Tracks multi-environment deployments with full state tracking
 # Supports GitHub Migration Project's deployment workflow:
 # Preview (auto) → Staging (manual) → Production (manual)
+#
+# Rails Best Practice: Database as source of truth for all deployment state
 
 class AppDeployment < ApplicationRecord
   belongs_to :app
 
+  # Deployment status enum - track every stage
+  enum :status, {
+    pending: 'pending',
+    building: 'building', 
+    deploying: 'deploying',
+    deployed: 'deployed',
+    failed: 'failed',
+    rolled_back: 'rolled_back'
+  }, prefix: :deployment
+  
   # Deployment environments
   validates :environment, inclusion: { in: %w[preview staging production] }
   validates :environment, uniqueness: { 
     scope: :app_id, 
-    conditions: -> { where(is_rollback: false) },
+    conditions: -> { where(is_rollback: false, status: ['deployed', 'deploying']) },
     message: 'can only have one active deployment per environment'
   }
 
@@ -23,7 +35,13 @@ class AppDeployment < ApplicationRecord
   # Order by deployment time
   scope :recent, -> { order(deployed_at: :desc) }
   scope :chronological, -> { order(deployed_at: :asc) }
-
+  scope :successful, -> { where(status: 'deployed') }
+  scope :failed, -> { where(status: 'failed') }
+  scope :in_progress, -> { where(status: ['building', 'deploying']) }
+  
+  # Callbacks to calculate durations automatically
+  before_save :calculate_durations
+  
   def rollback?
     is_rollback
   end
@@ -42,6 +60,60 @@ class AppDeployment < ApplicationRecord
 
   def production_deployment?
     environment == 'production'
+  end
+  
+  # State transition helpers with timing
+  def start_build!
+    update!(
+      status: 'building',
+      build_started_at: Time.current
+    )
+  end
+  
+  def complete_build!
+    update!(
+      build_completed_at: Time.current,
+      status: 'deploying',
+      deploy_started_at: Time.current
+    )
+  end
+  
+  def complete_deployment!(url = nil)
+    update!(
+      status: 'deployed',
+      deploy_completed_at: Time.current,
+      deployment_url: url || deployment_url,
+      deployed_at: Time.current
+    )
+  end
+  
+  def fail_deployment!(error_message, error_details = nil)
+    update!(
+      status: 'failed',
+      error_message: error_message,
+      error_details: error_details,
+      deploy_completed_at: Time.current
+    )
+  end
+  
+  # Track bundle size and file count
+  def track_build_metrics(bundle_size_bytes, files_count)
+    update!(
+      bundle_size_bytes: bundle_size_bytes,
+      files_count: files_count
+    )
+  end
+  
+  private
+  
+  def calculate_durations
+    if build_started_at && build_completed_at
+      self.build_duration_seconds = (build_completed_at - build_started_at).to_i
+    end
+    
+    if deploy_started_at && deploy_completed_at
+      self.deploy_duration_seconds = (deploy_completed_at - deploy_started_at).to_i
+    end
   end
 
   # Generate deployment metadata for tracking

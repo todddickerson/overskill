@@ -121,8 +121,8 @@ class App < ApplicationRecord
   
   # Publish app to production
   def publish_to_production!
-    service = Deployment::ProductionDeploymentService.new(self)
-    service.deploy_to_production!
+    # FIXED: Use DeployAppJob instead of deprecated ProductionDeploymentService
+    DeployAppJob.perform_later(self, "production")
   end
   
   # Update subdomain (with uniqueness check and one-change limit)
@@ -149,10 +149,11 @@ class App < ApplicationRecord
     self.subdomain_change_count = (subdomain_change_count || 0) + 1
     
     if save
-      # If app is deployed, update the deployment
+      # If app is deployed, trigger redeployment with new subdomain
       if status == 'published' || status == 'ready'
-        service = Deployment::ProductionDeploymentService.new(self)
-        service.update_subdomain(new_subdomain)
+        # FIXED: Queue deployment job instead of using deprecated service
+        # The deployment job will handle subdomain updates
+        DeployAppJob.perform_later(self, "production")
       end
       
       Rails.logger.info "[App #{id}] Subdomain changed from '#{old_subdomain}' to '#{new_subdomain}'"

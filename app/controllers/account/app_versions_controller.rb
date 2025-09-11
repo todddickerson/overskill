@@ -78,6 +78,14 @@ class Account::AppVersionsController < Account::ApplicationController
   def preview
     app = @app_version.app
     
+    # If this is the latest version and the app has a preview URL from fast deployment, redirect to it
+    latest_version = app.app_versions.order(created_at: :desc).first
+    if @app_version == latest_version && app.preview_url.present?
+      Rails.logger.info "[Preview] Redirecting to fast deployment preview: #{app.preview_url}"
+      redirect_to app.preview_url, allow_other_host: true
+      return
+    end
+    
     # For V5, we need to temporarily restore the version's files, build, and deploy
     begin
       Rails.logger.info "[Preview] Starting preview for version #{@app_version.version_number}"

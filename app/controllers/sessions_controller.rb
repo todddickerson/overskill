@@ -43,11 +43,36 @@ class SessionsController < Devise::SessionsController
     sign_in(resource_name, resource)
     
     # Check if we have a pending generation in cookies
-    if cookies.encrypted[:pending_generation].present?
+    redirect_path = if cookies.encrypted[:pending_generation].present?
       # Redirect to generator index where it will be processed
-      redirect_to generator_index_path, notice: "Signed in successfully. Creating your app..."
+      Rails.logger.info "[AUTH] Found pending generation, redirecting to generator"
+      generator_index_path
     else
-      redirect_to after_sign_in_path_for(resource)
+      after_sign_in_path_for(resource)
+    end
+    
+    respond_to do |format|
+      format.html do
+        # Check if this is a Turbo Frame request for auth_modal
+        if request.headers["Turbo-Frame"] == "auth_modal"
+          # Return empty turbo frame to close modal, then redirect via Turbo
+          render html: <<~HTML.html_safe
+            <turbo-frame id="auth_modal"></turbo-frame>
+            <script>
+              setTimeout(() => {
+                window.location.href = '#{redirect_path}';
+              }, 100);
+            </script>
+          HTML
+        else
+          redirect_to redirect_path, notice: "Signed in successfully."
+        end
+      end
+      format.turbo_stream do
+        # For Turbo Stream requests, handle redirect via JavaScript
+        render turbo_stream: turbo_stream.append("body", 
+          "<script>window.location.href = '#{redirect_path}';</script>")
+      end
     end
   rescue
     # Handle authentication failure

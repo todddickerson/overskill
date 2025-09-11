@@ -52,6 +52,9 @@ export default class extends Controller {
       case 'conversation_flow_update':
         this.handleConversationFlowUpdate(data)
         break
+      case 'incremental_tool_update':
+        this.handleIncrementalToolUpdate(data)
+        break
       default:
         console.log("[ToolStreaming] Unknown action:", data.action)
     }
@@ -99,6 +102,43 @@ export default class extends Controller {
     updatedTools.forEach(tool => {
       tool.classList.add('animate-pulse')
     })
+  }
+  
+  handleIncrementalToolUpdate(data) {
+    console.log("[ToolStreaming] Incremental tool update:", data.execution_id, data.tool_index, data.status)
+    
+    // Handle incremental tool status updates for the V2 streaming system
+    // The main UI update is handled by Turbo Streams, but we can add
+    // client-side visual effects here
+    
+    if (data.tool_index !== undefined) {
+      // Find the specific tool element by execution ID and tool index
+      const toolSelector = `[data-execution-id="${data.execution_id}"][data-tool-index="${data.tool_index}"]`
+      const toolElement = this.element.querySelector(toolSelector)
+      
+      if (toolElement) {
+        this.updateToolElement(toolElement, data.status)
+        
+        // Add status-specific animations
+        if (data.status === 'complete') {
+          toolElement.classList.add('animate-pulse')
+          setTimeout(() => {
+            toolElement.classList.remove('animate-pulse')
+          }, 1000)
+        } else if (data.status === 'running') {
+          toolElement.classList.add('animate-pulse')
+        }
+      }
+    }
+    
+    // Update progress text if provided
+    if (data.progress_text && data.tool_index !== undefined) {
+      const progressSelector = `[data-execution-id="${data.execution_id}"][data-tool-index="${data.tool_index}"] .progress-text`
+      const progressEl = this.element.querySelector(progressSelector)
+      if (progressEl) {
+        progressEl.textContent = data.progress_text
+      }
+    }
   }
   
   findToolInFlow(flow, toolName, filePath) {

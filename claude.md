@@ -32,13 +32,28 @@
 - **Context7 MCP** - Documentation lookups and knowledge base
 - **Rails MCP** - Rails-specific commands and patterns (if available)
 
-## 🚀 Streaming Tool Execution (FIXED)
+## 🚀 Current App Generation & Deployment Pipeline
+
+### Active Pipeline (January 2025)
+```mermaid
+graph LR
+    A[App Model] --> B[AppGenerationJob]
+    B --> C[ProcessAppUpdateJobV5]
+    C --> D[AppBuilderV5]
+    D --> E[AppFiles + DB]
+    E --> F[DeployAppJob]
+    F --> G[GitHub + WFP]
+```
+
+**Current Process**: ProcessAppUpdateJobV5 → AppBuilderV5 (direct delegation)
+**Legacy to Remove**: ProcessAppUpdateJobV3, V4, OrchestratorsV3
+**Database State**: Track all deployments in AppDeployment model (Rails best practice)
+
+### Streaming Tool Execution (FIXED)
 **Real-time parallel tool execution with UI feedback - OPERATIONAL!**
 - **Documentation**: `docs/STREAMING_TOOL_EXECUTION_COMPLETE_GUIDE.md`
 - **Critical Fix Applied**: AppBuilderV5 handles `stop_reason='stop'` (lines 1681-1759)
-- **Timeout Bug Fixed**: StreamingToolCoordinator preserves successful tool statuses
 - **Success Indicator**: `[V5_TOOLS] STREAMING FIX: Found N tool calls with stop_reason='stop'`
-- **Monitor**: `tail -f log/development.log | grep -E "STREAMING|V5_TOOLS|COORDINATOR"`
 
 ## ðŸ"‹ Quick Commands
 ```bash
@@ -130,13 +145,27 @@ bin/super scaffold crud Project Team title:text_field description:trix_editor
 - **Cost**: $50-100/month for 1,000 apps (96% savings vs standard Workers)
 - **Scale**: Unlimited apps via WFP dispatch namespaces
 
-## ðŸ”§ Development Philosophy
+## ðŸ"§ Development Philosophy & Rails Best Practices
+
+### Core Principles
 1. **Rails Conventions First** - Follow Rails patterns over custom solutions
 2. **BulletTrain Super Scaffolding** - Leverage built-in generators
 3. **Supabase-First** - Simple, scalable database architecture
 4. **API-Only Deployment** - No Wrangler CLI, pure HTTP API approach
 5. **Test-Driven** - Golden flows protect critical user journeys
 6. **Professional Stack** - TypeScript + Vite + React Router consistency
+
+### Rails Best Practices (ENFORCE THESE)
+- **Database as Source of Truth**: Always maintain state in models
+  - Track deployments in `AppDeployment` with proper timestamps
+  - Update `status` fields during long-running operations
+  - Never rely on in-memory state for critical data
+- **Fat Models, Skinny Controllers**: Business logic in models/services
+- **Use Callbacks Wisely**: Document all `after_create` callbacks
+- **Background Jobs**: Use ActiveJob for async work
+- **Proper Associations**: Use Rails associations over raw queries
+- **Comment Complex Code**: Especially when removing legacy versions
+- **Maintain Audit Trail**: Keep deployment history, version records
 
 ## ðŸŽ¯ AI Model Preferences
 - **Planning/Architecture**: Claude Opus 4.1 (`claude-opus-4-1-20250805`)
