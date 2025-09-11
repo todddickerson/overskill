@@ -360,24 +360,13 @@ class FastBuildService
   end
   
   def process_tailwind_css(temp_dir)
-    Rails.logger.info "[FastBuild] Processing CSS with Tailwind"
+    # ISOLATION FIX: Skip Tailwind CLI processing to avoid conflicts with Rails app
+    # The CDN approach in combine_assets already handles Tailwind properly
+    Rails.logger.info "[FastBuild] Skipping Tailwind CLI processing - using CDN approach"
     
-    # Create Tailwind config if it doesn't exist
-    tailwind_config = File.join(temp_dir, 'tailwind.config.js')
-    unless File.exist?(tailwind_config)
-      File.write(tailwind_config, <<~JS)
-        module.exports = {
-          content: [
-            "./src/**/*.{js,jsx,ts,tsx}",
-            "./index.html"
-          ],
-          theme: {
-            extend: {},
-          },
-          plugins: [],
-        }
-      JS
-    end
+    # Simply return success as we'll use Tailwind CDN instead
+    # This avoids any potential conflicts with the Rails app's Tailwind configuration
+    return { success: true }
     
     # Create PostCSS config
     postcss_config = File.join(temp_dir, 'postcss.config.js')
@@ -390,29 +379,8 @@ class FastBuildService
       }
     JS
     
-    # Process index.css through Tailwind
-    index_css_path = File.join(temp_dir, 'src', 'index.css')
-    output_css_path = File.join(temp_dir, 'src', 'index.compiled.css')
-    
-    if File.exist?(index_css_path)
-      cmd = "npx tailwindcss -i #{index_css_path} -o #{output_css_path} --minify"
-      Rails.logger.info "[FastBuild] Running: #{cmd}"
-      
-      stdout, stderr, status = Open3.capture3(cmd, chdir: temp_dir)
-      
-      if status.success?
-        # Replace original CSS with compiled version
-        File.write(index_css_path, File.read(output_css_path))
-        Rails.logger.info "[FastBuild] Tailwind CSS compiled successfully"
-        { success: true }
-      else
-        Rails.logger.error "[FastBuild] Tailwind compilation failed: #{stderr}"
-        { success: false, error: stderr }
-      end
-    else
-      Rails.logger.warn "[FastBuild] No index.css found to process"
-      { success: true }
-    end
+    # Old Tailwind processing code removed - we now use CDN approach exclusively
+    # This was causing conflicts with the Rails app's Tailwind configuration
   end
   
   def build_with_esbuild(temp_dir, entry_point, environment_vars = {})

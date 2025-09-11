@@ -1105,6 +1105,9 @@ module Ai
           
           Rails.logger.info "[V5_FAST_DEPLOY] Successfully deployed to #{result[:preview_url]} in #{result[:deploy_time_ms]}ms"
           
+          # FIX: Broadcast preview frame update to refresh the UI
+          broadcast_preview_frame_update
+          
           # Queue GitHub sync as a non-blocking background job
           GitHubSyncJob.set(wait: 5.seconds).perform_later(@app.id) if defined?(GitHubSyncJob)
           
@@ -1247,30 +1250,8 @@ module Ai
         @app.update!(preview_url: preview_url, status: 'generated')
         Rails.logger.info "[V5_DEPLOY] Updated app preview_url: #{preview_url}"
         
-        # Broadcast preview frame update when app is deployed
-        begin
-          if @app&.preview_url.present?
-          
-            Rails.logger.info "[V5_BROADCAST] Broadcasting preview frame update for app #{@app.id}"
-            
-            # Broadcast to the app channel that users are subscribed to
-            Turbo::StreamsChannel.broadcast_replace_to(
-              "app_#{@app.id}",
-              target: "preview_frame",
-              partial: "account/app_editors/preview_frame",
-              locals: { app: @app }
-            )
-            
-            # Also broadcast a refresh action to the chat channel for better UX
-            Turbo::StreamsChannel.broadcast_action_to(
-              "app_#{@app.id}_chat",
-              action: "refresh",
-              target: "preview_frame"
-            )
-          end
-        rescue => e
-          Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
-        end
+        # FIX: Use the fixed broadcast method instead of inline code with wrong action
+        broadcast_preview_frame_update
         
         { 
           success: true, 
@@ -4541,7 +4522,7 @@ module Ai
           iteration_count: 0,
           tool_calls: [],
           conversation_flow: [],
-          thinking_status: "Initializing Overskill AI...",
+          thinking_status: "",
           is_code_generation: false
         )
       end
@@ -5254,12 +5235,21 @@ module Ai
         locals: { app: @app }
       )
       
-      # Also broadcast a refresh action to the chat channel for better UX
-      Turbo::StreamsChannel.broadcast_action_to(
+      # FIX: Use broadcast_replace instead of invalid "refresh" action
+      # This will properly replace the preview frame content with updated URL
+      Turbo::StreamsChannel.broadcast_replace_to(
         "app_#{@app.id}_chat",
-        action: "refresh",
-        target: "preview_frame"
+        target: "preview_frame",
+        partial: "account/app_editors/preview_frame",
+        locals: { app: @app }
       )
+      
+      # Also broadcast via AppPreviewChannel for HMR clients
+      AppPreviewChannel.broadcast_to(@app, {
+        type: 'preview_deployed',
+        preview_url: @app.preview_url,
+        timestamp: Time.current.to_i
+      })
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast preview frame update: #{e.message}"
     end

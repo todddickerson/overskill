@@ -290,7 +290,7 @@ class App < ApplicationRecord
       iteration_count: 0,
       loop_messages: [],
       tool_calls: [],
-      thinking_status: "Initializing Overskill AI...",
+      thinking_status: "",
       is_code_generation: false
     )
     
