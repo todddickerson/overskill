@@ -42,7 +42,7 @@ module Ai
       
       # Use Net::HTTP for true streaming
       Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 500) do |http|
-        request = build_request(uri, body)
+        request = build_request(uri, body, options)
         
         # Stream the response
         http.request(request) do |response|
@@ -124,11 +124,21 @@ module Ai
       body
     end
     
-    def build_request(uri, body)
+    def build_request(uri, body, options = {})
       request = Net::HTTP::Post.new(uri)
       
       # Build headers (including Helicone if configured)
       headers = @client.send(:build_request_options)[:headers]
+      
+      # Add Helicone session headers if provided
+      if ENV['HELICONE_API_KEY'].present?
+        if options[:helicone_session].present?
+          headers["Helicone-Session-Id"] = options[:helicone_session]
+          headers["Helicone-Session-Path"] = options[:helicone_path] || "/tool-calling"
+          headers["Helicone-Session-Name"] = "OverSkill-Incremental-Tools"
+        end
+      end
+      
       headers.each { |k, v| request[k] = v }
       
       request.body = body.to_json

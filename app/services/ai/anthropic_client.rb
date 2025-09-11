@@ -135,7 +135,7 @@ module Ai
       }
     end
 
-    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: false, thinking_budget: nil, stream: false)
+    def chat(messages, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, helicone_path: nil, extended_thinking: false, thinking_budget: nil, stream: false)
       model_id = MODELS[model] || model
       
       # Calculate optimal max_tokens if not provided
@@ -230,6 +230,7 @@ module Ai
       if helicone_key.present? && helicone_session.present?
         request_options[:headers] = request_options[:headers].merge({
           "Helicone-Session-Id" => helicone_session,
+          "Helicone-Session-Path" => helicone_path || "/app-generation",
           "Helicone-Session-Name" => "OverSkill-App-Generation"
         })
       end
@@ -364,7 +365,7 @@ module Ai
       streamer.stream_chat_with_tools(messages, tools, callbacks, options)
     end
 
-    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, extended_thinking: true, thinking_budget: nil, stream: false)
+    def chat_with_tools(messages, tools, model: DEFAULT_MODEL, temperature: 0.7, max_tokens: nil, use_cache: true, cache_breakpoints: [], helicone_session: nil, helicone_path: nil, extended_thinking: true, thinking_budget: nil, stream: false)
       model_id = MODELS[model] || model
       
       # Calculate optimal max_tokens if not provided
@@ -471,6 +472,7 @@ module Ai
       if helicone_key.present? && helicone_session.present?
         request_options[:headers] = request_options[:headers].merge({
           "Helicone-Session-Id" => helicone_session,
+          "Helicone-Session-Path" => helicone_path || "/tool-calling",
           "Helicone-Session-Name" => "OverSkill-Tool-Calling"
         })
       end

@@ -1687,11 +1687,12 @@ module Ai
         Rails.logger.debug "[V5_DEBUG]   Message #{i}: role=#{msg[:role]}, content_length=#{msg[:content]&.length}"
       end
       
-      # Generate Helicone session for tracking
+      # Generate Helicone session for tracking with proper path hierarchy
       helicone_session = "overskill-v5-#{@app.id}-#{Time.current.to_i}"
+      helicone_path = "/app-#{@app.id}/generation"
       
       # CRITICAL FIX: Implement proper tool calling cycle with result feedback
-      final_response = execute_tool_calling_cycle(client, messages, tools, helicone_session)
+      final_response = execute_tool_calling_cycle(client, messages, tools, helicone_session, helicone_path)
       
       log_claude_event("API_CALL_COMPLETE", {
         final_content: final_response[:content].present?,
@@ -1703,11 +1704,11 @@ module Ai
     end
 
     # CRITICAL FIX: Implement proper tool calling cycle according to Anthropic docs
-    def execute_tool_calling_cycle(client, messages, tools, helicone_session)
+    def execute_tool_calling_cycle(client, messages, tools, helicone_session, helicone_path = nil)
       # Check if incremental streaming is enabled
       if @incremental_streaming_enabled
         Rails.logger.info "[V5_INCREMENTAL] Using incremental tool streaming"
-        return execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session)
+        return execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session, helicone_path)
       end
       
       # Fallback to traditional streaming
@@ -1751,6 +1752,7 @@ module Ai
             temperature: 0.7,
             max_tokens: 48000,
             helicone_session: helicone_session,
+            helicone_path: "#{helicone_path || '/app-generation'}/cycle-#{tool_cycles}",
             extended_thinking: false, # Testing costs around thinking vs non TODO: evaluate more
             thinking_budget: 16000
           )
@@ -2082,9 +2084,10 @@ module Ai
       client = Ai::AnthropicClient.instance
       tools = @prompt_service.generate_tools
       helicone_session = SecureRandom.uuid
+      helicone_path = "/app-#{@app.id}/resume"
       
       # Continue the tool calling cycle
-      result = execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session)
+      result = execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session, helicone_path)
       
       # Handle the result
       if result[:async_execution]
@@ -2109,7 +2112,7 @@ module Ai
     
     # NEW: Incremental tool streaming implementation
     # Tools are dispatched AS they arrive in the stream, not after completion
-    def execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session)
+    def execute_tool_calling_cycle_incremental(client, messages, tools, helicone_session, helicone_path = nil)
       conversation_messages = messages.dup
       tool_cycles = 0
       max_tool_cycles = 30
@@ -2247,7 +2250,8 @@ module Ai
             model: :claude_sonnet_4,
             temperature: 0.7,
             max_tokens: 48000,
-            helicone_session: helicone_session
+            helicone_session: helicone_session,
+            helicone_path: "#{helicone_path || '/app-generation'}/cycle-#{tool_cycles}"
           }
           
           client.stream_chat_with_tools_incremental(
