@@ -1153,7 +1153,7 @@ module Ai
       Rails.logger.info "[V5_DEPLOY] Queueing DeployAppJob for app #{@app.id}"
       
       # Queue deployment with a small delay to ensure all database writes are committed
-      job = DeployAppJob.set(wait: 5.seconds).perform_later(@app.id, "production")
+      job = DeployAppJob.set(wait: 5.seconds).perform_later(@app.id, "preview")
       job_id = job.job_id if job.respond_to?(:job_id)
       
       Rails.logger.info "[V5_DEPLOY] DeployAppJob queued with ID: #{job_id}"
