@@ -104,9 +104,6 @@ class DeployAppJob < ApplicationJob
     # Track build start time in database
     build_start_time = Time.current
     
-    # Use new GitHub-based deployment flow (GitHub migration architecture)
-    github_service = Deployment::GithubRepositoryService.new(app)
-    
     # CRITICAL FIX: Ensure we're deploying generated content, not template files
     # Reload app to ensure we have the latest file content
     app.reload
@@ -119,6 +116,93 @@ class DeployAppJob < ApplicationJob
       sleep(5)
       app.reload
     end
+    
+    # ============================================================
+    # IMMEDIATE DEPLOYMENT TO WFP FOR INSTANT PREVIEW
+    # ============================================================
+    Rails.logger.info "[DeployAppJob] Starting immediate WFP deployment for instant preview"
+    
+    # Only deploy to preview environment immediately (production requires user action)
+    if environment.to_s == 'preview'
+      begin
+        # Deploy immediately using EdgePreviewService for instant feedback
+        edge_service = EdgePreviewService.new(app)
+        wfp_result = edge_service.deploy_preview do |progress|
+          # Update deployment progress in real-time
+          broadcast_deployment_progress(app,
+            progress: (progress * 40).to_i, # 0-40% for immediate deployment
+            phase: "Deploying to edge preview...",
+            deployment_steps: [
+              { name: 'Build app', current: progress < 0.5, completed: progress >= 0.5 },
+              { name: 'Deploy to edge', current: progress >= 0.5, completed: progress >= 1.0 },
+              { name: 'Sync to GitHub (backup)', current: false, completed: false },
+              { name: 'Configure routes', current: false, completed: false }
+            ]
+          )
+        end
+        
+        if wfp_result[:success]
+          Rails.logger.info "[DeployAppJob] ✅ Immediate WFP deployment successful: #{wfp_result[:preview_url]}"
+          
+          # Broadcast to main app channel for UI updates
+          ActionCable.server.broadcast(
+            "app_#{app.id}",
+            {
+              action: 'preview_deployed',
+              preview_url: wfp_result[:preview_url],
+              message: 'Preview deployed successfully!'
+            }
+          )
+          
+          # Also broadcast to app preview channel for HMR/iframe refresh
+          ActionCable.server.broadcast(
+            "app_preview_#{app.id}",
+            {
+              action: 'refresh',
+              url: wfp_result[:preview_url]
+            }
+          )
+          
+          # Broadcast Turbo Stream to replace the preview frame HTML
+          # Using the main app channel that's already subscribed in the view
+          begin
+            Turbo::StreamsChannel.broadcast_replace_to(
+              "app_#{app.id}",
+              target: "preview_frame",
+              partial: "account/app_editors/preview_frame",
+              locals: { app: app.reload }
+            )
+            Rails.logger.info "[DeployAppJob] Broadcasted Turbo Stream to refresh preview frame"
+          rescue => e
+            Rails.logger.error "[DeployAppJob] Error broadcasting Turbo Stream: #{e.message}"
+          end
+          
+          broadcast_deployment_progress(app,
+            progress: 40,
+            phase: "Preview deployed! Syncing to GitHub...",
+            preview_url: wfp_result[:preview_url],
+            deployment_steps: [
+              { name: 'Build app', current: false, completed: true },
+              { name: 'Deploy to edge', current: false, completed: true },
+              { name: 'Sync to GitHub (backup)', current: true, completed: false },
+              { name: 'Configure routes', current: false, completed: false }
+            ]
+          )
+        else
+          Rails.logger.error "[DeployAppJob] Immediate WFP deployment failed: #{wfp_result[:error]}"
+          # Continue with GitHub deployment as fallback
+        end
+      rescue => e
+        Rails.logger.error "[DeployAppJob] Error during immediate deployment: #{e.message}"
+        # Continue with GitHub deployment as fallback
+      end
+    end
+    
+    # ============================================================
+    # GITHUB BACKUP DEPLOYMENT
+    # ============================================================
+    # Use GitHub-based deployment flow as backup
+    github_service = Deployment::GithubRepositoryService.new(app)
     
     # Sync all app files to GitHub repository
     Rails.logger.info "[DeployAppJob] Syncing #{app.app_files.count} app files to GitHub repository"

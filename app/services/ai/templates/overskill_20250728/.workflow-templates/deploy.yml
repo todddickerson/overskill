@@ -40,27 +40,14 @@ jobs:
     - name: Build Vite application
       run: npm run build
       
-    - name: Deploy to Workers for Platforms (Preview)
-      # Always deploy to preview on main branch pushes (unless production is requested)
+    - name: Skip Preview Deployment (Handled by OverSkill Platform)
+      # Preview deployment is handled immediately by the OverSkill platform
+      # GitHub Actions only handles production and staging deployments
       if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[deploy:production]')
-      env:
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       run: |
-        # Deploy to WFP namespace using direct API call
-        NAMESPACE="overskill-development-preview"
-        SCRIPT_NAME="preview-{{APP_ID}}"
-        
-        echo "🚀 Deploying to preview WFP namespace..."
-        
-        # Create form data for multipart upload (main module must match uploaded file name)
-        curl -X PUT "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/dispatch/namespaces/${NAMESPACE}/scripts/${SCRIPT_NAME}" \
-          -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-          -H "Content-Type: multipart/form-data" \
-          -F "metadata={\"main_module\":\"index.js\",\"compatibility_date\":\"2024-01-01\"}" \
-          -F "index.js=@dist/index.js;type=application/javascript+module"
-        
-        echo "✅ Deployed to preview: https://preview-{{APP_ID}}.overskill.app"
+        echo "ℹ️ Preview deployment is handled by OverSkill platform's immediate deployment"
+        echo "ℹ️ GitHub Actions workflow is for production/staging deployments only"
+        echo "✅ Preview already deployed at: https://preview-{{APP_ID}}.overskill.app"
         
     - name: Deploy to Workers for Platforms (Production)
       # Only deploy to production if commit message contains [deploy:production] or [production]

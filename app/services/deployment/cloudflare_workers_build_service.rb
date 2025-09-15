@@ -70,14 +70,13 @@ class Deployment::CloudflareWorkersBuildService
     end
   end
 
-  # Trigger manual deployment to staging environment
+  # Trigger manual deployment to staging environment using WFP for immediate deployment
   def promote_to_staging
-    worker_name = @app.cloudflare_worker_name
-    return { success: false, error: 'No worker configured' } unless worker_name
+    Rails.logger.info "[CloudflareWorkersBuildService] Promoting app #{@app.id} to staging using WFP"
     
-    Rails.logger.info "[CloudflareWorkersBuildService] Promoting #{worker_name} to staging"
-    
-    deployment_result = trigger_environment_deployment(worker_name, 'staging')
+    # Use WorkersForPlatformsService for immediate deployment
+    wfp_service = Deployment::WorkersForPlatformsService.new(@app)
+    deployment_result = wfp_service.promote_to_staging
     
     if deployment_result[:success]
       @app.update!(
@@ -86,19 +85,29 @@ class Deployment::CloudflareWorkersBuildService
       )
       
       create_deployment_record('staging', deployment_result[:deployment_id])
+      
+      Rails.logger.info "[CloudflareWorkersBuildService] ✅ Promoted to staging via WFP: #{deployment_result[:staging_url]}"
+      
+      # GitHub Actions will run as backup via the normal push to main branch
+      Rails.logger.info "[CloudflareWorkersBuildService] GitHub Actions will deploy as backup on next push"
+      
+      deployment_result
+    else
+      Rails.logger.error "[CloudflareWorkersBuildService] Failed to promote to staging: #{deployment_result[:error]}"
+      deployment_result
     end
-    
-    deployment_result
+  rescue => e
+    Rails.logger.error "[CloudflareWorkersBuildService] Error promoting to staging: #{e.message}"
+    { success: false, error: e.message }
   end
 
-  # Trigger manual deployment to production environment  
+  # Trigger manual deployment to production environment using WFP for immediate deployment
   def promote_to_production
-    worker_name = @app.cloudflare_worker_name
-    return { success: false, error: 'No worker configured' } unless worker_name
+    Rails.logger.info "[CloudflareWorkersBuildService] Promoting app #{@app.id} to production using WFP"
     
-    Rails.logger.info "[CloudflareWorkersBuildService] Promoting #{worker_name} to production"
-    
-    deployment_result = trigger_environment_deployment(worker_name, 'production')
+    # Use WorkersForPlatformsService for immediate deployment
+    wfp_service = Deployment::WorkersForPlatformsService.new(@app)
+    deployment_result = wfp_service.promote_to_production
     
     if deployment_result[:success]
       @app.update!(
@@ -107,53 +116,32 @@ class Deployment::CloudflareWorkersBuildService
       )
       
       create_deployment_record('production', deployment_result[:deployment_id])
+      
+      Rails.logger.info "[CloudflareWorkersBuildService] ✅ Promoted to production via WFP: #{deployment_result[:production_url]}"
+      
+      # GitHub Actions will run as backup via the normal push to main branch
+      Rails.logger.info "[CloudflareWorkersBuildService] GitHub Actions will deploy as backup on next push"
+      
+      deployment_result
+    else
+      Rails.logger.error "[CloudflareWorkersBuildService] Failed to promote to production: #{deployment_result[:error]}"
+      deployment_result
     end
-    
-    deployment_result
+  rescue => e
+    Rails.logger.error "[CloudflareWorkersBuildService] Error promoting to production: #{e.message}"
+    { success: false, error: e.message }
   end
 
-  # Get deployment status for all environments
+  # Get deployment status for all environments using WFP
   def get_deployment_status
-    worker_name = @app.cloudflare_worker_name
-    return { success: false, error: 'No worker configured' } unless worker_name
+    Rails.logger.info "[CloudflareWorkersBuildService] Getting deployment status via WFP"
     
-    begin
-      # Get worker details including deployment status
-      response = self.class.get(
-        "/accounts/#{@cloudflare_account_id}/workers/scripts/#{worker_name}",
-        headers: self.class.headers
-      )
-      
-      if response.success?
-        worker_data = response.parsed_response['result']
-        
-        {
-          success: true,
-          worker_name: worker_name,
-          environments: {
-            preview: {
-              url: generate_preview_url(worker_name),
-              status: 'active', # Preview auto-deploys
-              last_deployed: worker_data.dig('modified_on')
-            },
-            staging: {
-              url: generate_staging_url(worker_name),
-              status: @app.staging_deployed_at ? 'deployed' : 'not_deployed',
-              last_deployed: @app.staging_deployed_at
-            },
-            production: {
-              url: generate_production_url(worker_name),
-              status: @app.deployment_status == 'production_deployed' ? 'deployed' : 'not_deployed',
-              last_deployed: @app.last_deployed_at
-            }
-          }
-        }
-      else
-        { success: false, error: "Worker not found: #{response.code}" }
-      end
-    rescue => e
-      { success: false, error: e.message }
-    end
+    # Use WorkersForPlatformsService to get actual deployment status
+    wfp_service = Deployment::WorkersForPlatformsService.new(@app)
+    wfp_service.get_deployment_status
+  rescue => e
+    Rails.logger.error "[CloudflareWorkersBuildService] Error getting deployment status: #{e.message}"
+    { success: false, error: e.message }
   end
 
   # Build and deploy from GitHub repository
@@ -350,15 +338,18 @@ class Deployment::CloudflareWorkersBuildService
   end
 
   def generate_preview_url(worker_name)
-    "https://preview-#{worker_name}.overskill.workers.dev"
+    wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+    "https://preview-#{worker_name}.#{wfp_domain}"
   end
 
   def generate_staging_url(worker_name)
-    "https://staging-#{worker_name}.overskill.workers.dev"
+    wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+    "https://staging-#{worker_name}.#{wfp_domain}"
   end
 
   def generate_production_url(worker_name)
-    "https://#{worker_name}.overskill.workers.dev"
+    wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+    "https://#{worker_name}.#{wfp_domain}"
   end
 
   def create_deployment_record(environment, deployment_id)

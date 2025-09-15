@@ -7,13 +7,29 @@ class CleanupStuckMessagesJob < ApplicationJob
     stuck_count = 0
     orphaned_count = 0
     
-    # Find messages stuck in processing states that haven't been updated for more than 15 minutes
-    # This ensures we don't kill active processes that are still making progress
+    # Find messages stuck in processing states that haven't been updated for more than 20 minutes
+    # Increased from 15 to 20 minutes to give more time for long-running operations
+    # Also check conversation_flow to see if there's recent activity
     stuck_messages = AppChatMessage.where(
       status: ['planning', 'executing', 'generating']
-    ).where('updated_at < ?', 15.minutes.ago)
+    ).where('updated_at < ?', 20.minutes.ago)
     
     stuck_messages.each do |message|
+      # Check if there's recent activity in conversation_flow
+      if message.conversation_flow.present? && message.conversation_flow.is_a?(Array)
+        last_activity = message.conversation_flow.map { |entry| 
+          [entry['timestamp'], entry['updated_at'], entry['completed_at']].compact.map { |t| 
+            Time.parse(t.to_s) rescue nil 
+          }.compact.max
+        }.compact.max
+        
+        # Skip if there's been activity in the last 15 minutes
+        if last_activity && last_activity > 15.minutes.ago
+          Rails.logger.info "[CleanupStuckMessages] Skipping message #{message.id} - recent activity detected at #{last_activity}"
+          next
+        end
+      end
+      
       Rails.logger.info "[CleanupStuckMessages] Found stuck message #{message.id} in #{message.status} state - created #{((Time.current - message.created_at) / 60).round} min ago, last updated #{((Time.current - message.updated_at) / 60).round} min ago"
       
       message.update!(

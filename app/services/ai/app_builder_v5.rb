@@ -2700,6 +2700,9 @@ module Ai
         tool_name = tool_call['function']['name']
         tool_args = JSON.parse(tool_call['function']['arguments'])
         
+        # Touch the message to prevent timeout during tool execution
+        @assistant_message.touch if @assistant_message.present?
+        
         Rails.logger.info "[V5_DEBUG] Processing tool: #{tool_name}, streaming_executor present: #{streaming_executor.present?}"
         
         log_claude_event("TOOL_EXECUTE_START", {
@@ -4743,6 +4746,10 @@ module Ai
       
       # Broadcast the final update
       broadcast_message_update
+      
+      # Trigger deployment after successful generation
+      Rails.logger.info "[V5_FINALIZE] App generation completed, triggering deployment"
+      trigger_deployment_if_ready
     end
     
     def mark_as_discussion_only

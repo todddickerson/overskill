@@ -53,6 +53,17 @@ export default class extends Controller {
             this.reloadPreview()
           } else if (data.type === "error") {
             this.showError(data.error)
+          } else if (data.action === "refresh") {
+            // Handle refresh from deployment
+            console.log("[HMR] Refreshing preview with new URL:", data.url)
+            this.refreshPreviewWithUrl(data.url)
+          } else if (data.action === "preview_deployed") {
+            // Handle preview deployment notification
+            console.log("[HMR] Preview deployed:", data.preview_url)
+            this.showDeploymentSuccess(data.message)
+            if (data.preview_url) {
+              this.refreshPreviewWithUrl(data.preview_url)
+            }
           }
         },
         
@@ -162,5 +173,33 @@ export default class extends Controller {
         puck_data: puckData 
       })
     }
+  }
+  
+  // Refresh preview with a new URL (after deployment)
+  refreshPreviewWithUrl(url) {
+    const iframe = this.element.querySelector("iframe")
+    if (iframe && url) {
+      console.log(`[HMR] Refreshing preview with new URL: ${url}`)
+      iframe.src = url
+      
+      // Update the global preview URL
+      if (window.PREVIEW_URL !== url) {
+        window.PREVIEW_URL = url
+      }
+    }
+  }
+  
+  // Show deployment success message
+  showDeploymentSuccess(message) {
+    // Display a success toast or notification
+    const notification = document.createElement("div")
+    notification.className = "fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50"
+    notification.textContent = message || "Preview deployed successfully!"
+    document.body.appendChild(notification)
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      notification.remove()
+    }, 3000)
   }
 }

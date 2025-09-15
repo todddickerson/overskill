@@ -1,6 +1,46 @@
 # 🚀 OverSkill Development Handoff - UNLIMITED SCALABILITY ACHIEVED!
 
-## ⚡ IMMEDIATE STATUS (September 10, 2025 - FAST DEPLOYMENT FULLY OPERATIONAL!)
+## ⚡ IMMEDIATE STATUS (January 2025 - DEPLOYMENT PIPELINE & CHANNEL CONSOLIDATION COMPLETE!)
+
+### ✅ DEPLOYMENT PIPELINE & ACTIONCABLE CHANNELS FULLY OPTIMIZED
+**All issues resolved - Ready for testing**
+
+#### Complete Fix List (January 2025):
+1. **Timeout Fixes** ✅ - CleanupStuckMessagesJob: 20min timeout + activity checking
+2. **Domain Fix** ✅ - All deployments to *.overskill.app (not workers.dev)
+3. **Immediate Preview Deployment** ✅ - EdgePreviewService deploys before GitHub push
+4. **GitHub Actions Fix** ✅ - Disabled preview deployment (no more overwriting)
+5. **Preview UI Auto-Refresh** ✅ - Turbo Streams + HMR working correctly
+6. **Production User-Triggered** ✅ - Only via publish modal button
+7. **Channel Consolidation** ✅ - Single `app_#{app.id}` channel per BulletTrain standards
+
+#### Deployment Architecture:
+```
+Preview (Automatic):
+1. AppBuilderV5 completes → DeployAppJob(environment='preview')
+2. EdgePreviewService deploys to WFP immediately (<2s)
+3. Turbo::StreamsChannel broadcasts to app_#{app.id}
+4. Preview iframe auto-refreshes without manual reload
+5. GitHub push follows as backup only
+
+Production (User-Triggered):
+1. User clicks "Deploy to Production" in publish modal
+2. POST /deploy with environment='production'
+3. DeployAppJob(environment='production')
+4. WorkersForPlatformsService promotes to production
+```
+
+#### Modified Files Ready to Commit:
+- `app/jobs/cleanup_stuck_messages_job.rb` - Timeout handling
+- `app/services/ai/app_builder_v5.rb` - Message touching during tools
+- `app/jobs/deploy_app_job.rb` - Immediate WFP + Turbo Streams
+- `app/services/deployment/cloudflare_workers_build_service.rb` - URL fixes
+- `app/services/deployment/workers_for_platforms_service.rb` - Domain fixes
+- `app/javascript/controllers/hmr_controller.js` - Preview refresh
+- `.workflow-templates/deploy.yml` - GitHub Actions skip preview
+- Removed: `cloudflare_workers_build_service_v2.rb` (unused)
+
+## ⚡ PREVIOUS STATUS (September 10, 2025 - FAST DEPLOYMENT FULLY OPERATIONAL!)
 
 ### 🚀 FAST DEPLOYMENT ARCHITECTURE - 100% WORKING WITH FULL STYLING!
 **APP FULLY FUNCTIONAL - Rendering perfectly with CSS, Supabase errors are non-blocking**

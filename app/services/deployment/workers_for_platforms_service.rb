@@ -931,6 +931,157 @@ module Deployment
       nil
     end
     
+    # Promote app from preview to staging environment
+    def promote_to_staging
+      Rails.logger.info "[WorkersForPlatformsService] Promoting app to staging"
+      
+      # Get the current preview deployment
+      preview_namespace = self.class.namespace_for(:preview)
+      preview_script_name = generate_script_name(:preview)
+      
+      # Copy to staging namespace
+      staging_namespace = self.class.namespace_for(:staging)
+      staging_script_name = generate_script_name(:staging)
+      
+      # Get the current script from preview
+      script_result = get_script_from_namespace(preview_namespace, preview_script_name)
+      
+      if script_result[:success]
+        # Deploy to staging
+        deployment_result = deploy_app(script_result[:content], environment: :staging)
+        
+        if deployment_result[:success]
+          Rails.logger.info "[WorkersForPlatformsService] ✅ Promoted to staging: #{deployment_result[:url]}"
+          
+          {
+            success: true,
+            deployment_id: "staging-#{@app.obfuscated_id}-#{Time.current.to_i}",
+            staging_url: deployment_result[:url],
+            message: "Successfully promoted to staging"
+          }
+        else
+          { success: false, error: "Failed to deploy to staging: #{deployment_result[:error]}" }
+        end
+      else
+        { success: false, error: "Failed to get preview script: #{script_result[:error]}" }
+      end
+    rescue => e
+      Rails.logger.error "[WorkersForPlatformsService] Error promoting to staging: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
+    # Promote app from staging to production environment
+    def promote_to_production
+      Rails.logger.info "[WorkersForPlatformsService] Promoting app to production"
+      
+      # Get the current staging deployment
+      staging_namespace = self.class.namespace_for(:staging)
+      staging_script_name = generate_script_name(:staging)
+      
+      # Copy to production namespace
+      production_namespace = self.class.namespace_for(:production)
+      production_script_name = generate_script_name(:production)
+      
+      # Get the current script from staging
+      script_result = get_script_from_namespace(staging_namespace, staging_script_name)
+      
+      if script_result[:success]
+        # Deploy to production
+        deployment_result = deploy_app(script_result[:content], environment: :production)
+        
+        if deployment_result[:success]
+          Rails.logger.info "[WorkersForPlatformsService] ✅ Promoted to production: #{deployment_result[:url]}"
+          
+          {
+            success: true,
+            deployment_id: "production-#{@app.obfuscated_id}-#{Time.current.to_i}",
+            production_url: deployment_result[:url],
+            message: "Successfully promoted to production"
+          }
+        else
+          { success: false, error: "Failed to deploy to production: #{deployment_result[:error]}" }
+        end
+      else
+        { success: false, error: "Failed to get staging script: #{script_result[:error]}" }
+      end
+    rescue => e
+      Rails.logger.error "[WorkersForPlatformsService] Error promoting to production: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
+    # Get deployment status for all environments
+    def get_deployment_status
+      Rails.logger.info "[WorkersForPlatformsService] Getting deployment status"
+      
+      status = {
+        success: true,
+        worker_name: @app.obfuscated_id.downcase,
+        environments: {}
+      }
+      
+      [:preview, :staging, :production].each do |env|
+        namespace = self.class.namespace_for(env)
+        script_name = generate_script_name(env)
+        
+        # Check if script exists in namespace
+        exists_result = script_exists_in_namespace?(namespace, script_name)
+        
+        if exists_result[:exists]
+          status[:environments][env] = {
+            url: generate_app_url(script_name, env),
+            status: 'deployed',
+            last_deployed: exists_result[:modified_on]
+          }
+        else
+          status[:environments][env] = {
+            url: generate_app_url(script_name, env),
+            status: 'not_deployed',
+            last_deployed: nil
+          }
+        end
+      end
+      
+      status
+    rescue => e
+      Rails.logger.error "[WorkersForPlatformsService] Error getting deployment status: #{e.message}"
+      { success: false, error: e.message }
+    end
+    
+    # Get script content from a namespace
+    def get_script_from_namespace(namespace, script_name)
+      response = self.class.get(
+        "/accounts/#{@account_id}/workers/dispatch/namespaces/#{namespace}/scripts/#{script_name}/content",
+        headers: headers
+      )
+      
+      if response.success?
+        { success: true, content: response.body }
+      else
+        { success: false, error: "Script not found: #{response.code}" }
+      end
+    rescue => e
+      { success: false, error: e.message }
+    end
+    
+    # Check if script exists in namespace
+    def script_exists_in_namespace?(namespace, script_name)
+      response = self.class.get(
+        "/accounts/#{@account_id}/workers/dispatch/namespaces/#{namespace}/scripts/#{script_name}",
+        headers: headers
+      )
+      
+      if response.success? && response['result']
+        { 
+          exists: true, 
+          modified_on: response['result']['modified_on'] 
+        }
+      else
+        { exists: false }
+      end
+    rescue => e
+      { exists: false }
+    end
+    
     def track_deployment_analytics(script_name, namespace)
       # Track deployment for cost monitoring using Analytics API
       # This will be used to calculate per-app costs

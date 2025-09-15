@@ -42,8 +42,23 @@ graph LR
     C --> D[AppBuilderV5]
     D --> E[AppFiles + DB]
     E --> F[DeployAppJob]
-    F --> G[GitHub + WFP]
+    F --> G1[Immediate WFP Preview]
+    F --> G2[GitHub Push Backup]
+    G1 --> H[ActionCable Refresh]
 ```
+
+### Deployment Architecture
+**Preview Deployment (Automatic)**:
+1. AppBuilderV5 completes generation → triggers DeployAppJob
+2. EdgePreviewService deploys to WFP immediately (<2s)
+3. ActionCable broadcasts to refresh preview UI (HMR enabled)
+4. GitHub push follows as backup deployment mechanism
+
+**Production Deployment (User-Triggered)**:
+- User clicks "Deploy to Production" in publish modal
+- DeployAppJob with environment='production'
+- WorkersForPlatformsService promotes to production
+- GitHub Actions runs as backup
 
 **Current Process**: ProcessAppUpdateJobV5 → AppBuilderV5 (direct delegation)
 **Legacy to Remove**: ProcessAppUpdateJobV3, V4, OrchestratorsV3
@@ -64,7 +79,9 @@ bin/rails runner "Testing::PlaywrightMcpService.new('development').run_golden_fl
 bin/rails runner "Testing::GoldenFlowBaselineService.new.measure_all_flows"
 
 # Generated app deployment pipeline
-# 1. ProcessAppUpdateJobV4 â†’ 2. Database files â†’ 3. DeployAppJob â†’ 4. AppFilesInitializationJob
+# 1. ProcessAppUpdateJobV5 → 2. AppBuilderV5 → 3. Database files → 4. DeployAppJob → 5. WFP + GitHub
+# Preview: Automatic immediate deployment via EdgePreviewService
+# Production: User-triggered via publish modal only
 ```
 
 ## ðŸ—ï¸ Rails/BulletTrain Patterns
@@ -79,7 +96,13 @@ bin/super scaffold crud Project Team title:text_field description:trix_editor
 - **Template Base**: `/app/services/ai/templates/overskill_20250728`
 - **File Storage**: AppFile, AppVersion, AppVersionFile models
 - **Database**: App-scoped tables (`app_${APP_ID}_${table}`)
-- **Deployment**: GitHub repos â†’ WFP â†’ Dispatch router
+- **Deployment**: GitHub repos â†' WFP â†' Dispatch router
+
+### Routing Architecture
+- **Account Namespace**: All authenticated routes under `/account/`
+- **Member Experience**: Post-purchase routes use `/account/` (not `/m/`)
+- **API Routes**: Under `/api/v1/` with versioning
+- **Public Routes**: Minimal public surface (landing, auth, webhooks)
 
 ## ðŸ§ª Golden Flow Protection
 **CRITICAL**: Always add `data-testid` for UI elements:
