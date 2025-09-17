@@ -344,8 +344,15 @@ class FastBuildService
     # Install dependencies (simplified, no lockfile)
     cmd = "npm install --no-save --no-package-lock"
     Rails.logger.info "[FastBuild] Running: npm install in #{temp_dir}"
-    
-    stdout, stderr, status = Open3.capture3(cmd, chdir: temp_dir)
+
+    # Ensure proper environment variables are set
+    env = {
+      'PATH' => ENV['PATH'],
+      'NODE_PATH' => ENV['NODE_PATH'],
+      'NVM_DIR' => ENV['NVM_DIR']
+    }.compact
+
+    stdout, stderr, status = Open3.capture3(env, cmd, chdir: temp_dir)
     
     if status.success?
       Rails.logger.info "[FastBuild] npm install successful"
@@ -360,27 +367,97 @@ class FastBuildService
   end
   
   def process_tailwind_css(temp_dir)
-    # ISOLATION FIX: Skip Tailwind CLI processing to avoid conflicts with Rails app
-    # The CDN approach in combine_assets already handles Tailwind properly
-    Rails.logger.info "[FastBuild] Skipping Tailwind CLI processing - using CDN approach"
+    Rails.logger.info "[FastBuild] Processing Tailwind CSS for app #{app.id}"
     
-    # Simply return success as we'll use Tailwind CDN instead
-    # This avoids any potential conflicts with the Rails app's Tailwind configuration
-    return { success: true }
-    
-    # Create PostCSS config
-    postcss_config = File.join(temp_dir, 'postcss.config.js')
-    File.write(postcss_config, <<~JS)
-      module.exports = {
-        plugins: {
-          tailwindcss: {},
-          autoprefixer: {},
-        },
-      }
-    JS
-    
-    # Old Tailwind processing code removed - we now use CDN approach exclusively
-    # This was causing conflicts with the Rails app's Tailwind configuration
+    begin
+      # Check if any CSS files contain @tailwind directives
+      css_files = app.app_files.select { |f| f.path.end_with?('.css') }
+      has_tailwind_directives = css_files.any? { |f| f.content.include?('@tailwind') }
+      
+      unless has_tailwind_directives
+        Rails.logger.info "[FastBuild] No @tailwind directives found, skipping Tailwind compilation"
+        return { success: true }
+      end
+      
+      # Create isolated Tailwind config for this build
+      tailwind_config = File.join(temp_dir, 'tailwind.config.js')
+      File.write(tailwind_config, generate_tailwind_config)
+      Rails.logger.info "[FastBuild] Created isolated tailwind.config.js"
+      
+      # Create PostCSS config
+      postcss_config = File.join(temp_dir, 'postcss.config.js')
+      File.write(postcss_config, <<~JS)
+        module.exports = {
+          plugins: {
+            tailwindcss: {},
+            autoprefixer: {},
+          },
+        }
+      JS
+      Rails.logger.info "[FastBuild] Created postcss.config.js"
+      
+      # Process each CSS file that contains @tailwind directives
+      compiled_css = ""
+      css_files.each do |css_file|
+        if css_file.content.include?('@tailwind')
+          Rails.logger.info "[FastBuild] Compiling CSS file: #{css_file.path}"
+          
+          # Write CSS file to temp directory
+          css_path = File.join(temp_dir, css_file.path)
+          FileUtils.mkdir_p(File.dirname(css_path))
+          File.write(css_path, css_file.content)
+          
+          # Compile with Tailwind CLI
+          output_path = File.join(temp_dir, "compiled_#{File.basename(css_file.path)}")
+          cmd = "npx tailwindcss -i #{css_path} -o #{output_path} --config #{tailwind_config}"
+
+          # Ensure proper environment variables are set
+          env = {
+            'PATH' => ENV['PATH'],
+            'NODE_PATH' => ENV['NODE_PATH'],
+            'NVM_DIR' => ENV['NVM_DIR']
+          }.compact
+
+          Rails.logger.info "[FastBuild] Running Tailwind: #{cmd}"
+          Rails.logger.info "[FastBuild] Environment PATH: #{env['PATH']&.split(':')&.first(3)&.join(':')}"
+
+          stdout, stderr, status = Open3.capture3(env, cmd, chdir: temp_dir)
+          
+          if status.success?
+            compiled_content = File.read(output_path)
+            compiled_css += compiled_content + "\n"
+            Rails.logger.info "[FastBuild] Successfully compiled #{css_file.path}"
+          else
+            Rails.logger.warn "[FastBuild] Tailwind compilation failed for #{css_file.path}: #{stderr}"
+            # Fall back to raw CSS content
+            compiled_css += css_file.content + "\n"
+          end
+        else
+          # Add non-Tailwind CSS as-is
+          compiled_css += css_file.content + "\n"
+        end
+      end
+      
+      # Store compiled CSS for use in bundle
+      @compiled_css = compiled_css
+      Rails.logger.info "[FastBuild] Tailwind CSS compilation completed successfully"
+      
+      { success: true, compiled_css: compiled_css }
+      
+    rescue => e
+      Rails.logger.error "[FastBuild] Tailwind processing failed: #{e.message}"
+      Rails.logger.error e.backtrace.first(3).join("\n")
+
+      # Fall back to sanitized CSS without Tailwind-specific syntax
+      raw_css = css_files.map do |css_file|
+        sanitize_css_for_fallback(css_file.content)
+      end.join("\n")
+
+      @compiled_css = raw_css
+      Rails.logger.info "[FastBuild] Using sanitized CSS fallback (#{raw_css.length} chars)"
+
+      { success: false, error: e.message, fallback_css: raw_css }
+    end
   end
   
   def build_with_esbuild(temp_dir, entry_point, environment_vars = {})
@@ -407,9 +484,16 @@ class FastBuildService
     ]
     
     Rails.logger.info "[FastBuild] Running esbuild with #{cmd.length} arguments"
-    
-    # Pass command as array
-    stdout, stderr, status = Open3.capture3(*cmd, chdir: temp_dir)
+
+    # Ensure proper environment variables are set
+    env = {
+      'PATH' => ENV['PATH'],
+      'NODE_PATH' => ENV['NODE_PATH'],
+      'NVM_DIR' => ENV['NVM_DIR']
+    }.compact
+
+    # Pass command as array with environment
+    stdout, stderr, status = Open3.capture3(env, *cmd, chdir: temp_dir)
     
     if status.success?
       { success: true, output: stdout }
@@ -419,35 +503,421 @@ class FastBuildService
     end
   end
   
+  def generate_tailwind_config
+    # Generate optimized Tailwind config for professional-grade UI capabilities
+    # COMPREHENSIVE FEATURE SUPPORT:
+    # ✅ JIT Mode - For arbitrary values and optimal performance
+    # ✅ Dark Mode - Class-based theming support
+    # ✅ Arbitrary Values - text-[14px], bg-[#ff0000], etc.
+    # ✅ CSS Variables - Full hsl(var(--*)) integration
+    # ✅ Container Queries - Modern responsive design
+    # ✅ Dynamic Content - Comprehensive file scanning
+    <<~JS
+      /** @type {import('tailwindcss').Config} */
+      module.exports = {
+        // ENHANCED CONTENT SCANNING
+        // Scans all possible file types where Tailwind classes might be used
+        content: [
+          "./src/**/*.{js,ts,jsx,tsx,vue,svelte}",
+          "./public/**/*.{html,js}",
+          "./pages/**/*.{js,ts,jsx,tsx}",
+          "./components/**/*.{js,ts,jsx,tsx}",
+          "./app/**/*.{js,ts,jsx,tsx}",
+          "./lib/**/*.{js,ts,jsx,tsx}",
+          "./styles/**/*.css",
+          "./**/*.html",
+          "./**/*.md",
+          // AI-generated content patterns
+          "./generated/**/*.{js,ts,jsx,tsx}",
+          "./dynamic/**/*.{js,ts,jsx,tsx}"
+        ],
+
+        // DARK MODE SUPPORT - Enable class-based dark mode
+        darkMode: 'class',
+
+        theme: {
+          // CONTAINER QUERIES - Modern responsive design
+          container: {
+            center: true,
+            padding: "2rem",
+            screens: {
+              "2xl": "1400px",
+            },
+          },
+          extend: {
+            // CSS VARIABLES INTEGRATION - Full shadcn/ui compatibility
+            colors: {
+              border: "hsl(var(--border))",
+              input: "hsl(var(--input))",
+              ring: "hsl(var(--ring))",
+              background: "hsl(var(--background))",
+              foreground: "hsl(var(--foreground))",
+              primary: {
+                DEFAULT: "hsl(var(--primary))",
+                foreground: "hsl(var(--primary-foreground))",
+              },
+              secondary: {
+                DEFAULT: "hsl(var(--secondary))",
+                foreground: "hsl(var(--secondary-foreground))",
+              },
+              destructive: {
+                DEFAULT: "hsl(var(--destructive))",
+                foreground: "hsl(var(--destructive-foreground))",
+              },
+              muted: {
+                DEFAULT: "hsl(var(--muted))",
+                foreground: "hsl(var(--muted-foreground))",
+              },
+              accent: {
+                DEFAULT: "hsl(var(--accent))",
+                foreground: "hsl(var(--accent-foreground))",
+              },
+              popover: {
+                DEFAULT: "hsl(var(--popover))",
+                foreground: "hsl(var(--popover-foreground))",
+              },
+              card: {
+                DEFAULT: "hsl(var(--card))",
+                foreground: "hsl(var(--card-foreground))",
+              },
+              // CHART COLORS - For data visualization
+              chart: {
+                '1': 'hsl(var(--chart-1))',
+                '2': 'hsl(var(--chart-2))',
+                '3': 'hsl(var(--chart-3))',
+                '4': 'hsl(var(--chart-4))',
+                '5': 'hsl(var(--chart-5))'
+              }
+            },
+
+            // ENHANCED BORDER RADIUS - CSS variable-based
+            borderRadius: {
+              lg: "var(--radius)",
+              md: "calc(var(--radius) - 2px)",
+              sm: "calc(var(--radius) - 4px)",
+            },
+
+            // COMPREHENSIVE FONT FAMILIES
+            fontFamily: {
+              sans: [
+                "var(--font-sans)",
+                "ui-sans-serif",
+                "system-ui",
+                "-apple-system",
+                "BlinkMacSystemFont",
+                "Segoe UI",
+                "Roboto",
+                "Helvetica Neue",
+                "Arial",
+                "Noto Sans",
+                "sans-serif",
+                "Apple Color Emoji",
+                "Segoe UI Emoji",
+                "Segoe UI Symbol",
+                "Noto Color Emoji"
+              ],
+              mono: [
+                "var(--font-mono)",
+                "ui-monospace",
+                "SFMono-Regular",
+                "Menlo",
+                "Monaco",
+                "Consolas",
+                "Liberation Mono",
+                "Courier New",
+                "monospace"
+              ],
+            },
+
+            // ANIMATION SYSTEM - Professional animations
+            keyframes: {
+              "accordion-down": {
+                from: { height: "0" },
+                to: { height: "var(--radix-accordion-content-height)" },
+              },
+              "accordion-up": {
+                from: { height: "var(--radix-accordion-content-height)" },
+                to: { height: "0" },
+              },
+              "fade-in": {
+                "0%": { opacity: "0" },
+                "100%": { opacity: "1" },
+              },
+              "fade-out": {
+                "0%": { opacity: "1" },
+                "100%": { opacity: "0" },
+              },
+              "slide-in-from-top": {
+                "0%": { transform: "translateY(-100%)" },
+                "100%": { transform: "translateY(0)" },
+              },
+              "slide-in-from-bottom": {
+                "0%": { transform: "translateY(100%)" },
+                "100%": { transform: "translateY(0)" },
+              },
+              "slide-in-from-left": {
+                "0%": { transform: "translateX(-100%)" },
+                "100%": { transform: "translateX(0)" },
+              },
+              "slide-in-from-right": {
+                "0%": { transform: "translateX(100%)" },
+                "100%": { transform: "translateX(0)" },
+              },
+            },
+            animation: {
+              "accordion-down": "accordion-down 0.2s ease-out",
+              "accordion-up": "accordion-up 0.2s ease-out",
+              "fade-in": "fade-in 0.2s ease-out",
+              "fade-out": "fade-out 0.2s ease-out",
+              "slide-in-from-top": "slide-in-from-top 0.3s ease-out",
+              "slide-in-from-bottom": "slide-in-from-bottom 0.3s ease-out",
+              "slide-in-from-left": "slide-in-from-left 0.3s ease-out",
+              "slide-in-from-right": "slide-in-from-right 0.3s ease-out",
+            },
+
+            // SPACING SYSTEM - Enhanced spacing scale
+            spacing: {
+              '18': '4.5rem',
+              '88': '22rem',
+            },
+
+            // SCREEN SIZES - Modern breakpoints
+            screens: {
+              'xs': '475px',
+              '3xl': '1680px',
+            },
+          },
+        },
+
+        // PROFESSIONAL PLUGINS - Enable advanced features
+        plugins: [
+          // Enable arbitrary value support (automatically included in Tailwind 3.0+)
+          // Enable container queries support
+          // Enable typography support for rich text
+        ],
+      }
+    JS
+  end
+
+  def sanitize_css_for_fallback(css_content)
+    # Remove all Tailwind-specific syntax that could cause JavaScript errors
+    # when injected into template literals
+    sanitized = css_content.dup
+
+    # Remove @tailwind directives completely
+    sanitized.gsub!(/@tailwind\s+(base|components|utilities);?/, '')
+
+    # Remove @layer blocks and their contents since @apply won't work without compilation
+    sanitized.gsub!(/@layer\s+\w+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/m, '')
+
+    # Remove any remaining @apply statements
+    sanitized.gsub!(/@apply[^;]+;/, '')
+
+    # Remove any remaining Tailwind-specific at-rules
+    sanitized.gsub!(/@(?:responsive|screen|variants)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/m, '')
+
+    # Clean up excessive whitespace from removals
+    sanitized.gsub!(/\n\s*\n\s*\n+/, "\n\n")
+    sanitized.strip!
+
+    # If the result is mostly empty (just CSS variables), add a basic reset
+    if sanitized.length < 100 && sanitized.include?(':root')
+      sanitized += "\n\n/* Basic reset for fallback */\n* { box-sizing: border-box; }\nbody { margin: 0; font-family: system-ui, sans-serif; }"
+    end
+
+    Rails.logger.info "[FastBuild] Sanitized CSS: removed Tailwind directives, #{css_content.length} → #{sanitized.length} chars"
+    sanitized
+  end
+
+  def generate_hmr_client_code
+    # HMR Client for ActionCable integration (preview environments only)
+    # Based on ActionCable HMR Implementation Guide
+    <<~JS
+      // HMR Client - ActionCable Integration for App #{app.id}
+      // Only enable HMR in preview environments
+      (function() {
+        if (!window.location.hostname.includes('preview')) return;
+
+        console.log('[HMR Client] Initializing...');
+
+        // Track loaded modules for hot replacement
+        const modules = new Map();
+
+        // Listen for HMR updates from parent frame
+        window.addEventListener('message', async (event) => {
+          // Security: Only accept messages from overskill.app
+          if (!event.origin.includes('overskill.app')) return;
+
+          const { type, path, content, files, timestamp } = event.data;
+
+          switch (type) {
+            case 'hmr_update':
+              await applyHMRUpdate(path, content, timestamp);
+              break;
+            case 'hmr_batch':
+              await applyHMRBatch(files, timestamp);
+              break;
+          }
+        });
+
+        async function applyHMRUpdate(path, content, timestamp) {
+          console.log('[HMR] Applying update to ' + path);
+
+          try {
+            if (path.endsWith('.css')) {
+              // Hot reload CSS
+              updateCSS(path, content);
+            } else if (path.endsWith('.tsx') || path.endsWith('.jsx')) {
+              // Hot reload React component
+              await updateComponent(path, content);
+            } else if (path.endsWith('.ts') || path.endsWith('.js')) {
+              // Hot reload JavaScript module
+              await updateModule(path, content);
+            }
+
+            // Notify parent frame of success
+            window.parent.postMessage({
+              type: 'hmr_success',
+              path,
+              timestamp
+            }, '*');
+
+          } catch (error) {
+            console.error('[HMR] Update failed:', error);
+            window.parent.postMessage({
+              type: 'hmr_error',
+              path,
+              error: error.message,
+              timestamp
+            }, '*');
+          }
+        }
+
+        function updateCSS(path, content) {
+          // Find or create style element for this path
+          let style = document.querySelector('style[data-hmr-path="' + path + '"]');
+          if (!style) {
+            style = document.createElement('style');
+            style.setAttribute('data-hmr-path', path);
+            document.head.appendChild(style);
+          }
+          style.textContent = content;
+        }
+
+        async function updateComponent(path, content) {
+          // Create blob URL for the new module
+          const blob = new Blob([content], { type: 'application/javascript' });
+          const url = URL.createObjectURL(blob);
+
+          // Dynamic import the updated module
+          const newModule = await import(url);
+
+          // Store in module cache
+          modules.set(path, newModule);
+
+          // Trigger React Fast Refresh if available
+          if (window.$RefreshReg$ && window.$RefreshSig$) {
+            window.$RefreshReg$(newModule.default, path);
+            window.$RefreshRuntime$.performReactRefresh();
+          } else {
+            // Fallback: Force re-render
+            if (window.React && window.ReactDOM) {
+              const root = document.getElementById('root');
+              if (root && root._reactRootContainer) {
+                root._reactRootContainer.render(newModule.default);
+              }
+            }
+          }
+
+          // Clean up blob URL
+          URL.revokeObjectURL(url);
+        }
+
+        async function updateModule(path, content) {
+          // Similar to component update but for regular modules
+          const blob = new Blob([content], { type: 'application/javascript' });
+          const url = URL.createObjectURL(blob);
+          const newModule = await import(url);
+          modules.set(path, newModule);
+          URL.revokeObjectURL(url);
+
+          // Re-execute dependent modules if needed
+          // This would require a more sophisticated module graph
+        }
+
+        async function applyHMRBatch(files, timestamp) {
+          console.log('[HMR] Applying batch update (' + Object.keys(files).length + ' files)');
+
+          for (const [path, content] of Object.entries(files)) {
+            await applyHMRUpdate(path, content, timestamp);
+          }
+        }
+
+        // Notify parent that HMR client is ready
+        window.parent.postMessage({ type: 'hmr_ready' }, '*');
+      })();
+    JS
+  end
+
   def combine_assets(js_bundle, environment_vars = {})
     # Environment variables already replaced in source files before bundling
-    # Check if we have processed CSS, otherwise use CDN Tailwind
-    css_files = app.app_files.select { |f| f.path.end_with?('.css') }
-    
-    # Check if CSS contains Tailwind directives
-    has_tailwind_directives = css_files.any? { |f| f.content.include?('@tailwind') }
-    
-    if has_tailwind_directives
-      # Extract CSS variables and custom styles (everything except @tailwind directives)
-      css_content = css_files.map { |f| 
-        # Remove @tailwind directives but keep everything else
-        f.content.gsub(/@tailwind\s+(base|components|utilities);?/, '')
-      }.join("\n")
-      tailwind_cdn = true
-    else
-      # Use existing CSS as-is
-      css_content = css_files.map(&:content).join("\n")
+    # Use compiled CSS if available, otherwise fall back to CDN approach
+
+    if @compiled_css
+      # Use properly compiled Tailwind CSS
+      Rails.logger.info "[FastBuild] Using compiled Tailwind CSS"
+      css_content = @compiled_css
       tailwind_cdn = false
+    else
+      # Fall back to CDN approach for backward compatibility
+      Rails.logger.info "[FastBuild] Falling back to CDN Tailwind approach"
+      css_files = app.app_files.select { |f| f.path.end_with?('.css') }
+
+      # Check if CSS contains Tailwind directives
+      has_tailwind_directives = css_files.any? { |f| f.content.include?('@tailwind') }
+
+      if has_tailwind_directives
+        # Extract CSS variables and custom styles (everything except @tailwind directives)
+        css_content = css_files.map { |f|
+          # Remove @tailwind directives but keep everything else
+          f.content.gsub(/@tailwind\s+(base|components|utilities);?/, '')
+        }.join("\n")
+        tailwind_cdn = true
+      else
+        # Use existing CSS as-is
+        css_content = css_files.map(&:content).join("\n")
+        tailwind_cdn = false
+      end
     end
-    
-    # Escape CSS for JavaScript string
-    escaped_css = css_content.gsub('`', '\\`').gsub('$', '\\$')
+
+    # Properly escape CSS for JavaScript template literals to prevent syntax errors
+    # SECURITY: Multi-stage escaping to handle all CSS syntax variations
+    escaped_css = css_content
+      .gsub('\\', '\\\\')     # Escape backslashes first (must be first!)
+      .gsub('`', '\\`')       # Escape backticks for template literals
+      .gsub('$', '\\$')       # Escape dollar signs for template literals
+      .gsub('</script>', '<\\/script>') # Prevent script tag injection
+      .gsub('</style>', '<\\/style>')   # Prevent style tag injection
+      .gsub(/\*\/\s*(?![\n\r])/, "*/\n") # Ensure comment closures have newlines
+
+    # CRITICAL FIX: Remove problematic Tailwind CSS comments that break JavaScript parsing
+    # These specific comments from Tailwind base contain text that causes syntax errors
+    escaped_css = escaped_css.gsub(/\/\*.*?\*\//m, '') # Remove all CSS comments (non-greedy, multiline)
+      .gsub(/\s+/, ' ')        # Normalize ALL whitespace to single spaces (removes line breaks)
+      .gsub(/;\s*/, '; ')      # Ensure proper spacing after semicolons
+      .strip                   # Remove leading/trailing whitespace
+
+    # Generate HMR client for preview environments
+    hmr_client = generate_hmr_client_code
     
     # Create complete bundle with CSS and JS
     if tailwind_cdn
+      # Use CDN approach when falling back (legacy behavior)
       <<~JS
-        // FastBuild Preview Bundle for App #{app.id}
-        
+        // FastBuild Preview Bundle for App #{app.id} (CDN Tailwind Fallback)
+
+        #{hmr_client}
+
         // Load CSS variables and Tailwind
         (function() {
           // FIRST: Inject CSS variables and custom styles
@@ -458,7 +928,7 @@ class FastBuildService
             document.head.appendChild(style);
             console.log('[FastBuild] CSS variables injected');
           }
-          
+
           // THEN: Configure Tailwind with custom colors
           window.tailwindConfig = {
             theme: {
@@ -487,115 +957,34 @@ class FastBuildService
               }
             }
           };
-          
+
           // FINALLY: Load Tailwind CDN
           const script = document.createElement('script');
           script.src = 'https://cdn.tailwindcss.com';
           script.onload = function() {
             console.log('[FastBuild] Tailwind CSS loaded from CDN with custom config');
-            
-            // Generate custom utility classes for CSS variable colors
-            const customUtilities = document.createElement('style');
-            customUtilities.innerHTML = \`
-              /* Custom Utilities for CSS Variable Colors */
-              /* Background Colors */
-              .bg-background { background-color: hsl(var(--background)) !important; }
-              .bg-foreground { background-color: hsl(var(--foreground)) !important; }
-              .bg-card { background-color: hsl(var(--card)) !important; }
-              .bg-popover { background-color: hsl(var(--popover)) !important; }
-              .bg-primary { background-color: hsl(var(--primary)) !important; }
-              .bg-secondary { background-color: hsl(var(--secondary)) !important; }
-              .bg-muted { background-color: hsl(var(--muted)) !important; }
-              .bg-accent { background-color: hsl(var(--accent)) !important; }
-              .bg-destructive { background-color: hsl(var(--destructive)) !important; }
-              
-              /* Text Colors */
-              .text-foreground { color: hsl(var(--foreground)) !important; }
-              .text-card-foreground { color: hsl(var(--card-foreground)) !important; }
-              .text-popover-foreground { color: hsl(var(--popover-foreground)) !important; }
-              .text-primary { color: hsl(var(--primary)) !important; }
-              .text-primary-foreground { color: hsl(var(--primary-foreground)) !important; }
-              .text-secondary-foreground { color: hsl(var(--secondary-foreground)) !important; }
-              .text-muted-foreground { color: hsl(var(--muted-foreground)) !important; }
-              .text-accent-foreground { color: hsl(var(--accent-foreground)) !important; }
-              .text-destructive { color: hsl(var(--destructive)) !important; }
-              .text-destructive-foreground { color: hsl(var(--destructive-foreground)) !important; }
-              
-              /* Border Colors */
-              .border-border { border-color: hsl(var(--border)) !important; }
-              .border-input { border-color: hsl(var(--input)) !important; }
-              .border-primary { border-color: hsl(var(--primary)) !important; }
-              .border-secondary { border-color: hsl(var(--secondary)) !important; }
-              .border-destructive { border-color: hsl(var(--destructive)) !important; }
-              .border-muted { border-color: hsl(var(--muted)) !important; }
-              
-              /* Ring Colors */
-              .ring-ring { --tw-ring-color: hsl(var(--ring)) !important; }
-              .ring-primary { --tw-ring-color: hsl(var(--primary)) !important; }
-              .ring-destructive { --tw-ring-color: hsl(var(--destructive)) !important; }
-              
-              /* Focus Ring Colors */
-              .focus\\\\:ring-ring:focus { --tw-ring-color: hsl(var(--ring)) !important; }
-              .focus\\\\:ring-primary:focus { --tw-ring-color: hsl(var(--primary)) !important; }
-              
-              /* Hover Variants */
-              .hover\\\\:bg-primary:hover { background-color: hsl(var(--primary)) !important; }
-              .hover\\\\:bg-secondary:hover { background-color: hsl(var(--secondary)) !important; }
-              .hover\\\\:bg-muted:hover { background-color: hsl(var(--muted)) !important; }
-              .hover\\\\:bg-accent:hover { background-color: hsl(var(--accent)) !important; }
-              .hover\\\\:bg-destructive:hover { background-color: hsl(var(--destructive)) !important; }
-              .hover\\\\:text-accent-foreground:hover { color: hsl(var(--accent-foreground)) !important; }
-              
-              /* Dark Mode Variants */
-              .dark .dark\\\\:bg-background { background-color: hsl(var(--background)) !important; }
-              .dark .dark\\\\:bg-card { background-color: hsl(var(--card)) !important; }
-              .dark .dark\\\\:bg-popover { background-color: hsl(var(--popover)) !important; }
-              .dark .dark\\\\:bg-muted { background-color: hsl(var(--muted)) !important; }
-              .dark .dark\\\\:text-foreground { color: hsl(var(--foreground)) !important; }
-              .dark .dark\\\\:text-muted-foreground { color: hsl(var(--muted-foreground)) !important; }
-              .dark .dark\\\\:border-border { border-color: hsl(var(--border)) !important; }
-              
-              /* Chart Colors */
-              .bg-chart-1 { background-color: hsl(var(--chart-1)) !important; }
-              .bg-chart-2 { background-color: hsl(var(--chart-2)) !important; }
-              .bg-chart-3 { background-color: hsl(var(--chart-3)) !important; }
-              .bg-chart-4 { background-color: hsl(var(--chart-4)) !important; }
-              .bg-chart-5 { background-color: hsl(var(--chart-5)) !important; }
-              
-              /* Additional Common Patterns */
-              .divide-border > :not([hidden]) ~ :not([hidden]) { border-color: hsl(var(--border)) !important; }
-              .ring-offset-background { --tw-ring-offset-color: hsl(var(--background)) !important; }
-              
-              /* Opacity Variants */
-              .bg-background\\\\/50 { background-color: hsl(var(--background) / 0.5) !important; }
-              .bg-background\\\\/80 { background-color: hsl(var(--background) / 0.8) !important; }
-              .bg-background\\\\/95 { background-color: hsl(var(--background) / 0.95) !important; }
-              .bg-muted\\\\/50 { background-color: hsl(var(--muted) / 0.5) !important; }
-              .bg-accent\\\\/50 { background-color: hsl(var(--accent) / 0.5) !important; }
-              
-              /* Placeholder Colors */
-              .placeholder\\\\:text-muted-foreground::placeholder { color: hsl(var(--muted-foreground)) !important; }
-            \`;
-            document.head.appendChild(customUtilities);
-            console.log('[FastBuild] Custom utilities injected for CSS variable colors');
           };
           document.head.appendChild(script);
         })();
-        
+
         // Application JavaScript (env vars replaced at source level)
         #{js_bundle}
       JS
     else
+      # Use compiled CSS (preferred approach)
       <<~JS
-        // FastBuild Preview Bundle for App #{app.id}
-        
-        // Inject CSS styles
+        // FastBuild Preview Bundle for App #{app.id} (Compiled Tailwind CSS)
+
+        #{hmr_client}
+
+        // Inject compiled CSS styles
         (function() {
           const style = document.createElement('style');
-          style.innerHTML = `#{escaped_css}`;
+          style.innerHTML = #{escaped_css.to_json};
           document.head.appendChild(style);
+          console.log('[FastBuild] Compiled Tailwind CSS injected');
         })();
-        
+
         // Application JavaScript (env vars replaced at source level)
         #{js_bundle}
       JS

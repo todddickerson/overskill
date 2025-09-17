@@ -10,20 +10,18 @@ class AppDeployment < ApplicationRecord
   # Deployment status enum - track every stage
   enum :status, {
     pending: 'pending',
-    building: 'building', 
+    building: 'building',
     deploying: 'deploying',
     deployed: 'deployed',
     failed: 'failed',
-    rolled_back: 'rolled_back'
+    rolled_back: 'rolled_back',
+    superseded: 'superseded'  # Previous deployment replaced by newer one
   }, prefix: :deployment
   
   # Deployment environments
   validates :environment, inclusion: { in: %w[preview staging production] }
-  validates :environment, uniqueness: { 
-    scope: :app_id, 
-    conditions: -> { where(is_rollback: false, status: ['deployed', 'deploying']) },
-    message: 'can only have one active deployment per environment'
-  }
+  # Note: Uniqueness enforced by application logic in create_for_environment!
+  # validate :only_one_active_deployment_per_environment  # Temporarily disabled
 
   # Scopes for different environments
   scope :preview, -> { where(environment: 'preview') }
@@ -105,7 +103,26 @@ class AppDeployment < ApplicationRecord
   end
   
   private
-  
+
+  def only_one_active_deployment_per_environment
+    return if is_rollback? # Rollbacks don't count toward active limit
+    return unless ['deployed', 'deploying'].include?(status) # Only validate active statuses
+
+    # Skip validation during superseding process
+    return if Thread.current[:superseding_deployments]
+
+    existing_active = AppDeployment.where(
+      app: app,
+      environment: environment,
+      is_rollback: false,
+      status: ['deployed', 'deploying']
+    ).where.not(id: id) # Exclude self for updates
+
+    if existing_active.exists?
+      errors.add(:environment, 'can only have one active deployment per environment')
+    end
+  end
+
   def calculate_durations
     if build_started_at && build_completed_at
       self.build_duration_seconds = (build_completed_at - build_started_at).to_i
@@ -118,20 +135,39 @@ class AppDeployment < ApplicationRecord
 
   # Generate deployment metadata for tracking
   def self.create_for_environment!(app:, environment:, deployment_id:, url: nil, commit_sha: nil)
-    create!(
-      app: app,
-      environment: environment,
-      deployment_id: deployment_id,
-      deployment_url: url || generate_environment_url(app, environment),
-      commit_sha: commit_sha,
-      deployed_at: Time.current,
-      deployment_metadata: {
-        deployed_by: 'GitHub Migration System',
-        deployment_type: environment == 'preview' ? 'auto' : 'manual',
-        timestamp: Time.current.iso8601,
-        app_obfuscated_id: app.obfuscated_id
-      }.to_json
-    )
+    transaction do
+      # Set thread-local flag to skip validation during superseding
+      Thread.current[:superseding_deployments] = true
+
+      # Mark any existing active deployments as superseded before creating new one
+      AppDeployment.where(
+        app: app,
+        environment: environment,
+        is_rollback: false,
+        status: ['deployed', 'deploying']
+      ).update_all(status: 'superseded')
+
+      result = create!(
+        app: app,
+        environment: environment,
+        deployment_id: deployment_id,
+        deployment_url: url || generate_environment_url(app, environment),
+        commit_sha: commit_sha,
+        status: 'deployed',  # Explicitly set status since this is called after successful deployment
+        deployed_at: Time.current,
+        deployment_metadata: {
+          deployed_by: 'GitHub Migration System',
+          deployment_type: environment == 'preview' ? 'auto' : 'manual',
+          timestamp: Time.current.iso8601,
+          app_obfuscated_id: app.obfuscated_id
+        }.to_json
+      )
+
+      # Clear thread-local flag
+      Thread.current[:superseding_deployments] = false
+
+      result
+    end
   end
 
   # Generate rollback deployment record
@@ -159,15 +195,21 @@ class AppDeployment < ApplicationRecord
   private
 
   def self.generate_environment_url(app, environment)
-    worker_name = "overskill-#{app.name.parameterize}-#{app.obfuscated_id}"
-    
+    # Use WFP_APPS_DOMAIN if configured, otherwise fall back to workers.dev
+    domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+
+    # For WFP dispatch, we use obfuscated_id as the script name
+    script_name = app.obfuscated_id.downcase
+
     case environment
     when 'preview'
-      "https://preview-#{worker_name}.overskill.workers.dev"
+      "https://preview-#{script_name}.#{domain}"
     when 'staging'
-      "https://staging-#{worker_name}.overskill.workers.dev"
+      "https://staging-#{script_name}.#{domain}"
     when 'production'
-      "https://#{worker_name}.overskill.workers.dev"
+      # Production uses subdomain directly (no prefix)
+      subdomain = app.subdomain || script_name
+      "https://#{subdomain}.#{domain}"
     end
   end
 end

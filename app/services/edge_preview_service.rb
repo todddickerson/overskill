@@ -142,7 +142,31 @@ class EdgePreviewService
       const FILE_UPDATES = {};
       
       #{ENV['SKIP_HMR_DEPLOYMENT'] != 'true' ? <<~HMR : '// HMR disabled for deployment'}
-      // Durable Object class for HMR WebSocket handling
+      // ============================================================
+      // DEPRECATED: Durable Object HMR Handler
+      // ============================================================
+      // DECISION (Sep 2025): We chose ActionCable over Durable Objects for HMR
+      //
+      // Reasons for using ActionCable instead:
+      // 1. NO HIBERNATION DELAYS - ActionCable is always hot (50ms updates)
+      //    vs Durable Objects with 2s wake-up delay after idle periods
+      // 2. SIMPLER ARCHITECTURE - Users already connected to Rails for editing
+      //    No need for additional WebSocket to Cloudflare edge
+      // 3. COST-FREE - Uses existing Rails infrastructure
+      //    vs ~$5/month per 1000 apps with Durable Objects
+      // 4. MORE RELIABLE - Single connection path (Editor → Rails → Preview)
+      //    vs complex routing (Editor → Rails → Cloudflare → Durable Object)
+      // 5. CONSISTENT UX - Predictable 50ms updates regardless of idle time
+      //
+      // User Experience Impact:
+      // - ActionCable: Always instant (50ms) even after 1hr idle
+      // - Durable Objects: 30ms when hot, but 2000ms after hibernation
+      //
+      // The code below is kept for reference but is NOT USED.
+      // See app/channels/app_preview_channel.rb for the actual HMR implementation.
+      // ============================================================
+
+      // [DEPRECATED] Durable Object class for HMR WebSocket handling
       export class HMRHandler {
         constructor(state, env) {
           this.state = state;

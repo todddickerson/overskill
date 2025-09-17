@@ -1026,13 +1026,39 @@ module Ai
     # Queue deployment via DeployAppJob or use fast preview with EdgePreviewService
     def deploy_app
       Rails.logger.info "[V5_DEPLOY] Starting deployment for app #{@app.id}"
-      
-      # Fast preview is now the default (can be disabled by setting FAST_PREVIEW_ENABLED=false)
-      if ENV['FAST_PREVIEW_ENABLED'] != 'false'
-        Rails.logger.info "[V5_FAST_DEPLOY] Using EdgePreviewService for instant preview deployment (default)"
+
+      # ============================================================
+      # FEATURE FLAG: Fast Preview Deployment (EdgePreviewService)
+      # ============================================================
+      # Default: ENABLED (uses EdgePreviewService for 2-3s deployments)
+      # To disable: Set FAST_PREVIEW_ENABLED=false
+      #
+      # EdgePreviewService advantages:
+      # - 2-3s deployment time (vs 3-5min with DeployAppJob)
+      # - Direct to Cloudflare Workers (no GitHub Actions)
+      # - Immediate preview updates
+      #
+      # DeployAppJob advantages:
+      # - Full GitHub integration and audit trail
+      # - Production-ready builds
+      # - Established pipeline with monitoring
+      #
+      # Gradual rollout strategy:
+      # 1. Default to EdgePreviewService for all preview deployments
+      # 2. Monitor for issues via AppDeployment records
+      # 3. Keep DeployAppJob for production deployments
+      # 4. Can override per-app with app.use_fast_preview flag
+      # ============================================================
+
+      # Check app-specific override first, then global flag
+      use_fast_preview = @app.respond_to?(:use_fast_preview) ? @app.use_fast_preview : true
+      use_fast_preview = false if ENV['FAST_PREVIEW_ENABLED'] == 'false'
+
+      if use_fast_preview
+        Rails.logger.info "[V5_FAST_DEPLOY] Using EdgePreviewService for instant preview deployment (2-3s)"
         deploy_fast_preview
       else
-        Rails.logger.info "[V5_DEPLOY] Using legacy standard deployment pipeline (FAST_PREVIEW_ENABLED=false)"
+        Rails.logger.info "[V5_DEPLOY] Using legacy DeployAppJob pipeline (3-5min)"
         deploy_standard
       end
     end
@@ -1986,7 +2012,17 @@ module Ai
     # Check if deployment should be triggered after incremental completion
     def trigger_deployment_if_ready
       Rails.logger.info "[V5_INCREMENTAL] Checking if deployment should be triggered"
-      
+
+      # ULTRATHINK FIX: Add timing delay to ensure all file commits are propagated
+      # This fixes the critical deployment pipeline timing issue where deployments
+      # were triggered before all generated files were fully committed to the database
+      Rails.logger.info "[V5_TIMING_FIX] Waiting 2 seconds for file commits to propagate..."
+      sleep(2)
+
+      # Reload app to ensure we have the latest file count
+      @app.reload
+      Rails.logger.info "[V5_TIMING_FIX] File count after reload: #{@app.app_files.count}"
+
       # Check if app has files ready for deployment
       if @app.app_files.any?
         Rails.logger.info "[V5_INCREMENTAL] App has #{@app.app_files.count} files, triggering deployment"
@@ -2582,6 +2618,11 @@ module Ai
         success: !result[:error],
         error: result[:error]
       })
+      
+      # VALIDATION: Check if file modification tools actually implemented user prompt
+      if result[:success] && ['os-write', 'os-line-replace'].include?(tool_name)
+        validate_file_modification(tool_name, tool_args, result)
+      end
       
       # Update tool status - find the specific tool call for this tool
       tool_call_to_update = @assistant_message.tool_calls.reverse.find do |tc|
@@ -5368,6 +5409,112 @@ module Ai
       )
     rescue => e
       Rails.logger.error "[V5_BROADCAST] Failed to broadcast deployment progress: #{e.message}"
+    end
+    
+    private
+    
+    # Validate that AI file modifications actually implement user prompts
+    # instead of copying template placeholder content
+    def validate_file_modification(tool_name, tool_args, result)
+      file_path = tool_args['file_path']
+      
+      # Skip validation for non-component files
+      return unless file_path&.match?(/\.(tsx?|jsx?)$/)
+      
+      begin
+        # Get the current file content after modification
+        app_file = @app.app_files.find_by(path: file_path)
+        return unless app_file
+        
+        current_content = app_file.content
+        user_prompt = @chat_message.content.downcase
+        
+        # Check for template placeholder content that should be replaced
+        placeholder_indicators = [
+          'welcome to your overskill app',
+          'this is your starting template',
+          'starting template with all the essentials',
+          'count: {count}',
+          'increment'
+        ]
+        
+        has_placeholders = placeholder_indicators.any? { |indicator| 
+          current_content.downcase.include?(indicator) 
+        }
+        
+        if has_placeholders
+          Rails.logger.warn "[V5_VALIDATION] ⚠️ File #{file_path} still contains template placeholder content"
+          Rails.logger.warn "[V5_VALIDATION] User requested: #{user_prompt.truncate(100)}"
+          
+          # Check if AI is implementing the actual prompt
+          prompt_keywords = extract_prompt_keywords(user_prompt)
+          content_has_keywords = prompt_keywords.any? { |keyword|
+            current_content.downcase.include?(keyword)
+          }
+          
+          unless content_has_keywords
+            Rails.logger.error "[V5_VALIDATION] ❌ File #{file_path} does NOT implement user prompt!"
+            Rails.logger.error "[V5_VALIDATION] Expected keywords: #{prompt_keywords.join(', ')}"
+            
+            # Track failed validation in agent state for system prompt feedback
+            @agent_state[:validation_failures] ||= []
+            @agent_state[:validation_failures] << {
+              file_path: file_path,
+              tool_name: tool_name,
+              issue: 'placeholder_content_not_replaced',
+              expected_keywords: prompt_keywords,
+              timestamp: Time.current
+            }
+          else
+            Rails.logger.info "[V5_VALIDATION] ✅ File #{file_path} has some prompt keywords but still contains placeholders"
+          end
+        else
+          Rails.logger.info "[V5_VALIDATION] ✅ File #{file_path} successfully modified without template placeholders"
+        end
+        
+      rescue => e
+        Rails.logger.error "[V5_VALIDATION] Validation error for #{file_path}: #{e.message}"
+      end
+    end
+    
+    # Extract key terms from user prompt to validate implementation
+    def extract_prompt_keywords(prompt)
+      # Common app types and their keywords
+      app_type_keywords = {
+        'todo' => ['todo', 'task', 'complete', 'add', 'delete', 'list'],
+        'calculator' => ['calculator', 'calculate', 'number', 'result', 'operation'],
+        'landing' => ['landing', 'hero', 'feature', 'service', 'contact'],
+        'dashboard' => ['dashboard', 'analytics', 'chart', 'data', 'metric'],
+        'blog' => ['blog', 'post', 'article', 'content', 'author'],
+        'shop' => ['shop', 'product', 'cart', 'buy', 'price'],
+        'weather' => ['weather', 'temperature', 'forecast', 'climate'],
+        'chat' => ['chat', 'message', 'conversation', 'send']
+      }
+      
+      keywords = []
+      
+      # Check for app type matches
+      app_type_keywords.each do |type, type_keywords|
+        if prompt.include?(type)
+          keywords.concat(type_keywords)
+          break # Found primary app type
+        end
+      end
+      
+      # Extract explicit keywords from prompt
+      words = prompt.scan(/\b\w{3,}\b/).map(&:downcase).uniq
+      action_words = words.select { |word| 
+        %w[create add remove delete update edit save load display show list generate calculate].include?(word)
+      }
+      keywords.concat(action_words)
+      
+      # Add specific terms mentioned in prompt
+      specific_terms = words.select { |word|
+        word.length > 4 && !%w[application template simple modern clean design].include?(word)
+      }
+      keywords.concat(specific_terms.take(3)) # Limit to 3 most specific terms
+      
+      keywords.uniq.take(8) # Return max 8 keywords for validation
     end
   end
   
