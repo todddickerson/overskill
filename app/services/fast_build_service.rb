@@ -42,7 +42,7 @@ class FastBuildService
     @app = app
     @build_cache = Rails.cache
     @template_path = Rails.root.join("app/services/ai/templates/overskill_20250728")
-    @vite_path = find_vite_binary
+    @vite_path = find_vite_binary_path
   end
 
   # Build a single file asynchronously using Vite's transform API
@@ -652,16 +652,38 @@ class FastBuildService
       env[key] = value.to_s
     end
 
-    # No longer forcing IIFE - let Vite build with ES modules and chunks
-    # This follows the lovable template approach
+    # Try build with automatic dependency recovery
+    result = build_with_dependency_recovery(temp_dir, env)
+    result
+  end
 
-    # Keep index.html for standard Vite build with ES modules and chunks
+  # Phase 1: Build Error Recovery - Auto-detect and install missing dependencies
+  def build_with_dependency_recovery(temp_dir, env, max_retries = 3)
+    retries = 0
 
-    # Run Vite build with memory-safe execution to prevent Broken Pipe errors
-    Rails.logger.info "[FastBuild] Running Vite build with ES modules and chunks"
+    loop do
+      result = execute_vite_build(temp_dir, env)
 
+      if result[:success]
+        return result
+      elsif missing_dep = detect_missing_dependency(result[:error])
+        Rails.logger.info "[FastBuild] Auto-installing missing dependency: #{missing_dep}"
+        install_result = install_dependency(temp_dir, missing_dep, env)
+
+        if install_result && retries < max_retries
+          retries += 1
+          next  # Retry build
+        else
+          Rails.logger.error "[FastBuild] Failed to install #{missing_dep} or max retries reached"
+        end
+      end
+
+      return result  # Failed after retries
+    end
+  end
+
+  def execute_vite_build(temp_dir, env)
     # Use the vite binary directly from node_modules
-    # This avoids npx issues and prepare-worker.js
     vite_binary = File.join(temp_dir, "node_modules", ".bin", "vite")
 
     # Check if vite binary exists
@@ -740,6 +762,340 @@ class FastBuildService
       Rails.logger.error "[FastBuild] Output was truncated: true" if result[:truncated]
       {success: false, error: "Vite build failed: #{result[:stderr]}"}
     end
+  end
+
+  # Phase 1: Detect missing dependencies from build error messages
+  def detect_missing_dependency(error_message)
+    return nil unless error_message
+
+    # Common dependency patterns from build errors
+    patterns = {
+      /terser not found/ => 'terser',
+      /postcss not found/ => 'postcss',
+      /autoprefixer not found/ => 'autoprefixer',
+      /Cannot resolve module ['"]([^'"]+)['"]/ => '$1',
+      /Module not found: Error: Can't resolve ['"]([^'"]+)['"]/ => '$1',
+      /@rollup\/plugin-(\w+) not found/ => '@rollup/plugin-$1',
+      /Failed to resolve import ['"]([^'"]+)['"]/ => '$1',
+      /Could not resolve ['"]([^'"]+)['"]/ => '$1'
+    }
+
+    patterns.each do |pattern, replacement|
+      if match = error_message.match(pattern)
+        dependency = replacement.gsub('$1', match[1] || '')
+        # Filter out relative imports and focus on npm packages
+        next if dependency.start_with?('./', '../', '/')
+        return dependency
+      end
+    end
+
+    nil
+  end
+
+  # Phase 1: Install missing dependency
+  def install_dependency(temp_dir, package, env)
+    Rails.logger.info "[FastBuild] Installing package: #{package}"
+
+    cmd = ["npm", "install", package, "--save-dev", "--no-package-lock"]
+    result = execute_command_with_limits(
+      cmd,
+      env: env,
+      chdir: temp_dir,
+      timeout: 60,
+      max_output: 5.megabytes
+    )
+
+    if result[:success]
+      Rails.logger.info "[FastBuild] Successfully installed #{package}"
+      true
+    else
+      Rails.logger.error "[FastBuild] Failed to install #{package}: #{result[:stderr]}"
+      false
+    end
+  end
+
+  # Phase 2: Pre-build Dependency Analysis
+  def analyze_and_install_dependencies(temp_dir, env)
+    Rails.logger.info "[FastBuild] Analyzing app dependencies..."
+
+    analyzer = DependencyAnalyzer.new(app)
+    missing_deps = analyzer.analyze_missing_dependencies(temp_dir)
+
+    if missing_deps.any?
+      Rails.logger.info "[FastBuild] Found #{missing_deps.size} missing dependencies: #{missing_deps.join(', ')}"
+
+      success_count = 0
+      missing_deps.each do |package|
+        if install_dependency(temp_dir, package, env)
+          success_count += 1
+        end
+      end
+
+      Rails.logger.info "[FastBuild] Successfully installed #{success_count}/#{missing_deps.size} dependencies"
+      success_count > 0
+    else
+      Rails.logger.info "[FastBuild] No missing dependencies detected"
+      true
+    end
+  end
+
+  # Enhanced build_full_bundle with dependency analysis
+  def build_full_bundle_with_analysis(environment_vars = {})
+    Dir.mktmpdir("app_build_#{app.id}_") do |temp_dir|
+      Rails.logger.info "[FastBuild] Created temp dir: #{temp_dir}"
+      Rails.logger.info "[FastBuild] Setting up Vite project with template structure..."
+
+      # Copy template and write app files
+      setup_vite_project(temp_dir, environment_vars)
+
+      # Phase 2: Analyze and pre-install dependencies
+      analyze_and_install_dependencies(temp_dir, build_env(environment_vars))
+
+      # Now build with dependency recovery as fallback
+      build_with_vite(temp_dir, environment_vars)
+    end
+  rescue => e
+    Rails.logger.error "[FastBuild] Exception during build: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    {success: false, error: e.message}
+  end
+
+  private
+
+  def build_env(environment_vars)
+    nvm_node_path = ENV["NVM_DIR"] ? "#{ENV["NVM_DIR"]}/versions/node/v22.16.0/bin" : nil
+    enhanced_path = [nvm_node_path, ENV["PATH"]].compact.join(":")
+
+    env = {
+      "PATH" => enhanced_path,
+      "NODE_PATH" => ENV["NODE_PATH"],
+      "NVM_DIR" => ENV["NVM_DIR"],
+      "NODE_ENV" => "production"
+    }.compact
+
+    environment_vars.each do |key, value|
+      env[key] = value.to_s
+    end
+
+    env
+  end
+
+  def find_vite_binary_path
+    # Try common locations for Vite
+    paths = [
+      File.join(@template_path, "node_modules/.bin/vite"),
+      "node_modules/.bin/vite",
+      "/usr/local/bin/vite"
+    ]
+
+    paths.each do |path|
+      return path if File.exist?(path)
+    end
+
+    # Fall back to npx vite
+    "npx vite"
+  end
+
+  # Essential method for setting up Vite project structure
+  def setup_vite_project(temp_dir, environment_vars = {})
+    # Copy template structure
+    FileUtils.cp_r("#{@template_path}/.", temp_dir)
+
+    # Write all app files, overriding template files
+    write_app_files(temp_dir, environment_vars)
+
+    # Ensure package.json exists with proper dependencies
+    package_json_path = File.join(temp_dir, 'package.json')
+    if File.exist?(package_json_path)
+      Rails.logger.info "[FastBuild] Using existing package.json from template"
+    else
+      File.write(package_json_path, generate_minimal_package_json)
+    end
+
+    # Ensure vite.config.ts exists
+    vite_config_path = File.join(temp_dir, 'vite.config.ts')
+    unless File.exist?(vite_config_path)
+      File.write(vite_config_path, generate_vite_config)
+    end
+
+    # Install dependencies quickly (using existing node_modules if available)
+    if File.exist?(File.join(@template_path, 'node_modules'))
+      Rails.logger.info "[FastBuild] Copying node_modules from template"
+      FileUtils.cp_r(File.join(@template_path, 'node_modules'), temp_dir, remove_destination: true)
+    else
+      Rails.logger.info "[FastBuild] Installing dependencies"
+      system("cd #{temp_dir} && npm ci --silent")
+    end
+  end
+
+  def generate_minimal_package_json
+    {
+      "name": "app-build",
+      "version": "1.0.0",
+      "type": "module",
+      "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+      },
+      "devDependencies": {
+        "vite" => "^6.0.7",
+        "@vitejs/plugin-react-swc" => "^3.11.0",
+        "typescript" => "^5.8.3"
+      }
+    }.to_json
+  end
+
+  def generate_vite_config
+    <<~TS
+      import { defineConfig } from "vite";
+      import react from "@vitejs/plugin-react-swc";
+
+      export default defineConfig({
+        plugins: [react()],
+        build: {
+          outDir: "dist",
+          rollupOptions: {
+            output: {
+              manualChunks: {
+                vendor: ['react', 'react-dom']
+              }
+            }
+          }
+        }
+      });
+    TS
+  end
+end
+
+# Phase 2: Dependency Analysis Service
+class DependencyAnalyzer
+  attr_reader :app
+
+  def initialize(app)
+    @app = app
+  end
+
+  def analyze_missing_dependencies(temp_dir)
+    used_packages = extract_used_packages
+    installed_packages = get_installed_packages(temp_dir)
+    common_deps = get_common_dependencies
+
+    # Find packages that are used but not installed
+    missing = used_packages - installed_packages
+
+    # Add common dependencies based on usage patterns
+    missing += suggest_dependencies_from_patterns
+
+    missing.uniq
+  end
+
+  private
+
+  def extract_used_packages
+    packages = Set.new
+
+    app.app_files.each do |file|
+      next unless compilable_file?(file.path)
+      packages.merge(extract_dependencies_from_content(file.content))
+    end
+
+    packages.to_a
+  end
+
+  def extract_dependencies_from_content(content)
+    dependencies = Set.new
+    return dependencies unless content
+
+    # ES6 imports: import { x } from 'package'
+    content.scan(/import\s+.*?\s+from\s+['"]([^'"]+)['"]/) do |match|
+      package = normalize_package_name(match[0])
+      dependencies << package if package
+    end
+
+    # Dynamic imports: import('package')
+    content.scan(/import\s*\(\s*['"]([^'"]+)['"]\s*\)/) do |match|
+      package = normalize_package_name(match[0])
+      dependencies << package if package
+    end
+
+    # CommonJS: require('package')
+    content.scan(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/) do |match|
+      package = normalize_package_name(match[0])
+      dependencies << package if package
+    end
+
+    dependencies
+  end
+
+  def normalize_package_name(import_path)
+    return nil if import_path.start_with?('./', '../', '/')
+
+    # Handle scoped packages (@scope/package)
+    if import_path.start_with?('@')
+      parts = import_path.split('/')
+      return "#{parts[0]}/#{parts[1]}" if parts.length >= 2
+    end
+
+    # Regular package (first part before /)
+    import_path.split('/').first
+  end
+
+  def compilable_file?(path)
+    %w[.js .jsx .ts .tsx .vue .svelte .mjs].include?(File.extname(path))
+  end
+
+  def get_installed_packages(temp_dir)
+    package_json_path = File.join(temp_dir, 'package.json')
+    return [] unless File.exist?(package_json_path)
+
+    begin
+      package_data = JSON.parse(File.read(package_json_path))
+      dependencies = package_data.dig('dependencies')&.keys || []
+      dev_dependencies = package_data.dig('devDependencies')&.keys || []
+      (dependencies + dev_dependencies).uniq
+    rescue JSON::ParserError => e
+      Rails.logger.error "[DependencyAnalyzer] Failed to parse package.json: #{e.message}"
+      []
+    end
+  end
+
+  def suggest_dependencies_from_patterns
+    suggested = []
+
+    # Check for Vite config patterns that might need specific plugins
+    vite_config = app.app_files.find { |f| f.path.match?(/vite\.config\.[jt]s$/) }
+    if vite_config&.content
+      # Detect terser usage in config
+      if vite_config.content.include?('terser') || vite_config.content.include?('minify: true')
+        suggested << 'terser'
+      end
+
+      # Detect PostCSS usage
+      if vite_config.content.include?('postcss')
+        suggested << 'postcss'
+        suggested << 'autoprefixer'
+      end
+    end
+
+    # Check for CSS files that might need PostCSS processing
+    css_files = app.app_files.select { |f| f.path.end_with?('.css', '.scss', '.sass') }
+    if css_files.any? { |f| f.content&.include?('@tailwind') }
+      suggested << 'postcss'
+      suggested << 'autoprefixer'
+    end
+
+    suggested
+  end
+
+  def get_common_dependencies
+    # Dependencies commonly needed by AI-generated apps
+    [
+      'terser',           # For minification
+      'postcss',          # For CSS processing
+      'autoprefixer',     # For CSS vendor prefixes
+      '@vitejs/plugin-react-swc',  # For React apps
+      'vite'              # Core build tool
+    ]
   end
 
   def create_combined_bundle(js_content, css_content)
