@@ -287,7 +287,7 @@ module Ai
 
         # Phase 2: Build and deploy preview
         update_thinking_status("Building and deploying preview...")
-        deploy_result = deploy_preview_if_ready
+        deploy_result = deploy_app
 
         if deploy_result[:success]
           # Phase 3: Complete
