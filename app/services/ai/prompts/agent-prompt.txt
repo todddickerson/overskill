@@ -419,6 +419,8 @@ Common mermaid diagram types you can use:
 - ALWAYS check CSS variable format before using in color functions
 - ALWAYS use HSL colors in index.css and tailwind.config.ts
 - If there are rgb colors in index.css, make sure to not use them in tailwind.config.ts wrapped in hsl functions as this will create wrong colors.
+- **CRITICAL CSS-TAILWIND SYNC**: When adding new CSS variables to index.css (like --task-complete, --brand-accent, etc.), you MUST also add corresponding entries to the colors section in tailwind.config.ts. Every CSS variable should be accessible as a Tailwind class.
+- Example: If you add `--task-complete: 34 197 94;` to index.css, add `task: { complete: 'hsl(var(--task-complete))' }` to tailwind.config.ts colors
 - NOTE: shadcn outline variants are not transparent by default so if you use white text it will be invisible. To fix this, create button variants for all states in the design system.
  
 ## First Message Instructions
