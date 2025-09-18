@@ -1247,81 +1247,97 @@ class FastBuildService
       .strip                   # Remove leading/trailing whitespace
 
     # Generate HMR client for preview environments
-    generate_hmr_client_code
+    hmr_client = generate_hmr_client_code
 
     # Create complete bundle with CSS and JS
     <<~JS
-      end
+      // Vite-compiled bundle with Tailwind CSS for App #{app.id}
+      #{hmr_client}
 
-      # Legacy Vite setup (kept for reference/fallback)
-      def setup_vite_project(temp_dir, environment_vars = {})
-        # Copy template structure
-        FileUtils.cp_r("#{@template_path}/.", temp_dir)
+      // Inject compiled CSS
+      (function() {
+        const style = document.createElement('style');
+        style.innerHTML = `#{escaped_css}`;
+        document.head.appendChild(style);
+        console.log('[FastBuild] CSS injected (#{css_content.length} chars)');
+      })();
 
-        # Write all app files, overriding template files
-        write_app_files(temp_dir, environment_vars)
+      // Application JavaScript (compiled)
+      #{js_bundle}
+    JS
+  end
 
-        # No longer forcing IIFE - let Vite build with ES modules and chunks
-        # This follows the lovable template approach
+  private
 
-        # Ensure package.json exists with proper dependencies
-        package_json_path = File.join(temp_dir, 'package.json')
-        if File.exist?(package_json_path)
-          Rails.logger.info "[FastBuild] Using existing package.json from template"
-        else
-          File.write(package_json_path, generate_minimal_package_json)
-        end
+  # Legacy Vite setup (kept for reference/fallback)
+  def setup_vite_project(temp_dir, environment_vars = {})
+    # Copy template structure
+    FileUtils.cp_r("#{@template_path}/.", temp_dir)
 
-        # Ensure vite.config.ts exists
-        vite_config_path = File.join(temp_dir, 'vite.config.ts')
-        unless File.exist?(vite_config_path)
-          File.write(vite_config_path, generate_vite_config)
-        end
+    # Write all app files, overriding template files
+    write_app_files(temp_dir, environment_vars)
 
-        # Install dependencies quickly (using existing node_modules if available)
-        if File.exist?(File.join(@template_path, 'node_modules'))
-          Rails.logger.info "[FastBuild] Copying node_modules from template"
-          # Use dereference_root option to handle symlinks properly
-          FileUtils.cp_r(File.join(@template_path, 'node_modules'), temp_dir, remove_destination: true)
-        else
-          Rails.logger.info "[FastBuild] Installing dependencies"
-          system("cd #{temp_dir} && npm ci --silent")
-        end
-      end
+    # No longer forcing IIFE - let Vite build with ES modules and chunks
+    # This follows the lovable template approach
 
-      def create_transform_project(temp_dir, file_path, content)
-        # Create minimal project for single file transformation
-        File.write(File.join(temp_dir, 'package.json'), generate_minimal_package_json)
-        File.write(File.join(temp_dir, 'vite.config.ts'), generate_vite_config)
-        File.write(File.join(temp_dir, File.basename(file_path)), content)
-      end
+    # Ensure package.json exists with proper dependencies
+    package_json_path = File.join(temp_dir, 'package.json')
+    if File.exist?(package_json_path)
+      Rails.logger.info "[FastBuild] Using existing package.json from template"
+    else
+      File.write(package_json_path, generate_minimal_package_json)
+    end
 
-      def generate_transform_script(file_path)
-        # Node.js script that uses Vite's transform API
-        <<~JS
-          import { createServer } from 'vite';
-          import fs from 'fs';
+    # Ensure vite.config.ts exists
+    vite_config_path = File.join(temp_dir, 'vite.config.ts')
+    unless File.exist?(vite_config_path)
+      File.write(vite_config_path, generate_vite_config)
+    end
 
-          async function transform() {
-            const server = await createServer({
-              configFile: './vite.config.ts',
-              logLevel: 'error'
-            });
+    # Install dependencies quickly (using existing node_modules if available)
+    if File.exist?(File.join(@template_path, 'node_modules'))
+      Rails.logger.info "[FastBuild] Copying node_modules from template"
+      # Use dereference_root option to handle symlinks properly
+      FileUtils.cp_r(File.join(@template_path, 'node_modules'), temp_dir, remove_destination: true)
+    else
+      Rails.logger.info "[FastBuild] Installing dependencies"
+      system("cd #{temp_dir} && npm ci --silent")
+    end
+  end
 
-            try {
-              const content = fs.readFileSync('#{File.basename(file_path)}', 'utf-8');
-              const result = await server.transformRequest('#{file_path}');
-              
-              console.log(JSON.stringify({
-                code: result.code,
-                map: result.map
-              }));
-            } finally {
-              await server.close();
-            }
-          }
+  def create_transform_project(temp_dir, file_path, content)
+    # Create minimal project for single file transformation
+    File.write(File.join(temp_dir, 'package.json'), generate_minimal_package_json)
+    File.write(File.join(temp_dir, 'vite.config.ts'), generate_vite_config)
+    File.write(File.join(temp_dir, File.basename(file_path)), content)
+  end
 
-          transform().catch(console.error);
+  def generate_transform_script(file_path)
+    # Node.js script that uses Vite's transform API
+    <<~JS
+      import { createServer } from 'vite';
+      import fs from 'fs';
+
+      async function transform() {
+        const server = await createServer({
+          configFile: './vite.config.ts',
+          logLevel: 'error'
+        });
+
+        try {
+          const content = fs.readFileSync('#{File.basename(file_path)}', 'utf-8');
+          const result = await server.transformRequest('#{file_path}');
+
+          console.log(JSON.stringify({
+            code: result.code,
+            map: result.map
+          }));
+        } finally {
+          await server.close();
+        }
+      }
+
+      transform().catch(console.error);
     JS
   end
 
