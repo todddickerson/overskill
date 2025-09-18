@@ -85,13 +85,12 @@ class AppTest < ActiveSupport::TestCase
 
   test "should support end-to-end app generation golden flow" do
     # Test the complete app generation lifecycle
-    app = create(:app, 
+    app = create(:app,
       name: "Test Todo App",
-      prompt: "Create a simple todo app with add, edit, delete functionality", 
+      prompt: "Create a simple todo app with add, edit, delete functionality",
       status: "pending",
-      team: @team, 
-      creator: @membership
-    )
+      team: @team,
+      creator: @membership)
 
     assert_equal "pending", app.status
     assert_not app.generated?
@@ -102,9 +101,9 @@ class AppTest < ActiveSupport::TestCase
 
     # Create files as AI would (matches golden flow expectations)
     app.app_files.create!([
-      { path: "index.html", content: "<h1>Todo App</h1>", team: @team },
-      { path: "app.js", content: "console.log('todo app');", team: @team },
-      { path: "style.css", content: "body { font-family: Arial; }", team: @team }
+      {path: "index.html", content: "<h1>Todo App</h1>", team: @team},
+      {path: "app.js", content: "console.log('todo app');", team: @team},
+      {path: "style.css", content: "body { font-family: Arial; }", team: @team}
     ])
 
     # Complete generation
@@ -121,17 +120,16 @@ class AppTest < ActiveSupport::TestCase
 
   test "should support end-to-end publishing golden flow" do
     # Create generated app ready for publishing
-    app = create(:app, 
+    app = create(:app,
       status: "generated",
-      team: @team, 
-      creator: @membership
-    )
+      team: @team,
+      creator: @membership)
 
     # Add generated files
     app.app_files.create!([
-      { path: "index.html", content: "<h1>Test App</h1>", team: @team },
-      { path: "app.js", content: "console.log('test');", team: @team },
-      { path: "style.css", content: "body { margin: 0; }", team: @team }
+      {path: "index.html", content: "<h1>Test App</h1>", team: @team},
+      {path: "app.js", content: "console.log('test');", team: @team},
+      {path: "style.css", content: "body { margin: 0; }", team: @team}
     ])
 
     assert app.generated?
@@ -155,19 +153,19 @@ class AppTest < ActiveSupport::TestCase
 
     # Simulate app creation timing
     app = create(:app, team: @team, creator: @membership)
-    
+
     creation_duration = Time.current - start_time
-    
+
     # Golden flow baseline: app creation should be fast
     assert creation_duration < 1.0, "App creation took #{creation_duration}s, should be < 1.0s"
 
     # Simulate file creation timing (AI generation simulation)
     file_creation_start = Time.current
-    
+
     app.app_files.create!([
-      { path: "index.html", content: "<h1>Test</h1>" * 100, team: @team },
-      { path: "app.js", content: "console.log('test');" * 50, team: @team },
-      { path: "style.css", content: "body { margin: 0; }" * 20, team: @team }
+      {path: "index.html", content: "<h1>Test</h1>" * 100, team: @team},
+      {path: "app.js", content: "console.log('test');" * 50, team: @team},
+      {path: "style.css", content: "body { margin: 0; }" * 20, team: @team}
     ])
 
     file_creation_duration = Time.current - file_creation_start
@@ -185,7 +183,7 @@ class AppTest < ActiveSupport::TestCase
     assert_equal @membership.user, app.creator.user
 
     # Verify user can access their apps (auth golden flow requirement)
-    user_apps = App.joins(:creator).where(memberships: { user: @membership.user })
+    user_apps = App.joins(:creator).where(memberships: {user: @membership.user})
     assert_includes user_apps, app
   end
 
@@ -194,16 +192,16 @@ class AppTest < ActiveSupport::TestCase
 
     # Test valid status transitions used in golden flows
     valid_transitions = %w[pending generating generated published failed]
-    
+
     valid_transitions.each do |status|
       app.update!(status: status)
       assert_equal status, app.status
-      
+
       # Test status query methods
       case status
       when "generating"
         assert app.generating?
-      when "generated"  
+      when "generated"
         assert app.generated?
       when "published"
         assert app.published?
@@ -213,12 +211,11 @@ class AppTest < ActiveSupport::TestCase
 
   test "should validate required attributes for golden flow creation" do
     # Test minimum required data for golden flow app creation
-    app = build(:app, 
+    app = build(:app,
       name: nil,
-      prompt: nil, 
+      prompt: nil,
       team: @team,
-      creator: @membership
-    )
+      creator: @membership)
 
     assert_not app.valid?
     assert_includes app.errors[:name], "can't be blank"

@@ -1,11 +1,11 @@
 class AppGenerationJob < ApplicationJob
   include ActiveJob::Uniqueness
-  
+
   queue_as :ai_generation
 
   # Prevent duplicate app generations for the same app
   unique :until_executed, lock_ttl: 1.hour, on_conflict: :log
-  
+
   # Define uniqueness based on app_generation id or app id
   def lock_key
     arg = arguments.first
@@ -34,7 +34,7 @@ class AppGenerationJob < ApplicationJob
         return
       end
     end
-    
+
     Rails.logger.info "[AppGenerationJob] Processing generation ##{app_generation.id}"
 
     app = app_generation.app
@@ -48,14 +48,14 @@ class AppGenerationJob < ApplicationJob
     # FIXED: Use ProcessAppUpdateJobV5 - the current active pipeline
     # V3 Orchestrator was removed as it doesn't exist
     # Pipeline: AppGenerationJob → ProcessAppUpdateJobV5 → AppBuilderV5
-    
+
     # Create a chat message to trigger the generation
     message = app.app_chat_messages.create!(
       role: "user",
       content: app_generation.prompt || app.prompt || "Generate the app based on the requirements",
       message_type: "generation_request"
     )
-    
+
     # Create assistant placeholder for V5 builder to update
     assistant_message = app.app_chat_messages.create!(
       role: "assistant",
@@ -65,24 +65,24 @@ class AppGenerationJob < ApplicationJob
       iteration_count: 0,
       thinking_status: "Initializing app generation..."
     )
-    
+
     # Process synchronously to maintain job flow and error handling
     # ProcessAppUpdateJobV5 delegates directly to AppBuilderV5
     begin
       job = ProcessAppUpdateJobV5.new
       job.perform(assistant_message)
-      result = { success: true }
+      result = {success: true}
     rescue => e
       Rails.logger.error "[AppGenerationJob] Failed to process: #{e.message}"
-      result = { success: false, error: e.message }
+      result = {success: false, error: e.message}
     end
 
     if result[:success]
       Rails.logger.info "[AppGenerationJob] Successfully generated app ##{app.id}"
-      
+
       # Automatically create database tables
       setup_database_tables(app)
-      
+
       # Create auth settings if not present
       create_auth_settings(app)
 
@@ -91,10 +91,10 @@ class AppGenerationJob < ApplicationJob
 
       # Queue app naming job (runs before logo generation)
       AppNamingJob.perform_later(app.id)
-      
+
       # Queue logo generation job
       GenerateAppLogoJob.perform_later(app.id)
-      
+
       # Queue deployment job if enabled
       if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
         DeployAppJob.perform_later(app.id)
@@ -120,59 +120,59 @@ class AppGenerationJob < ApplicationJob
   end
 
   private
-  
+
   def create_auth_settings(app)
     return if app.app_auth_setting.present?
-    
+
     # Determine if app needs authentication based on its type/prompt
     needs_auth = app_needs_authentication?(app)
-    
+
     visibility = if needs_auth
-      'public_login_required'  # Default: anyone can sign up but must login
+      "public_login_required"  # Default: anyone can sign up but must login
     else
-      'public_no_login'  # No auth needed
+      "public_no_login"  # No auth needed
     end
-    
+
     app.create_app_auth_setting!(
       visibility: visibility,
-      allowed_providers: ['email', 'google', 'github'],
+      allowed_providers: ["email", "google", "github"],
       allowed_email_domains: [],
       require_email_verification: false,  # NOTE: Supabase email verification is PROJECT-LEVEL, not app-level
       allow_signups: true,
       allow_anonymous: false
     )
-    
+
     Rails.logger.info "[AppGenerationJob] Created auth settings for app ##{app.id} with visibility: #{visibility}"
   rescue => e
     Rails.logger.error "[AppGenerationJob] Failed to create auth settings: #{e.message}"
   end
-  
+
   def app_needs_authentication?(app)
     # Check if app prompt mentions users, authentication, accounts, or personal data
-    keywords = ['user', 'login', 'auth', 'account', 'personal', 'private', 'todo', 'note', 'diary', 'dashboard']
+    keywords = ["user", "login", "auth", "account", "personal", "private", "todo", "note", "diary", "dashboard"]
     prompt_text = "#{app.prompt} #{app.name}".downcase
-    
+
     keywords.any? { |keyword| prompt_text.include?(keyword) }
   end
-  
+
   def setup_database_tables(app)
     Rails.logger.info "[AppGenerationJob] Setting up database tables for app #{app.id}"
-    
+
     begin
       # Use the automatic table creation service
       table_service = Supabase::AutoTableService.new(app)
       result = table_service.ensure_tables_exist!
-      
+
       if result[:success]
-        Rails.logger.info "[AppGenerationJob] Created tables: #{result[:tables].join(', ')}"
-        
+        Rails.logger.info "[AppGenerationJob] Created tables: #{result[:tables].join(", ")}"
+
         # Broadcast table creation success
         ActionCable.server.broadcast(
           "app_#{app.id}_generation",
           {
-            type: 'database_ready',
+            type: "database_ready",
             tables: result[:tables],
-            message: 'Database tables created automatically'
+            message: "Database tables created automatically"
           }
         )
       else
@@ -201,7 +201,7 @@ class AppGenerationJob < ApplicationJob
       partial: "account/apps/status_badge",
       locals: {app: app}
     )
-    
+
     # If generation is complete, redirect to editor
     if status == "generated"
       Turbo::StreamsChannel.broadcast_append_to(

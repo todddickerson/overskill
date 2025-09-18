@@ -3,44 +3,44 @@ module Deployment
   # Keeps infrastructure lean - just Cloudflare + Supabase
   class CloudflareSecretService
     include HTTParty
-    base_uri 'https://api.cloudflare.com/client/v4'
-    
+    base_uri "https://api.cloudflare.com/client/v4"
+
     def initialize(app)
       @app = app
-      @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
-      @api_token = ENV['CLOUDFLARE_API_TOKEN']
-      
-      self.class.headers 'Authorization' => "Bearer #{@api_token}" if @api_token
+      @account_id = ENV["CLOUDFLARE_ACCOUNT_ID"]
+      @api_token = ENV["CLOUDFLARE_API_TOKEN"]
+
+      self.class.headers "Authorization" => "Bearer #{@api_token}" if @api_token
     end
-    
+
     # Deploy app with proper secret management
     def deploy_with_secrets!
       worker_name = "app-#{@app.id}"
-      
+
       # Step 1: Generate wrangler.toml with public vars only
-      wrangler_config = generate_wrangler_config
-      
+      generate_wrangler_config
+
       # Step 2: Upload worker script
       worker_script = generate_lean_worker_script
       upload_worker(worker_name, worker_script)
-      
+
       # Step 3: Set secrets via API (not in code)
       set_worker_secrets(worker_name)
-      
+
       # Step 4: Configure routes
       configure_routes(worker_name)
-      
-      { 
-        success: true, 
+
+      {
+        success: true,
         url: "https://#{@app.subdomain}.overskill.app",
         message: "Deployed with secure secrets"
       }
     rescue => e
-      { success: false, error: e.message }
+      {success: false, error: e.message}
     end
-    
+
     private
-    
+
     def generate_wrangler_config
       # Only public vars go in wrangler.toml
       # Secrets are set separately via API
@@ -71,7 +71,7 @@ module Deployment
         id = "#{kv_namespace_id}"
       TOML
     end
-    
+
     def generate_lean_worker_script
       <<~JAVASCRIPT
         // Lean Cloudflare Worker - No external dependencies
@@ -244,7 +244,7 @@ module Deployment
         }
         
         function getCacheControl(path) {
-          if (path.includes('.') && path.match(/\.[a-f0-9]{8}\./)) {
+          if (path.includes('.') && path.match(/.[a-f0-9]{8}./)) {
             return 'public, max-age=31536000, immutable';
           }
           if (path.endsWith('.html')) {
@@ -262,93 +262,93 @@ module Deployment
         }
       JAVASCRIPT
     end
-    
+
     def set_worker_secrets(worker_name)
       # Set secrets via Cloudflare API (not exposed in code)
       secrets = {
-        'SUPABASE_SERVICE_KEY' => supabase_service_key_for_app,
-        'GOOGLE_CLIENT_SECRET' => ENV['GOOGLE_CLIENT_SECRET'],
-        'STRIPE_SECRET_KEY' => ENV['STRIPE_SECRET_KEY'],
-        'OPENAI_API_KEY' => ENV['OPENAI_API_KEY']
+        "SUPABASE_SERVICE_KEY" => supabase_service_key_for_app,
+        "GOOGLE_CLIENT_SECRET" => ENV["GOOGLE_CLIENT_SECRET"],
+        "STRIPE_SECRET_KEY" => ENV["STRIPE_SECRET_KEY"],
+        "OPENAI_API_KEY" => ENV["OPENAI_API_KEY"]
       }
-      
+
       secrets.each do |key, value|
         next unless value.present?
-        
+
         # Use Cloudflare API to set secret
-        response = self.class.put(
+        self.class.put(
           "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
-          body: { 
+          body: {
             name: key,
             text: value,
-            type: 'secret_text'
+            type: "secret_text"
           }.to_json,
-          headers: { 'Content-Type' => 'application/json' }
+          headers: {"Content-Type" => "application/json"}
         )
-        
+
         Rails.logger.info "Set secret #{key} for worker #{worker_name}"
       end
     end
-    
+
     def upload_worker(worker_name, script)
       # Upload worker script
       response = self.class.put(
         "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
-        headers: { 'Content-Type' => 'application/javascript' },
+        headers: {"Content-Type" => "application/javascript"},
         body: script
       )
-      
+
       raise "Failed to upload worker" unless response.success?
     end
-    
+
     def configure_routes(worker_name)
       # Set up custom domain routing
       subdomain = @app.subdomain
       route_pattern = "#{subdomain}.overskill.app/*"
-      
+
       self.class.post(
-        "/zones/#{ENV['CLOUDFLARE_ZONE_ID']}/workers/routes",
+        "/zones/#{ENV["CLOUDFLARE_ZONE_ID"]}/workers/routes",
         body: {
           pattern: route_pattern,
           script: worker_name
         }.to_json,
-        headers: { 'Content-Type' => 'application/json' }
+        headers: {"Content-Type" => "application/json"}
       )
     end
-    
+
     def supabase_url_for_app
       # Get the Supabase URL for this app's shard
       shard = @app.database_shard || DatabaseShard.current_shard
       shard.supabase_url
     end
-    
+
     def supabase_anon_key_for_app
       # Public anon key (safe to expose, RLS protects data)
       shard = @app.database_shard || DatabaseShard.current_shard
       shard.supabase_anon_key
     end
-    
+
     def supabase_service_key_for_app
       # Service key (NEVER expose to client)
       shard = @app.database_shard || DatabaseShard.current_shard
       shard.supabase_service_key
     end
-    
+
     def kv_namespace_id
       # Get or create KV namespace for this app
-      ENV['CLOUDFLARE_KV_NAMESPACE_ID'] || create_kv_namespace
+      ENV["CLOUDFLARE_KV_NAMESPACE_ID"] || create_kv_namespace
     end
-    
+
     def create_kv_namespace
       response = self.class.post(
         "/accounts/#{@account_id}/storage/kv/namespaces",
-        body: { title: "overskill-sessions" }.to_json,
-        headers: { 'Content-Type' => 'application/json' }
+        body: {title: "overskill-sessions"}.to_json,
+        headers: {"Content-Type" => "application/json"}
       )
-      
-      response.parsed_response['result']['id']
+
+      response.parsed_response["result"]["id"]
     end
-    
+
     def embedded_files_json
       # Embed app files for fast preview
       files = {}

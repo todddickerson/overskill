@@ -1,7 +1,7 @@
 #!/usr/bin/env rails runner
 
 # End-to-end test for V4 Enhanced with all fixes applied
-require 'timeout'
+require "timeout"
 
 puts "=" * 60
 puts "V4 Enhanced End-to-End Test"
@@ -22,12 +22,12 @@ puts "Using team: #{team.name}"
 
 # Create a test app
 app = App.create!(
-  name: "V4 Enhanced E2E Test #{Time.current.strftime('%H%M%S')}",
+  name: "V4 Enhanced E2E Test #{Time.current.strftime("%H%M%S")}",
   team: team,
   creator: membership,
   prompt: "Create a modern counter app with increment and decrement buttons",
-  status: 'generating',
-  app_type: 'tool'
+  status: "generating",
+  app_type: "tool"
 )
 
 puts "\n✅ Created app: #{app.name} (ID: #{app.id})"
@@ -36,8 +36,8 @@ puts "\n✅ Created app: #{app.name} (ID: #{app.id})"
 user_message = AppChatMessage.create!(
   app: app,
   user: user,
-  role: 'user',
-  content: 'Create a modern counter app with increment and decrement buttons. Use React with TypeScript.'
+  role: "user",
+  content: "Create a modern counter app with increment and decrement buttons. Use React with TypeScript."
 )
 
 puts "✅ Created user message: #{user_message.id}"
@@ -49,26 +49,26 @@ puts "=" * 40
 
 begin
   # Load the orchestrator
-  require_relative 'app/services/ai/app_builder_v4_enhanced'
-  
+  require_relative "app/services/ai/app_builder_v4_enhanced"
+
   # Initialize orchestrator with the chat message
   orchestrator = Ai::AppBuilderV4Enhanced.new(user_message)
-  
+
   puts "\n📋 Starting 6-phase generation process..."
-  
+
   # Track start time
-  start_time = Time.current
-  
+  Time.current
+
   # Execute with timeout
-  Timeout::timeout(120) do
+  Timeout.timeout(120) do
     result = orchestrator.execute!
-    
+
     if result[:success]
       puts "\n✅ V4 Enhanced Orchestrator completed successfully!"
       puts "   Files generated: #{result[:files_generated]}"
       puts "   Build time: #{result[:build_time]}s"
       puts "   Token usage: #{result[:token_usage]}"
-      
+
       # Check if app was deployed
       if result[:deployed]
         puts "\n🚀 App deployed successfully!"
@@ -82,7 +82,6 @@ begin
       puts "   Error details: #{result[:error_details]}"
     end
   end
-  
 rescue Timeout::Error
   puts "\n⚠️  Orchestrator timed out after 120 seconds"
   puts "This might indicate an issue with AI response times"
@@ -103,9 +102,9 @@ if app.app_files.any?
     size = file.content.bytesize
     puts "   • #{file.path} (#{size} bytes)"
   end
-  
+
   # Check for key files
-  key_files = ['index.html', 'src/App.tsx', 'package.json', 'vite.config.ts']
+  key_files = ["index.html", "src/App.tsx", "package.json", "vite.config.ts"]
   key_files.each do |path|
     if app.app_files.exists?(path: path)
       puts "   ✅ #{path} exists"
@@ -124,11 +123,11 @@ puts "=" * 40
 
 if app.app_versions.any?
   latest_version = app.app_versions.order(created_at: :desc).first
-  puts "\n📦 Latest version: #{latest_version.version_number || 'v1'}"
+  puts "\n📦 Latest version: #{latest_version.version_number || "v1"}"
   puts "   Status: #{latest_version.status}"
   puts "   Files changed: #{latest_version.app_version_files.count}"
   puts "   Created: #{latest_version.created_at}"
-  
+
   if latest_version.deployed
     puts "   ✅ Deployed successfully"
   else
@@ -143,12 +142,12 @@ puts "\n" + "=" * 40
 puts "Checking Chat Messages..."
 puts "=" * 40
 
-assistant_messages = app.app_chat_messages.where(role: 'assistant').order(:created_at)
+assistant_messages = app.app_chat_messages.where(role: "assistant").order(:created_at)
 if assistant_messages.any?
   puts "\n💬 Found #{assistant_messages.count} assistant messages:"
   assistant_messages.each_with_index do |msg, i|
     preview = msg.content.lines.first(2).join.strip[0..100]
-    puts "   #{i+1}. #{preview}..."
+    puts "   #{i + 1}. #{preview}..."
   end
 else
   puts "⚠️  No assistant messages found"
@@ -216,5 +215,5 @@ else
 end
 
 puts "\n" + "=" * 60
-puts "Test completed at #{Time.current.strftime('%H:%M:%S')}"
+puts "Test completed at #{Time.current.strftime("%H:%M:%S")}"
 puts "=" * 60

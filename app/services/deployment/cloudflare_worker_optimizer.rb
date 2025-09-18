@@ -38,7 +38,7 @@ module Deployment
 
       # Phase 4: Generate optimized worker script
       worker_script = generate_optimized_worker_script(
-        optimization_result[:worker_assets], 
+        optimization_result[:worker_assets],
         optimization_result[:r2_assets]
       )
 
@@ -71,12 +71,12 @@ module Deployment
 
         if critical_asset?(path)
           analysis[:critical_size] += size
-          
+
           if size > CRITICAL_ASSET_MAX_SIZE
             analysis[:oversized_assets] << {
               path: path,
               size: size,
-              type: 'critical_oversized'
+              type: "critical_oversized"
             }
           end
         else
@@ -86,14 +86,14 @@ module Deployment
 
       # Generate recommendations
       if analysis[:total_size] > SAFE_WORKER_SIZE_LIMIT
-        analysis[:recommendations] << 'Requires hybrid asset strategy (R2 offloading)'
+        analysis[:recommendations] << "Requires hybrid asset strategy (R2 offloading)"
       end
 
       if analysis[:critical_size] > SAFE_WORKER_SIZE_LIMIT
-        analysis[:recommendations] << 'Critical assets too large - requires code splitting'
+        analysis[:recommendations] << "Critical assets too large - requires code splitting"
       end
 
-      analysis[:recommendations] << 'Consider asset compression' if analysis[:total_size] > 500.kilobytes
+      analysis[:recommendations] << "Consider asset compression" if analysis[:total_size] > 500.kilobytes
 
       analysis
     end
@@ -103,11 +103,11 @@ module Deployment
       utilization = (current_size.to_f / WORKER_SIZE_LIMIT * 100).round(1)
 
       status = case utilization
-               when 0..60 then 'healthy'
-               when 61..80 then 'warning'
-               when 81..95 then 'critical'
-               else 'violation'
-               end
+      when 0..60 then "healthy"
+      when 61..80 then "warning"
+      when 81..95 then "critical"
+      else "violation"
+      end
 
       {
         current_size: current_size,
@@ -170,7 +170,7 @@ module Deployment
           content: content,
           size: content.bytesize,
           cdn_url: generate_cdn_url(path),
-          priority: 'high' # Critical assets get high priority CDN
+          priority: "high" # Critical assets get high priority CDN
         }
       end
 
@@ -180,7 +180,7 @@ module Deployment
           content: content,
           size: content.bytesize,
           cdn_url: generate_cdn_url(path),
-          priority: 'normal'
+          priority: "normal"
         }
       end
 
@@ -197,7 +197,7 @@ module Deployment
 
     def critical_asset?(path)
       case path.downcase
-      when 'index.html' then true
+      when "index.html" then true
       when /^main\.(js|css)$/ then true
       when /^app\.(js|css)$/ then true
       when /critical/ then true
@@ -209,8 +209,8 @@ module Deployment
     def inline_script?(path)
       # Scripts that must be inline in worker for functionality
       case path.downcase
-      when 'worker-bootstrap.js' then true
-      when 'api-router.js' then true
+      when "worker-bootstrap.js" then true
+      when "api-router.js" then true
       when /service-worker/ then true
       else false
       end
@@ -219,7 +219,7 @@ module Deployment
     def generate_optimized_worker_script(worker_assets, r2_assets)
       # Create CDN mapping for R2 assets
       cdn_map = r2_assets.transform_values { |asset| asset[:cdn_url] }
-      
+
       script = <<~JAVASCRIPT
         // Optimized Cloudflare Worker for App ##{@app.id}
         // Generated: #{Time.current.iso8601}
@@ -267,14 +267,14 @@ module Deployment
       handlers = worker_assets.map do |path, content|
         content_type = determine_content_type(path)
         compressed_content = compress_if_beneficial(content, content_type)
-        
+
         <<~JAVASCRIPT
           if (path === '#{path}') {
             return new Response(#{compressed_content.to_json}, {
               headers: {
                 'Content-Type': '#{content_type}',
                 'Cache-Control': 'public, max-age=86400',
-                'Content-Encoding': '#{compressed_content == content ? 'identity' : 'gzip'}'
+                'Content-Encoding': '#{(compressed_content == content) ? "identity" : "gzip"}'
               }
             });
           }
@@ -312,7 +312,7 @@ module Deployment
         }
 
         async function serveSpaWithPreloads(request, env) {
-          let html = #{worker_assets['index.html']&.to_json || '"<html><body>Loading...</body></html>"'};
+          let html = #{worker_assets["index.html"]&.to_json || '"<html><body>Loading...</body></html>"'};
           
           // Inject preload hints for high-priority R2 assets
           const preloadHints = HIGH_PRIORITY_ASSETS
@@ -363,7 +363,7 @@ module Deployment
 
     def filter_high_priority_assets(r2_assets)
       r2_assets
-        .select { |_path, asset| asset[:priority] == 'high' }
+        .select { |_path, asset| asset[:priority] == "high" }
         .values
         .map { |asset| asset[:cdn_url] }
     end
@@ -374,8 +374,8 @@ module Deployment
       return content if content.bytesize < 1.kilobyte
 
       # Simulate gzip compression (in real implementation, use actual compression)
-      compressed = content.gsub(/\s+/, ' ').strip
-      compressed.bytesize < content.bytesize * 0.8 ? compressed : content
+      compressed = content.gsub(/\s+/, " ").strip
+      (compressed.bytesize < content.bytesize * 0.8) ? compressed : content
     end
 
     def text_content_type?(content_type)
@@ -384,29 +384,27 @@ module Deployment
 
     def optimize_script_size(script)
       # Apply final script optimizations
-      optimized = script
-        .gsub(/\/\/.*$/, '') # Remove comments
+      script
+        .gsub(/\/\/.*$/, "") # Remove comments
         .gsub(/\n\s*\n/, "\n") # Remove empty lines
-        .gsub(/\s+/, ' ') # Normalize whitespace
+        .gsub(/\s+/, " ") # Normalize whitespace
         .strip
-
-      optimized
     end
 
     def determine_content_type(path)
       case File.extname(path).downcase
-      when '.js' then 'application/javascript'
-      when '.css' then 'text/css'
-      when '.html' then 'text/html'
-      when '.json' then 'application/json'
-      when '.woff2' then 'font/woff2'
-      when '.woff' then 'font/woff'
-      else 'text/plain'
+      when ".js" then "application/javascript"
+      when ".css" then "text/css"
+      when ".html" then "text/html"
+      when ".json" then "application/json"
+      when ".woff2" then "font/woff2"
+      when ".woff" then "font/woff"
+      else "text/plain"
       end
     end
 
     def generate_cdn_url(path)
-      "https://cdn.overskill.app/apps/#{@app.id}/#{path.gsub(/^\//, '')}"
+      "https://cdn.overskill.app/apps/#{@app.id}/#{path.gsub(/^\//, "")}"
     end
 
     def calculate_total_size(assets)
@@ -417,9 +415,9 @@ module Deployment
 
     def validate_worker_size!(worker_assets)
       total_size = calculate_total_size(worker_assets)
-      
+
       if total_size > WORKER_SIZE_LIMIT
-        raise SizeViolationError, 
+        raise SizeViolationError,
           "Worker size #{format_bytes(total_size)} exceeds Cloudflare limit of #{format_bytes(WORKER_SIZE_LIMIT)}"
       end
 
@@ -431,7 +429,7 @@ module Deployment
 
     def generate_optimization_recommendations
       recommendations = []
-      
+
       worker_size = @optimization_stats[:optimized_size]
       r2_count = @optimization_stats[:r2_assets].size
 
@@ -460,7 +458,7 @@ module Deployment
       Rails.logger.info "[CloudflareWorkerOptimizer] Optimization complete for app ##{@app.id}: " \
         "worker_size=#{format_bytes(worker_size)} (#{utilization}%), " \
         "r2_assets=#{r2_assets}, " \
-        "status=#{result[:optimization_stats][:status] || 'optimized'}"
+        "status=#{result[:optimization_stats][:status] || "optimized"}"
 
       # Log detailed stats in development
       if Rails.env.development?

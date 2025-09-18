@@ -9,6 +9,7 @@ module Deployment
     MAX_WORKER_SIZE = 900.kilobytes # Buffer under 1MB Cloudflare limit
 
     class BuildError < StandardError; end
+
     class WorkerSizeExceededError < BuildError; end
 
     def initialize(app)
@@ -19,10 +20,10 @@ module Deployment
 
     def build_for_development!
       Rails.logger.info "[ViteBuilderService] Starting fast development build for app ##{@app.id}"
-      
+
       builder = FastDevelopmentBuilder.new(@app, @app_version)
       result = builder.execute!
-      
+
       Rails.logger.info "[ViteBuilderService] Development build completed in #{result[:build_time]}s"
       result
     rescue => e
@@ -32,10 +33,10 @@ module Deployment
 
     def build_for_production!
       Rails.logger.info "[ViteBuilderService] Starting optimized production build for app ##{@app.id}"
-      
+
       builder = ProductionOptimizedBuilder.new(@app, @app_version)
       result = builder.execute!
-      
+
       Rails.logger.info "[ViteBuilderService] Production build completed in #{result[:build_time]}s"
       result
     rescue => e
@@ -62,8 +63,8 @@ module Deployment
       if worker_script_size > MAX_WORKER_SIZE
         size_mb = (worker_script_size / 1.megabyte.to_f).round(2)
         max_mb = (MAX_WORKER_SIZE / 1.megabyte.to_f).round(2)
-        
-        raise WorkerSizeExceededError, 
+
+        raise WorkerSizeExceededError,
           "Worker script size #{size_mb}MB exceeds limit of #{max_mb}MB. " \
           "Consider using hybrid asset strategy (R2 offloading)."
       end
@@ -94,7 +95,7 @@ module Deployment
       worker_package = package_for_worker(build_result, optimize: false)
 
       build_time = (Time.current - @start_time).round(1)
-      
+
       {
         success: true,
         mode: :development,
@@ -152,10 +153,10 @@ module Deployment
 
     def execute_vite_build(build_env, source_files, development: true)
       Rails.logger.info "[FastDevelopmentBuilder] Executing Vite build via Node.js executor (development mode)"
-      
+
       # Use NodejsBuildExecutor for actual build execution
       executor = Deployment::NodejsBuildExecutor.new(@app)
-      
+
       build_result = if development
         executor.execute_fast_build(prepare_source_files_for_executor(source_files))
       else
@@ -163,15 +164,15 @@ module Deployment
       end
 
       {
-        success: build_result['success'],
-        assets: build_result['artifacts']['files'],
-        bundle_size: build_result['artifacts']['total_size'],
-        build_time: build_result['build_time'],
-        stats: build_result['stats']
+        success: build_result["success"],
+        assets: build_result["artifacts"]["files"],
+        bundle_size: build_result["artifacts"]["total_size"],
+        build_time: build_result["build_time"],
+        stats: build_result["stats"]
       }
     rescue Deployment::NodejsBuildExecutor::BuildExecutionError => e
       Rails.logger.error "[FastDevelopmentBuilder] Build execution failed: #{e.message}"
-      
+
       # Fallback to simulated build for development
       Rails.logger.warn "[FastDevelopmentBuilder] Falling back to simulated build"
       {
@@ -197,10 +198,10 @@ module Deployment
 
     def generate_worker_script(assets, optimize)
       # Generate the Cloudflare Worker script with embedded assets
-      template = <<~JAVASCRIPT
+      <<~JAVASCRIPT
         // Cloudflare Worker for App ID: #{@app.id}
         // Generated at: #{Time.current.iso8601}
-        // Build mode: #{optimize ? 'production' : 'development'}
+        // Build mode: #{optimize ? "production" : "development"}
 
         export default {
           async fetch(request, env, ctx) {
@@ -221,8 +222,6 @@ module Deployment
 
         #{generate_helper_functions(assets, optimize)}
       JAVASCRIPT
-
-      template
     end
 
     def generate_asset_handlers(assets)
@@ -252,7 +251,7 @@ module Deployment
         }
 
         async function serveSpaApp(request, env) {
-          const htmlContent = #{assets['index.html']&.to_json || '"<html><body>Loading...</body></html>"'};
+          const htmlContent = #{assets["index.html"]&.to_json || '"<html><body>Loading...</body></html>"'};
           return new Response(htmlContent, {
             headers: { 'Content-Type': 'text/html' }
           });
@@ -270,28 +269,28 @@ module Deployment
 
     def simulate_built_assets(source_files, optimized:)
       assets = {}
-      
+
       source_files.each do |path, file_data|
         content = file_data.is_a?(Hash) ? file_data[:content] : file_data
-        
+
         case File.extname(path)
-        when '.tsx', '.ts', '.jsx', '.js'
+        when ".tsx", ".ts", ".jsx", ".js"
           # Simulate TypeScript compilation
           compiled = simulate_typescript_compilation(content, optimized)
-          js_path = path.gsub(/\.tsx?$/, '.js')
+          js_path = path.gsub(/\.tsx?$/, ".js")
           assets[js_path] = compiled
-        when '.html'
+        when ".html"
           # Process HTML template variables
           processed = process_html_template(content)
           assets[path] = processed
-        when '.css', '.json'
+        when ".css", ".json"
           assets[path] = content
         end
       end
 
       # Add main entry points
-      assets['index.html'] ||= generate_default_html
-      assets['main.js'] ||= generate_default_main_js
+      assets["index.html"] ||= generate_default_html
+      assets["main.js"] ||= generate_default_main_js
 
       assets
     end
@@ -302,15 +301,15 @@ module Deployment
         .gsub(/import\s+.*?\s+from\s+['"](.+?)['"];?/, "const \\1 = require('\\1');")
         .gsub(/export\s+default\s+/, "module.exports = ")
         .gsub(/export\s+/, "")
-      
-      optimized ? compiled.gsub(/\s+/, ' ').strip : compiled
+
+      optimized ? compiled.gsub(/\s+/, " ").strip : compiled
     end
 
     def process_html_template(content)
       content
-        .gsub('{{APP_NAME}}', CGI.escapeHTML(@app.name.to_s))
-        .gsub('{{APP_ID}}', @app.id.to_s)
-        .gsub('{{ENVIRONMENT}}', 'development')
+        .gsub("{{APP_NAME}}", CGI.escapeHTML(@app.name.to_s))
+        .gsub("{{APP_ID}}", @app.id.to_s)
+        .gsub("{{ENVIRONMENT}}", "development")
     end
 
     def generate_default_html
@@ -333,7 +332,7 @@ module Deployment
     def generate_default_main_js
       # Escape app name for JavaScript string literal
       escaped_name = @app.name.to_s.gsub("'", "\\'").gsub('"', '\\"')
-      
+
       <<~JAVASCRIPT
         // Main entry point for #{escaped_name}
         console.log('App loading...');
@@ -358,22 +357,22 @@ module Deployment
 
     def mime_type_for(path)
       case File.extname(path).downcase
-      when '.js' then 'application/javascript'
-      when '.css' then 'text/css'
-      when '.html' then 'text/html'
-      when '.json' then 'application/json'
-      else 'text/plain'
+      when ".js" then "application/javascript"
+      when ".css" then "text/css"
+      when ".html" then "text/html"
+      when ".json" then "application/json"
+      else "text/plain"
       end
     end
 
     def detect_file_type(path)
       case File.extname(path).downcase
-      when '.tsx', '.ts' then 'typescript'
-      when '.jsx', '.js' then 'javascript'
-      when '.css' then 'stylesheet'
-      when '.html' then 'html'
-      when '.json' then 'json'
-      else 'text'
+      when ".tsx", ".ts" then "typescript"
+      when ".jsx", ".js" then "javascript"
+      when ".css" then "stylesheet"
+      when ".html" then "html"
+      when ".json" then "json"
+      else "text"
       end
     end
 
@@ -439,7 +438,7 @@ module Deployment
 
     def prepare_optimized_source_files
       source_files = super
-      
+
       # Apply production optimizations
       source_files.transform_values do |file_data|
         content = file_data.is_a?(Hash) ? file_data[:content] : file_data
@@ -453,18 +452,18 @@ module Deployment
     def optimize_source_content(content)
       # Apply basic optimizations
       content
-        .gsub(/console\.log\(.*?\);?/, '') # Remove debug logs
-        .gsub(/\/\*.*?\*\//m, '') # Remove block comments
-        .gsub(/\/\/.*$/, '') # Remove line comments
+        .gsub(/console\.log\(.*?\);?/, "") # Remove debug logs
+        .gsub(/\/\*.*?\*\//m, "") # Remove block comments
+        .gsub(/\/\/.*$/, "") # Remove line comments
         .strip
     end
 
     def execute_vite_build(build_env, source_files, development: false)
       Rails.logger.info "[ProductionOptimizedBuilder] Executing optimized Vite build"
-      
+
       # Simulate production build (longer time, better optimization)
       sleep(0.2) # Placeholder for actual API call
-      
+
       {
         success: true,
         assets: simulate_built_assets(source_files, optimized: true),
@@ -482,11 +481,11 @@ module Deployment
     def package_for_production_worker(build_result)
       # Use CloudflareWorkerOptimizer for advanced optimization
       optimizer = Deployment::CloudflareWorkerOptimizer.new(@app)
-      
+
       Rails.logger.info "[ProductionOptimizedBuilder] Optimizing build for Cloudflare Worker deployment"
-      
+
       optimization_result = optimizer.optimize_for_worker(build_result)
-      
+
       {
         script: optimization_result[:worker_script],
         size: optimization_result[:worker_size],
@@ -503,7 +502,7 @@ module Deployment
     def critical_asset?(path)
       # Determine which assets must be embedded in worker
       case path
-      when 'index.html', /main\.(js|css)$/, /critical\./
+      when "index.html", /main\.(js|css)$/, /critical\./
         true
       else
         false
@@ -512,7 +511,7 @@ module Deployment
 
     def generate_production_worker_script(critical_assets, r2_assets)
       cdn_map = r2_assets.transform_values { |asset| asset[:cdn_url] }
-      
+
       <<~JAVASCRIPT
         // Cloudflare Worker for App ID: #{@app.id} (Production)
         // Generated at: #{Time.current.iso8601}
@@ -564,7 +563,7 @@ module Deployment
         }
 
         async function serveSpaApp(request, env) {
-          const htmlContent = #{critical_assets['index.html']&.to_json || '"<html><body>Loading...</body></html>"'};
+          const htmlContent = #{critical_assets["index.html"]&.to_json || '"<html><body>Loading...</body></html>"'};
           
           return new Response(htmlContent, {
             headers: {
@@ -598,18 +597,18 @@ module Deployment
 
     def simulate_code_splitting
       {
-        main: { size: 50.kilobytes, critical: true },
-        vendor: { size: 120.kilobytes, critical: false },
-        components: { size: 80.kilobytes, critical: false }
+        main: {size: 50.kilobytes, critical: true},
+        vendor: {size: 120.kilobytes, critical: false},
+        components: {size: 80.kilobytes, critical: false}
       }
     end
 
     def calculate_compression_ratio(original_assets, final_assets)
       original_size = original_assets.values.sum(&:bytesize)
       final_size = final_assets.values.sum(&:bytesize)
-      
+
       return 1.0 if original_size.zero?
-      
+
       (final_size.to_f / original_size).round(3)
     end
 

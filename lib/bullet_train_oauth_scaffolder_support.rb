@@ -10,10 +10,11 @@
 # https://github.com/bullet-train-co/bullet_train/issues/941#issuecomment-2447355572
 
 def google_oauth2_enabled?
-  ENV['GOOGLE_OAUTH_CLIENT_ID'].present? && ENV['GOOGLE_OAUTH_CLIENT_SECRET'].present?
+  ENV["GOOGLE_OAUTH_CLIENT_ID"].present? && ENV["GOOGLE_OAUTH_CLIENT_SECRET"].present?
 end
+
 def github_enabled?
-  ENV['GITHUB_OAUTH_CLIENT_ID'].present? && ENV['GITHUB_OAUTH_CLIENT_SECRET'].present?
+  ENV["GITHUB_OAUTH_CLIENT_ID"].present? && ENV["GITHUB_OAUTH_CLIENT_SECRET"].present?
 end
 # 🚅 super scaffolding will insert new oauth providers above this line.
 

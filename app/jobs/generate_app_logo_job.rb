@@ -3,7 +3,7 @@ class GenerateAppLogoJob < ApplicationJob
 
   def perform(app_id)
     app = App.find(app_id)
-    
+
     # Skip if logo already exists and was generated recently
     if app.logo.attached? && app.logo_generated_at && app.logo_generated_at > 1.day.ago
       Rails.logger.info "[Logo] Skipping logo generation for app #{app.id} - already has recent logo"
@@ -16,7 +16,7 @@ class GenerateAppLogoJob < ApplicationJob
     if result[:success]
       app.update(logo_generated_at: Time.current)
       Rails.logger.info "[Logo] Successfully generated logo for app: #{app.name}"
-      
+
       # Broadcast the updated navigation to refresh the logo
       broadcast_navigation_update(app)
     else
@@ -35,7 +35,7 @@ class GenerateAppLogoJob < ApplicationJob
       "app_#{app.id}",
       target: "app_navigation_#{app.id}",
       partial: "account/app_editors/app_navigation",
-      locals: { app: app }
+      locals: {app: app}
     )
   end
 end

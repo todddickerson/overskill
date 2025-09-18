@@ -17,32 +17,46 @@ class ProcessAppUpdateJobV5 < ApplicationJob
       # Handle GlobalID cases
       AppChatMessage.find(message_or_id)
     end
-    
+
     Rails.logger.info "[ProcessAppUpdateJobV5] Processing message ##{message.id} directly with AppBuilderV5"
-    
+
     # Track processing state in database (Rails best practice)
     app = message.app
     app.update!(
-      status: 'processing',
+      status: "processing",
       processing_started_at: Time.current
     )
-    
+
     # Process directly with AppBuilderV5 - our single AI builder service
     begin
       service = Ai::AppBuilderV5.new(message)
       result = service.execute!
-      
-      # Update completion state
-      app.update!(
-        status: result ? 'generated' : 'failed',
-        processing_completed_at: Time.current
-      )
-      
+
+      # ULTRATHINK FIX: Don't overwrite status if it's already ready_to_deploy
+      # AppBuilderV5 sets status to 'ready_to_deploy' when triggering deployment
+      # We should only update if it's still in 'processing' state
+      app.reload # Get latest status from database
+
+      Rails.logger.info "[ProcessAppUpdateJobV5] After execute, app status: #{app.status}"
+
+      if app.status == "processing"
+        # Only update if still processing (means something went wrong)
+        app.update!(
+          status: result ? "generated" : "failed",
+          processing_completed_at: Time.current
+        )
+        Rails.logger.info "[ProcessAppUpdateJobV5] Updated status to: #{app.status}"
+      else
+        # Just update the processing timestamp
+        app.update!(processing_completed_at: Time.current)
+        Rails.logger.info "[ProcessAppUpdateJobV5] Kept status as: #{app.status}"
+      end
+
       result
     rescue => e
       Rails.logger.error "[ProcessAppUpdateJobV5] Error: #{e.message}"
       app.update!(
-        status: 'failed',
+        status: "failed",
         processing_completed_at: Time.current
       )
       raise

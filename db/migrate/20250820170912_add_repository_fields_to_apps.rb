@@ -4,14 +4,14 @@ class AddRepositoryFieldsToApps < ActiveRecord::Migration[8.0]
     add_column :apps, :repository_url, :string
     add_column :apps, :repository_name, :string  # Generated with obfuscated_id
     add_column :apps, :github_repo_id, :integer
-    
+
     # Cloudflare Workers tracking (using obfuscated_id for privacy) - NEW FIELDS
     add_column :apps, :cloudflare_worker_name, :string  # Generated with obfuscated_id
-    # Note: preview_url, staging_url, production_url, staging_deployed_at, 
+    # Note: preview_url, staging_url, production_url, staging_deployed_at,
     # last_deployed_at, and deployment_status already exist
-    
+
     # Migration and deployment status - NEW FIELDS
-    add_column :apps, :repository_status, :string, default: 'pending'
+    add_column :apps, :repository_status, :string, default: "pending"
 
     # Indexes (repository_name includes obfuscated_id, so safe to index)
     add_index :apps, :repository_name, unique: true

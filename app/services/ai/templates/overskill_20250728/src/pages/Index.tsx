@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { analytics } from "@/lib/analytics";
 
 export default function Index() {
   const [count, setCount] = useState(0);
 
   const handleClick = () => {
     setCount(count + 1);
-    analytics.trackClick('counter_button', { count: count + 1 });
   };
 
   return (
@@ -30,8 +28,8 @@ export default function Index() {
           <div className="text-sm text-muted-foreground space-y-2">
             <p>✅ React 18 with TypeScript</p>
             <p>✅ Tailwind CSS & shadcn/ui components</p>
-            <p>✅ Supabase integration with RLS</p>
-            <p>✅ Analytics tracking</p>
+            <p>✅ Simplified deployment-ready setup</p>
+            <p>✅ Clean architecture</p>
             <p>✅ Dark mode support</p>
             <p>✅ Cloudflare Workers ready</p>
           </div>

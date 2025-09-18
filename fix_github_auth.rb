@@ -11,24 +11,24 @@ puts "\n1. Environment Variables Check:"
 puts "-" * 40
 
 env_vars = {
-  'GITHUB_APP_PRIVATE_KEY' => ENV['GITHUB_APP_PRIVATE_KEY'],
-  'GITHUB_PRIVATE_KEY' => ENV['GITHUB_PRIVATE_KEY'],
-  'GITHUB_TOKEN' => ENV['GITHUB_TOKEN'],
-  'GITHUB_ORG' => ENV['GITHUB_ORG'],
-  'GITHUB_TEMPLATE_REPO' => ENV['GITHUB_TEMPLATE_REPO']
+  "GITHUB_APP_PRIVATE_KEY" => ENV["GITHUB_APP_PRIVATE_KEY"],
+  "GITHUB_PRIVATE_KEY" => ENV["GITHUB_PRIVATE_KEY"],
+  "GITHUB_TOKEN" => ENV["GITHUB_TOKEN"],
+  "GITHUB_ORG" => ENV["GITHUB_ORG"],
+  "GITHUB_TEMPLATE_REPO" => ENV["GITHUB_TEMPLATE_REPO"]
 }
 
 env_vars.each do |name, value|
   if value.present?
-    if name.include?('KEY')
+    display = if name.include?("KEY")
       # For keys, show first/last few chars
-      display = if value.include?('BEGIN')
-                  "Present (#{value.lines.first.strip}...)"
-                else
-                  "Present (#{value[0..20]}...)"
-                end
+      if value.include?("BEGIN")
+        "Present (#{value.lines.first.strip}...)"
+      else
+        "Present (#{value[0..20]}...)"
+      end
     else
-      display = value
+      value
     end
     puts "✅ #{name}: #{display}"
   else
@@ -43,7 +43,7 @@ puts "-" * 40
 begin
   authenticator = Deployment::GithubAppAuthenticator.new
   token = authenticator.get_installation_token
-  
+
   if token
     puts "✅ Installation token generated successfully"
     puts "   Token: #{token[0..20]}..."
@@ -64,11 +64,11 @@ begin
   test_app = App.last
   if test_app
     puts "Using app: #{test_app.name} (ID: #{test_app.id})"
-    
+
     # Try to create repository service
     repo_service = Deployment::GithubRepositoryService.new(test_app)
     puts "✅ Repository service created successfully"
-    
+
     # Try to get repository info if it exists
     if test_app.repository_name.present?
       info = repo_service.get_repository_info
@@ -90,17 +90,17 @@ end
 puts "\n4. Private Key Format Check:"
 puts "-" * 40
 
-private_key = ENV['GITHUB_APP_PRIVATE_KEY'] || ENV['GITHUB_PRIVATE_KEY']
+private_key = ENV["GITHUB_APP_PRIVATE_KEY"] || ENV["GITHUB_PRIVATE_KEY"]
 
 if private_key.present?
   # Check if key has proper line breaks
   if private_key.include?('\n') && !private_key.include?("\n")
     puts "⚠️  Private key appears to have escaped newlines (\\n instead of actual line breaks)"
     puts "   This can happen when copying from environment variables"
-    
+
     # Try to fix it
     fixed_key = private_key.gsub('\n', "\n")
-    
+
     begin
       # Test the fixed key
       OpenSSL::PKey::RSA.new(fixed_key)
@@ -131,9 +131,9 @@ begin
   app = App.last
   if app
     puts "Testing with app: #{app.name}"
-    
+
     # This simulates what DeployAppJob does
-    github_service = Deployment::GithubRepositoryService.new(app)
+    Deployment::GithubRepositoryService.new(app)
     puts "✅ Service creation successful in job context"
   else
     puts "⚠️  No apps available for job context test"

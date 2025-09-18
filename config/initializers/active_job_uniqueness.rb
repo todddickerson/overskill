@@ -7,13 +7,13 @@ ActiveJob::Uniqueness.configure do |config|
   config.lock_ttl = 1.hour
 
   # Prefix for lock keys. Can not be set per job.
-  config.lock_prefix = 'overskill_jobs'
+  config.lock_prefix = "overskill_jobs"
 
   # Default action on lock conflict. Can be set per job.
   # Log duplicates by default instead of raising errors
   config.on_conflict = :log
 
-  # Default action on redis connection error. 
+  # Default action on redis connection error.
   # Continue processing even if Redis is down (fallback to non-unique behavior)
   config.on_redis_connection_error = proc do |job, resource: nil, error: nil|
     Rails.logger.warn "[ActiveJob::Uniqueness] Redis connection error for #{job.class.name}: #{error&.message}"
@@ -25,11 +25,11 @@ ActiveJob::Uniqueness.configure do |config|
 
   # Array of redis servers for Redlock quorum
   # Use the same Redis as Sidekiq
-  config.redlock_servers = [ENV.fetch('REDIS_URL', 'redis://localhost:6379/0')]
+  config.redlock_servers = [ENV.fetch("REDIS_URL", "redis://localhost:6379/0")]
 
   # Custom options for Redlock
   # Retry once on lock conflicts
-  config.redlock_options = { 
+  config.redlock_options = {
     retry_count: 1,
     retry_delay: 200 # milliseconds
   }

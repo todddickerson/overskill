@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'json'
+require "json"
 
 module Ai
   module Prompts
@@ -76,7 +76,7 @@ module Ai
         # Check for any remaining unsubstituted variables
         remaining_variables = result.scan(/\{\{([^}]+)\}\}/).flatten
         if remaining_variables.any?
-          Rails.logger.warn "Unsubstituted variables in agent tools: #{remaining_variables.join(', ')}"
+          Rails.logger.warn "Unsubstituted variables in agent tools: #{remaining_variables.join(", ")}"
         end
 
         result
@@ -87,8 +87,8 @@ module Ai
         lines = json_string.lines
         filtered_lines = lines.reject do |line|
           stripped = line.strip
-          stripped.start_with?('//') || 
-          (stripped.start_with?('/*') && stripped.end_with?('*/'))
+          stripped.start_with?("//") ||
+            (stripped.start_with?("/*") && stripped.end_with?("*/"))
         end
         filtered_lines.join
       end

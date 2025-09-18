@@ -8,128 +8,127 @@ module Ai
   # 5. Batched file processing
   class AppUpdateOrchestratorV3Optimized
     include Rails.application.routes.url_helpers
-    
+
     # Configuration learned from successful platforms
     MAX_CONTEXT_TOKENS = 32_000
     MAX_FILES_PER_BATCH = 5        # Process files in manageable batches
     API_TIMEOUT_SECONDS = 120       # 2 minutes per API call
     MAX_RETRIES = 2
-    
+
     # Prompt caching (reduces latency by 50-80%)
     ENABLE_PROMPT_CACHING = true
-    
+
     attr_reader :chat_message, :app, :user, :app_version, :broadcaster
-    
+
     def initialize(chat_message)
       @chat_message = chat_message
       @app = chat_message.app
       @user = chat_message.user
       @iteration_count = 0
-      
+
       # IMPORTANT: Check if new app BEFORE any versions are created
       # An app is "new" if it has no real content files (ignore minimal placeholders)
       @is_new_app = is_app_new?
-      
+
       # Model selection
-      @model_preference = @app.ai_model || 'gpt-5'
+      @model_preference = @app.ai_model || "gpt-5"
       setup_ai_client
-      
+
       @broadcaster = Ai::Services::ProgressBroadcaster.new(@app, @chat_message)
       @streaming_buffer = Ai::Services::StreamingBufferEnhanced.new(@app, @chat_message, @broadcaster)
-      @use_streaming = ENV['USE_STREAMING'] != 'false' && @supports_streaming
-      
+      @use_streaming = ENV["USE_STREAMING"] != "false" && @supports_streaming
+
       @files_modified = []
       @start_time = Time.current
-      
+
       # OPTIMIZATION: Load standards once and create cached system prompt
       load_standards_once
       @system_prompt = create_optimized_system_prompt
     end
-    
+
     def is_app_new?
       # An app is "new" if it has no files or only has minimal placeholder files
       return true if @app.app_files.empty?
-      
+
       # Check if only minimal files exist (created by ensure_minimum_files)
       files = @app.app_files.pluck(:path)
-      minimal_files = ['index.html', 'src/App.jsx']
-      
+      minimal_files = ["index.html", "src/App.jsx"]
+
       # If we only have the minimal files and they're small, treat as new
       if files.sort == minimal_files.sort
         total_size = @app.app_files.sum { |f| f.content.length }
         # If total content is less than 2KB, these are just placeholders
         return total_size < 2000
       end
-      
+
       false
     end
-    
+
     def execute!
       Rails.logger.info "[V3-Optimized] Starting execution for message ##{chat_message.id}"
-      Rails.logger.info "[V3-Optimized] Type: #{@is_new_app ? 'CREATE' : 'UPDATE'}, Model: #{@model}"
-      
+      Rails.logger.info "[V3-Optimized] Type: #{@is_new_app ? "CREATE" : "UPDATE"}, Model: #{@model}"
+
       begin
         # Skip discussion mode check for new apps
         unless @is_new_app || explicit_code_request?
           return handle_discussion_mode
         end
-        
+
         # Initialize version tracking
         create_app_version!
         define_execution_stages
-        
+
         # PHASE 1: Quick Analysis (lightweight)
         @broadcaster.enter_stage(:analyzing)
         analysis = perform_quick_analysis
-        
+
         # PHASE 2: Execution Planning (minimal)
         @broadcaster.enter_stage(:planning)
         plan = create_execution_plan(analysis)
-        
+
         # PHASE 3: Batched Implementation (efficient)
         @broadcaster.enter_stage(:coding)
         result = execute_in_batches(plan)
-        
+
         # PHASE 4: Quick Review
         @broadcaster.enter_stage(:reviewing)
         review_and_finalize(result)
-        
+
         # PHASE 5: Deploy if new
         if @is_new_app
           @broadcaster.enter_stage(:deploying)
           deploy_app
         end
-        
+
         finalize_success
-        
       rescue => e
         Rails.logger.error "[V3-Optimized] Error: #{e.message}"
         Rails.logger.error e.backtrace.first(5).join("\n")
         handle_failure(e.message)
       end
     end
-    
+
     private
-    
+
     def setup_ai_client
       client_info = Ai::ModelClientFactory.create_client(@model_preference)
       @client = client_info[:client]
       @model = client_info[:model]
       @provider = client_info[:provider]
       @supports_streaming = client_info[:supports_streaming]
-      @use_openai_direct = @provider == 'openai_direct'
-      
+      @use_openai_direct = @provider == "openai_direct"
+
       Rails.logger.info "[V3-Optimized] Using #{@provider}/#{@model}"
     end
-    
+
     def load_standards_once
       # Load standards ONCE at initialization
-      standards_path = Rails.root.join('AI_APP_STANDARDS.md')
-      
+      standards_path = Rails.root.join("AI_APP_STANDARDS.md")
+
       if File.exist?(standards_path)
         @standards_full = ::File.read(standards_path)
         Rails.logger.info "[V3-Optimized] Loaded standards: #{@standards_full.length} bytes"
-        
+
         # Create condensed version for reference
         @standards_key_points = extract_key_points(@standards_full)
         Rails.logger.info "[V3-Optimized] Condensed to: #{@standards_key_points.length} bytes"
@@ -138,17 +137,17 @@ module Ai
         @standards_key_points = @standards_full
       end
     end
-    
+
     def extract_key_points(full_standards)
       # Simple key points for logging/debugging only
       # The full standards are in the system prompt
       "React CDN + Tailwind, Professional Quality, Complete Functionality"
     end
-    
+
     def create_optimized_system_prompt
       # OPTIMIZATION: Single, comprehensive system prompt (cached by OpenAI)
       # Focused on one high-quality approach - no mode switching
-      
+
       prompt = <<~SYSTEM
         You are an elite web application developer building production-ready applications that match the quality of Lovable.dev, Bolt.new, and Cursor.
         
@@ -381,7 +380,7 @@ module Ai
         CRITICAL: Build applications that users would happily pay for. Every detail matters.
         Implement the complete OverSkill platform integration with Supabase, OAuth, and Cloudflare Workers.
       SYSTEM
-      
+
       # Add operation-specific guidance
       if @is_new_app
         prompt += "\n\nNEW APP CREATION:\n"
@@ -396,17 +395,16 @@ module Ai
         prompt += "3. Integrate new features smoothly\n"
         prompt += "4. Maintain consistent code style"
       end
-      
+
       prompt
     end
-    
-    
+
     def perform_quick_analysis
       Rails.logger.info "[V3-Optimized] Quick analysis phase"
-      
+
       # Load minimal context
       context = if @is_new_app
-        { files: [], summary: "Empty app - needs full implementation" }
+        {files: [], summary: "Empty app - needs full implementation"}
       else
         Ai::SmartContextService.load_relevant_context(
           @app,
@@ -414,14 +412,14 @@ module Ai
           operation_type: :update
         )
       end
-      
+
       # Comprehensive analysis prompt
       analysis_prompt = <<~PROMPT
         Analyze this request: "#{@chat_message.content}"
         
         App: #{@app.name}
-        Type: #{@is_new_app ? 'NEW' : 'UPDATE'}
-        Current files: #{context[:files].map { |f| f[:path] }.join(', ')}
+        Type: #{@is_new_app ? "NEW" : "UPDATE"}
+        Current files: #{context[:files].map { |f| f[:path] }.join(", ")}
         
         IMPORTANT: For NEW apps, you must plan to create a COMPLETE application with:
         - Full authentication system (login, signup, OAuth)
@@ -438,25 +436,25 @@ module Ai
           "needs_auth": true
         }
       PROMPT
-      
+
       messages = [
-        { role: "system", content: @system_prompt },
-        { role: "user", content: analysis_prompt }
+        {role: "system", content: @system_prompt},
+        {role: "user", content: analysis_prompt}
       ]
-      
+
       # Use streaming if available
       response = execute_ai_call(messages, use_json: true)
-      
+
       if response[:success]
         parse_json_response(response[:content])
       else
-        { approach: "Standard implementation", files_needed: ["index.html", "src/App.jsx"], complexity: "moderate" }
+        {approach: "Standard implementation", files_needed: ["index.html", "src/App.jsx"], complexity: "moderate"}
       end
     end
-    
+
     def create_execution_plan(analysis)
       Rails.logger.info "[V3-Optimized] Creating execution plan"
-      
+
       # Lightweight planning
       plan_prompt = <<~PROMPT
         Create a plan to: "#{@chat_message.content}"
@@ -471,50 +469,50 @@ module Ai
           ]
         }
       PROMPT
-      
+
       messages = [
-        { role: "system", content: @system_prompt + "\n\nReturn JSON only." },
-        { role: "user", content: plan_prompt }
+        {role: "system", content: @system_prompt + "\n\nReturn JSON only."},
+        {role: "user", content: plan_prompt}
       ]
-      
+
       response = execute_ai_call(messages, use_json: true)
-      
+
       if response[:success]
         parse_json_response(response[:content])
       else
         # Fallback plan
         {
           "steps" => [
-            { "description" => "Create app structure", "files" => ["index.html", "src/App.jsx"] }
+            {"description" => "Create app structure", "files" => ["index.html", "src/App.jsx"]}
           ]
         }
       end
     end
-    
+
     def execute_in_batches(plan)
       Rails.logger.info "[V3-Optimized] Executing in batches"
-      
+
       # Define tools for file operations (without broadcast_progress to avoid confusion)
       tools = create_tool_definitions(false)
-      
+
       # Process each step
-      steps = plan["steps"] || [{ "description" => "Build app", "files" => [] }]
-      
+      steps = plan["steps"] || [{"description" => "Build app", "files" => []}]
+
       steps.each_with_index do |step, index|
-        Rails.logger.info "[V3-Optimized] Step #{index + 1}/#{steps.length}: #{step['description']}"
-        @broadcaster.update(step['description'], (index.to_f / steps.length))
-        
+        Rails.logger.info "[V3-Optimized] Step #{index + 1}/#{steps.length}: #{step["description"]}"
+        @broadcaster.update(step["description"], index.to_f / steps.length)
+
         # Execute with tools
         execute_step_with_tools(step, tools)
       end
-      
-      { success: true, files_created: @files_modified }
+
+      {success: true, files_created: @files_modified}
     end
-    
+
     def execute_step_with_tools(step, tools)
       # Create focused prompt for this step with explicit tool usage instructions
       prompt = <<~PROMPT
-        Implement: #{step['description']}
+        Implement: #{step["description"]}
         
         User wants: "#{@chat_message.content}"
         
@@ -603,15 +601,15 @@ module Ai
         
         Start creating files NOW using the create_file tool function.
       PROMPT
-      
+
       messages = [
-        { role: "system", content: @system_prompt },
-        { role: "user", content: prompt }
+        {role: "system", content: @system_prompt},
+        {role: "user", content: prompt}
       ]
-      
+
       # Log for debugging
       Rails.logger.info "[V3-Optimized] Executing step with #{tools.length} tools available"
-      
+
       # Execute with streaming if available
       if @use_streaming && @streaming_buffer
         execute_with_streaming(messages, tools)
@@ -621,12 +619,12 @@ module Ai
         execute_with_fallback(messages, tools)
       end
     end
-    
+
     def execute_with_streaming(messages, tools)
       Rails.logger.info "[V3-Optimized] Executing with streaming"
-      
+
       @streaming_buffer.start_generation
-      
+
       if @use_openai_direct
         # Direct OpenAI streaming with tools
         stream_openai_with_tools(messages, tools)
@@ -635,13 +633,13 @@ module Ai
         stream_openrouter_with_tools(messages, tools)
       end
     end
-    
+
     def stream_openai_with_tools(messages, tools)
-      require 'net/http'
-      require 'json'
-      
-      uri = URI('https://api.openai.com/v1/chat/completions')
-      
+      require "net/http"
+      require "json"
+
+      uri = URI("https://api.openai.com/v1/chat/completions")
+
       request_body = {
         model: @model,
         messages: messages,
@@ -649,16 +647,16 @@ module Ai
         tool_choice: "auto",  # Let AI choose but prompt strongly encourages tool use
         stream: true
       }
-      
+
       # GPT-5 specific adjustments
-      if @model.include?('gpt-5')
+      if @model.include?("gpt-5")
         request_body[:max_completion_tokens] = 16000
         # GPT-5 only supports default temperature of 1
       else
         request_body[:max_tokens] = 16000
         request_body[:temperature] = 0.7
       end
-      
+
       # GPT-5 doesn't support the cache parameter
       # Keeping this commented for future when it might be supported
       # if ENABLE_PROMPT_CACHING && @model.include?('gpt-5')
@@ -667,103 +665,103 @@ module Ai
       #     ttl: 300
       #   }
       # end
-      
+
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
       http.read_timeout = API_TIMEOUT_SECONDS
-      
+
       request = Net::HTTP::Post.new(uri)
-      request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
-      request['Content-Type'] = 'application/json'
+      request["Authorization"] = "Bearer #{ENV["OPENAI_API_KEY"]}"
+      request["Content-Type"] = "application/json"
       request.body = request_body.to_json
-      
+
       # Variables to accumulate streaming response
       accumulated_content = ""
       accumulated_tool_calls = []
       current_tool_call = nil
-      
+
       Rails.logger.info "[V3-Optimized] Starting streaming request to OpenAI"
-      
+
       http.request(request) do |response|
         Rails.logger.info "[V3-Optimized] Response status: #{response.code}"
-        
+
         # Handle error responses
-        if response.code != '200'
+        if response.code != "200"
           error_body = response.read_body
           Rails.logger.error "[V3-Optimized] API Error Response: #{error_body}"
-          
+
           # Try to parse error message
           begin
             error_data = JSON.parse(error_body)
-            Rails.logger.error "[V3-Optimized] Error details: #{error_data['error']['message']}" if error_data['error']
+            Rails.logger.error "[V3-Optimized] Error details: #{error_data["error"]["message"]}" if error_data["error"]
           rescue
             Rails.logger.error "[V3-Optimized] Raw error: #{error_body}"
           end
-          
+
           # Fall back to non-streaming or simpler approach
           Rails.logger.info "[V3-Optimized] Falling back to non-streaming due to error"
           return execute_with_openai_tools(messages, tools)
         end
-        
+
         response.read_body do |chunk|
           # Process SSE chunks and extract tool calls
           chunk.split("\n").each do |line|
             next unless line.start_with?("data: ")
-            
-            json_str = line[6..-1]  # Remove "data: " prefix
+
+            json_str = line[6..]  # Remove "data: " prefix
             next if json_str == "[DONE]"
-            
+
             begin
               data = JSON.parse(json_str)
-              
+
               # Log first chunk to see structure
               if accumulated_content.empty? && accumulated_tool_calls.empty?
                 Rails.logger.info "[V3-Optimized] First chunk structure: #{data.keys}"
-                Rails.logger.info "[V3-Optimized] Choice keys: #{data['choices']&.first&.keys}"
+                Rails.logger.info "[V3-Optimized] Choice keys: #{data["choices"]&.first&.keys}"
               end
-              
-              choice = data['choices']&.first
+
+              choice = data["choices"]&.first
               next unless choice
-              
-              delta = choice['delta']
+
+              delta = choice["delta"]
               next unless delta
-              
+
               # Handle content
-              if delta['content']
-                accumulated_content += delta['content']
-                @streaming_buffer.process_chunk(delta['content']) if @streaming_buffer
+              if delta["content"]
+                accumulated_content += delta["content"]
+                @streaming_buffer&.process_chunk(delta["content"])
               end
-              
+
               # Handle tool calls
-              if delta['tool_calls']
-                Rails.logger.info "[V3-Optimized] Tool call delta detected: #{delta['tool_calls'].inspect}"
-                delta['tool_calls'].each do |tool_call_delta|
-                  index = tool_call_delta['index']
-                  
+              if delta["tool_calls"]
+                Rails.logger.info "[V3-Optimized] Tool call delta detected: #{delta["tool_calls"].inspect}"
+                delta["tool_calls"].each do |tool_call_delta|
+                  index = tool_call_delta["index"]
+
                   # Initialize or update tool call at index
-                  if tool_call_delta['id']
+                  if tool_call_delta["id"]
                     # New tool call
-                    Rails.logger.info "[V3-Optimized] New tool call: #{tool_call_delta['function']['name']}"
+                    Rails.logger.info "[V3-Optimized] New tool call: #{tool_call_delta["function"]["name"]}"
                     current_tool_call = {
-                      'id' => tool_call_delta['id'],
-                      'type' => tool_call_delta['type'] || 'function',
-                      'function' => {
-                        'name' => tool_call_delta['function']['name'],
-                        'arguments' => ""
+                      "id" => tool_call_delta["id"],
+                      "type" => tool_call_delta["type"] || "function",
+                      "function" => {
+                        "name" => tool_call_delta["function"]["name"],
+                        "arguments" => ""
                       }
                     }
                     accumulated_tool_calls[index] = current_tool_call
                   elsif accumulated_tool_calls[index]
                     # Accumulate arguments for existing tool call
-                    if tool_call_delta['function'] && tool_call_delta['function']['arguments']
-                      accumulated_tool_calls[index]['function']['arguments'] += tool_call_delta['function']['arguments']
+                    if tool_call_delta["function"] && tool_call_delta["function"]["arguments"]
+                      accumulated_tool_calls[index]["function"]["arguments"] += tool_call_delta["function"]["arguments"]
                     end
                   end
                 end
               end
-              
+
               # Handle finish reason
-              if choice['finish_reason'] == 'tool_calls' && accumulated_tool_calls.any?
+              if choice["finish_reason"] == "tool_calls" && accumulated_tool_calls.any?
                 # Execute all accumulated tool calls
                 Rails.logger.info "[V3-Optimized] Executing #{accumulated_tool_calls.length} tool calls"
                 process_tool_calls(accumulated_tool_calls)
@@ -775,89 +773,89 @@ module Ai
           end
         end
       end
-      
+
       # Process any remaining tool calls
       if accumulated_tool_calls.any?
         Rails.logger.info "[V3-Optimized] Executing final #{accumulated_tool_calls.length} tool calls"
         process_tool_calls(accumulated_tool_calls)
       end
-      
+
       # Return accumulated content if no tool calls were made
       if accumulated_content.present? && @files_modified.empty?
         Rails.logger.warn "[V3-Optimized] No tool calls made, creating files from content"
         create_files_from_response(accumulated_content)
       end
     end
-    
+
     def execute_with_openai_tools(messages, tools)
       # Non-streaming OpenAI with tools
-      require 'net/http'
-      require 'json'
-      
-      uri = URI('https://api.openai.com/v1/chat/completions')
-      
+      require "net/http"
+      require "json"
+
+      uri = URI("https://api.openai.com/v1/chat/completions")
+
       request_body = {
         model: @model,
         messages: messages,
         tools: tools,
         tool_choice: "auto"  # Let AI choose but prompt strongly encourages tool use
       }
-      
+
       # GPT-5 specific adjustments
-      if @model.include?('gpt-5')
+      if @model.include?("gpt-5")
         request_body[:max_completion_tokens] = 16000
         # GPT-5 only supports default temperature of 1
       else
         request_body[:max_tokens] = 16000
         request_body[:temperature] = 0.7
       end
-      
+
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
       http.read_timeout = API_TIMEOUT_SECONDS
-      
+
       request = Net::HTTP::Post.new(uri)
-      request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
-      request['Content-Type'] = 'application/json'
+      request["Authorization"] = "Bearer #{ENV["OPENAI_API_KEY"]}"
+      request["Content-Type"] = "application/json"
       request.body = request_body.to_json
-      
+
       Rails.logger.info "[V3-Optimized] Sending non-streaming request with #{tools.length} tools"
-      
+
       response = http.request(request)
       result = JSON.parse(response.body)
-      
-      if result['error']
-        Rails.logger.error "[V3-Optimized] OpenAI API error: #{result['error']['message']}"
+
+      if result["error"]
+        Rails.logger.error "[V3-Optimized] OpenAI API error: #{result["error"]["message"]}"
         return
       end
-      
+
       # Process tool calls
-      if result['choices'] && result['choices'][0]['message']['tool_calls']
-        tool_calls = result['choices'][0]['message']['tool_calls']
+      if result["choices"] && result["choices"][0]["message"]["tool_calls"]
+        tool_calls = result["choices"][0]["message"]["tool_calls"]
         Rails.logger.info "[V3-Optimized] Received #{tool_calls.length} tool calls from API"
         process_tool_calls(tool_calls)
-      elsif result['choices'] && result['choices'][0]['message']['content']
+      elsif result["choices"] && result["choices"][0]["message"]["content"]
         # AI returned content without tool calls - parse it for file creation
-        content = result['choices'][0]['message']['content']
+        content = result["choices"][0]["message"]["content"]
         Rails.logger.warn "[V3-Optimized] No tool calls received, attempting to parse content for files"
         create_files_from_response(content)
       else
         Rails.logger.error "[V3-Optimized] Unexpected response structure: #{result.keys}"
       end
     end
-    
+
     def execute_with_fallback(messages, tools)
       # Fallback to simple generation without tools
       Rails.logger.warn "[V3-Optimized] Using fallback execution without tools"
-      
+
       response = @client.chat(messages, model: @model, temperature: 0.7)
-      
+
       if response[:success]
         # Parse and create files from response
         create_files_from_response(response[:content])
       end
     end
-    
+
     def create_tool_definitions(include_broadcast = false)
       tools = [
         {
@@ -868,30 +866,30 @@ module Ai
             parameters: {
               type: "object",
               properties: {
-                path: { type: "string", description: "File path (e.g., index.html, src/App.jsx, src/lib/supabase.js)" },
-                content: { type: "string", description: "Complete file content with all code" }
+                path: {type: "string", description: "File path (e.g., index.html, src/App.jsx, src/lib/supabase.js)"},
+                content: {type: "string", description: "Complete file content with all code"}
               },
               required: ["path", "content"]
             }
           }
         },
         {
-          type: "function", 
+          type: "function",
           function: {
             name: "update_file",
             description: "Update an existing file with new content",
             parameters: {
               type: "object",
               properties: {
-                path: { type: "string", description: "Path to existing file" },
-                content: { type: "string", description: "New complete content for the file" }
+                path: {type: "string", description: "Path to existing file"},
+                content: {type: "string", description: "New complete content for the file"}
               },
               required: ["path", "content"]
             }
           }
         }
       ]
-      
+
       # Only include broadcast_progress if explicitly requested
       # This tool seems to confuse GPT-5 during file generation
       if include_broadcast
@@ -903,37 +901,37 @@ module Ai
             parameters: {
               type: "object",
               properties: {
-                message: { type: "string" }
+                message: {type: "string"}
               },
               required: ["message"]
             }
           }
         }
       end
-      
+
       tools
     end
-    
+
     def process_tool_calls(tool_calls)
       Rails.logger.info "[V3-Optimized] Processing #{tool_calls.length} tool calls"
-      
+
       tool_calls.each_with_index do |call, index|
-        function_name = call['function']['name']
-        arguments_str = call['function']['arguments']
-        
+        function_name = call["function"]["name"]
+        arguments_str = call["function"]["arguments"]
+
         begin
           arguments = JSON.parse(arguments_str)
-          Rails.logger.info "[V3-Optimized] Tool call #{index + 1}: #{function_name} - #{arguments['path'] || arguments['message'] || 'no path'}"
-          
+          Rails.logger.info "[V3-Optimized] Tool call #{index + 1}: #{function_name} - #{arguments["path"] || arguments["message"] || "no path"}"
+
           case function_name
-          when 'create_file'
-            create_or_update_file(arguments['path'], arguments['content'])
-            @broadcaster.file_created(arguments['path']) if @broadcaster
-          when 'update_file'
-            create_or_update_file(arguments['path'], arguments['content'])
-            @broadcaster.update("Updated #{arguments['path']}", nil) if @broadcaster
-          when 'broadcast_progress'
-            @broadcaster.update(arguments['message']) if @broadcaster
+          when "create_file"
+            create_or_update_file(arguments["path"], arguments["content"])
+            @broadcaster&.file_created(arguments["path"])
+          when "update_file"
+            create_or_update_file(arguments["path"], arguments["content"])
+            @broadcaster&.update("Updated #{arguments["path"]}", nil)
+          when "broadcast_progress"
+            @broadcaster&.update(arguments["message"])
           else
             Rails.logger.warn "[V3-Optimized] Unknown tool function: #{function_name}"
           end
@@ -945,58 +943,56 @@ module Ai
           Rails.logger.error e.backtrace.first(3).join("\n")
         end
       end
-      
+
       Rails.logger.info "[V3-Optimized] Completed processing tool calls. Files modified: #{@files_modified.count}"
     end
-    
+
     def create_or_update_file(path, content)
       Rails.logger.info "[V3-Optimized] Creating/updating file: #{path}"
-      
+
       # Validate content
-      if path.end_with?('.jsx', '.js')
+      if path.end_with?(".jsx", ".js")
         content = ensure_valid_javascript(content)
       end
-      
+
       # Create or update file
       file = @app.app_files.find_or_initialize_by(path: path)
       file.content = content
       file.file_type = determine_file_type(path)
       file.team = @app.team  # Set team association
       file.save!
-      
+
       @files_modified << path
       @broadcaster.file_created(path)
     rescue => e
       Rails.logger.error "[V3-Optimized] Error creating file #{path}: #{e.message}"
       raise
     end
-    
+
     def ensure_valid_javascript(content)
       # Remove TypeScript syntax
       content = content.gsub(/:\s*(string|number|boolean|any|void|object|Function)(\s*[;,\)\}=])/, '\2')
-      content = content.gsub(/^[\s]*interface\s+\w+\s*\{.*?\}/m, '')
-      content = content.gsub(/<([A-Z]\w*),[\w\s,<>]*>/, '')
-      
-      content
+      content = content.gsub(/^[\s]*interface\s+\w+\s*\{.*?\}/m, "")
+      content.gsub(/<([A-Z]\w*),[\w\s,<>]*>/, "")
     end
-    
+
     def determine_file_type(path)
       case path
-      when /\.html$/i then 'html'
-      when /\.jsx$/i then 'jsx'
-      when /\.js$/i then 'js'
-      when /\.css$/i then 'css'
-      when /\.json$/i then 'json'
-      else 'text'
+      when /\.html$/i then "html"
+      when /\.jsx$/i then "jsx"
+      when /\.js$/i then "js"
+      when /\.css$/i then "css"
+      when /\.json$/i then "json"
+      else "text"
       end
     end
-    
+
     def review_and_finalize(result)
       Rails.logger.info "[V3-Optimized] Reviewing and finalizing"
-      
+
       # Quick review
       @broadcaster.update("Reviewing generated code...", 0.9)
-      
+
       # Only ensure minimum files if we're in UPDATE mode and no files were created
       # For NEW apps, we should have created comprehensive files via tool calls
       if !@is_new_app && @files_modified.empty?
@@ -1007,27 +1003,27 @@ module Ai
         # Still create minimal files so app isn't broken, but log the error
         ensure_minimum_files
       end
-      
+
       # Update app status
-      @app.update!(status: 'generated')
-      
+      @app.update!(status: "generated")
+
       @broadcaster.update("Generation complete!", 1.0)
     end
-    
+
     def ensure_minimum_files
       return unless @is_new_app
-      
+
       # Ensure index.html exists
-      unless @app.app_files.exists?(path: 'index.html')
+      unless @app.app_files.exists?(path: "index.html")
         create_default_index_html
       end
-      
+
       # Ensure App.jsx exists
-      unless @app.app_files.exists?(path: 'src/App.jsx')
+      unless @app.app_files.exists?(path: "src/App.jsx")
         create_default_app_jsx
       end
     end
-    
+
     def create_default_index_html
       content = <<~HTML
         <!DOCTYPE html>
@@ -1047,16 +1043,16 @@ module Ai
         </body>
         </html>
       HTML
-      
+
       @app.app_files.create!(
-        path: 'index.html',
+        path: "index.html",
         content: content,
-        file_type: 'html',
+        file_type: "html",
         team: @app.team
       )
-      @files_modified << 'index.html'
+      @files_modified << "index.html"
     end
-    
+
     def create_default_app_jsx
       content = <<~JSX
         const App = () => {
@@ -1075,27 +1071,27 @@ module Ai
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
       JSX
-      
+
       @app.app_files.create!(
-        path: 'src/App.jsx',
+        path: "src/App.jsx",
         content: content,
-        file_type: 'jsx',
+        file_type: "jsx",
         team: @app.team
       )
-      @files_modified << 'src/App.jsx'
+      @files_modified << "src/App.jsx"
     end
-    
+
     def deploy_app
       Rails.logger.info "[V3-Optimized] Deploying app"
-      
+
       begin
         # Use simplified service for now to avoid worker errors
         service = Deployment::FastPreviewServiceSimple.new(@app)
         result = service.deploy_instant_preview!
-        
+
         if result[:success]
           @broadcaster.update("Deployed to #{result[:preview_url]}", 1.0)
-          
+
           # Broadcast preview URL update to refresh the UI
           broadcast_preview_ready(result[:preview_url])
         else
@@ -1107,7 +1103,7 @@ module Ai
         @broadcaster.update("Deployment error: #{e.message}", 0.95)
       end
     end
-    
+
     def broadcast_preview_ready(preview_url)
       # Broadcast that preview is ready to trigger UI refresh
       ActionCable.server.broadcast(
@@ -1118,29 +1114,29 @@ module Ai
           message: "Preview deployed successfully!"
         }
       )
-      
+
       # Also broadcast a Turbo Stream to refresh the preview iframe if it exists
       Turbo::StreamsChannel.broadcast_replace_later_to(
         "app_#{@app.id}_preview",
         target: "preview_frame",
         partial: "account/app_editors/preview_frame",
-        locals: { app: @app }
+        locals: {app: @app}
       )
     rescue => e
       Rails.logger.error "[V3-Optimized] Failed to broadcast preview update: #{e.message}"
     end
-    
+
     def create_app_version!
       @app_version = @app.app_versions.create!(
         team: @app.team,
         user: @user,
         version_number: next_version_number,
         changelog: @chat_message.content,
-        status: 'in_progress',
+        status: "in_progress",
         started_at: Time.current
       )
     end
-    
+
     def next_version_number
       last_version = @app.app_versions.order(created_at: :desc).first
       if last_version
@@ -1151,167 +1147,165 @@ module Ai
         "1.0.0"
       end
     end
-    
+
     def define_execution_stages
       stages = if @is_new_app
         [
-          { name: :analyzing, description: "Understanding requirements" },
-          { name: :planning, description: "Planning architecture" },
-          { name: :coding, description: "Building application" },
-          { name: :reviewing, description: "Reviewing code" },
-          { name: :deploying, description: "Deploying app" }
+          {name: :analyzing, description: "Understanding requirements"},
+          {name: :planning, description: "Planning architecture"},
+          {name: :coding, description: "Building application"},
+          {name: :reviewing, description: "Reviewing code"},
+          {name: :deploying, description: "Deploying app"}
         ]
       else
         [
-          { name: :analyzing, description: "Analyzing changes" },
-          { name: :planning, description: "Planning updates" },
-          { name: :coding, description: "Implementing changes" },
-          { name: :reviewing, description: "Reviewing updates" }
+          {name: :analyzing, description: "Analyzing changes"},
+          {name: :planning, description: "Planning updates"},
+          {name: :coding, description: "Implementing changes"},
+          {name: :reviewing, description: "Reviewing updates"}
         ]
       end
-      
+
       @broadcaster.define_stages(stages)
     end
-    
+
     def finalize_success
       @app_version.update!(
-        status: 'completed',
+        status: "completed",
         completed_at: Time.current,
         files_snapshot: @files_modified.to_json
       )
-      
+
       # Update app status for new apps
       if @is_new_app
-        @app.update!(status: 'generated')
+        @app.update!(status: "generated")
       end
-      
+
       # Create success message
       @app.app_chat_messages.create!(
-        role: 'assistant',
-        content: "Successfully #{@is_new_app ? 'created' : 'updated'} your app with #{@files_modified.count} files.",
-        status: 'completed'
+        role: "assistant",
+        content: "Successfully #{@is_new_app ? "created" : "updated"} your app with #{@files_modified.count} files.",
+        status: "completed"
       )
-      
+
       # Queue post-generation jobs for new apps
       if @is_new_app
         queue_post_generation_jobs
       end
     end
-    
+
     def queue_post_generation_jobs
       Rails.logger.info "[V3-Optimized] Queueing post-generation jobs for app ##{@app.id}"
-      
+
       # Queue app naming job (runs first to name the app properly)
       ::AppNamingJob.perform_later(@app.id)
-      
+
       # Queue logo generation job (uses the proper name)
       ::GenerateAppLogoJob.perform_later(@app.id)
-      
+
       # Queue deployment job if enabled
       if ENV["AUTO_DEPLOY_AFTER_GENERATION"] == "true"
         ::DeployAppJob.perform_later(@app)
       end
     end
-    
+
     def handle_failure(error_message)
       @app_version&.update!(
-        status: 'failed',
+        status: "failed",
         error_message: error_message,
         completed_at: Time.current
       )
-      
+
       @app.app_chat_messages.create!(
-        role: 'assistant',
+        role: "assistant",
         content: "Failed to generate app: #{error_message}",
-        status: 'failed'
+        status: "failed"
       )
-      
+
       @broadcaster.update("Generation failed: #{error_message}", 0)
     end
-    
+
     def handle_discussion_mode
       # Provide guidance without generating code
       response = "I can help you with that. To implement '#{@chat_message.content}', you would need to..."
-      
+
       @app.app_chat_messages.create!(
-        role: 'assistant',
+        role: "assistant",
         content: response,
-        status: 'completed'
+        status: "completed"
       )
     end
-    
+
     def explicit_code_request?
-      keywords = ['create', 'build', 'implement', 'add', 'make', 'generate', 'code', 'develop']
+      keywords = ["create", "build", "implement", "add", "make", "generate", "code", "develop"]
       keywords.any? { |word| @chat_message.content.downcase.include?(word) }
     end
-    
+
     def execute_ai_call(messages, use_json: false)
-      begin
-        if @use_openai_direct
-          # Direct OpenAI call
-          require 'net/http'
-          require 'json'
-          
-          uri = URI('https://api.openai.com/v1/chat/completions')
-          
-          request_body = {
-            model: @model,
-            messages: messages,
-            temperature: 0.7
-          }
-          
-          request_body[:response_format] = { type: "json_object" } if use_json
-          
-          http = Net::HTTP.new(uri.host, uri.port)
-          http.use_ssl = true
-          http.read_timeout = API_TIMEOUT_SECONDS
-          
-          request = Net::HTTP::Post.new(uri)
-          request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
-          request['Content-Type'] = 'application/json'
-          request.body = request_body.to_json
-          
-          response = http.request(request)
-          result = JSON.parse(response.body)
-          
-          if result['choices']
-            { success: true, content: result['choices'][0]['message']['content'] }
-          else
-            { success: false, error: result['error']['message'] }
-          end
+      if @use_openai_direct
+        # Direct OpenAI call
+        require "net/http"
+        require "json"
+
+        uri = URI("https://api.openai.com/v1/chat/completions")
+
+        request_body = {
+          model: @model,
+          messages: messages,
+          temperature: 0.7
+        }
+
+        request_body[:response_format] = {type: "json_object"} if use_json
+
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+        http.read_timeout = API_TIMEOUT_SECONDS
+
+        request = Net::HTTP::Post.new(uri)
+        request["Authorization"] = "Bearer #{ENV["OPENAI_API_KEY"]}"
+        request["Content-Type"] = "application/json"
+        request.body = request_body.to_json
+
+        response = http.request(request)
+        result = JSON.parse(response.body)
+
+        if result["choices"]
+          {success: true, content: result["choices"][0]["message"]["content"]}
         else
-          # Use client
-          response = @client.chat(messages, model: @model, temperature: 0.7)
-          response
+          {success: false, error: result["error"]["message"]}
         end
-      rescue => e
-        { success: false, error: e.message }
+      else
+        # Use client
+        @client.chat(messages, model: @model, temperature: 0.7)
+
       end
+    rescue => e
+      {success: false, error: e.message}
     end
-    
+
     def parse_json_response(content)
       JSON.parse(content)
     rescue JSON::ParserError => e
       Rails.logger.error "[V3-Optimized] JSON parse error: #{e.message}"
       {}
     end
-    
+
     def create_files_from_response(content)
       # Enhanced fallback parser for when AI returns structured content without tool calls
       Rails.logger.info "[V3-Optimized] Parsing content for file structures"
-      
+
       files_created = 0
-      
+
       # Try to parse as JSON first (AI might return structured JSON)
       begin
-        if content.include?('{') && content.include?('files')
+        if content.include?("{") && content.include?("files")
           # Extract JSON from content
           json_match = content.match(/\{[^{}]*"files"[^{}]*\}/m)
           if json_match
             data = JSON.parse(json_match[0])
-            if data['files'].is_a?(Array)
-              data['files'].each do |file|
-                create_or_update_file(file['path'], file['content'])
+            if data["files"].is_a?(Array)
+              data["files"].each do |file|
+                create_or_update_file(file["path"], file["content"])
                 files_created += 1
               end
             end
@@ -1320,24 +1314,24 @@ module Ai
       rescue JSON::ParserError
         # Not JSON, continue with other parsing methods
       end
-      
+
       # Parse file markers like "// File: src/App.jsx" or "<!-- File: index.html -->"
-      if content.include?('File:') || content.include?('file:')
+      if content.include?("File:") || content.include?("file:")
         sections = content.split(/(?:^|\n)(?:\/\/|#|<!--)\s*[Ff]ile:\s*/)
         sections.each do |section|
           next if section.strip.empty?
-          
+
           # Extract filename and content
           lines = section.split("\n")
-          filename = lines.first.strip.gsub(/-->.*/, '').strip
+          filename = lines.first.strip.gsub(/-->.*/, "").strip
           next unless filename.match?(/\.(jsx?|html|css|json)$/)
-          
+
           # Get content (skip the filename line)
-          file_content = lines[1..-1].join("\n")
-          
+          file_content = lines[1..].join("\n")
+
           # Clean up content (remove trailing comment closers, etc)
-          file_content = file_content.gsub(/^```.*?\n/, '').gsub(/\n```\s*$/, '')
-          
+          file_content = file_content.gsub(/^```.*?\n/, "").gsub(/\n```\s*$/, "")
+
           if file_content.strip.length > 10  # Ensure meaningful content
             create_or_update_file(filename, file_content)
             files_created += 1
@@ -1345,9 +1339,9 @@ module Ai
           end
         end
       end
-      
+
       # Parse code blocks with filenames in the fence
-      if content.include?('```')
+      if content.include?("```")
         # Pattern: ```jsx:src/App.jsx or ```html:index.html
         content.scan(/```([a-z]+):([^\n]+)\n(.*?)```/m).each do |lang, filepath, code|
           filepath = filepath.strip
@@ -1357,27 +1351,27 @@ module Ai
             Rails.logger.info "[V3-Optimized] Created #{filepath} from code block"
           end
         end
-        
+
         # Also try standard code blocks if no files created yet
         if files_created == 0
           # Extract HTML block for index.html
           html_match = content.match(/```html\n(.*?)```/m)
           if html_match
-            create_or_update_file('index.html', html_match[1])
+            create_or_update_file("index.html", html_match[1])
             files_created += 1
           end
-          
+
           # Extract JSX/JS blocks for App.jsx
           jsx_match = content.match(/```(?:jsx?|javascript)\n(.*?)```/m)
           if jsx_match
-            create_or_update_file('src/App.jsx', jsx_match[1])
+            create_or_update_file("src/App.jsx", jsx_match[1])
             files_created += 1
           end
         end
       end
-      
+
       Rails.logger.info "[V3-Optimized] Fallback parser created #{files_created} files"
-      
+
       # If still no files created, log the content for debugging
       if files_created == 0
         Rails.logger.warn "[V3-Optimized] No files could be parsed from content"

@@ -1,19 +1,19 @@
-require 'test_helper'
+require "test_helper"
 
 class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
   setup do
     @app = create(:app)
     @auto_fix = Deployment::AutoFixService.new(@app)
-    
+
     # Create test app files
     @test_file = @app.app_files.create!(
       path: "src/components/TestComponent.tsx",
       content: test_component_content,
       team: @app.team
     )
-    
+
     @sales_page_file = @app.app_files.create!(
-      path: "src/pages/SalesPage.tsx", 
+      path: "src/pages/SalesPage.tsx",
       content: sales_page_content,
       team: @app.team
     )
@@ -35,11 +35,11 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Fixed JSX tag mismatch"
     assert_equal 1, result[:changes].length
-    
+
     # Verify the file was updated
     @test_file.reload
     refute_includes @test_file.content, "</span>"
@@ -48,7 +48,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
 
   test "fixes duplicate div tag issues" do
     # Create a file with duplicate div tags
-    duplicate_div_file = @app.app_files.create!(
+    @app.app_files.create!(
       path: "src/components/Calculator.tsx",
       content: <<~JSX,
         function Calculator() {
@@ -74,7 +74,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Removed duplicate div closing tags"
   end
@@ -94,11 +94,11 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Added missing closing tag </section>"
     assert_equal 1, result[:changes].length
-    
+
     # Verify the closing tag was added
     @test_file.reload
     assert_includes @test_file.content, "</section>"
@@ -133,10 +133,10 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Fixed JSX expression error in className/style attribute"
-    
+
     # Verify the fix
     expression_error_file.reload
     assert_includes expression_error_file.content, 'className="container mx-auto"'
@@ -167,7 +167,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     style_error_file.reload
     assert_includes style_error_file.content, 'style="color: red"'
@@ -201,10 +201,10 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Added missing closing quote"
-    
+
     unterminated_file.reload
     assert_includes unterminated_file.content, 'className="container mx-auto"'
   end
@@ -228,7 +228,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     generic_unterminated_file.reload
     assert_includes generic_unterminated_file.content, '"Hello World"'
@@ -259,10 +259,10 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Fixed unexpected token by balancing braces"
-    
+
     brace_error_file.reload
     assert_includes brace_error_file.content, '{ name: "test", value: 42 }'
   end
@@ -287,7 +287,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     extra_brace_file.reload
     refute_includes extra_brace_file.content, "}}"
@@ -316,16 +316,16 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Added missing semicolon"
-    
+
     semicolon_file.reload
     assert_includes semicolon_file.content, 'const API_URL = "https://api.example.com";'
   end
 
   test "does not add semicolon to lines ending with braces" do
-    brace_line_file = @app.app_files.create!(
+    @app.app_files.create!(
       path: "src/components/Component.tsx",
       content: <<~TS,
         function Component() {
@@ -344,7 +344,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     # Should not succeed because line ends with }
     refute result[:success]
   end
@@ -373,10 +373,10 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Added missing closing parenthesis"
-    
+
     parenthesis_file.reload
     assert_includes parenthesis_file.content, "Math.max(a, b);"
   end
@@ -412,10 +412,10 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Added missing file extension"
-    
+
     import_file.reload
     assert_includes import_file.content, "from './components/Button.tsx'"
   end
@@ -447,10 +447,10 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Added missing React hook import: useState"
-    
+
     hook_file.reload
     assert_includes hook_file.content, "import React, { useState } from 'react';"
   end
@@ -477,7 +477,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     no_react_file.reload
     assert_includes no_react_file.content, "import React, { useEffect } from 'react';"
@@ -511,14 +511,14 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     assert result[:success]
     assert_includes result[:description], "Changed 'class' attributes to 'className'"
-    
+
     class_attr_file.reload
     assert_includes class_attr_file.content, 'className="container"'
     assert_includes class_attr_file.content, 'className="text"'
-    refute_includes class_attr_file.content, 'class='
+    refute_includes class_attr_file.content, "class="
   end
 
   # ========================
@@ -535,7 +535,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     refute result[:success]
     assert_includes result[:error], "File not found"
   end
@@ -550,7 +550,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     refute result[:success]
     assert_includes result[:error], "Line number out of range"
   end
@@ -565,7 +565,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     }
 
     result = @auto_fix.apply_fix(error)
-    
+
     refute result[:success]
     assert_includes result[:error], "No fix available for error type"
   end
@@ -583,7 +583,7 @@ class Deployment::AutoFixServiceTest < ActiveSupport::TestCase
     # Make the app file throw an error when trying to update
     @test_file.stub(:update!, ->(*) { raise StandardError.new("Database error") }) do
       result = @auto_fix.apply_fix(error)
-      
+
       refute result[:success]
       assert_includes result[:error], "Exception while applying fix"
     end

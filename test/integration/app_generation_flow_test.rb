@@ -41,35 +41,10 @@ class AppGenerationFlowTest < ActiveJob::TestCase
     assert_equal "pending", generation.status
 
     # Step 3: Mock the AI service and generate the app
-    mock_ai_response = {
-      success: true,
-      app: {
-        "name" => "Todo List App",
-        "description" => "A beautiful todo list application",
-        "features" => ["Add tasks", "Edit tasks", "Delete tasks", "Mark as complete"]
-      },
-      files: [
-        {
-          "path" => "index.html",
-          "content" => "<html><body><div id='app'></div></body></html>",
-          "type" => "html"
-        },
-        {
-          "path" => "app.js",
-          "content" => "const TodoApp = () => { /* app code */ };",
-          "type" => "javascript"
-        },
-        {
-          "path" => "styles.css",
-          "content" => "body { font-family: Arial; }",
-          "type" => "css"
-        }
-      ]
-    }
 
     # Mock the service
     service = Ai::AppGeneratorService.new(app, generation)
-    
+
     # Mock the generate_with_ai method
     def service.generate_with_ai(prompt)
       {
@@ -102,9 +77,9 @@ class AppGenerationFlowTest < ActiveJob::TestCase
         usage: {"prompt_tokens" => 100, "completion_tokens" => 500}
       }
     end
-    
+
     result = service.generate!
-    
+
     puts "Result: #{result.inspect}" if result[:success] == false
     assert result[:success], "Generation failed: #{result[:error]}"
     assert_nil result[:error]
@@ -121,7 +96,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
 
     # Step 5: Verify files were created
     assert_equal 3, app.app_files.count
-    
+
     html_file = app.app_files.find_by(path: "index.html")
     assert_not_nil html_file
     assert_equal "html", html_file.file_type
@@ -144,7 +119,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
     generation = create(:app_generation, app: app, team: @team)
 
     service = Ai::AppGeneratorService.new(app, generation)
-    
+
     # Mock the generate_with_ai method to return failure
     def service.generate_with_ai(prompt)
       {
@@ -152,9 +127,9 @@ class AppGenerationFlowTest < ActiveJob::TestCase
         error: "API rate limit exceeded"
       }
     end
-    
+
     result = service.generate!
-    
+
     assert_not result[:success]
     assert_equal "AI generation failed: API rate limit exceeded", result[:error]
 
@@ -169,7 +144,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
   test "app update via chat message flow" do
     # Create an app with existing files
     app = create(:app, :generated, :with_files, team: @team)
-    
+
     # Create a chat message
     chat_message = nil
     assert_difference "AppChatMessage.count", 1 do
@@ -184,7 +159,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
     assert_not_nil chat_message
     assert_equal "user", chat_message.role
     assert_equal "Add a delete all button", chat_message.content
-    
+
     # The ProcessAppUpdateJob would handle the actual update in production
     # For now, just verify the job can be enqueued
     assert_enqueued_with(job: ProcessAppUpdateJob) do
@@ -198,28 +173,22 @@ class AppGenerationFlowTest < ActiveJob::TestCase
 
     # Create multiple apps
     3.times do |i|
-      app = create(:app, 
-        team: @team, 
-        name: "App #{i}", 
-        prompt: "Create app #{i}"
-      )
+      app = create(:app,
+        team: @team,
+        name: "App #{i}",
+        prompt: "Create app #{i}")
       generation = create(:app_generation, app: app, team: @team)
-      
+
       apps << app
       generations << generation
     end
 
     # Mock successful generation for all
-    mock_ai_response = {
-      success: true,
-      app: {"name" => "Generated App", "description" => "Test"},
-      files: [{"path" => "index.html", "content" => "<html></html>", "type" => "html"}]
-    }
 
     # Process all generations
     generations.each_with_index do |generation, i|
       service = Ai::AppGeneratorService.new(apps[i], generation)
-      
+
       # Mock the generate_with_ai method
       def service.generate_with_ai(prompt)
         {
@@ -232,7 +201,7 @@ class AppGenerationFlowTest < ActiveJob::TestCase
           usage: {"prompt_tokens" => 50, "completion_tokens" => 200}
         }
       end
-      
+
       result = service.generate!
       assert result[:success]
     end

@@ -3,30 +3,30 @@ module Ai
   # Uses GPT-5 for fast, creative naming that matches the app's purpose
   class AppNamerService
     include Rails.application.routes.url_helpers
-    
+
     # Maximum attempts for naming
     MAX_RETRIES = 2
-    
+
     # Model preferences for naming (lightweight and fast)
-    NAMING_MODEL_PREFERENCE = 'gpt-4o'
-    
+    NAMING_MODEL_PREFERENCE = "gpt-4o"
+
     attr_reader :app, :prompt, :client_info
-    
+
     def initialize(app)
       @app = app
       @prompt = extract_app_prompt
       setup_ai_client
     end
-    
+
     def generate_name!
       Rails.logger.info "[AppNamer] Generating name for app ##{@app.id} based on: '#{@prompt}'"
-      
+
       retries = 0
-      
+
       begin
         # Generate name using AI
         generated_name = request_ai_name
-        
+
         if generated_name.present? && valid_app_name?(generated_name)
           # Update app name
           old_name = @app.name
@@ -43,13 +43,13 @@ module Ai
           rescue => e
             Rails.logger.warn "[AppNamer] Exception when updating subdomain after renaming: #{e.message}"
           end
-          
+
           Rails.logger.info "[AppNamer] Successfully renamed app ##{@app.id}: '#{old_name}' → '#{generated_name}'"
-          
+
           # Broadcast the name change to update UI (no progress, just final update)
           broadcast_name_update(old_name, generated_name)
-          
-          return {
+
+          {
             success: true,
             old_name: old_name,
             new_name: generated_name,
@@ -58,16 +58,15 @@ module Ai
         else
           raise "Generated name is invalid: '#{generated_name}'"
         end
-        
       rescue => e
         retries += 1
         Rails.logger.warn "[AppNamer] Attempt #{retries} failed: #{e.message}"
-        
+
         if retries < MAX_RETRIES
           retry
         else
           Rails.logger.error "[AppNamer] Failed to generate name after #{MAX_RETRIES} attempts"
-          return {
+          {
             success: false,
             error: e.message,
             message: "Failed to generate app name"
@@ -75,32 +74,32 @@ module Ai
         end
       end
     end
-    
+
     private
-    
+
     def extract_app_prompt
       # Get the most descriptive prompt available
       prompts = [
         @app.prompt
       ].compact
-      
+
       # Use the longest, most descriptive prompt
       prompts.max_by(&:length) || "A web application"
     end
-    
+
     def setup_ai_client
       @client_info = {
         client: self,  # Use self to handle the API call directly
         model: NAMING_MODEL_PREFERENCE,
-        provider: 'openai_direct'
+        provider: "openai_direct"
       }
       Rails.logger.info "[AppNamer] Using #{@client_info[:provider]}/#{@client_info[:model]} for naming"
     end
-    
+
     def request_ai_name
       # Create focused naming prompt
       naming_prompt = build_naming_prompt
-      
+
       messages = [
         {
           role: "system",
@@ -111,17 +110,17 @@ module Ai
           content: naming_prompt
         }
       ]
-      
+
       # Make direct OpenAI API request
       response = make_openai_request(messages)
-      
+
       if response[:success]
         # Check if we have valid content
         if response[:content].present?
           # Clean up the response
           clean_name = sanitize_ai_response(response[:content])
           Rails.logger.info "[AppNamer] AI suggested: '#{clean_name}'"
-          return clean_name
+          clean_name
         else
           raise "AI naming request succeeded but returned empty content"
         end
@@ -129,12 +128,12 @@ module Ai
         raise "AI naming request failed: #{response[:error]}"
       end
     end
-    
+
     def build_naming_prompt
       # Create context-aware naming prompt
-      app_type = determine_app_type
-      
-      prompt = <<~PROMPT
+      determine_app_type
+
+      <<~PROMPT
         Name this application our user is building.
         
         App Description: "#{@prompt}"
@@ -149,11 +148,11 @@ module Ai
         Generate ONE perfect name:
       PROMPT
     end
-    
+
     def determine_app_type
       # Analyze prompt to determine app category
       prompt_lower = @prompt.downcase
-      
+
       case prompt_lower
       when /todo|task|checklist/
         "task management"
@@ -162,7 +161,7 @@ module Ai
       when /note|journal|diary|memo/
         "note-taking"
       when /recipe|cook|food|meal/
-        "recipe management" 
+        "recipe management"
       when /time|hour|schedule|calendar/
         "time management"
       when /chat|message|social/
@@ -179,78 +178,80 @@ module Ai
         "web"
       end
     end
-    
+
     def sanitize_ai_response(raw_response)
       # Clean up AI response to get just the name
       # Handle nil or empty responses gracefully
       return "Generated App" if raw_response.blank?
-      
+
       name = raw_response.strip
-      
+
       # Remove quotes, extra text, explanations
-      name = name.gsub(/["']/, '')  # Remove quotes
-      name = name.split('.').first || name   # Take first sentence
-      name = name.split(',').first || name   # Take part before comma
-      name = name.split(':').last || name    # Take part after colon
+      name = name.gsub(/["']/, "")  # Remove quotes
+      name = name.split(".").first || name   # Take first sentence
+      name = name.split(",").first || name   # Take part before comma
+      name = name.split(":").last || name    # Take part after colon
       name = name.split("\n").first || name  # Take first line
-      
+
       # Remove common prefixes/suffixes
-      name = name.gsub(/^(The |A |An |App |Application |Tool |System )/i, '')
-      name = name.gsub(/(App|Tool|System|Application)$/i, '')
-      
+      name = name.gsub(/^(The |A |An |App |Application |Tool |System )/i, "")
+      name = name.gsub(/(App|Tool|System|Application)$/i, "")
+
       # Clean whitespace and capitalize properly
       name = name.strip
-      words = name.split(' ')
-      name = words.present? ? words.map(&:capitalize).join(' ') : "Generated App"
-      
-      name
+      words = name.split(" ")
+      words.present? ? words.map(&:capitalize).join(" ") : "Generated App"
     end
-    
+
     def make_openai_request(messages)
-      require 'net/http'
-      require 'json'
-      
-      api_key = ENV['OPENAI_API_KEY']
+      require "net/http"
+      require "json"
+
+      api_key = ENV["OPENAI_API_KEY"]
       unless api_key.present?
-        return { success: false, error: "OpenAI API key not configured" }
+        return {success: false, error: "OpenAI API key not configured"}
       end
-      
-      uri = URI('https://api.openai.com/v1/chat/completions')
+
+      uri = URI("https://api.openai.com/v1/chat/completions")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
-      
+
       request = Net::HTTP::Post.new(uri)
-      request['Authorization'] = "Bearer #{api_key}"
-      request['Content-Type'] = 'application/json'
-      
+      request["Authorization"] = "Bearer #{api_key}"
+      request["Content-Type"] = "application/json"
+
       body = {
-        model: 'gpt-4o',
+        model: "gpt-4o",
         messages: messages,
         temperature: 0.8,
         max_completion_tokens: 50,  # Use max_completion_tokens for newer OpenAI models
         stream: false
       }
-      
+
       request.body = body.to_json
-      
+
       begin
         response = http.request(request)
-        
-        if response.code == '200'
+
+        if response.code == "200"
           result = JSON.parse(response.body)
-          content = result.dig('choices', 0, 'message', 'content')
-          
+          content = result.dig("choices", 0, "message", "content")
+
           {
             success: true,
             content: content,
-            usage: result['usage']
+            usage: result["usage"]
           }
         else
-          error_body = JSON.parse(response.body) rescue { error: response.body }
+          error_body = begin
+            JSON.parse(response.body)
+          rescue
+            {error: response.body}
+          end
           Rails.logger.error "[AppNamer] OpenAI API error: #{error_body}"
           {
             success: false,
-            error: "OpenAI API error: #{error_body['error']&.dig('message') || response.code}"
+            error: "OpenAI API error: #{error_body["error"]&.dig("message") || response.code}"
           }
         end
       rescue => e
@@ -261,24 +262,24 @@ module Ai
         }
       end
     end
-    
+
     def valid_app_name?(name)
       return false if name.blank?
       return false if name.length > 50
       return false if name.length < 2
       return false if name.match?(/^\d+$/)  # All numbers
-      return false if name.downcase.include?('error')
-      return false if name.downcase.include?('invalid')
-      
+      return false if name.downcase.include?("error")
+      return false if name.downcase.include?("invalid")
+
       # Must contain at least one letter
       return false unless name.match?(/[a-zA-Z]/)
-      
+
       true
     end
-    
+
     def broadcast_name_update(old_name, new_name)
       Rails.logger.info "[AppNamer] Broadcasting name update to UI"
-      
+
       begin
         # Broadcast to app editor to update header/title
         ActionCable.server.broadcast(
@@ -290,28 +291,27 @@ module Ai
             message: "App renamed to '#{new_name}'"
           }
         )
-        
+
         # Update editor header via Turbo Stream
         Turbo::StreamsChannel.broadcast_replace_later_to(
           "app_#{@app.id}_editor",
           target: "app_header_name",
           html: "<h1 class='text-2xl font-bold text-gray-900'>#{new_name}</h1>"
         )
-        
+
         # Update any other places that show app name
         Turbo::StreamsChannel.broadcast_replace_later_to(
           "app_#{@app.id}_updates",
           target: "app_#{@app.id}_name",
           html: new_name
         )
-        
+
         # Update page title
         Turbo::StreamsChannel.broadcast_append_later_to(
           "app_#{@app.id}_editor",
           target: "head",
           html: "<script>document.title = '#{new_name} - OverSkill App Editor';</script>"
         )
-        
       rescue => e
         Rails.logger.error "[AppNamer] Failed to broadcast name update: #{e.message}"
       end

@@ -40,7 +40,7 @@ module Ai
         puts "Generated config with:"
         puts "  - Prompt: #{config[:prompt].length} characters"
         puts "  - Tools: #{config[:tools].size} tools"
-        puts "  - Tool names: #{service.tool_names.first(3).join(', ')}..."
+        puts "  - Tool names: #{service.tool_names.first(3).join(", ")}..."
         puts "  - Platform: #{service.variables[:platform_name]}"
         puts
       end
@@ -57,9 +57,9 @@ module Ai
         )
 
         prompt = service.generate_prompt
-        puts "Custom platform name found: #{prompt.include?('MyCustomPlatform')}"
+        puts "Custom platform name found: #{prompt.include?("MyCustomPlatform")}"
         puts "Custom tool prefix used: #{service.tool_names.first}"
-        puts "Custom backend mentioned: #{prompt.include?('Firebase')}"
+        puts "Custom backend mentioned: #{prompt.include?("Firebase")}"
         puts
       end
 
@@ -68,7 +68,7 @@ module Ai
         puts "-" * 40
 
         platforms = Ai::Prompts::AgentPromptService.available_platforms
-        puts "Available platforms: #{platforms.join(', ')}"
+        puts "Available platforms: #{platforms.join(", ")}"
 
         platforms.each do |platform|
           service = Ai::Prompts::AgentPromptService.for_platform(platform)
@@ -93,8 +93,8 @@ module Ai
         # Show first tool structure
         first_tool = tools.first
         puts "\nFirst tool structure:"
-        puts "  Name: #{first_tool['name']}"
-        puts "  Description: #{first_tool['description'][0..80]}..."
+        puts "  Name: #{first_tool["name"]}"
+        puts "  Description: #{first_tool["description"][0..80]}..."
         puts
       end
 
@@ -110,7 +110,7 @@ module Ai
         begin
           export_path = service.export_to_files(Rails.root.join("tmp", "example_export"))
           puts "Exported to: #{export_path}"
-          
+
           files = Dir.glob(::File.join(export_path, "*"))
           puts "Created files:"
           files.each do |file|

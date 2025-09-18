@@ -53,15 +53,15 @@ module Ai
           parsed["image_url"]
 
         if image_url.present?
-          { success: true, image_url: image_url }
+          {success: true, image_url: image_url}
         else
-          { success: false, error: "No image URL found in Ideogram response" }
+          {success: false, error: "No image URL found in Ideogram response"}
         end
       else
-        { success: false, error: response.parsed_response || response.body }
+        {success: false, error: response.parsed_response || response.body}
       end
     rescue => e
-      { success: false, error: e.message }
+      {success: false, error: e.message}
     end
 
     private
@@ -82,5 +82,3 @@ module Ai
     end
   end
 end
-
-

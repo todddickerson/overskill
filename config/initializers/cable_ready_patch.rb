@@ -6,11 +6,13 @@ if defined?(CableReady::Updatable::ClassMethods)
     module Updatable
       module ClassMethods
         # Define the missing constant
-        class CollectionsRegistry < Hash
-          def initialize
-            super { |hash, key| hash[key] = [] }
+        unless defined?(CollectionsRegistry)
+          class CollectionsRegistry < Hash
+            def initialize
+              super { |hash, key| hash[key] = [] }
+            end
           end
-        end unless defined?(CollectionsRegistry)
+        end
       end
     end
   end

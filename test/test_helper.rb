@@ -143,28 +143,28 @@ end
 
 class ActiveSupport::TestCase
   include FactoryBot::Syntax::Methods
-  
+
   # WebMock configuration
   WebMock.disable_net_connect!(allow_localhost: true)
-  
+
   # Common WebMock stubs for testing
   setup do
     # Stub pwned password API that's called during user creation
     stub_request(:get, /api\.pwnedpasswords\.com/)
       .to_return(status: 200, body: "", headers: {})
-      
+
     # Stub any Claude/OpenAI API calls to avoid external dependencies in tests
     stub_request(:post, /api\.anthropic\.com/)
-      .to_return(status: 200, body: '{"content": [{"text": "test response"}]}', headers: {'Content-Type' => 'application/json'})
-      
+      .to_return(status: 200, body: '{"content": [{"text": "test response"}]}', headers: {"Content-Type" => "application/json"})
+
     stub_request(:post, /api\.openai\.com/)
-      .to_return(status: 200, body: '{"choices": [{"message": {"content": "test response"}}]}', headers: {'Content-Type' => 'application/json'})
-      
+      .to_return(status: 200, body: '{"choices": [{"message": {"content": "test response"}}]}', headers: {"Content-Type" => "application/json"})
+
     # Stub Cloudflare API calls to avoid external dependencies in tests
     stub_request(:put, /api\.cloudflare\.com/)
-      .to_return(status: 200, body: '{"success": true, "result": {"id": "test-worker"}}', headers: {'Content-Type' => 'application/json'})
-      
+      .to_return(status: 200, body: '{"success": true, "result": {"id": "test-worker"}}', headers: {"Content-Type" => "application/json"})
+
     stub_request(:post, /api\.cloudflare\.com/)
-      .to_return(status: 200, body: '{"success": true, "result": {"id": "test-worker"}}', headers: {'Content-Type' => 'application/json'})
+      .to_return(status: 200, body: '{"success": true, "result": {"id": "test-worker"}}', headers: {"Content-Type" => "application/json"})
   end
 end

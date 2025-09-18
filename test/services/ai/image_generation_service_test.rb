@@ -16,7 +16,7 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Square aspect ratio should use 1024x1024
     size = @service.send(:determine_openai_size, 1024, 1024)
     assert_equal "1024x1024", size
-    
+
     size = @service.send(:determine_openai_size, 512, 512)
     assert_equal "1024x1024", size
   end
@@ -25,7 +25,7 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Wide aspect ratio should use 1536x1024
     size = @service.send(:determine_openai_size, 1920, 1080)
     assert_equal "1536x1024", size
-    
+
     size = @service.send(:determine_openai_size, 1600, 900)
     assert_equal "1536x1024", size
   end
@@ -34,7 +34,7 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Tall aspect ratio should use 1024x1536
     size = @service.send(:determine_openai_size, 768, 1024)
     assert_equal "1024x1536", size
-    
+
     size = @service.send(:determine_openai_size, 512, 1024)
     assert_equal "1024x1536", size
   end
@@ -49,13 +49,13 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Test dimension adjustment
     adjusted = @service.send(:adjust_to_multiple_of_32, 1080)
     assert_equal 1088, adjusted
-    
+
     adjusted = @service.send(:adjust_to_multiple_of_32, 1920)
     assert_equal 1920, adjusted  # Already a multiple of 32
-    
+
     adjusted = @service.send(:adjust_to_multiple_of_32, 500)
     assert_equal 512, adjusted  # Minimum is 512
-    
+
     adjusted = @service.send(:adjust_to_multiple_of_32, 2000)
     assert_equal 1920, adjusted  # Maximum is 1920
   end
@@ -64,17 +64,17 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Valid dimensions (multiples of 32 within range)
     result = @service.send(:validate_dimensions, 1024, 1024)
     assert result[:valid]
-    
+
     # Invalid - not multiple of 32
     result = @service.send(:validate_dimensions, 1000, 1000)
     assert result[:error]
     assert_includes result[:error], "multiples of 32"
-    
+
     # Invalid - too small
     result = @service.send(:validate_dimensions, 256, 256)
     assert result[:error]
     assert_includes result[:error], "between 512 and 1920"
-    
+
     # Invalid - too large
     result = @service.send(:validate_dimensions, 2048, 2048)
     assert result[:error]
@@ -85,10 +85,10 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Mock the image generation and R2 upload
     mock_image_data = "fake_image_data"
     mock_r2_url = "https://pub.overskill.app/app-#{@app.id}/production/public/images/test.jpg"
-    
+
     # Stub the generate_image method to return success
-    @service.stub :generate_image, { 
-      success: true, 
+    @service.stub :generate_image, {
+      success: true,
       image_data: mock_image_data,
       provider: "gpt-image-1"
     } do
@@ -100,7 +100,7 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
           width: 1024,
           height: 1024
         )
-        
+
         assert result[:success]
         assert_equal mock_r2_url, result[:url]
         assert_equal "r2", result[:storage_method]
@@ -127,19 +127,19 @@ class Ai::ImageGenerationServiceTest < ActiveSupport::TestCase
     # Square
     ratio = @service.send(:calculate_ideogram_aspect_ratio, 1024, 1024)
     assert_equal "1x1", ratio
-    
+
     # Landscape
     ratio = @service.send(:calculate_ideogram_aspect_ratio, 1920, 1080)
     assert_equal "16x9", ratio
-    
-    # Portrait  
+
+    # Portrait
     ratio = @service.send(:calculate_ideogram_aspect_ratio, 1080, 1920)
     assert_equal "9x16", ratio
-    
+
     # 4:3
     ratio = @service.send(:calculate_ideogram_aspect_ratio, 1600, 1200)
     assert_equal "4x3", ratio
-    
+
     # 3:4
     ratio = @service.send(:calculate_ideogram_aspect_ratio, 1200, 1600)
     assert_equal "3x4", ratio

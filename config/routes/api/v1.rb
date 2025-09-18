@@ -42,13 +42,13 @@ shallow do
         resources :app_security_policies
         resources :app_audit_logs
         resources :app_env_vars
-        
+
         member do
           post :create_preview_environment
         end
       end
     end
-    
+
     # Iframe bridge routes - outside of teams scope for direct app access
     resources :iframe_bridge, only: [], param: :app_id do
       member do

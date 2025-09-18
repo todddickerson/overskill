@@ -448,21 +448,20 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   def verify_no_js_errors
     # Check for JavaScript errors in console using existing Bullet Train method
     # This leverages the existing assert_no_js_errors method but doesn't yield a block
-    begin
-      if use_cuprite?
-        verify_no_js_errors_cuprite
-      else
-        verify_no_js_errors_selenium  
-      end
-    rescue => e
-      puts "Note: Could not check JavaScript console logs: #{e.message}"
+
+    if use_cuprite?
+      verify_no_js_errors_cuprite
+    else
+      verify_no_js_errors_selenium
     end
+  rescue => e
+    puts "Note: Could not check JavaScript console logs: #{e.message}"
   end
 
   def create_test_user(email: nil)
     # Create authenticated test user compatible with Bullet Train
     test_email = email || "test-#{Time.current.to_i}@example.com"
-    
+
     user = User.create!(
       email: test_email,
       password: "password123",
@@ -471,11 +470,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
       last_name: "User",
       time_zone: "UTC"
     )
-    
+
     # Create team and membership (Bullet Train requirement)
     team = Team.create!(name: "Test Team #{Time.current.to_i}")
     Membership.create!(user: user, team: team)
-    
+
     user
   end
 
@@ -483,7 +482,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # Create test app for publishing golden flow tests
     team = user.teams.first
     membership = user.memberships.first
-    
+
     App.create!(
       name: "Test Generated App",
       prompt: "Test app for golden flow testing",
@@ -493,9 +492,9 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     ).tap do |app|
       # Create test files to simulate generated app
       app.app_files.create!([
-        { path: "index.html", content: "<h1>Test App</h1>", team: team },
-        { path: "app.js", content: "console.log('test');", team: team },
-        { path: "style.css", content: "body { margin: 0; }", team: team }
+        {path: "index.html", content: "<h1>Test App</h1>", team: team},
+        {path: "app.js", content: "console.log('test');", team: team},
+        {path: "style.css", content: "body { margin: 0; }", team: team}
       ])
     end
   end
@@ -505,16 +504,16 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     start_time = Time.current
     result = yield
     duration = Time.current - start_time
-    
+
     puts "🎯 Golden Flow Performance: #{flow_name} took #{duration.round(2)}s"
-    
+
     # Log performance for CI analysis
-    if ENV['CI']
+    if ENV["CI"]
       File.open("tmp/golden_flow_metrics.log", "a") do |f|
         f.puts "#{Time.current.iso8601},#{flow_name},#{duration}"
       end
     end
-    
+
     result
   end
 

@@ -3,43 +3,43 @@ module Ai
     def initialize(app)
       @app = app
     end
-    
+
     # Get available component categories including Supabase UI
     def available_component_categories
       {
-        'shadcn_ui_core' => {
-          description: 'Core shadcn/ui components with variants and TypeScript',
+        "shadcn_ui_core" => {
+          description: "Core shadcn/ui components with variants and TypeScript",
           components: SHADCN_CORE_COMPONENTS,
-          dependencies: ['@radix-ui/react-dialog', '@radix-ui/react-slot', 'class-variance-authority', 'lucide-react']
+          dependencies: ["@radix-ui/react-dialog", "@radix-ui/react-slot", "class-variance-authority", "lucide-react"]
         },
-        'shadcn_ui_forms' => {
-          description: 'Advanced form components with validation',
+        "shadcn_ui_forms" => {
+          description: "Advanced form components with validation",
           components: SHADCN_FORM_COMPONENTS,
-          dependencies: ['@hookform/resolvers', 'react-hook-form', 'zod', '@radix-ui/react-popover']
+          dependencies: ["@hookform/resolvers", "react-hook-form", "zod", "@radix-ui/react-popover"]
         },
-        'supabase_ui_auth' => {
-          description: 'Complete Supabase authentication system with email verification',
+        "supabase_ui_auth" => {
+          description: "Complete Supabase authentication system with email verification",
           components: SUPABASE_AUTH_COMPONENTS,
-          dependencies: ['@supabase/auth-helpers-nextjs', '@supabase/auth-helpers-react']
+          dependencies: ["@supabase/auth-helpers-nextjs", "@supabase/auth-helpers-react"]
         },
-        'supabase_ui_data' => {
-          description: 'Advanced data handling and file management',
+        "supabase_ui_data" => {
+          description: "Advanced data handling and file management",
           components: SUPABASE_DATA_COMPONENTS,
-          dependencies: ['react-dropzone', '@tanstack/react-query', 'react-intersection-observer']
+          dependencies: ["react-dropzone", "@tanstack/react-query", "react-intersection-observer"]
         },
-        'supabase_ui_realtime' => {
-          description: 'Real-time collaboration features',
+        "supabase_ui_realtime" => {
+          description: "Real-time collaboration features",
           components: SUPABASE_REALTIME_COMPONENTS,
-          dependencies: ['@supabase/realtime-js']
+          dependencies: ["@supabase/realtime-js"]
         },
-        'supabase_ui_platform' => {
-          description: 'Full database management interface',
+        "supabase_ui_platform" => {
+          description: "Full database management interface",
           components: SUPABASE_PLATFORM_COMPONENTS,
-          dependencies: ['@monaco-editor/react', 'recharts', '@supabase/postgres-meta']
+          dependencies: ["@monaco-editor/react", "recharts", "@supabase/postgres-meta"]
         }
       }
     end
-    
+
     # Generate enhanced AI context with Supabase UI awareness
     def generate_ai_context_with_supabase
       context = []
@@ -47,7 +47,7 @@ module Ai
       context << ""
       context << "You have access to high-quality, production-ready components:"
       context << ""
-      
+
       # shadcn/ui components
       context << "### 🎨 shadcn/ui Components"
       context << "Modern, accessible UI components with variants and proper TypeScript"
@@ -59,7 +59,7 @@ module Ai
       context << "- **Form**: React Hook Form integration with validation"
       context << "- **Select**: Dropdown selects with search capabilities"
       context << ""
-      
+
       # Supabase UI components
       context << "### 🔐 Supabase Auth Components"
       context << "Production-ready authentication with complete flows"
@@ -68,28 +68,28 @@ module Ai
       context << "- **Current User Avatar**: Automatic avatar with user metadata"
       context << "- **Protected Routes**: Authentication guards and middleware"
       context << ""
-      
+
       context << "### 📊 Supabase Data Components"
       context << "Advanced data handling and file management"
       context << "- **Infinite Query Hook**: Pagination and progressive loading"
       context << "- **Dropzone**: Drag-and-drop file upload to Supabase Storage"
       context << "- **Results Table**: Display query results with sorting/filtering"
       context << ""
-      
+
       context << "### ⚡ Supabase Realtime Components"
       context << "Real-time collaboration features"
       context << "- **Realtime Chat**: Multi-user chat system with persistence"
       context << "- **Realtime Cursor**: Shared cursor tracking for collaboration"
       context << "- **Realtime Avatar Stack**: Show online users in real-time"
       context << ""
-      
+
       context << "### 🛠️ Supabase Platform Components"
       context << "Database management and analytics interface"
       context << "- **Platform Kit**: Complete embedded database manager"
       context << "- **SQL Editor**: AI-powered SQL query interface"
       context << "- **Users Growth Chart**: Analytics and user growth visualization"
       context << ""
-      
+
       context << "## Component Usage Examples:"
       context << ""
       context << "**For modern UI:**"
@@ -110,169 +110,169 @@ module Ai
       context << "**To request components:**"
       context << "Say things like: 'Add shadcn/ui core components' or 'Include Supabase auth components'"
       context << ""
-      
+
       context.join("\n")
     end
-    
+
     # Add specific component category to the app
     def add_component_category(category_key)
       category = available_component_categories[category_key]
       return false unless category
-      
+
       Rails.logger.info "[EnhancedOptionalComponentService] Adding #{category_key} components to app ##{@app.id}"
-      
+
       # Add dependencies to package.json if needed
       add_category_dependencies(category[:dependencies]) if category[:dependencies].any?
-      
+
       # Add component files
       category[:components].each do |component_name, component_info|
         create_component_file(component_name, component_info, category_key)
       end
-      
+
       Rails.logger.info "[EnhancedOptionalComponentService] Added #{category[:components].size} components from #{category_key}"
       true
     end
-    
+
     private
-    
+
     # Core shadcn/ui components
     SHADCN_CORE_COMPONENTS = {
-      'button' => {
-        description: 'Flexible button with 6 variants and size options',
-        path: 'src/components/ui/button.tsx',
-        template_source: 'shadcn_ui/button.tsx'
+      "button" => {
+        description: "Flexible button with 6 variants and size options",
+        path: "src/components/ui/button.tsx",
+        template_source: "shadcn_ui/button.tsx"
       },
-      'card' => {
-        description: 'Card container with header, content, and footer sections',
-        path: 'src/components/ui/card.tsx',
-        template_source: 'shadcn_ui/card.tsx'
+      "card" => {
+        description: "Card container with header, content, and footer sections",
+        path: "src/components/ui/card.tsx",
+        template_source: "shadcn_ui/card.tsx"
       },
-      'input' => {
-        description: 'Styled input field with proper focus states',
-        path: 'src/components/ui/input.tsx',
-        template_source: 'shadcn_ui/input.tsx'
+      "input" => {
+        description: "Styled input field with proper focus states",
+        path: "src/components/ui/input.tsx",
+        template_source: "shadcn_ui/input.tsx"
       },
-      'dialog' => {
-        description: 'Modal dialog with overlay and accessibility',
-        path: 'src/components/ui/dialog.tsx',
-        template_source: 'shadcn_ui/dialog.tsx'
+      "dialog" => {
+        description: "Modal dialog with overlay and accessibility",
+        path: "src/components/ui/dialog.tsx",
+        template_source: "shadcn_ui/dialog.tsx"
       },
-      'sheet' => {
-        description: 'Slide-out panel (drawer) from any edge',
-        path: 'src/components/ui/sheet.tsx',
-        template_source: 'shadcn_ui/sheet.tsx'
+      "sheet" => {
+        description: "Slide-out panel (drawer) from any edge",
+        path: "src/components/ui/sheet.tsx",
+        template_source: "shadcn_ui/sheet.tsx"
       }
     }.freeze
-    
+
     # Form components
     SHADCN_FORM_COMPONENTS = {
-      'form' => {
-        description: 'React Hook Form integration with validation',
-        path: 'src/components/ui/form.tsx',
-        template_source: 'shadcn_ui/form.tsx'
+      "form" => {
+        description: "React Hook Form integration with validation",
+        path: "src/components/ui/form.tsx",
+        template_source: "shadcn_ui/form.tsx"
       },
-      'select' => {
-        description: 'Dropdown select with search and custom options',
-        path: 'src/components/ui/select.tsx',
-        template_source: 'shadcn_ui/select.tsx'
+      "select" => {
+        description: "Dropdown select with search and custom options",
+        path: "src/components/ui/select.tsx",
+        template_source: "shadcn_ui/select.tsx"
       },
-      'label' => {
-        description: 'Form label with proper accessibility',
-        path: 'src/components/ui/label.tsx',
-        template_source: 'shadcn_ui/label.tsx'
+      "label" => {
+        description: "Form label with proper accessibility",
+        path: "src/components/ui/label.tsx",
+        template_source: "shadcn_ui/label.tsx"
       }
     }.freeze
-    
+
     # Supabase authentication components
     SUPABASE_AUTH_COMPONENTS = {
-      'password-based-auth' => {
-        description: 'Complete authentication flow with signup, login, forgot password',
-        path: 'src/components/auth/password-based-auth.tsx',
-        template_source: 'supabase_ui/auth/password-based-auth.tsx'
+      "password-based-auth" => {
+        description: "Complete authentication flow with signup, login, forgot password",
+        path: "src/components/auth/password-based-auth.tsx",
+        template_source: "supabase_ui/auth/password-based-auth.tsx"
       },
-      'social-auth' => {
-        description: 'OAuth authentication with multiple providers',
-        path: 'src/components/auth/social-auth.tsx',
-        template_source: 'supabase_ui/auth/social-auth.tsx'
+      "social-auth" => {
+        description: "OAuth authentication with multiple providers",
+        path: "src/components/auth/social-auth.tsx",
+        template_source: "supabase_ui/auth/social-auth.tsx"
       },
-      'current-user-avatar' => {
-        description: 'Auth-aware avatar with automatic user metadata',
-        path: 'src/components/auth/current-user-avatar.tsx',
-        template_source: 'supabase_ui/auth/current-user-avatar.tsx'
+      "current-user-avatar" => {
+        description: "Auth-aware avatar with automatic user metadata",
+        path: "src/components/auth/current-user-avatar.tsx",
+        template_source: "supabase_ui/auth/current-user-avatar.tsx"
       }
     }.freeze
-    
+
     # Supabase data components
     SUPABASE_DATA_COMPONENTS = {
-      'infinite-query-hook' => {
-        description: 'React hook for infinite lists and pagination',
-        path: 'src/hooks/use-infinite-query.ts',
-        template_source: 'supabase_ui/data/infinite-query-hook.ts'
+      "infinite-query-hook" => {
+        description: "React hook for infinite lists and pagination",
+        path: "src/hooks/use-infinite-query.ts",
+        template_source: "supabase_ui/data/infinite-query-hook.ts"
       },
-      'dropzone' => {
-        description: 'Drag-and-drop file upload to Supabase Storage',
-        path: 'src/components/data/dropzone.tsx',
-        template_source: 'supabase_ui/data/dropzone.tsx'
+      "dropzone" => {
+        description: "Drag-and-drop file upload to Supabase Storage",
+        path: "src/components/data/dropzone.tsx",
+        template_source: "supabase_ui/data/dropzone.tsx"
       }
     }.freeze
-    
+
     # Supabase realtime components
     SUPABASE_REALTIME_COMPONENTS = {
-      'realtime-chat' => {
-        description: 'Real-time chat system with persistence support',
-        path: 'src/components/realtime/realtime-chat.tsx',
-        template_source: 'supabase_ui/realtime/realtime-chat.tsx'
+      "realtime-chat" => {
+        description: "Real-time chat system with persistence support",
+        path: "src/components/realtime/realtime-chat.tsx",
+        template_source: "supabase_ui/realtime/realtime-chat.tsx"
       },
-      'realtime-cursor' => {
-        description: 'Shared cursor tracking for collaboration',
-        path: 'src/components/realtime/realtime-cursor.tsx',
-        template_source: 'supabase_ui/realtime/realtime-cursor.tsx'
+      "realtime-cursor" => {
+        description: "Shared cursor tracking for collaboration",
+        path: "src/components/realtime/realtime-cursor.tsx",
+        template_source: "supabase_ui/realtime/realtime-cursor.tsx"
       },
-      'realtime-avatar-stack' => {
-        description: 'Show online users in real-time',
-        path: 'src/components/realtime/realtime-avatar-stack.tsx',
-        template_source: 'supabase_ui/realtime/realtime-avatar-stack.tsx'
+      "realtime-avatar-stack" => {
+        description: "Show online users in real-time",
+        path: "src/components/realtime/realtime-avatar-stack.tsx",
+        template_source: "supabase_ui/realtime/realtime-avatar-stack.tsx"
       }
     }.freeze
-    
+
     # Supabase platform components
     SUPABASE_PLATFORM_COMPONENTS = {
-      'platform-kit' => {
-        description: 'Complete embedded database management interface',
-        path: 'src/components/platform/platform-kit.tsx',
-        template_source: 'supabase_ui/platform/platform-kit.tsx'
+      "platform-kit" => {
+        description: "Complete embedded database management interface",
+        path: "src/components/platform/platform-kit.tsx",
+        template_source: "supabase_ui/platform/platform-kit.tsx"
       },
-      'sql-editor' => {
-        description: 'AI-powered SQL query interface',
-        path: 'src/components/platform/sql-editor.tsx',
-        template_source: 'supabase_ui/platform/sql-editor.tsx'
+      "sql-editor" => {
+        description: "AI-powered SQL query interface",
+        path: "src/components/platform/sql-editor.tsx",
+        template_source: "supabase_ui/platform/sql-editor.tsx"
       }
     }.freeze
-    
+
     def add_category_dependencies(dependencies)
       # This would update package.json with additional dependencies
-      Rails.logger.info "[EnhancedOptionalComponentService] Dependencies needed: #{dependencies.join(', ')}"
-      
+      Rails.logger.info "[EnhancedOptionalComponentService] Dependencies needed: #{dependencies.join(", ")}"
+
       # TODO: Implement package.json updates in future iteration
       # For now, we'll track what needs to be added
     end
-    
+
     def create_component_file(component_name, component_info, category_key)
-      template_path = Rails.root.join('app', 'templates', 'optional', component_info[:template_source])
-      
+      template_path = Rails.root.join("app", "templates", "optional", component_info[:template_source])
+
       if ::File.exist?(template_path)
         template_content = ::File.read(template_path)
         processed_content = process_component_template(template_content)
-        
+
         # Ensure content is not blank
         if processed_content.blank?
           Rails.logger.warn "[EnhancedOptionalComponentService] Blank content for #{component_info[:path]}, using placeholder"
           processed_content = "// Placeholder for #{component_info[:path]}"
         end
-        
+
         # Check if file already exists to avoid constraint violations
         existing_file = @app.app_files.find_by(path: component_info[:path])
-        
+
         if existing_file
           existing_file.update!(content: processed_content)
           Rails.logger.info "[EnhancedOptionalComponentService] Updated existing #{component_info[:path]}"
@@ -284,21 +284,21 @@ module Ai
           )
           Rails.logger.info "[EnhancedOptionalComponentService] Created #{component_info[:path]}"
         end
-        
+
       else
         Rails.logger.warn "[EnhancedOptionalComponentService] Template not found: #{template_path}"
-        
+
         # Create placeholder for missing templates
         create_placeholder_component(component_name, component_info)
       end
     end
-    
+
     def create_placeholder_component(component_name, component_info)
       placeholder_content = generate_placeholder_content(component_name, component_info)
-      
+
       # Check if file already exists to avoid constraint violations
       existing_file = @app.app_files.find_by(path: component_info[:path])
-      
+
       if existing_file
         existing_file.update!(content: placeholder_content)
         Rails.logger.info "[EnhancedOptionalComponentService] Updated existing placeholder #{component_info[:path]}"
@@ -311,7 +311,7 @@ module Ai
         Rails.logger.info "[EnhancedOptionalComponentService] Created placeholder for #{component_info[:path]}"
       end
     end
-    
+
     def generate_placeholder_content(component_name, component_info)
       <<~TYPESCRIPT
         // #{component_name.humanize} Component
@@ -335,190 +335,190 @@ module Ai
         }
       TYPESCRIPT
     end
-    
+
     def process_component_template(content)
       # Process template variables
       content
-        .gsub('{{APP_ID}}', @app.id.to_s)
-        .gsub('{{APP_NAME}}', @app.name)
-        .gsub('{{APP_SLUG}}', @app.subdomain)
+        .gsub("{{APP_ID}}", @app.id.to_s)
+        .gsub("{{APP_NAME}}", @app.name)
+        .gsub("{{APP_SLUG}}", @app.subdomain)
     end
-    
+
     public
-    
+
     # Detect which components to add based on AI response
     def detect_and_add_components(ai_response_text)
       components_added = []
-      
+
       # Check for authentication components
       if ai_response_text.match?(/\b(auth|login|signup|sign.?up|sign.?in|password|authentication)\b/i)
-        add_component_category('supabase_ui_auth')
-        components_added << 'supabase_ui_auth' unless components_added.include?('supabase_ui_auth')
+        add_component_category("supabase_ui_auth")
+        components_added << "supabase_ui_auth" unless components_added.include?("supabase_ui_auth")
       end
-      
+
       # Check for file upload
       if ai_response_text.match?(/\b(upload|dropzone|file|storage|attachment)\b/i)
-        add_component_category('supabase_ui_data')
-        components_added << 'supabase_ui_data'
+        add_component_category("supabase_ui_data")
+        components_added << "supabase_ui_data"
       end
-      
+
       # Check for realtime features
       if ai_response_text.match?(/\b(realtime|chat|cursor|presence|collaboration)\b/i)
-        add_component_category('supabase_ui_realtime')
-        components_added << 'supabase_ui_realtime'
+        add_component_category("supabase_ui_realtime")
+        components_added << "supabase_ui_realtime"
       end
-      
+
       # Check for UI components
       if ai_response_text.match?(/\b(button|card|dialog|form|input)\b/i)
-        add_component_category('shadcn_ui_core')
-        components_added << 'shadcn_ui_core'
+        add_component_category("shadcn_ui_core")
+        components_added << "shadcn_ui_core"
       end
-      
+
       # Check for database management
       if ai_response_text.match?(/\b(database|sql|query|platform)\b/i)
         if ai_response_text.match?(/\b(management|admin|platform)\b/i)
-          add_component_category('supabase_ui_platform')
-          components_added << 'supabase_ui_platform'
+          add_component_category("supabase_ui_platform")
+          components_added << "supabase_ui_platform"
         end
       end
-      
-      Rails.logger.info "[EnhancedOptionalComponentService] Detected and added components: #{components_added.join(', ')}" if components_added.any?
+
+      Rails.logger.info "[EnhancedOptionalComponentService] Detected and added components: #{components_added.join(", ")}" if components_added.any?
       components_added
     end
-    
+
     # Get list of dependencies needed for added components
     def get_required_dependencies
       dependencies = Set.new
-      
+
       # Analyze all app files for dependency imports and usage
       @app.app_files.each do |file|
         file_content = file.content || ""
-        
+
         # Scan for import statements and component usage
         analyze_file_dependencies(file_content, dependencies)
-        
+
         # Path-based detection for specific component categories
         analyze_path_dependencies(file.path, dependencies)
       end
-      
+
       dependencies.to_a
     end
-    
+
     private
-    
+
     def analyze_file_dependencies(content, dependencies)
       # Drag and drop libraries
-      if content.include?('@hello-pangea/dnd') || content.include?('DragDropContext') || content.include?('Draggable')
-        dependencies.add('@hello-pangea/dnd')
+      if content.include?("@hello-pangea/dnd") || content.include?("DragDropContext") || content.include?("Draggable")
+        dependencies.add("@hello-pangea/dnd")
       end
-      
+
       # Icon libraries
-      if content.include?('lucide-react') || content.match?(/import.*from ['"]lucide-react['"]/)
-        dependencies.add('lucide-react')
+      if content.include?("lucide-react") || content.match?(/import.*from ['"]lucide-react['"]/)
+        dependencies.add("lucide-react")
       end
-      
+
       # shadcn/ui component dependencies
       add_shadcn_dependencies(content, dependencies)
-      
+
       # Supabase auth UI
-      if content.include?('@supabase/auth-ui-react') || content.include?('Auth from')
-        dependencies.add('@supabase/auth-ui-react')
-        dependencies.add('@supabase/auth-ui-shared')
+      if content.include?("@supabase/auth-ui-react") || content.include?("Auth from")
+        dependencies.add("@supabase/auth-ui-react")
+        dependencies.add("@supabase/auth-ui-shared")
       end
-      
+
       # React Hook Form (common in forms)
-      if content.include?('react-hook-form') || content.include?('useForm')
-        dependencies.add('react-hook-form')
-        dependencies.add('@hookform/resolvers')
-        dependencies.add('zod') # commonly used with react-hook-form
+      if content.include?("react-hook-form") || content.include?("useForm")
+        dependencies.add("react-hook-form")
+        dependencies.add("@hookform/resolvers")
+        dependencies.add("zod") # commonly used with react-hook-form
       end
-      
+
       # Toast/notification libraries
-      if content.include?('react-hot-toast') || content.include?('toast')
-        dependencies.add('react-hot-toast')
+      if content.include?("react-hot-toast") || content.include?("toast")
+        dependencies.add("react-hot-toast")
       end
-      
+
       # Date/time libraries
-      if content.include?('date-fns') || content.include?('formatDistance')
-        dependencies.add('date-fns')
+      if content.include?("date-fns") || content.include?("formatDistance")
+        dependencies.add("date-fns")
       end
-      
+
       # State management
-      if content.include?('zustand')
-        dependencies.add('zustand')
+      if content.include?("zustand")
+        dependencies.add("zustand")
       end
-      
+
       # Animation libraries
-      if content.include?('framer-motion') || content.include?('motion.')
-        dependencies.add('framer-motion')
+      if content.include?("framer-motion") || content.include?("motion.")
+        dependencies.add("framer-motion")
       end
     end
-    
+
     def add_shadcn_dependencies(content, dependencies)
       # Core shadcn/ui dependencies always needed
-      if content.match?(/['"]@\/components\/ui\//) || content.include?('components/ui/')
-        dependencies.add('class-variance-authority') # CVA for variants
-        dependencies.add('clsx') # className utilities
-        dependencies.add('tailwind-merge') # Tailwind className merging
+      if content.match?(/['"]@\/components\/ui\//) || content.include?("components/ui/")
+        dependencies.add("class-variance-authority") # CVA for variants
+        dependencies.add("clsx") # className utilities
+        dependencies.add("tailwind-merge") # Tailwind className merging
       end
-      
+
       # Radix UI dependencies based on component usage
       radix_components = {
-        'Dialog' => '@radix-ui/react-dialog',
-        'Popover' => '@radix-ui/react-popover', 
-        'Tooltip' => '@radix-ui/react-tooltip',
-        'DropdownMenu' => '@radix-ui/react-dropdown-menu',
-        'Select' => '@radix-ui/react-select',
-        'Checkbox' => '@radix-ui/react-checkbox',
-        'RadioGroup' => '@radix-ui/react-radio-group',
-        'Switch' => '@radix-ui/react-switch',
-        'Slider' => '@radix-ui/react-slider',
-        'Progress' => '@radix-ui/react-progress',
-        'Tabs' => '@radix-ui/react-tabs',
-        'Accordion' => '@radix-ui/react-accordion',
-        'AlertDialog' => '@radix-ui/react-alert-dialog',
-        'Sheet' => '@radix-ui/react-dialog', # Sheets use dialog primitives
-        'Toast' => '@radix-ui/react-toast',
-        'Slot' => '@radix-ui/react-slot'
+        "Dialog" => "@radix-ui/react-dialog",
+        "Popover" => "@radix-ui/react-popover",
+        "Tooltip" => "@radix-ui/react-tooltip",
+        "DropdownMenu" => "@radix-ui/react-dropdown-menu",
+        "Select" => "@radix-ui/react-select",
+        "Checkbox" => "@radix-ui/react-checkbox",
+        "RadioGroup" => "@radix-ui/react-radio-group",
+        "Switch" => "@radix-ui/react-switch",
+        "Slider" => "@radix-ui/react-slider",
+        "Progress" => "@radix-ui/react-progress",
+        "Tabs" => "@radix-ui/react-tabs",
+        "Accordion" => "@radix-ui/react-accordion",
+        "AlertDialog" => "@radix-ui/react-alert-dialog",
+        "Sheet" => "@radix-ui/react-dialog", # Sheets use dialog primitives
+        "Toast" => "@radix-ui/react-toast",
+        "Slot" => "@radix-ui/react-slot"
       }
-      
+
       radix_components.each do |component, package|
         if content.include?(component) || content.include?("ui/#{component.downcase}")
           dependencies.add(package)
         end
       end
-      
+
       # Additional shadcn/ui specific packages
-      if content.include?('Badge') || content.include?('ui/badge')
-        dependencies.add('lucide-react') # badges often use icons
+      if content.include?("Badge") || content.include?("ui/badge")
+        dependencies.add("lucide-react") # badges often use icons
       end
-      
-      if content.include?('useToast') || content.include?('toast(')
-        dependencies.add('@radix-ui/react-toast')
+
+      if content.include?("useToast") || content.include?("toast(")
+        dependencies.add("@radix-ui/react-toast")
       end
     end
-    
+
     def analyze_path_dependencies(path, dependencies)
       # Path-based dependency detection (existing logic)
       # Supabase auth components
-      if path.include?('components/auth/password-based-auth')
-        dependencies.add('@supabase/auth-helpers-react')
+      if path.include?("components/auth/password-based-auth")
+        dependencies.add("@supabase/auth-helpers-react")
       end
-      
+
       # Dropzone
-      if path.include?('components/data/dropzone')
-        dependencies.add('react-dropzone')
+      if path.include?("components/data/dropzone")
+        dependencies.add("react-dropzone")
       end
-      
+
       # Realtime components
-      if path.include?('components/realtime/')
-        dependencies.add('@supabase/realtime-js')
+      if path.include?("components/realtime/")
+        dependencies.add("@supabase/realtime-js")
       end
-      
+
       # Platform kit
-      if path.include?('components/platform/')
-        dependencies.add('@monaco-editor/react')
-        dependencies.add('recharts')
+      if path.include?("components/platform/")
+        dependencies.add("@monaco-editor/react")
+        dependencies.add("recharts")
       end
     end
   end

@@ -6,7 +6,7 @@ module Ai
       @app = app
       @openai_client = OpenaiClient.new
       @ideogram_client = nil
-      
+
       # Initialize Ideogram client for fallback
       begin
         @ideogram_client = IdeogramClient.new
@@ -16,11 +16,11 @@ module Ai
     end
 
     # Main image generation method with provider fallback
-    def generate_image(prompt:, width: 512, height: 512, model: 'flux.schnell', target_path: nil, options: {})
+    def generate_image(prompt:, width: 512, height: 512, model: "flux.schnell", target_path: nil, options: {})
       # Auto-adjust dimensions to valid multiples of 32
       width = adjust_to_multiple_of_32(width)
       height = adjust_to_multiple_of_32(height)
-      
+
       # Validate dimensions after adjustment
       validation_result = validate_dimensions(width, height)
       return validation_result if validation_result[:error]
@@ -50,19 +50,18 @@ module Ai
         end
 
         # Both providers failed
-        return { error: "Failed to generate image with both OpenAI and Ideogram providers" }
-
+        {error: "Failed to generate image with both OpenAI and Ideogram providers"}
       rescue => e
         Rails.logger.error "[ImageGen] Exception during image generation: #{e.message}"
         Rails.logger.error e.backtrace.first(5).join("\n")
-        return { error: "Image generation failed: #{e.message}" }
+        {error: "Image generation failed: #{e.message}"}
       end
     end
 
     # Generate and save image to app files (for app builder)
-    def generate_and_save_image(prompt:, width: 512, height: 512, target_path:, model: 'flux.schnell', options: {})
+    def generate_and_save_image(prompt:, target_path:, width: 512, height: 512, model: "flux.schnell", options: {})
       unless @app
-        return { error: "App context required for saving images" }
+        return {error: "App context required for saving images"}
       end
 
       result = generate_image(
@@ -77,16 +76,16 @@ module Ai
       if result[:success] && result[:image_data]
         # Upload to R2 immediately instead of embedding in app files
         r2_url = upload_image_to_r2(target_path, result[:image_data])
-        
+
         # Save reference to the R2 URL in app files (not the actual image)
         save_image_reference_to_app_files(target_path, r2_url, result[:image_data])
-        
+
         # Return with R2 URL and usage instructions for AI
         result.merge(
           path: target_path,
           url: r2_url,
           usage_instruction: "Use this URL in your HTML/CSS: #{r2_url}",
-          storage_method: 'r2'
+          storage_method: "r2"
         )
       else
         result
@@ -96,13 +95,13 @@ module Ai
     # Generate logo (for logo service)
     def generate_logo(app_name, app_description, options: {})
       prompt = build_logo_prompt(app_name, app_description)
-      
+
       # Use square aspect ratio for logos
       result = generate_image(
         prompt: prompt,
         width: 1024,
         height: 1024,
-        options: options.merge(style_type: 'DESIGN')
+        options: options.merge(style_type: "DESIGN")
       )
 
       if result[:success]
@@ -121,29 +120,29 @@ module Ai
     def adjust_to_multiple_of_32(dimension)
       # Round to nearest multiple of 32
       rounded = (dimension.to_f / 32).round * 32
-      
+
       # Ensure minimum of 512 and maximum of 1920
       rounded = 512 if rounded < 512
       rounded = 1920 if rounded > 1920
-      
+
       # Log adjustment if changed
       if rounded != dimension
         Rails.logger.info "[ImageGen] Adjusted dimension from #{dimension} to #{rounded} (multiple of 32)"
       end
-      
+
       rounded
     end
 
     def validate_dimensions(width, height)
       if width < 512 || height < 512 || width > 1920 || height > 1920
-        return { error: "Image dimensions must be between 512 and 1920 pixels" }
+        return {error: "Image dimensions must be between 512 and 1920 pixels"}
       end
 
       if width % 32 != 0 || height % 32 != 0
-        return { error: "Image dimensions must be multiples of 32" }
+        return {error: "Image dimensions must be multiples of 32"}
       end
 
-      { valid: true }
+      {valid: true}
     end
 
     def generate_with_ideogram(prompt, width, height, options)
@@ -151,10 +150,10 @@ module Ai
 
       # Build enhanced prompt
       enhanced_prompt = build_ideogram_prompt(prompt, width, height, options)
-      
+
       # Calculate aspect ratio for Ideogram
       aspect_ratio = calculate_ideogram_aspect_ratio(width, height)
-      
+
       # Generate with Ideogram
       result = @ideogram_client.generate_image(
         prompt: enhanced_prompt,
@@ -170,7 +169,7 @@ module Ai
         if image_data
           result.merge(image_data: image_data)
         else
-          { success: false, error: "Failed to download image from Ideogram URL" }
+          {success: false, error: "Failed to download image from Ideogram URL"}
         end
       else
         result
@@ -185,9 +184,9 @@ module Ai
 
       # Map quality options - gpt-image-1 supports 'standard' and 'hd'
       quality = case options[:quality]
-                when 'high', 'hd', 'quality' then 'high'
-                else 'auto'
-                end
+      when "high", "hd", "quality" then "high"
+      else "auto"
+      end
 
       result = @openai_client.generate_image(
         prompt,
@@ -208,7 +207,7 @@ module Ai
         if image_data
           result.merge(image_data: image_data)
         else
-          { success: false, error: "Failed to retrieve image content from OpenAI" }
+          {success: false, error: "Failed to retrieve image content from OpenAI"}
         end
       else
         result
@@ -217,12 +216,12 @@ module Ai
 
     def build_ideogram_prompt(prompt, width, height, options)
       aspect_info = if width > height
-                      "landscape #{width}:#{height}"
-                    elsif height > width
-                      "portrait #{height}:#{width}"
-                    else
-                      "square 1:1"
-                    end
+        "landscape #{width}:#{height}"
+      elsif height > width
+        "portrait #{height}:#{width}"
+      else
+        "square 1:1"
+      end
 
       elements = [
         prompt,
@@ -232,7 +231,7 @@ module Ai
       ]
 
       # Add aspect ratio info unless it's a logo
-      unless options[:style_type] == 'DESIGN'
+      unless options[:style_type] == "DESIGN"
         elements << "#{aspect_info} aspect ratio"
       end
 
@@ -259,16 +258,16 @@ module Ai
     def calculate_ideogram_aspect_ratio(width, height)
       # Common aspect ratios supported by Ideogram
       ratio = width.to_f / height.to_f
-      
+
       case ratio
       when 0.5..0.75
-        height > width ? "2x3" : "3x2"
+        (height > width) ? "2x3" : "3x2"
       when 0.75..1.33
         "1x1"
       when 1.33..1.78
-        width > height ? "4x3" : "3x4"
+        (width > height) ? "4x3" : "3x4"
       when 1.78..2.0
-        width > height ? "16x9" : "9x16"
+        (width > height) ? "16x9" : "9x16"
       else
         "1x1" # Default fallback
       end
@@ -292,18 +291,17 @@ module Ai
     end
 
     def download_image_from_url(url)
-      require 'open-uri'
+      require "open-uri"
 
       Rails.logger.info "[ImageGen] Downloading image from URL: #{url[0..100]}..."
 
       # Download with timeout and size limits
       image_data = URI.open(url,
-        read_timeout: 30,
-        "User-Agent" => "OverSkill-ImageBot/1.0"
-      ) do |file|
+        :read_timeout => 30,
+        "User-Agent" => "OverSkill-ImageBot/1.0") do |file|
         # Limit file size to 10MB
-        if file.respond_to?(:meta) && file.meta['content-length']
-          size = file.meta['content-length'].to_i
+        if file.respond_to?(:meta) && file.meta["content-length"]
+          size = file.meta["content-length"].to_i
           if size > 10.megabytes
             Rails.logger.error "[ImageGen] Image too large: #{size} bytes"
             return nil
@@ -315,7 +313,6 @@ module Ai
 
       Rails.logger.info "[ImageGen] Successfully downloaded image (#{image_data.bytesize} bytes)"
       image_data
-
     rescue => e
       Rails.logger.error "[ImageGen] Failed to download image from URL: #{e.message}"
       nil
@@ -323,29 +320,28 @@ module Ai
 
     def upload_image_to_r2(target_path, image_content)
       # Upload image to R2 and return the public URL
-      begin
-        r2_service = Deployment::R2AssetService.new(@app)
-        url = r2_service.upload_file(target_path, image_content, content_type: detect_image_content_type(target_path))
-        Rails.logger.info "[ImageGen] Uploaded image to R2: #{target_path} -> #{url}"
-        url
-      rescue => e
-        Rails.logger.error "[ImageGen] Failed to upload to R2, falling back to embedded storage: #{e.message}"
-        # Fallback: return a data URL if R2 fails
-        content_type = detect_image_content_type(target_path)
-        "data:#{content_type};base64,#{Base64.encode64(image_content).gsub("\n", '')}"
-      end
+
+      r2_service = Deployment::R2AssetService.new(@app)
+      url = r2_service.upload_file(target_path, image_content, content_type: detect_image_content_type(target_path))
+      Rails.logger.info "[ImageGen] Uploaded image to R2: #{target_path} -> #{url}"
+      url
+    rescue => e
+      Rails.logger.error "[ImageGen] Failed to upload to R2, falling back to embedded storage: #{e.message}"
+      # Fallback: return a data URL if R2 fails
+      content_type = detect_image_content_type(target_path)
+      "data:#{content_type};base64,#{Base64.encode64(image_content).delete("\n")}"
     end
 
     def save_image_reference_to_app_files(target_path, r2_url, image_content)
       # Save a reference to the R2 URL in app files (not the actual image)
       file = @app.app_files.find_or_initialize_by(path: target_path)
-      
+
       # Store a placeholder HTML comment with the R2 URL
       # This makes it clear the image is hosted externally
       file.content = "<!-- Image hosted on R2: #{r2_url} -->\n<!-- Size: #{image_content.bytesize} bytes -->\n<!-- Generated: #{Time.current.iso8601} -->"
-      file.file_type = 'image_reference'
+      file.file_type = "image_reference"
       file.team = @app.team
-      
+
       file.save!
       Rails.logger.info "[ImageGen] Saved R2 image reference: #{target_path} -> #{r2_url}"
     end
@@ -353,12 +349,12 @@ module Ai
     def detect_image_content_type(path)
       extension = ::File.extname(path).downcase
       case extension
-      when '.png' then 'image/png'
-      when '.jpg', '.jpeg' then 'image/jpeg'
-      when '.gif' then 'image/gif'
-      when '.webp' then 'image/webp'
-      when '.svg' then 'image/svg+xml'
-      else 'image/png' # Default to PNG
+      when ".png" then "image/png"
+      when ".jpg", ".jpeg" then "image/jpeg"
+      when ".gif" then "image/gif"
+      when ".webp" then "image/webp"
+      when ".svg" then "image/svg+xml"
+      else "image/png" # Default to PNG
       end
     end
 
@@ -366,7 +362,7 @@ module Ai
     def save_image_to_app_files(target_path, image_content)
       # This method is deprecated - use save_image_reference_to_app_files instead
       Rails.logger.warn "[ImageGen] Using deprecated save_image_to_app_files method"
-      
+
       # Save image as AppFile with binary content
       file = @app.app_files.find_or_initialize_by(path: target_path)
 
@@ -381,9 +377,9 @@ module Ai
 
     def determine_file_type(path)
       case path
-      when /\.(png|jpg|jpeg|gif|webp)$/i then 'image'
-      when /\.svg$/i then 'svg'
-      else 'binary'
+      when /\.(png|jpg|jpeg|gif|webp)$/i then "image"
+      when /\.svg$/i then "svg"
+      else "binary"
       end
     end
 

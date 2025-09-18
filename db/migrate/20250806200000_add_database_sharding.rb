@@ -13,19 +13,19 @@ class AddDatabaseSharding < ActiveRecord::Migration[8.0]
       t.jsonb :metadata, default: {}
       t.timestamps
     end
-    
+
     add_index :database_shards, :name, unique: true
     add_index :database_shards, :supabase_project_id, unique: true
     add_index :database_shards, :status
     add_index :database_shards, :app_count
-    
+
     # Add shard reference to apps
     add_reference :apps, :database_shard, foreign_key: true, index: true
-    
+
     # Add shard-specific fields to apps
     add_column :apps, :shard_app_id, :string # Unique ID within the shard
     add_column :apps, :supabase_project_url, :string # Quick reference to shard URL
-    
+
     add_index :apps, [:database_shard_id, :shard_app_id], unique: true
   end
 end

@@ -2,7 +2,6 @@ module Ai
   # Service for providing app templates and accelerating AI generation
   # Templates reduce generation time and ensure consistent quality
   class AppTemplateService
-    
     # Common app templates that can be quickly customized
     TEMPLATES = {
       dashboard: {
@@ -18,11 +17,11 @@ module Ai
           "src/styles.css" => :dashboard_styles
         }
       },
-      
+
       landing_page: {
         name: "Landing Page",
         description: "Professional landing page with hero, features, and CTA",
-        category: "marketing", 
+        category: "marketing",
         files: {
           "index.html" => :landing_html,
           "src/App.tsx" => :landing_app,
@@ -32,7 +31,7 @@ module Ai
           "src/styles.css" => :landing_styles
         }
       },
-      
+
       saas_tool: {
         name: "SaaS Tool",
         description: "Complete SaaS application with auth, billing, and features",
@@ -49,7 +48,7 @@ module Ai
           "src/styles.css" => :saas_styles
         }
       },
-      
+
       game: {
         name: "Simple Game",
         description: "Interactive game with canvas and game logic",
@@ -64,16 +63,16 @@ module Ai
         }
       }
     }.freeze
-    
+
     def initialize
       @templates = TEMPLATES
     end
-    
+
     # Get template by key
     def get_template(template_key)
       template = @templates[template_key.to_sym]
       return nil unless template
-      
+
       {
         name: template[:name],
         description: template[:description],
@@ -81,7 +80,7 @@ module Ai
         files: generate_template_files(template[:files])
       }
     end
-    
+
     # Get all available templates
     def all_templates
       @templates.map do |key, template|
@@ -93,12 +92,12 @@ module Ai
         }
       end
     end
-    
+
     # Generate template-enhanced prompt for AI
     def enhance_prompt_with_template(user_prompt, template_key = nil)
       # Auto-detect template if not provided
       template_key ||= detect_template_from_prompt(user_prompt)
-      
+
       if template_key
         template = get_template(template_key)
         return <<~PROMPT
@@ -116,35 +115,35 @@ module Ai
           - Add requested features while preserving template foundation
         PROMPT
       end
-      
+
       user_prompt
     end
-    
+
     private
-    
+
     def generate_template_files(file_map)
       files = {}
-      
+
       file_map.each do |path, template_method|
         files[path] = send(template_method)
       end
-      
+
       files
     end
-    
+
     def detect_template_from_prompt(prompt)
       prompt_lower = prompt.downcase
-      
+
       return :dashboard if prompt_lower.match?(/dashboard|analytics|chart|metrics|admin/)
       return :landing_page if prompt_lower.match?(/landing|homepage|website|marketing/)
       return :saas_tool if prompt_lower.match?(/saas|subscription|billing|account|settings/)
       return :game if prompt_lower.match?(/game|play|canvas|score|level/)
-      
+
       nil
     end
-    
+
     # Template file contents
-    
+
     def dashboard_html
       <<~HTML
         <!DOCTYPE html>
@@ -161,7 +160,7 @@ module Ai
         </html>
       HTML
     end
-    
+
     def dashboard_app
       <<~TSX
         import React from 'react';
@@ -178,7 +177,7 @@ module Ai
         export default App;
       TSX
     end
-    
+
     def dashboard_component
       <<~TSX
         import React from 'react';
@@ -227,7 +226,7 @@ module Ai
         }
       TSX
     end
-    
+
     def chart_component
       <<~TSX
         import React from 'react';
@@ -256,7 +255,7 @@ module Ai
         }
       TSX
     end
-    
+
     def data_hook
       <<~TS
         import { useState, useEffect } from 'react';
@@ -291,7 +290,7 @@ module Ai
         }
       TS
     end
-    
+
     def dashboard_styles
       <<~CSS
         /* Dashboard specific styles */
@@ -308,7 +307,7 @@ module Ai
         }
       CSS
     end
-    
+
     def landing_html
       <<~HTML
         <!DOCTYPE html>
@@ -325,7 +324,7 @@ module Ai
         </html>
       HTML
     end
-    
+
     def landing_app
       <<~TSX
         import React from 'react';
@@ -346,7 +345,7 @@ module Ai
         export default App;
       TSX
     end
-    
+
     def hero_component
       <<~TSX
         import React from 'react';
@@ -373,7 +372,7 @@ module Ai
         }
       TSX
     end
-    
+
     def features_component
       <<~TSX
         import React from 'react';
@@ -424,7 +423,7 @@ module Ai
         }
       TSX
     end
-    
+
     def cta_component
       <<~TSX
         import React from 'react';
@@ -451,7 +450,7 @@ module Ai
         }
       TSX
     end
-    
+
     def landing_styles
       <<~CSS
         /* Landing page specific styles */
@@ -468,7 +467,7 @@ module Ai
         }
       CSS
     end
-    
+
     # Additional template methods would be defined here...
     # For brevity, I'm showing the pattern with dashboard and landing page templates
   end

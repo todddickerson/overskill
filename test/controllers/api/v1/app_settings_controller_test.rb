@@ -30,11 +30,11 @@ class Api::V1::AppSettingsControllerTest < Api::Test
     # Fetch the app_setting in question and prepare to compare it's attributes.
     app_setting = AppSetting.find(app_setting_data["id"])
 
-    assert_equal_or_nil app_setting_data['key'], app_setting.key
-    assert_equal_or_nil app_setting_data['value'], app_setting.value
-    assert_equal_or_nil app_setting_data['setting_type'], app_setting.setting_type
-    assert_equal_or_nil app_setting_data['description'], app_setting.description
-    assert_equal_or_nil app_setting_data['encrypted'], app_setting.encrypted
+    assert_equal_or_nil app_setting_data["key"], app_setting.key
+    assert_equal_or_nil app_setting_data["value"], app_setting.value
+    assert_equal_or_nil app_setting_data["setting_type"], app_setting.setting_type
+    assert_equal_or_nil app_setting_data["description"], app_setting.description
+    assert_equal_or_nil app_setting_data["encrypted"], app_setting.encrypted
     # 🚅 super scaffolding will insert new fields above this line.
 
     assert_equal app_setting_data["app_id"], app_setting.app_id
@@ -93,10 +93,10 @@ class Api::V1::AppSettingsControllerTest < Api::Test
     put "/api/v1/app_settings/#{@app_setting.id}", params: {
       access_token: access_token,
       app_setting: {
-        key: 'Alternative String Value',
-        value: 'Alternative String Value',
-        setting_type: 'Alternative String Value',
-        description: 'Alternative String Value',
+        key: "Alternative String Value",
+        value: "Alternative String Value",
+        setting_type: "Alternative String Value",
+        description: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -108,10 +108,10 @@ class Api::V1::AppSettingsControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @app_setting.reload
-    assert_equal @app_setting.key, 'Alternative String Value'
-    assert_equal @app_setting.value, 'Alternative String Value'
-    assert_equal @app_setting.setting_type, 'Alternative String Value'
-    assert_equal @app_setting.description, 'Alternative String Value'
+    assert_equal @app_setting.key, "Alternative String Value"
+    assert_equal @app_setting.value, "Alternative String Value"
+    assert_equal @app_setting.setting_type, "Alternative String Value"
+    assert_equal @app_setting.description, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

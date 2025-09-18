@@ -20,7 +20,7 @@ Rails.application.routes.draw do
     # The root `/` path is routed to `Public::HomeController#index` by default. You can set it
     # to whatever you want by doing something like this:
     # root to: "my_new_root_controller#index"
-    
+
     # Simple app generator - the main entry point
     root to: "generator#index"
     resources :generator, only: [:index, :create]
@@ -29,7 +29,7 @@ Rails.application.routes.draw do
   # Admin analytics dashboard (protected)
   authenticate :user, ->(user) { user.email == ENV["SUPER_ADMIN_EMAIL"] } do
     mount AhoyCaptain::Engine, at: "/admin/analytics"
-    
+
     # System optimization metrics dashboard
     namespace :admin do
       resources :metrics, only: [:index]
@@ -39,7 +39,7 @@ Rails.application.routes.draw do
   namespace :webhooks do
     # Supabase authentication webhooks
     post "supabase/auth_event", to: "supabase#auth_event"
-    
+
     namespace :incoming do
       namespace :oauth do
         resources :google_oauth2_account_webhooks if google_oauth2_enabled?
@@ -75,7 +75,7 @@ Rails.application.routes.draw do
 
         # routes for standard user actions and resources are configured in the `bullet_train` gem, but you can add more here.
       end
-      
+
       # Supabase sync management (admin only)
       resources :supabase_sync, only: [:index] do
         collection do
@@ -134,32 +134,32 @@ Rails.application.routes.draw do
             post :upload_logo
             post :debug_error
           end
-          
+
           resources :app_files, only: [:index]
-          
+
           # Chat interface (may be deprecated in favor of editor)
           resource :chat, controller: "app_chats", only: [:show, :create]
-          
+
           # Main editor interface at /account/apps/:id/editor
           resource :editor, controller: "app_editors", only: [:show] do
             post :create_message
             patch "files/:file_id", action: :update_file, as: :file
           end
-          
+
           # Version management actions
           post :update_preview, controller: "app_editors"
           post "versions/:version_id/restore", action: :restore_version, controller: "app_editors", as: :restore_version
-          post "versions/:version_id/bookmark", action: :bookmark_version, controller: "app_editors", as: :bookmark_version  
+          post "versions/:version_id/bookmark", action: :bookmark_version, controller: "app_editors", as: :bookmark_version
           get "versions/:version_id/compare", action: :compare_version, controller: "app_editors", as: :compare_version
-          
+
           # Version list for history modal
           get :versions, controller: "app_editors"
-          
+
           # Preview iframe and file serving at /account/apps/:id/preview
           resource :preview, controller: "app_previews", only: [:show] do
             get "files/*path", action: :serve_file, as: :file, format: false
           end
-          
+
           # Dashboard interface for database management
           resource :dashboard, controller: "app_dashboards", only: [:show] do
             get :data
@@ -188,14 +188,14 @@ Rails.application.routes.draw do
           resources :app_files
           resources :app_generations
           resources :app_collaborators
-          
+
           # API call logging and monitoring
           resources :api_calls, controller: "app_api_calls", only: [:index, :show, :destroy] do
             collection do
               delete :clear_all
             end
           end
-          
+
           # Security and audit features (transparent, unlike Base44)
           resources :security_policies, controller: "app_security_policies", only: [:index, :show]
           resources :audit_logs, controller: "app_audit_logs", only: [:index, :show] do
@@ -205,7 +205,7 @@ Rails.application.routes.draw do
               get :export
             end
           end
-          
+
           # Deployment management
           resource :deployment, controller: "app_deployments", only: [:show] do
             member do
@@ -215,7 +215,7 @@ Rails.application.routes.draw do
               get :logs
             end
           end
-          
+
           # App settings (simplified for non-technical users)
           resources :app_settings
           resources :app_security_policies

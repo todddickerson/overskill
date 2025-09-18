@@ -18,34 +18,33 @@ module Ai
           attach_logo_from_url(result[:image_url])
         else
           Rails.logger.error "[Logo] No image data returned from generation service"
-          return { success: false, error: "No image returned from provider" }
+          return {success: false, error: "No image returned from provider"}
         end
 
         # Store the revised prompt for reference
         @app.update(logo_prompt: result[:revised_prompt]) if result[:revised_prompt]
 
         Rails.logger.info "[Logo] Successfully generated logo for app: #{@app.name}"
-        result
       else
         Rails.logger.error "[Logo] Failed to generate logo: #{result[:error]}"
-        result
       end
+      result
     rescue => e
       Rails.logger.error "[Logo] Exception: #{e.message}"
-      { success: false, error: e.message }
+      {success: false, error: e.message}
     end
 
     def regenerate_logo(custom_prompt = nil)
       # Allow regeneration with a custom prompt
-      if custom_prompt.present?
-        result = @image_service.generate_image(
+      result = if custom_prompt.present?
+        @image_service.generate_image(
           prompt: custom_prompt,
           width: 1024,
           height: 1024,
-          options: { style_type: 'DESIGN' }
+          options: {style_type: "DESIGN"}
         )
       else
-        result = @image_service.generate_logo(@app.name, @app.prompt)
+        @image_service.generate_logo(@app.name, @app.prompt)
       end
 
       if result[:success]
@@ -54,11 +53,11 @@ module Ai
         elsif result[:image_url].present?
           attach_logo_from_url(result[:image_url])
         else
-          return { success: false, error: "No image returned from provider" }
+          return {success: false, error: "No image returned from provider"}
         end
-        { success: true, message: "Logo regenerated successfully" }
+        {success: true, message: "Logo regenerated successfully"}
       else
-        { success: false, error: result[:error] }
+        {success: false, error: result[:error]}
       end
     end
 
@@ -67,12 +66,12 @@ module Ai
     def attach_logo_from_data(image_data)
       # Generate a filename
       filename = "app_logo_#{@app.id}_#{Time.current.to_i}.png"
-      
+
       # Attach to the app using StringIO
       @app.logo.attach(
         io: StringIO.new(image_data),
         filename: filename,
-        content_type: 'image/png'
+        content_type: "image/png"
       )
     rescue => e
       Rails.logger.error "[Logo] Failed to attach image from data: #{e.message}"
@@ -80,19 +79,19 @@ module Ai
     end
 
     def attach_logo_from_url(url)
-      require 'open-uri'
-      
+      require "open-uri"
+
       # Download the image
       downloaded_image = URI.open(url)
-      
+
       # Generate a filename
       filename = "app_logo_#{@app.id}_#{Time.current.to_i}.png"
-      
+
       # Attach to the app (assuming you have Active Storage set up)
       @app.logo.attach(
         io: downloaded_image,
         filename: filename,
-        content_type: 'image/png'
+        content_type: "image/png"
       )
     rescue => e
       Rails.logger.error "[Logo] Failed to attach image: #{e.message}"
@@ -105,7 +104,7 @@ module Ai
       @app.logo.attach(
         io: StringIO.new(decoded),
         filename: filename,
-        content_type: 'image/png'
+        content_type: "image/png"
       )
     rescue => e
       Rails.logger.error "[Logo] Failed to attach base64 image: #{e.message}"

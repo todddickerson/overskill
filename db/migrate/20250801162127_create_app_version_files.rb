@@ -8,7 +8,7 @@ class CreateAppVersionFiles < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    
+
     # Add indexes for common queries
     add_index :app_version_files, [:app_version_id, :app_file_id], unique: true
   end

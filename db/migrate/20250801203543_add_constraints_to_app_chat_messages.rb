@@ -2,13 +2,13 @@ class AddConstraintsToAppChatMessages < ActiveRecord::Migration[8.0]
   def change
     # Add index for faster queries on status
     add_index :app_chat_messages, :status
-    
+
     # Add index for faster queries on created_at (for finding stuck messages)
     add_index :app_chat_messages, :created_at
-    
+
     # Add composite index for app_id and created_at for efficient chat loading
     add_index :app_chat_messages, [:app_id, :created_at]
-    
+
     # Clean up any invalid data before adding constraint
     # Set status to NULL for non-assistant messages (user messages shouldn't have status)
     reversible do |dir|
@@ -19,7 +19,7 @@ class AddConstraintsToAppChatMessages < ActiveRecord::Migration[8.0]
           SET status = NULL 
           WHERE role != 'assistant' AND status IS NOT NULL;
         SQL
-        
+
         # Then add the constraint
         execute <<-SQL
           ALTER TABLE app_chat_messages
@@ -31,7 +31,7 @@ class AddConstraintsToAppChatMessages < ActiveRecord::Migration[8.0]
           );
         SQL
       end
-      
+
       dir.down do
         execute <<-SQL
           ALTER TABLE app_chat_messages

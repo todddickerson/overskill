@@ -8,20 +8,20 @@ class Ai::ContextManager
     @context = {}
     @implementation_plan = nil
   end
-  
+
   def add_context(data)
     @context.merge!(data)
   end
-  
+
   def set_implementation_plan(plan)
     @implementation_plan = plan
   end
-  
+
   def update_from_result(result)
     @context[:last_result] = result
     @context[:last_action] = result[:action]
   end
-  
+
   def completeness_score
     # Calculate how complete our context is
     score = 0

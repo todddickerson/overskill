@@ -11,12 +11,12 @@ if Rails.env.test?
         def retrieve_connection_pool(connection_name, **options)
           # Handle any problematic shard values (empty string, nil, etc.)
           shard = options[:shard]
-          
+
           if shard.blank? || shard == ""
             # Remove shard option entirely to use default connection
             options = options.except(:shard)
           end
-          
+
           begin
             original_retrieve_connection_pool(connection_name, **options)
           rescue ActiveRecord::ConnectionNotDefined => e

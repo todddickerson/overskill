@@ -1,7 +1,7 @@
 class ProcessAppUpdateJob < ApplicationJob
   include ActionView::RecordIdentifier
   queue_as :ai_generation
-  
+
   # Set a 10-minute timeout for the entire job
   around_perform do |job, block|
     Timeout.timeout(600) do  # 10 minutes
@@ -15,12 +15,12 @@ class ProcessAppUpdateJob < ApplicationJob
   def perform(chat_message)
     Rails.logger.info "[ProcessAppUpdate] Job started for message ##{chat_message.id}"
     Rails.logger.info "[ProcessAppUpdate] Message details: role=#{chat_message.role}, content=#{chat_message.content[0..100]}..."
-    
+
     app = chat_message.app
     Rails.logger.info "[ProcessAppUpdate] App details: id=#{app.id}, name=#{app.name}"
-    
+
     @user = chat_message.user  # Store user for version creation
-    Rails.logger.info "[ProcessAppUpdate] User: #{@user&.email || 'nil'}"
+    Rails.logger.info "[ProcessAppUpdate] User: #{@user&.email || "nil"}"
 
     begin
       # Step 1: Planning phase
@@ -45,7 +45,7 @@ class ProcessAppUpdateJob < ApplicationJob
         framework: app.framework
       }
 
-      # Step 2: Executing phase  
+      # Step 2: Executing phase
       Rails.logger.info "[ProcessAppUpdate] Step 2: Executing phase"
       # Note: Don't update user message status - only assistant messages can have status
       broadcast_status_update(chat_message, "executing")
@@ -56,10 +56,10 @@ class ProcessAppUpdateJob < ApplicationJob
       client = Ai::OpenRouterClient.new
       response = client.update_app(chat_message.content, current_files, app_context)
       Rails.logger.info "[ProcessAppUpdate] AI response received: success=#{response[:success]}"
-    rescue Net::ReadTimeout => e
+    rescue Net::ReadTimeout
       handle_error(chat_message, "The request timed out. This usually happens with complex requests. Please try breaking your request into smaller, more specific changes.")
       return
-    rescue StandardError => e
+    rescue => e
       Rails.logger.error "[ProcessAppUpdate] Unexpected error: #{e.class} - #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       handle_error(chat_message, "An unexpected error occurred: #{e.message}")
@@ -73,7 +73,7 @@ class ProcessAppUpdateJob < ApplicationJob
       if result
         # Validate the generated code before applying
         validation = Ai::CodeValidatorService.validate_files(result[:files])
-        
+
         if validation[:valid]
           # Apply the changes
           apply_changes(app, result)
@@ -83,13 +83,13 @@ class ProcessAppUpdateJob < ApplicationJob
           validation[:errors].each do |error|
             Rails.logger.error "  #{error[:file]}: #{error[:message]}"
           end
-          
+
           # Try to fix common issues and retry
           fixed_files = result[:files].map do |file|
             file[:content] = Ai::CodeValidatorService.fix_common_issues(file[:content], file[:type])
             file
           end
-          
+
           # Validate again
           retry_validation = Ai::CodeValidatorService.validate_files(fixed_files)
           if retry_validation[:valid]
@@ -128,14 +128,14 @@ class ProcessAppUpdateJob < ApplicationJob
   def parse_update_response(content)
     # Clean up the content first
     cleaned_content = content.strip
-    
+
     # Try to parse as-is first
     begin
       return JSON.parse(cleaned_content, symbolize_names: true)
     rescue JSON::ParserError => e
       Rails.logger.info "[ProcessAppUpdate] Direct parse failed, trying to extract from markdown"
     end
-    
+
     # Try to extract JSON from markdown code blocks
     # Handle various formats: ```json, ```JSON, ```, etc.
     json_patterns = [
@@ -143,7 +143,7 @@ class ProcessAppUpdateJob < ApplicationJob
       /```JSON\s*\n?(.+?)\n?```/mi,
       /```\s*\n?(.+?)\n?```/mi
     ]
-    
+
     json_patterns.each do |pattern|
       match = cleaned_content.match(pattern)
       if match
@@ -157,7 +157,7 @@ class ProcessAppUpdateJob < ApplicationJob
         end
       end
     end
-    
+
     Rails.logger.error "[ProcessAppUpdate] Failed to parse response after all attempts"
     Rails.logger.error "[ProcessAppUpdate] Raw content: #{cleaned_content[0..500]}..."
     nil
@@ -205,17 +205,17 @@ class ProcessAppUpdateJob < ApplicationJob
         version_number: next_version_number(app),
         changelog: result[:changes][:summary],
         changed_files: result[:changes][:files_modified]&.join(", "),
-        files_snapshot: app.app_files.map { |f| 
-          { path: f.path, content: f.content, file_type: f.file_type }
+        files_snapshot: app.app_files.map { |f|
+          {path: f.path, content: f.content, file_type: f.file_type}
         }.to_json
       )
-      
+
       # No longer creating individual version files - using files_snapshot instead
-      
+
       # Update preview worker with latest changes
       UpdatePreviewJob.perform_later(app.id)
     end
-    
+
     # Link the AI response to this version
     if app_version && @assistant_message
       @assistant_message.update!(app_version: app_version)
@@ -272,10 +272,10 @@ class ProcessAppUpdateJob < ApplicationJob
     if result[:whats_next]
       bugs = result[:whats_next][:bugs] || []
       suggestions = result[:whats_next][:suggestions] || []
-      
+
       if bugs.any? || suggestions.any?
         response += "## What's next?\n\n"
-        
+
         if bugs.any?
           response += "⚠️ **Potential issues detected:**\n"
           bugs.each do |bug|
@@ -285,7 +285,7 @@ class ProcessAppUpdateJob < ApplicationJob
           end
           response += "\n"
         end
-        
+
         if suggestions.any?
           response += "**Quick actions:**\n"
           suggestions.each do |suggestion|
@@ -298,13 +298,12 @@ class ProcessAppUpdateJob < ApplicationJob
     response
   end
 
-
   def handle_timeout_error(chat_message)
     # If chat_message is an ID, load the actual message
     chat_message = AppChatMessage.find(chat_message) if chat_message.is_a?(Integer)
-    
+
     Rails.logger.error "[ProcessAppUpdate] Job timed out after 10 minutes for chat_message #{chat_message.id}"
-    
+
     # Note: Don't update user message status - only assistant messages can have status
 
     # Create timeout error message
@@ -322,7 +321,7 @@ class ProcessAppUpdateJob < ApplicationJob
 
     # If chat_message is an ID, load the actual message
     chat_message = AppChatMessage.find(chat_message) if chat_message.is_a?(Integer)
-    
+
     # Note: Don't update user message status - only assistant messages can have status
 
     # Create error message
@@ -337,16 +336,16 @@ class ProcessAppUpdateJob < ApplicationJob
 
   def broadcast_status_update(chat_message, status)
     Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Finding AI message for status: #{status}"
-    
+
     # Find the AI response message that was created
     ai_message = chat_message.app.app_chat_messages
       .where(role: "assistant")
       .where("created_at > ?", chat_message.created_at)
       .order(created_at: :asc)
       .first
-    
-    Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Found AI message: #{ai_message&.id || 'nil'}"
-    
+
+    Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Found AI message: #{ai_message&.id || "nil"}"
+
     if ai_message
       # Update the existing AI message
       Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] Updating AI message #{ai_message.id} with status: #{status}"
@@ -355,7 +354,7 @@ class ProcessAppUpdateJob < ApplicationJob
         status: status
       )
       Rails.logger.info "[ProcessAppUpdate#broadcast_status_update] AI message updated successfully"
-      
+
       Turbo::StreamsChannel.broadcast_replace_to(
         "app_#{chat_message.app_id}_chat",
         target: dom_id(ai_message),
@@ -380,8 +379,6 @@ class ProcessAppUpdateJob < ApplicationJob
     end
   end
 
-
-
   def broadcast_completion(user_message, assistant_message)
     # Find and update the AI message that was created initially
     ai_message = user_message.app.app_chat_messages
@@ -389,18 +386,18 @@ class ProcessAppUpdateJob < ApplicationJob
       .where("created_at > ?", user_message.created_at)
       .order(created_at: :asc)
       .first
-    
+
     if ai_message && ai_message.id != assistant_message.id
       # First, broadcast removal of the placeholder
       Turbo::StreamsChannel.broadcast_remove_to(
         "app_#{user_message.app_id}_chat",
         target: "app_chat_message_#{ai_message.id}"
       )
-      
+
       # Then delete the placeholder AI message
       ai_message.destroy
     end
-    
+
     # Broadcast the final assistant message
     Turbo::StreamsChannel.broadcast_append_to(
       "app_#{user_message.app_id}_chat",
@@ -416,7 +413,7 @@ class ProcessAppUpdateJob < ApplicationJob
       partial: "account/app_editors/preview_frame",
       locals: {app: user_message.app}
     )
-    
+
     # Refresh the chat form to re-enable it
     Turbo::StreamsChannel.broadcast_replace_to(
       "app_#{user_message.app_id}_chat",
@@ -434,18 +431,18 @@ class ProcessAppUpdateJob < ApplicationJob
       .where.not(id: error_message.id)
       .order(created_at: :asc)
       .first
-    
+
     if ai_message
       # Broadcast removal of the placeholder
       Turbo::StreamsChannel.broadcast_remove_to(
         "app_#{user_message.app_id}_chat",
         target: "app_chat_message_#{ai_message.id}"
       )
-      
+
       # Delete the placeholder
       ai_message.destroy
     end
-    
+
     # Broadcast the error message
     Turbo::StreamsChannel.broadcast_append_to(
       "app_#{user_message.app_id}_chat",
@@ -453,7 +450,7 @@ class ProcessAppUpdateJob < ApplicationJob
       partial: "account/app_editors/chat_message",
       locals: {message: error_message}
     )
-    
+
     # Re-enable the chat form
     Turbo::StreamsChannel.broadcast_replace_to(
       "app_#{user_message.app_id}_chat",
@@ -462,21 +459,21 @@ class ProcessAppUpdateJob < ApplicationJob
       locals: {app: user_message.app}
     )
   end
-  
+
   def create_version_file_snapshots(app_version, changed_files)
     app = app_version.app
-    
+
     # Create snapshots for all current files in the app
     app.app_files.each do |app_file|
       # Determine the action based on whether this file was changed
       file_change = changed_files.find { |f| f[:path] == app_file.path }
-      action = file_change ? file_change[:action] : 'unchanged'
-      
+      action = file_change ? file_change[:action] : "unchanged"
+
       # Create version file snapshot
       app_version.app_version_files.create!(
         app_file: app_file,
         content: app_file.content,
-        action: action == 'unchanged' ? 'update' : action
+        action: (action == "unchanged") ? "update" : action
       )
     end
   end
@@ -484,7 +481,7 @@ class ProcessAppUpdateJob < ApplicationJob
   def handle_validation_error(chat_message, errors, result)
     # Create a detailed error message
     error_details = errors.map { |e| "• #{e[:file]}: #{e[:message]}" }.join("\n")
-    
+
     error_message = <<~MESSAGE
       I encountered some issues with the generated code:
       
@@ -497,7 +494,7 @@ class ProcessAppUpdateJob < ApplicationJob
       
       What would you prefer?
     MESSAGE
-    
+
     # Create assistant response with error details
     assistant_message = chat_message.app.app_chat_messages.create!(
       role: "assistant",
@@ -508,9 +505,9 @@ class ProcessAppUpdateJob < ApplicationJob
         original_result: result
       }
     )
-    
+
     # Note: Don't update user message status - only assistant messages can have status
-    
+
     # Broadcast error response
     broadcast_error(chat_message, assistant_message)
   end

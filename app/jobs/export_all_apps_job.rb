@@ -1,28 +1,28 @@
 class ExportAllAppsJob < ApplicationJob
   queue_as :exports
-  
+
   def perform(team, user)
     # Export all apps for a team and email the results
     Rails.logger.info "Starting export for team #{team.id} requested by user #{user.id}"
-    
+
     begin
       # Create a temporary directory for all exports
-      export_dir = Rails.root.join('tmp', 'exports', "team_#{team.id}_#{Time.current.to_i}")
+      export_dir = Rails.root.join("tmp", "exports", "team_#{team.id}_#{Time.current.to_i}")
       FileUtils.mkdir_p(export_dir)
-      
+
       # Export each app
       exported_files = []
-      
+
       team.apps.includes(:app_tables, :app_files).find_each do |app|
         Rails.logger.info "Exporting app #{app.id} (#{app.name})"
-        
+
         exporter = DataExport::AppExporterService.new(app)
-        
+
         # Export to ZIP for each app
         zip_file = exporter.export_to_zip
         export_path = export_dir.join("#{app.subdomain}_export.zip")
         FileUtils.mv(zip_file.path, export_path)
-        
+
         exported_files << {
           app_name: app.name,
           app_subdomain: app.subdomain,
@@ -30,43 +30,42 @@ class ExportAllAppsJob < ApplicationJob
           file_size: File.size(export_path)
         }
       end
-      
+
       # Create master ZIP file
       master_zip_path = export_dir.join("#{team.name.parameterize}_all_apps_export.zip")
-      
+
       Zip::File.open(master_zip_path, Zip::File::CREATE) do |zipfile|
         # Add each app's export
         exported_files.each do |export|
           zipfile.add(File.basename(export[:file_path]), export[:file_path])
         end
-        
+
         # Add team-level README
         zipfile.get_output_stream("README.md") do |f|
           f.puts generate_team_readme(team, exported_files)
         end
       end
-      
+
       # Upload to cloud storage (future enhancement)
       # For now, we'll just log the location
       Rails.logger.info "Export completed: #{master_zip_path}"
-      
+
       # Send email notification
       TeamMailer.export_completed(team, user, master_zip_path).deliver_later
-      
+
       # Schedule cleanup after 24 hours
       CleanupExportJob.set(wait: 24.hours).perform_later(export_dir.to_s)
-      
     rescue => e
       Rails.logger.error "Export failed for team #{team.id}: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      
+
       # Notify user of failure
       TeamMailer.export_failed(team, user, e.message).deliver_later
     end
   end
-  
+
   private
-  
+
   def generate_team_readme(team, exported_files)
     <<~MARKDOWN
       # OverSkill Team Export
@@ -110,7 +109,7 @@ class ExportAllAppsJob < ApplicationJob
       Thank you for trusting OverSkill with your applications!
     MARKDOWN
   end
-  
+
   def number_to_human_size(size)
     if size < 1024
       "#{size} B"

@@ -9,19 +9,19 @@
 
 class Deployment::CloudflareWorkersBuildService
   include HTTParty
-  base_uri 'https://api.cloudflare.com/client/v4'
+  base_uri "https://api.cloudflare.com/client/v4"
 
   def initialize(app)
     @app = app
-    @cloudflare_token = ENV['CLOUDFLARE_API_TOKEN']
-    @cloudflare_account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
-    @github_org = ENV['GITHUB_ORG']
-    
+    @cloudflare_token = ENV["CLOUDFLARE_API_TOKEN"]
+    @cloudflare_account_id = ENV["CLOUDFLARE_ACCOUNT_ID"]
+    @github_org = ENV["GITHUB_ORG"]
+
     raise "Missing Cloudflare credentials" unless [@cloudflare_token, @cloudflare_account_id].all?(&:present?)
-    
+
     self.class.headers({
-      'Authorization' => "Bearer #{@cloudflare_token}",
-      'Content-Type' => 'application/json'
+      "Authorization" => "Bearer #{@cloudflare_token}",
+      "Content-Type" => "application/json"
     })
   end
 
@@ -29,28 +29,28 @@ class Deployment::CloudflareWorkersBuildService
   def create_worker_with_git_integration(repo_result)
     worker_name = generate_worker_name
     repo_name = repo_result[:repo_name]
-    
+
     Rails.logger.info "[CloudflareWorkersBuildService] Creating worker with git integration: #{worker_name}"
-    
+
     begin
       # Step 1: Create the worker script with initial placeholder
       worker_response = create_worker_with_github_builds(worker_name, repo_name)
       return worker_response unless worker_response[:success]
-      
+
       # Step 2: Configure environment variables for all environments
       env_result = setup_worker_environment_variables(worker_name)
       return env_result unless env_result[:success]
-      
+
       # Step 3: Build and deploy the actual app from GitHub
       build_result = build_and_deploy_from_github(repo_name, worker_name)
       return build_result unless build_result[:success]
-      
+
       # Step 4: Setup custom domain routing (if configured)
-      domain_result = setup_worker_domains(worker_name)
+      setup_worker_domains(worker_name)
       # Domain setup is optional - continue even if it fails
-      
+
       Rails.logger.info "[CloudflareWorkersBuildService] ✅ Worker created with git integration: #{worker_name}"
-      
+
       {
         success: true,
         worker_name: worker_name,
@@ -66,108 +66,106 @@ class Deployment::CloudflareWorkersBuildService
       }
     rescue => e
       Rails.logger.error "[CloudflareWorkersBuildService] Worker creation failed: #{e.message}"
-      { success: false, error: e.message }
+      {success: false, error: e.message}
     end
   end
 
   # Trigger manual deployment to staging environment using WFP for immediate deployment
   def promote_to_staging
     Rails.logger.info "[CloudflareWorkersBuildService] Promoting app #{@app.id} to staging using WFP"
-    
+
     # Use WorkersForPlatformsService for immediate deployment
     wfp_service = Deployment::WorkersForPlatformsService.new(@app)
     deployment_result = wfp_service.promote_to_staging
-    
+
     if deployment_result[:success]
       @app.update!(
-        deployment_status: 'staging_deployed',
+        deployment_status: "staging_deployed",
         staging_deployed_at: Time.current
       )
-      
-      create_deployment_record('staging', deployment_result[:deployment_id])
-      
+
+      create_deployment_record("staging", deployment_result[:deployment_id])
+
       Rails.logger.info "[CloudflareWorkersBuildService] ✅ Promoted to staging via WFP: #{deployment_result[:staging_url]}"
-      
+
       # GitHub Actions will run as backup via the normal push to main branch
       Rails.logger.info "[CloudflareWorkersBuildService] GitHub Actions will deploy as backup on next push"
-      
-      deployment_result
+
     else
       Rails.logger.error "[CloudflareWorkersBuildService] Failed to promote to staging: #{deployment_result[:error]}"
-      deployment_result
     end
+    deployment_result
   rescue => e
     Rails.logger.error "[CloudflareWorkersBuildService] Error promoting to staging: #{e.message}"
-    { success: false, error: e.message }
+    {success: false, error: e.message}
   end
 
   # Trigger manual deployment to production environment using WFP for immediate deployment
   def promote_to_production
     Rails.logger.info "[CloudflareWorkersBuildService] Promoting app #{@app.id} to production using WFP"
-    
+
     # Use WorkersForPlatformsService for immediate deployment
     wfp_service = Deployment::WorkersForPlatformsService.new(@app)
     deployment_result = wfp_service.promote_to_production
-    
+
     if deployment_result[:success]
       @app.update!(
-        deployment_status: 'production_deployed',
+        deployment_status: "production_deployed",
         last_deployed_at: Time.current
       )
-      
-      create_deployment_record('production', deployment_result[:deployment_id])
-      
+
+      create_deployment_record("production", deployment_result[:deployment_id])
+
       Rails.logger.info "[CloudflareWorkersBuildService] ✅ Promoted to production via WFP: #{deployment_result[:production_url]}"
-      
+
       # GitHub Actions will run as backup via the normal push to main branch
       Rails.logger.info "[CloudflareWorkersBuildService] GitHub Actions will deploy as backup on next push"
-      
-      deployment_result
+
     else
       Rails.logger.error "[CloudflareWorkersBuildService] Failed to promote to production: #{deployment_result[:error]}"
-      deployment_result
     end
+    deployment_result
   rescue => e
     Rails.logger.error "[CloudflareWorkersBuildService] Error promoting to production: #{e.message}"
-    { success: false, error: e.message }
+    {success: false, error: e.message}
   end
 
   # Get deployment status for all environments using WFP
   def get_deployment_status
     Rails.logger.info "[CloudflareWorkersBuildService] Getting deployment status via WFP"
-    
+
     # Use WorkersForPlatformsService to get actual deployment status
     wfp_service = Deployment::WorkersForPlatformsService.new(@app)
     wfp_service.get_deployment_status
   rescue => e
     Rails.logger.error "[CloudflareWorkersBuildService] Error getting deployment status: #{e.message}"
-    { success: false, error: e.message }
+    {success: false, error: e.message}
   end
 
   # Build and deploy from GitHub repository
   # Called after GitHub integration is set up to trigger initial deployment
   def build_and_deploy_from_github(repo_name, worker_name)
     Rails.logger.info "[CloudflareWorkersBuildService] Building and deploying from GitHub: #{repo_name} -> #{worker_name}"
-    
+
     begin
       # Trigger initial deployment from main branch
       # This will cause Cloudflare to pull from GitHub and build/deploy
-      deployment_result = trigger_environment_deployment(worker_name, 'production')
-      
+      deployment_result = trigger_environment_deployment(worker_name, "production")
+
       if deployment_result[:success]
         Rails.logger.info "[CloudflareWorkersBuildService] ✅ GitHub deployment triggered successfully"
-        
+
         # Update app URLs with the deployed worker URLs
         preview_url = generate_preview_url(worker_name)
         production_url = generate_production_url(worker_name)
-        
+
         @app.update!(
           preview_url: preview_url,
           production_url: production_url,
           cloudflare_worker_name: worker_name,
-          deployment_status: 'github_deployed'
+          deployment_status: "github_deployed"
         )
-        
+
         {
           success: true,
           message: "Successfully deployed from GitHub",
@@ -179,12 +177,11 @@ class Deployment::CloudflareWorkersBuildService
         }
       else
         Rails.logger.error "[CloudflareWorkersBuildService] Failed to trigger deployment: #{deployment_result[:error]}"
-        { success: false, error: "Failed to trigger deployment: #{deployment_result[:error]}" }
+        {success: false, error: "Failed to trigger deployment: #{deployment_result[:error]}"}
       end
-      
     rescue => e
       Rails.logger.error "[CloudflareWorkersBuildService] Error in build_and_deploy_from_github: #{e.message}"
-      { success: false, error: e.message }
+      {success: false, error: e.message}
     end
   end
 
@@ -193,112 +190,112 @@ class Deployment::CloudflareWorkersBuildService
   def create_worker_with_github_builds(worker_name, repo_name)
     # Create worker with GitHub builds integration
     worker_script = generate_build_worker_script
-    
+
     form_data = {
-      'metadata' => {
-        'main_module' => 'worker.js',
-        'compatibility_date' => '2024-08-01',
-        'compatibility_flags' => ['nodejs_compat'],
-        'build_config' => {
-          'github_integration' => {
-            'repository' => "#{@github_org}/#{repo_name}",
-            'production_branch' => 'main',
-            'preview_deployments' => true
+      "metadata" => {
+        "main_module" => "worker.js",
+        "compatibility_date" => "2024-08-01",
+        "compatibility_flags" => ["nodejs_compat"],
+        "build_config" => {
+          "github_integration" => {
+            "repository" => "#{@github_org}/#{repo_name}",
+            "production_branch" => "main",
+            "preview_deployments" => true
           }
         }
       }.to_json,
-      'worker.js' => worker_script
+      "worker.js" => worker_script
     }
-    
+
     # Use proper multipart form data
-    require 'net/http'
+    require "net/http"
     uri = URI("https://api.cloudflare.com/client/v4/accounts/#{@cloudflare_account_id}/workers/scripts/#{worker_name}")
-    
+
     req = Net::HTTP::Put.new(uri)
-    req['Authorization'] = "Bearer #{@cloudflare_token}"
-    
+    req["Authorization"] = "Bearer #{@cloudflare_token}"
+
     boundary = "----WebKitFormBoundary#{SecureRandom.hex(8)}"
-    req['Content-Type'] = "multipart/form-data; boundary=#{boundary}"
-    
+    req["Content-Type"] = "multipart/form-data; boundary=#{boundary}"
+
     body = []
     body << "--#{boundary}"
     body << 'Content-Disposition: form-data; name="metadata"'
-    body << ''
-    body << form_data['metadata']
+    body << ""
+    body << form_data["metadata"]
     body << "--#{boundary}"
     body << 'Content-Disposition: form-data; name="worker.js"; filename="worker.js"'
-    body << 'Content-Type: application/javascript+module'
-    body << ''
+    body << "Content-Type: application/javascript+module"
+    body << ""
     body << worker_script
     body << "--#{boundary}--"
-    
+
     req.body = body.join("\r\n")
-    
+
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
     response = http.request(req)
-    
-    if response.code == '200'
-      { success: true, worker_created: true }
+
+    if response.code == "200"
+      {success: true, worker_created: true}
     else
       Rails.logger.error "[CloudflareWorkersBuildService] Worker creation failed: #{response.code} - #{response.body}"
-      { success: false, error: "Worker creation failed: #{response.code}" }
+      {success: false, error: "Worker creation failed: #{response.code}"}
     end
   end
 
   def setup_worker_environment_variables(worker_name)
     # Set up environment variables for the worker
     variables = {
-      'VITE_APP_ID' => @app.obfuscated_id, # Use obfuscated ID for privacy
-      'VITE_SUPABASE_URL' => ENV['SUPABASE_URL'],
-      'VITE_SUPABASE_ANON_KEY' => ENV['SUPABASE_ANON_KEY'],
-      'VITE_OWNER_ID' => @app.team.id.to_s,
-      'VITE_ENVIRONMENT' => 'preview'
+      "VITE_APP_ID" => @app.obfuscated_id, # Use obfuscated ID for privacy
+      "VITE_SUPABASE_URL" => ENV["SUPABASE_URL"],
+      "VITE_SUPABASE_ANON_KEY" => ENV["SUPABASE_ANON_KEY"],
+      "VITE_OWNER_ID" => @app.team.id.to_s,
+      "VITE_ENVIRONMENT" => "preview"
     }
-    
+
     # Bulk update all environment variables at once
     # Using the correct endpoint for environment variables
     body = {
       vars: variables.transform_values(&:to_s)
     }
-    
+
     response = self.class.patch(
       "/accounts/#{@cloudflare_account_id}/workers/scripts/#{worker_name}/settings",
       body: body.to_json,
-      headers: self.class.headers.merge('Content-Type' => 'application/json')
+      headers: self.class.headers.merge("Content-Type" => "application/json")
     )
-    
+
     if response.success?
       Rails.logger.info "[CloudflareWorkersBuildService] ✅ Set #{variables.size} environment variables for worker #{worker_name}"
-      { success: true, variables_set: variables.size }
+      {success: true, variables_set: variables.size}
     else
       Rails.logger.error "[CloudflareWorkersBuildService] Failed to set environment variables: #{response.code} - #{response.body}"
-      { success: false, error: "Failed to set environment variables: #{response.code}" }
+      {success: false, error: "Failed to set environment variables: #{response.code}"}
     end
   end
 
   def setup_worker_domains(worker_name)
     # Optional: Setup custom domains for different environments
     # This is a placeholder for future domain configuration
-    { success: true, domains_configured: false }
+    {success: true, domains_configured: false}
   end
 
   def trigger_environment_deployment(worker_name, environment)
     # Note: This method is currently a placeholder as Cloudflare Workers with GitHub integration
     # auto-deploy when code is pushed. Manual deployment triggering is done via GitHub pushes.
     # For now, we'll verify the worker exists and return success.
-    
+
     Rails.logger.info "[CloudflareWorkersBuildService] Checking worker deployment status: #{worker_name}"
-    
+
     response = self.class.get(
       "/accounts/#{@cloudflare_account_id}/workers/scripts/#{worker_name}",
       headers: self.class.headers
     )
-    
+
     if response.success?
       deployment_id = "#{environment}-#{@app.obfuscated_id}-#{Time.current.to_i}"
       Rails.logger.info "[CloudflareWorkersBuildService] ✅ Worker exists and ready for GitHub auto-deployment"
-      
+
       {
         success: true,
         deployment_id: deployment_id,
@@ -338,17 +335,17 @@ class Deployment::CloudflareWorkersBuildService
   end
 
   def generate_preview_url(worker_name)
-    wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+    wfp_domain = ENV["WFP_APPS_DOMAIN"] || "overskill.app"
     "https://preview-#{worker_name}.#{wfp_domain}"
   end
 
   def generate_staging_url(worker_name)
-    wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+    wfp_domain = ENV["WFP_APPS_DOMAIN"] || "overskill.app"
     "https://staging-#{worker_name}.#{wfp_domain}"
   end
 
   def generate_production_url(worker_name)
-    wfp_domain = ENV['WFP_APPS_DOMAIN'] || 'overskill.app'
+    wfp_domain = ENV["WFP_APPS_DOMAIN"] || "overskill.app"
     "https://#{worker_name}.#{wfp_domain}"
   end
 
@@ -358,9 +355,9 @@ class Deployment::CloudflareWorkersBuildService
       environment: environment,
       deployment_id: deployment_id,
       deployment_url: case environment
-                      when 'preview' then @app.preview_url
-                      when 'staging' then @app.staging_url  
-                      when 'production' then @app.production_url
+                      when "preview" then @app.preview_url
+                      when "staging" then @app.staging_url
+                      when "production" then @app.production_url
                       end,
       deployed_at: Time.current
     )

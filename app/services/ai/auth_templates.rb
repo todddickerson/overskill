@@ -851,19 +851,19 @@ module Ai
       # Generate all auth files for an app
       def generate_auth_files(app)
         # Always include the supabase client with auth files
-        require_relative 'supabase_client_template'
-        
+        require_relative "supabase_client_template"
+
         files = [
-          { path: 'src/lib/supabase.ts', content: Ai::SupabaseClientTemplate.generate },
-          { path: 'src/pages/auth/Login.tsx', content: login_page },
-          { path: 'src/pages/auth/SignUp.tsx', content: signup_page },
-          { path: 'src/pages/auth/ForgotPassword.tsx', content: forgot_password_page },
-          { path: 'src/pages/auth/AuthCallback.tsx', content: auth_callback_page },
-          { path: 'src/components/auth/SocialButtons.tsx', content: social_buttons_component },
-          { path: 'src/components/auth/ProtectedRoute.tsx', content: protected_route_component },
-          { path: 'src/hooks/useAuth.ts', content: use_auth_hook }
+          {path: "src/lib/supabase.ts", content: Ai::SupabaseClientTemplate.generate},
+          {path: "src/pages/auth/Login.tsx", content: login_page},
+          {path: "src/pages/auth/SignUp.tsx", content: signup_page},
+          {path: "src/pages/auth/ForgotPassword.tsx", content: forgot_password_page},
+          {path: "src/pages/auth/AuthCallback.tsx", content: auth_callback_page},
+          {path: "src/components/auth/SocialButtons.tsx", content: social_buttons_component},
+          {path: "src/components/auth/ProtectedRoute.tsx", content: protected_route_component},
+          {path: "src/hooks/useAuth.ts", content: use_auth_hook}
         ]
-        
+
         files.each do |file|
           app.app_files.create!(
             path: file[:path],

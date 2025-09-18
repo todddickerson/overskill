@@ -35,7 +35,7 @@ module Ai
 
       if ai_response[:success]
         update_progress_message(progress_message, "AI generation complete! Processing response...", 50)
-        
+
         # Step 3: Parse the AI response (now using function calling)
         update_progress_message(progress_message, "Processing function call response...", 60)
         parsed_data = parse_function_call_response(ai_response)
@@ -71,10 +71,10 @@ module Ai
             )
 
             Rails.logger.info "[AppGenerator] Successfully generated App ##{app.id}"
-            
+
             # Mark progress as complete and clean up
             update_progress_message(progress_message, "✅ Generation complete! Your app is ready.", 100)
-            
+
             {success: true}
           else
             update_progress_message(progress_message, "❌ Security scan failed - unsafe code detected", 100)
@@ -123,30 +123,30 @@ module Ai
 
     def parse_function_call_response(ai_response)
       Rails.logger.info "[AppGenerator] Parsing function call response"
-      
+
       # Extract function call results
       tool_calls = ai_response[:tool_calls]
-      
+
       unless tool_calls&.any?
         Rails.logger.error "[AppGenerator] No function calls found in AI response"
         return nil
       end
-      
+
       # Find the generate_app function call
       generate_call = tool_calls.find { |call| call.dig("function", "name") == "generate_app" }
-      
+
       unless generate_call
         Rails.logger.error "[AppGenerator] No generate_app function call found"
         return nil
       end
-      
+
       begin
         # Parse the function arguments - this is already structured JSON
         arguments = generate_call.dig("function", "arguments")
         data = arguments.is_a?(String) ? JSON.parse(arguments) : arguments
-        
+
         Rails.logger.info "[AppGenerator] Successfully parsed function call arguments"
-        
+
         # Validate the structured data
         unless validate_function_call_data(data)
           Rails.logger.error "[AppGenerator] Function call data validation failed"
@@ -169,15 +169,15 @@ module Ai
 
     def parse_ai_response(content)
       Rails.logger.info "[AppGenerator] Parsing AI response (#{content.length} chars) - FALLBACK MODE"
-      
+
       # Log response preview for debugging
       if ENV["VERBOSE_AI_LOGGING"] == "true"
         Rails.logger.info "[AppGenerator] AI Response preview: #{content[0..1000]}..."
       end
-      
+
       # First try to extract JSON from markdown code blocks
       extracted_content = extract_json_from_markdown(content) || content
-      
+
       begin
         # Try to parse as JSON
         data = JSON.parse(extracted_content)
@@ -208,12 +208,12 @@ module Ai
       # Create a system message in the chat to show progress
       progress_msg = @app.app_chat_messages.create!(
         content: build_progress_content(message, progress),
-        role: 'system'
+        role: "system"
       )
-      
+
       # Broadcast the new message via Turbo
       broadcast_chat_message(progress_msg)
-      
+
       progress_msg
     end
 
@@ -223,7 +223,7 @@ module Ai
         content: build_progress_content(message, progress),
         updated_at: Time.current
       )
-      
+
       # Broadcast the update via Turbo
       broadcast_chat_message_update(progress_message)
     end
@@ -233,9 +233,9 @@ module Ai
       progress_bar_width = 20
       filled_chars = (progress * progress_bar_width / 100).round
       empty_chars = progress_bar_width - filled_chars
-      
+
       progress_bar = "█" * filled_chars + "░" * empty_chars
-      
+
       <<~CONTENT
         **🔄 Generation Progress**
 
@@ -252,7 +252,7 @@ module Ai
         "app_#{@app.id}_chat",
         target: "chat_messages",
         partial: "account/app_editors/chat_message",
-        locals: { message: message }
+        locals: {message: message}
       )
     end
 
@@ -261,7 +261,7 @@ module Ai
         "app_#{@app.id}_chat",
         target: "chat_message_#{message.id}",
         partial: "account/app_editors/chat_message",
-        locals: { message: message }
+        locals: {message: message}
       )
     end
 
@@ -271,47 +271,47 @@ module Ai
         /```json\s*\n?(.*?)\n?```/m,  # ```json\n...\n``` or ```json...```
         /```\s*\n?(.*?)\n?```/m       # ```\n...\n``` (no language specified)
       ]
-      
+
       patterns.each do |pattern|
         match = content.match(pattern)
         return match[1].strip if match
       end
-      
+
       nil
     end
 
     def validate_function_call_data(data)
       required_fields = %w[app files]
       missing_fields = required_fields.select { |field| data[field].nil? || data[field].empty? }
-      
+
       if missing_fields.any?
-        Rails.logger.error "[AppGenerator] Missing required fields in function call: #{missing_fields.join(', ')}"
+        Rails.logger.error "[AppGenerator] Missing required fields in function call: #{missing_fields.join(", ")}"
         return false
       end
-      
+
       # Validate app structure
       app_data = data["app"]
       required_app_fields = %w[name description type features tech_stack]
       missing_app_fields = required_app_fields.select { |field| app_data[field].nil? || app_data[field].empty? }
-      
+
       if missing_app_fields.any?
-        Rails.logger.error "[AppGenerator] Missing app fields: #{missing_app_fields.join(', ')}"
+        Rails.logger.error "[AppGenerator] Missing app fields: #{missing_app_fields.join(", ")}"
         return false
       end
-      
+
       # Validate files structure
       if !data["files"].is_a?(Array) || data["files"].empty?
         Rails.logger.error "[AppGenerator] Files must be a non-empty array"
         return false
       end
-      
+
       data["files"].each_with_index do |file, index|
         unless file.is_a?(Hash) && file["path"] && file["content"]
           Rails.logger.error "[AppGenerator] File #{index} missing path or content"
           return false
         end
       end
-      
+
       Rails.logger.info "[AppGenerator] Function call data validation passed"
       true
     end
@@ -319,25 +319,25 @@ module Ai
     def validate_ai_response(data)
       required_fields = %w[app files]
       missing_fields = required_fields.select { |field| data[field].nil? || data[field].empty? }
-      
+
       if missing_fields.any?
-        Rails.logger.error "[AppGenerator] Missing required fields: #{missing_fields.join(', ')}"
+        Rails.logger.error "[AppGenerator] Missing required fields: #{missing_fields.join(", ")}"
         return false
       end
-      
+
       # Validate files structure
       if !data["files"].is_a?(Array) || data["files"].empty?
         Rails.logger.error "[AppGenerator] Files must be a non-empty array"
         return false
       end
-      
+
       data["files"].each_with_index do |file, index|
         unless file.is_a?(Hash) && file["path"] && file["content"]
           Rails.logger.error "[AppGenerator] File #{index} missing path or content"
           return false
         end
       end
-      
+
       true
     end
 
@@ -368,18 +368,18 @@ module Ai
 
     def generate_auth_config(app)
       {
-        auth_provider: 'supabase',
-        supabase_url: ENV['SUPABASE_URL'],
-        supabase_anon_key: ENV['SUPABASE_ANON_KEY'],
+        auth_provider: "supabase",
+        supabase_url: ENV["SUPABASE_URL"],
+        supabase_anon_key: ENV["SUPABASE_ANON_KEY"],
         auth_options: {
-          providers: ['email', 'google', 'github'],
+          providers: ["email", "google", "github"],
           redirect_url: "#{app.published_url}/auth/callback",
           enable_signup: !app.invite_only?,
           require_email_verification: true
         }
       }
     end
-    
+
     def generate_auth_code
       <<~JS
         // Supabase client initialization
@@ -419,10 +419,10 @@ module Ai
       # Clear existing files for regeneration
       Rails.logger.info "[AppGenerator] Clearing existing files for regeneration"
       @app.app_files.destroy_all
-      
+
       # Validate and fix files before creating
       validated_files = validate_and_fix_files(files)
-      
+
       validated_files.each do |file_data|
         @app.app_files.create!(
           team: @app.team,
@@ -432,7 +432,7 @@ module Ai
           size_bytes: (file_data["content"] || file_data[:content]).bytesize
         )
       end
-      
+
       # Don't create version here - it's created by ProcessAppUpdateJob when there are actual changes
     end
 
@@ -440,16 +440,16 @@ module Ai
       # Clear existing files for regeneration
       Rails.logger.info "[AppGenerator] Clearing existing files for regeneration"
       @app.app_files.destroy_all
-      
+
       # Validate and fix files before creating
       validated_files = validate_and_fix_files(files)
-      
+
       validated_files.each_with_index do |file_data, index|
         file_path = file_data["path"] || file_data[:path]
         progress = 80 + (10 * (index + 1) / validated_files.length)
-        
+
         update_progress_message(progress_message, "Creating #{file_path}...", progress)
-        
+
         @app.app_files.create!(
           team: @app.team,
           path: file_path,
@@ -457,11 +457,11 @@ module Ai
           file_type: determine_file_type(file_path),
           size_bytes: (file_data["content"] || file_data[:content]).bytesize
         )
-        
+
         # Small delay to make progress visible
         sleep(0.1)
       end
-      
+
       # Don't create version here - it's created by ProcessAppUpdateJob when there are actual changes
     end
 
@@ -522,7 +522,7 @@ module Ai
 
       {success: false, error: message}
     end
-    
+
     def validate_and_fix_files(files)
       # Convert to consistent format for validation
       normalized_files = files.map do |file|
@@ -532,30 +532,30 @@ module Ai
           type: determine_file_type(file["path"] || file[:path])
         }
       end
-      
+
       # Validate the files
       validation = Ai::CodeValidatorService.validate_files(normalized_files)
-      
+
       if validation[:valid]
-        return files
+        files
       else
         # Log validation errors
         Rails.logger.warn "[AppGenerator] Code validation warnings:"
         validation[:errors].each do |error|
           Rails.logger.warn "  #{error[:file]}: #{error[:message]}"
         end
-        
+
         # Try to fix common issues
         fixed_files = files.map do |file|
           path = file["path"] || file[:path]
           content = file["content"] || file[:content]
           file_type = determine_file_type(path)
-          
+
           # Apply fixes for JavaScript and HTML files
           if file_type == "javascript" || file_type == "html"
             content = Ai::CodeValidatorService.fix_common_issues(content, file_type)
           end
-          
+
           # Return in original format
           if file.is_a?(Hash) && file.key?("path")
             file.merge("content" => content)
@@ -563,7 +563,7 @@ module Ai
             file.merge(content: content)
           end
         end
-        
+
         # Validate again after fixes
         normalized_fixed = fixed_files.map do |file|
           {
@@ -572,7 +572,7 @@ module Ai
             type: determine_file_type(file["path"] || file[:path])
           }
         end
-        
+
         retry_validation = Ai::CodeValidatorService.validate_files(normalized_fixed)
         if !retry_validation[:valid]
           Rails.logger.error "[AppGenerator] Code still has errors after fixes:"
@@ -580,7 +580,7 @@ module Ai
             Rails.logger.error "  #{error[:file]}: #{error[:message]}"
           end
         end
-        
+
         fixed_files
       end
     end

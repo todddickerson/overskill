@@ -1,46 +1,46 @@
 module DataExport
   class AppExporterService
     include HTTParty
-    
+
     def initialize(app)
       @app = app
       @team = app.team
       @database_service = Supabase::AppDatabaseService.new(app)
     end
-    
+
     def export_to_sql
       # Generate comprehensive SQL export for data portability
       # Superior to Base44: includes schema, data, RLS policies, and audit setup
-      
+
       sql_parts = []
-      
+
       # 1. Header and metadata
       sql_parts << generate_header
-      
+
       # 2. Create schema
       sql_parts << generate_schema_sql
-      
+
       # 3. Create all tables with their schemas
       sql_parts << generate_tables_sql
-      
+
       # 4. Create RLS policies (transparent and auditable)
       sql_parts << generate_rls_policies_sql
-      
+
       # 5. Export all data
       sql_parts << generate_data_sql
-      
+
       # 6. Create indexes for performance
       sql_parts << generate_indexes_sql
-      
+
       # 7. Create audit system
       sql_parts << generate_audit_system_sql
-      
+
       # 8. Migration instructions
       sql_parts << generate_footer_instructions
-      
+
       sql_parts.join("\n\n")
     end
-    
+
     def export_to_json
       # Export data in JSON format for easier processing
       {
@@ -64,30 +64,30 @@ module DataExport
         }
       }
     end
-    
+
     def export_to_zip
       # Create a ZIP file with SQL, JSON, and documentation
-      require 'zip'
-      require 'tempfile'
-      
-      temp_file = Tempfile.new(["#{@app.subdomain}_export", '.zip'])
-      
+      require "zip"
+      require "tempfile"
+
+      temp_file = Tempfile.new(["#{@app.subdomain}_export", ".zip"])
+
       Zip::File.open(temp_file.path, Zip::File::CREATE) do |zipfile|
         # Add SQL export
         zipfile.get_output_stream("#{@app.subdomain}_schema_and_data.sql") do |f|
           f.puts export_to_sql
         end
-        
+
         # Add JSON export
         zipfile.get_output_stream("#{@app.subdomain}_data.json") do |f|
           f.puts JSON.pretty_generate(export_to_json)
         end
-        
+
         # Add README with instructions
         zipfile.get_output_stream("README.md") do |f|
           f.puts generate_readme
         end
-        
+
         # Add app files if any
         @app.app_files.each do |file|
           zipfile.get_output_stream("app_files/#{file.path}") do |f|
@@ -95,12 +95,12 @@ module DataExport
           end
         end
       end
-      
+
       temp_file
     end
-    
+
     private
-    
+
     def generate_header
       <<~SQL
         -- OverSkill Data Export
@@ -125,10 +125,10 @@ module DataExport
         CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       SQL
     end
-    
+
     def generate_schema_sql
       schema_name = "app_#{@app.id}"
-      
+
       <<~SQL
         -- Create application schema
         CREATE SCHEMA IF NOT EXISTS #{schema_name};
@@ -141,12 +141,12 @@ module DataExport
         GRANT CREATE ON SCHEMA #{schema_name} TO authenticated;
       SQL
     end
-    
+
     def generate_tables_sql
       return "-- No tables to create" if @app.app_tables.empty?
-      
+
       sql_statements = []
-      
+
       @app.app_tables.each do |table|
         # Generate CREATE TABLE statement
         columns_sql = table.app_table_columns.map do |column|
@@ -155,7 +155,7 @@ module DataExport
           col_def += " DEFAULT #{format_default_value(column.default_value, column.column_type)}" if column.default_value.present?
           col_def
         end
-        
+
         # Add system columns
         columns_sql.unshift("  id UUID PRIMARY KEY DEFAULT gen_random_uuid()")
         columns_sql << "  organization_id UUID NOT NULL"
@@ -164,7 +164,7 @@ module DataExport
         columns_sql << "  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()"
         columns_sql << "  created_by UUID"
         columns_sql << "  updated_by UUID"
-        
+
         create_table_sql = <<~SQL
           -- Table: #{table.name}
           CREATE TABLE IF NOT EXISTS #{table.name} (
@@ -177,18 +177,18 @@ module DataExport
           -- Grant permissions
           GRANT ALL ON TABLE #{table.name} TO authenticated;
         SQL
-        
+
         sql_statements << create_table_sql
       end
-      
+
       sql_statements.join("\n\n")
     end
-    
+
     def generate_rls_policies_sql
       return "-- No RLS policies to create" if @app.app_tables.empty?
-      
+
       sql_statements = []
-      
+
       # First, create helper functions
       sql_statements << <<~SQL
         -- Helper function to check organization membership
@@ -201,7 +201,7 @@ module DataExport
         END;
         $$ LANGUAGE plpgsql SECURITY DEFINER;
       SQL
-      
+
       # Create RLS policies for each table
       @app.app_tables.each do |table|
         policies_sql = <<~SQL
@@ -238,36 +238,36 @@ module DataExport
             TO authenticated
             USING (check_organization_access(organization_id));
         SQL
-        
+
         sql_statements << policies_sql
       end
-      
+
       sql_statements.join("\n\n")
     end
-    
+
     def generate_data_sql
       return "-- No data to export" if @app.app_tables.empty?
-      
+
       sql_statements = []
-      
+
       @app.app_tables.each do |table|
         # Get records from Supabase
         records = fetch_table_records(table)
-        
+
         next if records.empty?
-        
+
         # Generate INSERT statements
         sql_statements << "-- Data for table: #{table.name}"
         sql_statements << "-- #{records.count} records"
-        
+
         # Get column names
         column_names = table.app_table_columns.map(&:name)
-        column_names.unshift('id', 'organization_id', 'app_id', 'created_at', 'updated_at', 'created_by', 'updated_by')
-        
+        column_names.unshift("id", "organization_id", "app_id", "created_at", "updated_at", "created_by", "updated_by")
+
         # Generate COPY command for efficient bulk insert
-        copy_sql = "COPY #{table.name} (#{column_names.join(', ')}) FROM stdin WITH (FORMAT csv, HEADER true, DELIMITER ',');"
+        copy_sql = "COPY #{table.name} (#{column_names.join(", ")}) FROM stdin WITH (FORMAT csv, HEADER true, DELIMITER ',');"
         sql_statements << copy_sql
-        
+
         # Add CSV data
         csv_data = CSV.generate do |csv|
           csv << column_names
@@ -275,19 +275,19 @@ module DataExport
             csv << column_names.map { |col| record[col] }
           end
         end
-        
+
         sql_statements << csv_data
         sql_statements << "\\."
       end
-      
+
       sql_statements.join("\n\n")
     end
-    
+
     def generate_indexes_sql
       return "-- No indexes to create" if @app.app_tables.empty?
-      
+
       sql_statements = []
-      
+
       @app.app_tables.each do |table|
         index_sql = <<~SQL
           -- Indexes for #{table.name}
@@ -295,18 +295,18 @@ module DataExport
           CREATE INDEX IF NOT EXISTS idx_#{table.name}_created_at ON #{table.name}(created_at DESC);
           CREATE INDEX IF NOT EXISTS idx_#{table.name}_updated_at ON #{table.name}(updated_at DESC);
         SQL
-        
+
         # Add indexes for foreign key columns
-        table.app_table_columns.where(column_type: 'reference').each do |column|
+        table.app_table_columns.where(column_type: "reference").each do |column|
           index_sql += "\nCREATE INDEX IF NOT EXISTS idx_#{table.name}_#{column.name} ON #{table.name}(#{column.name});"
         end
-        
+
         sql_statements << index_sql
       end
-      
+
       sql_statements.join("\n\n")
     end
-    
+
     def generate_audit_system_sql
       <<~SQL
         -- Audit system for compliance and transparency
@@ -350,7 +350,7 @@ module DataExport
         $$ LANGUAGE plpgsql SECURITY DEFINER;
       SQL
     end
-    
+
     def generate_footer_instructions
       <<~SQL
         -- ========================================
@@ -371,13 +371,13 @@ module DataExport
         -- Your data is yours - always.
       SQL
     end
-    
+
     def export_tables_to_json
       tables_data = {}
-      
+
       @app.app_tables.each do |table|
         records = fetch_table_records(table)
-        
+
         tables_data[table.name] = {
           schema: {
             columns: table.app_table_columns.map do |col|
@@ -394,52 +394,52 @@ module DataExport
           count: records.count
         }
       end
-      
+
       tables_data
     end
-    
+
     def fetch_table_records(table)
       # Fetch records from Supabase for the table
       # This would use the Supabase service to get actual data
       # For now, returning empty array as placeholder
       []
     end
-    
+
     def count_total_records
       @app.app_tables.sum { |table| fetch_table_records(table).count }
     end
-    
+
     def map_column_type(type)
       case type
-      when 'text' then 'TEXT'
-      when 'number' then 'NUMERIC'
-      when 'boolean' then 'BOOLEAN'
-      when 'date' then 'DATE'
-      when 'datetime' then 'TIMESTAMP WITH TIME ZONE'
-      when 'json' then 'JSONB'
-      when 'reference' then 'UUID'
-      when 'select', 'multiselect' then 'TEXT'
-      else 'TEXT'
+      when "text" then "TEXT"
+      when "number" then "NUMERIC"
+      when "boolean" then "BOOLEAN"
+      when "date" then "DATE"
+      when "datetime" then "TIMESTAMP WITH TIME ZONE"
+      when "json" then "JSONB"
+      when "reference" then "UUID"
+      when "select", "multiselect" then "TEXT"
+      else "TEXT"
       end
     end
-    
+
     def format_default_value(value, type)
-      return 'NULL' if value.nil?
-      
+      return "NULL" if value.nil?
+
       case type
-      when 'boolean'
+      when "boolean"
         value.to_s.upcase
-      when 'number'
+      when "number"
         value.to_s
-      when 'date', 'datetime'
+      when "date", "datetime"
         "'#{value}'"
-      when 'json'
+      when "json"
         "'#{value.to_json}'::jsonb"
       else
         "'#{value.gsub("'", "''")}'"
       end
     end
-    
+
     def generate_readme
       <<~MARKDOWN
         # OverSkill Data Export

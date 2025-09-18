@@ -30,13 +30,13 @@ class Api::V1::AppSecurityPoliciesControllerTest < Api::Test
     # Fetch the app_security_policy in question and prepare to compare it's attributes.
     app_security_policy = AppSecurityPolicy.find(app_security_policy_data["id"])
 
-    assert_equal_or_nil app_security_policy_data['policy_name'], app_security_policy.policy_name
-    assert_equal_or_nil app_security_policy_data['policy_type'], app_security_policy.policy_type
-    assert_equal_or_nil app_security_policy_data['enabled'], app_security_policy.enabled
-    assert_equal_or_nil app_security_policy_data['configuration'], app_security_policy.configuration
-    assert_equal_or_nil app_security_policy_data['description'], app_security_policy.description
-    assert_equal_or_nil DateTime.parse(app_security_policy_data['last_violation']), app_security_policy.last_violation
-    assert_equal_or_nil app_security_policy_data['violation_count'], app_security_policy.violation_count
+    assert_equal_or_nil app_security_policy_data["policy_name"], app_security_policy.policy_name
+    assert_equal_or_nil app_security_policy_data["policy_type"], app_security_policy.policy_type
+    assert_equal_or_nil app_security_policy_data["enabled"], app_security_policy.enabled
+    assert_equal_or_nil app_security_policy_data["configuration"], app_security_policy.configuration
+    assert_equal_or_nil app_security_policy_data["description"], app_security_policy.description
+    assert_equal_or_nil DateTime.parse(app_security_policy_data["last_violation"]), app_security_policy.last_violation
+    assert_equal_or_nil app_security_policy_data["violation_count"], app_security_policy.violation_count
     # 🚅 super scaffolding will insert new fields above this line.
 
     assert_equal app_security_policy_data["app_id"], app_security_policy.app_id
@@ -95,10 +95,10 @@ class Api::V1::AppSecurityPoliciesControllerTest < Api::Test
     put "/api/v1/app_security_policies/#{@app_security_policy.id}", params: {
       access_token: access_token,
       app_security_policy: {
-        policy_name: 'Alternative String Value',
-        policy_type: 'Alternative String Value',
-        configuration: 'Alternative String Value',
-        description: 'Alternative String Value',
+        policy_name: "Alternative String Value",
+        policy_type: "Alternative String Value",
+        configuration: "Alternative String Value",
+        description: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -110,10 +110,10 @@ class Api::V1::AppSecurityPoliciesControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @app_security_policy.reload
-    assert_equal @app_security_policy.policy_name, 'Alternative String Value'
-    assert_equal @app_security_policy.policy_type, 'Alternative String Value'
-    assert_equal @app_security_policy.configuration, 'Alternative String Value'
-    assert_equal @app_security_policy.description, 'Alternative String Value'
+    assert_equal @app_security_policy.policy_name, "Alternative String Value"
+    assert_equal @app_security_policy.policy_type, "Alternative String Value"
+    assert_equal @app_security_policy.configuration, "Alternative String Value"
+    assert_equal @app_security_policy.description, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

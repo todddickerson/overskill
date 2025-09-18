@@ -29,8 +29,8 @@ app = App.create!(
   team: team,
   creator: membership,
   prompt: "Create a simple counter app",
-  status: 'generating',
-  app_type: 'tool'
+  status: "generating",
+  app_type: "tool"
 )
 
 puts "Created app: #{app.name} (ID: #{app.id})"
@@ -39,14 +39,14 @@ puts "Created app: #{app.name} (ID: #{app.id})"
 message = AppChatMessage.create!(
   app: app,
   user: user,
-  role: 'user',
-  content: 'Create a simple counter app'
+  role: "user",
+  content: "Create a simple counter app"
 )
 
 puts "Created chat message: #{message.id}"
 
 # Test the broadcaster
-require_relative 'app/services/ai/chat_progress_broadcaster_v2'
+require_relative "app/services/ai/chat_progress_broadcaster_v2"
 broadcaster = Ai::ChatProgressBroadcasterV2.new(message)
 
 puts "\n1. Testing phase broadcasting..."
@@ -99,7 +99,7 @@ app_file = AppFile.create!(
       </button>
       <script>
         console.log("App started with 'special' characters");
-        const message = \`Template literal with "quotes" and 'apostrophes'\`;
+        const message = `Template literal with "quotes" and 'apostrophes'`;
       </script>
     </body>
     </html>
@@ -109,7 +109,7 @@ app_file = AppFile.create!(
 puts "Created test HTML file with special characters"
 
 # Test the builder
-require_relative 'app/services/deployment/external_vite_builder'
+require_relative "app/services/deployment/external_vite_builder"
 builder = Deployment::ExternalViteBuilder.new(app)
 
 puts "6. Testing worker code generation..."
@@ -117,42 +117,41 @@ begin
   # Simulate the wrapping that happens during build
   test_html = app_file.content
   test_assets = []
-  
+
   # Use private method directly for testing
   worker_code = builder.send(:wrap_for_worker_deployment_hybrid, test_html, test_assets)
-  
+
   # Check if the worker code is valid JavaScript
   puts "Generated worker code (first 500 chars):"
   puts worker_code[0..500]
   puts "..."
-  
+
   # Look for potential syntax errors
-  if worker_code.include?('`#{') || worker_code.include?('${')
+  if worker_code.include?('`#{') || worker_code.include?("${")
     puts "⚠️  Warning: Found unescaped template literal syntax"
   end
-  
+
   # Check for proper escaping
-  if worker_code.include?('const HTML_CONTENT = `')
+  if worker_code.include?("const HTML_CONTENT = `")
     escaped_content = worker_code.match(/const HTML_CONTENT = `([^`]*)`/m)
     if escaped_content
       puts "\n✅ HTML content is properly wrapped in template literal"
-      
+
       # Verify escaping of backticks
       if escaped_content[1].include?('\\`')
         puts "✅ Backticks are properly escaped"
       end
-      
+
       # Check for other problematic characters
-      if !escaped_content[1].include?('${')
+      if !escaped_content[1].include?("${")
         puts "✅ No unescaped template literal expressions"
       else
         puts "⚠️  Found potential unescaped template expression"
       end
     end
   end
-  
+
   puts "\n✅ Worker code generation test complete!"
-  
 rescue => e
   puts "❌ Error during worker code generation: #{e.message}"
   puts e.backtrace.first(5)

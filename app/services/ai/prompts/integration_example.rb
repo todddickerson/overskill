@@ -8,7 +8,7 @@ module Ai
       class EnhancedAppBuilder
         def initialize(platform: :overskill, custom_variables: {})
           @prompt_service = Ai::Prompts::AgentPromptService.for_platform(
-            platform, 
+            platform,
             custom_variables
           )
         end
@@ -16,7 +16,7 @@ module Ai
         def generate_app(user_prompt, app_name)
           system_prompt = @prompt_service.generate_prompt
           tools_config = @prompt_service.generate_tools
-          
+
           # Simulate AI API call
           {
             system_prompt: system_prompt,
@@ -46,7 +46,7 @@ module Ai
 
         def self.for_app_generation(app)
           team = app.team
-          
+
           custom_variables = {
             platform_name: "#{team.name} Builder",
             tool_prefix: "#{team.name.parameterize}-",
@@ -62,7 +62,7 @@ module Ai
       class PromptGenerationJob < ApplicationJob
         def perform(team_id, config_type = :standard)
           team = Team.find(team_id)
-          
+
           case config_type
           when :standard
             prompt_service = TeamSpecificPromptService.for_team(team)
@@ -75,7 +75,7 @@ module Ai
           end
 
           config = prompt_service.generate_config
-          
+
           # Store or cache the generated configuration
           Rails.cache.write(
             "team_#{team_id}_prompt_config_#{config_type}",
@@ -92,9 +92,9 @@ module Ai
       class PromptsController < ApplicationController
         def show
           platform = params[:platform]&.to_sym || :overskill
-          
+
           unless Ai::Prompts::AgentPromptService.available_platforms.include?(platform)
-            return render json: { error: "Invalid platform" }, status: :bad_request
+            return render json: {error: "Invalid platform"}, status: :bad_request
           end
 
           custom_vars = {
@@ -107,7 +107,7 @@ module Ai
           end
 
           prompt_service = Ai::Prompts::AgentPromptService.for_platform(platform, custom_vars)
-          
+
           if prompt_service.valid_config?
             config = prompt_service.generate_config
             render json: {
@@ -118,9 +118,9 @@ module Ai
               generated_at: config[:metadata][:generated_at]
             }
           else
-            render json: { 
-              error: "Invalid configuration", 
-              details: prompt_service.errors.full_messages 
+            render json: {
+              error: "Invalid configuration",
+              details: prompt_service.errors.full_messages
             }, status: :unprocessable_entity
           end
         end
@@ -128,12 +128,12 @@ module Ai
         def export
           platform = params[:platform]&.to_sym || :overskill
           prompt_service = Ai::Prompts::AgentPromptService.for_platform(platform)
-          
+
           export_path = prompt_service.export_to_files
-          
-          send_file ::File.join(export_path, "prompt.txt"), 
-                   disposition: 'attachment',
-                   filename: "#{platform}_agent_prompt.txt"
+
+          send_file ::File.join(export_path, "prompt.txt"),
+            disposition: "attachment",
+            filename: "#{platform}_agent_prompt.txt"
         end
       end
 
@@ -141,27 +141,25 @@ module Ai
       class ConfigurationTester
         def self.test_all_platforms
           results = {}
-          
+
           Ai::Prompts::AgentPromptService.available_platforms.each do |platform|
-            begin
-              service = Ai::Prompts::AgentPromptService.for_platform(platform)
-              config = service.generate_config
-              
-              results[platform] = {
-                success: true,
-                prompt_length: config[:prompt].length,
-                tool_count: config[:tools].size,
-                platform_name: service.variables[:platform_name],
-                tool_prefix: service.variables[:tool_prefix]
-              }
-            rescue => e
-              results[platform] = {
-                success: false,
-                error: e.message
-              }
-            end
+            service = Ai::Prompts::AgentPromptService.for_platform(platform)
+            config = service.generate_config
+
+            results[platform] = {
+              success: true,
+              prompt_length: config[:prompt].length,
+              tool_count: config[:tools].size,
+              platform_name: service.variables[:platform_name],
+              tool_prefix: service.variables[:tool_prefix]
+            }
+          rescue => e
+            results[platform] = {
+              success: false,
+              error: e.message
+            }
           end
-          
+
           results
         end
 
@@ -180,9 +178,9 @@ module Ai
           issues << "Platform name not substituted" unless prompt.include?("TEST_PLATFORM")
           issues << "Tool prefix not substituted" unless tools.first["name"].start_with?("test_")
           issues << "Current date not substituted" unless prompt.include?("2025-01-01")
-          
+
           remaining_vars = prompt.scan(/\{\{([^}]+)\}\}/).flatten
-          issues << "Unsubstituted variables: #{remaining_vars.join(', ')}" if remaining_vars.any?
+          issues << "Unsubstituted variables: #{remaining_vars.join(", ")}" if remaining_vars.any?
 
           {
             valid: issues.empty?,

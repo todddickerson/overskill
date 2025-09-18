@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require_relative 'config/environment'
+require_relative "config/environment"
 
 # Find the latest app
 latest_app = App.joins(:app_files).order(created_at: :desc).first
@@ -48,28 +48,28 @@ puts "\n" + "=" * 80
 puts "File Type Analysis:"
 puts "-" * 80
 
-file_types = Hash.new { |h, k| h[k] = { count: 0, total_size: 0, files: [] } }
+file_types = Hash.new { |h, k| h[k] = {count: 0, total_size: 0, files: []} }
 
 latest_app.app_files.each do |file|
   ext = File.extname(file.path).downcase
   ext = "(no extension)" if ext.empty?
   size = file.content.to_s.bytesize
-  
+
   file_types[ext][:count] += 1
   file_types[ext][:total_size] += size
-  file_types[ext][:files] << { path: file.path, size: size }
+  file_types[ext][:files] << {path: file.path, size: size}
 end
 
 file_types.sort_by { |_, info| -info[:total_size] }.each do |ext, info|
   size_mb = (info[:total_size] / 1024.0 / 1024.0).round(3)
   size_kb = (info[:total_size] / 1024.0).round(2)
-  
+
   if size_mb > 0.1
     puts "  #{ext.ljust(20)} #{info[:count].to_s.rjust(5)} files, #{size_mb.to_s.rjust(10)} MB total"
   else
     puts "  #{ext.ljust(20)} #{info[:count].to_s.rjust(5)} files, #{size_kb.to_s.rjust(10)} KB total"
   end
-  
+
   # Show largest files of this type if significant
   if info[:total_size] > 100_000 # > 100KB
     info[:files].sort_by { |f| -f[:size] }.first(3).each do |file|
@@ -97,24 +97,24 @@ if image_files.any?
 end
 
 # Check for large dependencies in package.json
-package_json_file = latest_app.app_files.find_by(path: 'package.json')
+package_json_file = latest_app.app_files.find_by(path: "package.json")
 if package_json_file
   begin
     package_json = JSON.parse(package_json_file.content)
-    deps = (package_json['dependencies'] || {}).merge(package_json['devDependencies'] || {})
-    
+    deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+
     # Known large dependencies
     large_deps = {
-      'moment' => '~290KB',
-      'lodash' => '~70KB', 
-      'axios' => '~400KB',
-      '@mui/material' => '~2.5MB',
-      'antd' => '~2MB',
-      'chart.js' => '~200KB',
-      'three' => '~600KB',
-      'd3' => '~350KB'
+      "moment" => "~290KB",
+      "lodash" => "~70KB",
+      "axios" => "~400KB",
+      "@mui/material" => "~2.5MB",
+      "antd" => "~2MB",
+      "chart.js" => "~200KB",
+      "three" => "~600KB",
+      "d3" => "~350KB"
     }
-    
+
     found_large_deps = deps.keys & large_deps.keys
     if found_large_deps.any?
       puts "\n⚠️  Large dependencies detected in package.json:"

@@ -35,7 +35,7 @@ module Ai
       }
 
       # Add tools if provided (for tool calling)
-      if tools && tools.any?
+      if tools&.any?
         body[:tools] = tools
         body[:tool_choice] = "auto"
       end
@@ -44,7 +44,7 @@ module Ai
 
       retries = 0
       max_retries = 2
-      
+
       begin
         response = self.class.post("/chat/completions", @options.merge(body: body.to_json))
       rescue Net::ReadTimeout => e
@@ -134,7 +134,7 @@ module Ai
                   description: "Deep analysis of user needs and how to create a sophisticated solution"
                 },
                 approach: {
-                  type: "string", 
+                  type: "string",
                   description: "Professional, design-first approach using approved technologies"
                 },
                 design_language: {
@@ -143,14 +143,14 @@ module Ai
                     color_palette: {
                       type: "object",
                       properties: {
-                        primary: { type: "string" },
-                        secondary: { type: "string" },
-                        accent: { type: "string" },
-                        background: { type: "string" }
+                        primary: {type: "string"},
+                        secondary: {type: "string"},
+                        accent: {type: "string"},
+                        background: {type: "string"}
                       }
                     },
-                    typography: { type: "string" },
-                    aesthetic: { type: "string" }
+                    typography: {type: "string"},
+                    aesthetic: {type: "string"}
                   }
                 },
                 steps: {
@@ -158,26 +158,26 @@ module Ai
                   items: {
                     type: "object",
                     properties: {
-                      description: { type: "string" },
+                      description: {type: "string"},
                       files_affected: {
                         type: "array",
-                        items: { type: "string" }
+                        items: {type: "string"}
                       },
-                      design_notes: { type: "string" }
+                      design_notes: {type: "string"}
                     }
                   }
                 },
                 system_architecture: {
                   type: "array",
-                  items: { type: "string" }
+                  items: {type: "string"}
                 },
                 user_experience_flow: {
-                  type: "array", 
-                  items: { type: "string" }
+                  type: "array",
+                  items: {type: "string"}
                 },
                 professional_touches: {
                   type: "array",
-                  items: { type: "string" }
+                  items: {type: "string"}
                 }
               },
               required: ["analysis", "approach", "steps"]
@@ -187,12 +187,12 @@ module Ai
       ]
 
       messages = [
-        {role: "system", content: build_analysis_prompt_system()},
+        {role: "system", content: build_analysis_prompt_system},
         {role: "user", content: build_analysis_prompt_user(request, current_files, app_context)}
       ]
-      
+
       response = chat(messages, model: :kimi_k2, temperature: 0.3, max_tokens: 2000, tools: tools)
-      
+
       if response[:success]
         if response[:tool_calls]&.any?
           # Handle native tool calling response
@@ -200,12 +200,12 @@ module Ai
           if tool_call["function"]["name"] == "create_update_plan"
             begin
               plan = JSON.parse(tool_call["function"]["arguments"], symbolize_names: true)
-              { success: true, plan: plan }
+              {success: true, plan: plan}
             rescue JSON::ParserError => e
-              { success: false, error: "Failed to parse tool call: #{e.message}" }
+              {success: false, error: "Failed to parse tool call: #{e.message}"}
             end
           else
-            { success: false, error: "Unexpected tool call: #{tool_call["function"]["name"]}" }
+            {success: false, error: "Unexpected tool call: #{tool_call["function"]["name"]}"}
           end
         else
           # Fallback to text parsing if no tool calls
@@ -235,9 +235,9 @@ module Ai
                   items: {
                     type: "object",
                     properties: {
-                      path: { type: "string" },
-                      content: { type: "string" },
-                      summary: { type: "string" }
+                      path: {type: "string"},
+                      content: {type: "string"},
+                      summary: {type: "string"}
                     },
                     required: ["path", "content"]
                   }
@@ -245,10 +245,10 @@ module Ai
                 whats_next: {
                   type: "array",
                   items: {
-                    type: "object", 
+                    type: "object",
                     properties: {
-                      title: { type: "string" },
-                      description: { type: "string" }
+                      title: {type: "string"},
+                      description: {type: "string"}
                     }
                   }
                 },
@@ -257,10 +257,10 @@ module Ai
                   items: {
                     type: "object",
                     properties: {
-                      severity: { type: "string" },
-                      title: { type: "string" },
-                      description: { type: "string" },
-                      file: { type: "string" }
+                      severity: {type: "string"},
+                      title: {type: "string"},
+                      description: {type: "string"},
+                      file: {type: "string"}
                     }
                   }
                 }
@@ -272,12 +272,12 @@ module Ai
       ]
 
       messages = [
-        {role: "system", content: build_execution_prompt_system()},
+        {role: "system", content: build_execution_prompt_system},
         {role: "user", content: build_execution_prompt_user(plan)}
       ]
-      
+
       response = chat(messages, model: :kimi_k2, temperature: 0.5, max_tokens: 8000, tools: tools)
-      
+
       if response[:success]
         if response[:tool_calls]&.any?
           # Handle native tool calling response
@@ -285,12 +285,12 @@ module Ai
           if tool_call["function"]["name"] == "generate_file_changes"
             begin
               changes = JSON.parse(tool_call["function"]["arguments"], symbolize_names: true)
-              { success: true, changes: changes }
+              {success: true, changes: changes}
             rescue JSON::ParserError => e
-              { success: false, error: "Failed to parse tool call: #{e.message}" }
+              {success: false, error: "Failed to parse tool call: #{e.message}"}
             end
           else
-            { success: false, error: "Unexpected tool call: #{tool_call["function"]["name"]}" }
+            {success: false, error: "Unexpected tool call: #{tool_call["function"]["name"]}"}
           end
         else
           # Fallback to text parsing if no tool calls
@@ -387,30 +387,28 @@ module Ai
 
     def parse_text_response(content)
       # Fallback text parsing similar to OpenRouterClient
-      begin
-        content = content.strip
-        if content.start_with?("```")
-          content = content.match(/```(?:json)?\s*\n?(.+?)\n?```/m)&.captures&.first || content
-        end
-        plan = JSON.parse(content, symbolize_names: true)
-        { success: true, plan: plan }
-      rescue JSON::ParserError => e
-        { success: false, error: "Failed to parse plan: #{e.message}" }
+
+      content = content.strip
+      if content.start_with?("```")
+        content = content.match(/```(?:json)?\s*\n?(.+?)\n?```/m)&.captures&.first || content
       end
+      plan = JSON.parse(content, symbolize_names: true)
+      {success: true, plan: plan}
+    rescue JSON::ParserError => e
+      {success: false, error: "Failed to parse plan: #{e.message}"}
     end
 
     def parse_execution_response(content)
       # Fallback text parsing for execution response
-      begin
-        content = content.strip
-        if content.start_with?("```")
-          content = content.match(/```(?:json)?\s*\n?(.+?)\n?```/m)&.captures&.first || content
-        end
-        changes = JSON.parse(content, symbolize_names: true)
-        { success: true, changes: changes }
-      rescue JSON::ParserError => e
-        { success: false, error: "Failed to parse changes: #{e.message}" }
+
+      content = content.strip
+      if content.start_with?("```")
+        content = content.match(/```(?:json)?\s*\n?(.+?)\n?```/m)&.captures&.first || content
       end
+      changes = JSON.parse(content, symbolize_names: true)
+      {success: true, changes: changes}
+    rescue JSON::ParserError => e
+      {success: false, error: "Failed to parse changes: #{e.message}"}
     end
 
     def calculate_cost(usage, model_id)

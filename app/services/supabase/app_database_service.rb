@@ -1,231 +1,231 @@
 class Supabase::AppDatabaseService
   include HTTParty
-  
-  base_uri ENV.fetch('SUPABASE_URL', 'https://overskill.supabase.co')
-  
+
+  base_uri ENV.fetch("SUPABASE_URL", "https://overskill.supabase.co")
+
   # Custom config support for hybrid architecture
   attr_accessor :custom_config
-  
+
   def initialize(app)
     @app = app
     # Default to managed Supabase credentials
     @headers = {
-      'Authorization' => "Bearer #{ENV.fetch('SUPABASE_SERVICE_KEY')}",
-      'Content-Type' => 'application/json',
-      'apikey' => ENV.fetch('SUPABASE_ANON_KEY')
+      "Authorization" => "Bearer #{ENV.fetch("SUPABASE_SERVICE_KEY")}",
+      "Content-Type" => "application/json",
+      "apikey" => ENV.fetch("SUPABASE_ANON_KEY")
     }
     # Custom config can be set by HybridConnectionManager
     @custom_config = nil
   end
-  
+
   def create_app_database
     # Create app-specific schema if it doesn't exist
     schema_name = app_schema_name
-    
+
     execute_sql("CREATE SCHEMA IF NOT EXISTS #{schema_name}")
     setup_row_level_security(schema_name)
-    
+
     schema_name
   end
-  
+
   def create_table(table_name, columns_schema)
     schema_name = create_app_database
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     # Build CREATE TABLE SQL
     columns_sql = columns_schema.map do |column|
       build_column_definition(column)
-    end.join(', ')
-    
+    end.join(", ")
+
     # Add standard columns
     columns_sql += ", id SERIAL PRIMARY KEY"
     columns_sql += ", created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
     columns_sql += ", updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
     columns_sql += ", app_user_id TEXT" # For row-level security
-    
+
     sql = "CREATE TABLE IF NOT EXISTS #{full_table_name} (#{columns_sql})"
-    
+
     result = execute_sql(sql)
-    
-    if result['error'].nil?
+
+    if result["error"].nil?
       # Set up RLS policy for this table
       setup_table_rls_policy(schema_name, table_name)
       # Create trigger for updated_at
       create_updated_at_trigger(schema_name, table_name)
     end
-    
+
     result
   end
-  
+
   def drop_table(table_name)
     schema_name = app_schema_name
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     execute_sql("DROP TABLE IF EXISTS #{full_table_name}")
   end
-  
+
   def get_table_data(table_name, app_user_id = nil)
     schema_name = app_schema_name
-    
+
     # Use Supabase REST API with RLS
     endpoint = "/rest/v1/#{schema_name}_#{table_name}"
     query_params = {}
-    query_params['app_user_id'] = "eq.#{app_user_id}" if app_user_id
-    
+    query_params["app_user_id"] = "eq.#{app_user_id}" if app_user_id
+
     response = self.class.get(endpoint, {
       headers: @headers,
       query: query_params
     })
-    
+
     response.parsed_response
   end
-  
+
   def insert_record(table_name, data, app_user_id)
     schema_name = app_schema_name
     endpoint = "/rest/v1/#{schema_name}_#{table_name}"
-    
+
     # Add app_user_id for RLS
     data_with_user = data.merge(app_user_id: app_user_id)
-    
+
     response = self.class.post(endpoint, {
       headers: @headers,
       body: data_with_user.to_json
     })
-    
+
     response.parsed_response
   end
-  
+
   def update_record(table_name, record_id, data, app_user_id)
     schema_name = app_schema_name
     endpoint = "/rest/v1/#{schema_name}_#{table_name}"
-    
+
     response = self.class.patch(endpoint, {
       headers: @headers,
-      query: { 
+      query: {
         id: "eq.#{record_id}",
         app_user_id: "eq.#{app_user_id}"
       },
       body: data.to_json
     })
-    
+
     response.parsed_response
   end
-  
+
   def delete_record(table_name, record_id, app_user_id)
     schema_name = app_schema_name
     endpoint = "/rest/v1/#{schema_name}_#{table_name}"
-    
+
     response = self.class.delete(endpoint, {
       headers: @headers,
-      query: { 
+      query: {
         id: "eq.#{record_id}",
         app_user_id: "eq.#{app_user_id}"
       }
     })
-    
+
     response.parsed_response
   end
-  
+
   def add_column(table_name, column_name, column_type)
     schema_name = app_schema_name
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     sql = "ALTER TABLE #{full_table_name} ADD COLUMN #{column_name} #{column_type}"
     execute_sql(sql)
   end
-  
+
   def alter_column(table_name, old_name, new_name, new_type)
     schema_name = app_schema_name
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     if old_name != new_name
       # Rename column
       rename_sql = "ALTER TABLE #{full_table_name} RENAME COLUMN #{old_name} TO #{new_name}"
       execute_sql(rename_sql)
     end
-    
+
     # Note: Type changes are complex in PostgreSQL and may require data migration
     # For now, we'll skip type changes to avoid data loss
     # In production, this would need careful handling with data conversion
   end
-  
+
   def drop_column(table_name, column_name)
     schema_name = app_schema_name
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     sql = "ALTER TABLE #{full_table_name} DROP COLUMN #{column_name}"
     execute_sql(sql)
   end
-  
+
   private
-  
+
   def app_schema_name
     "app_#{@app.id}"
   end
-  
+
   def execute_sql(sql)
-    endpoint = '/rest/v1/rpc/exec_sql'
-    
+    endpoint = "/rest/v1/rpc/exec_sql"
+
     response = self.class.post(endpoint, {
       headers: @headers,
-      body: { sql: sql }.to_json
+      body: {sql: sql}.to_json
     })
-    
+
     response.parsed_response
   end
-  
+
   def build_column_definition(column)
     sql_type = map_column_type(column[:type])
     definition = "#{column[:name]} #{sql_type}"
-    
+
     if column[:required]
       definition += " NOT NULL"
     end
-    
+
     if column[:default].present?
       definition += " DEFAULT '#{column[:default]}'"
     end
-    
+
     definition
   end
-  
+
   def build_create_table_sql(table_name, columns)
     schema_name = app_schema_name
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     column_definitions = columns.map { |col| build_column_definition(col) }
-    
+
     # Add standard columns for superior multi-tenant architecture
     column_definitions.unshift("id UUID PRIMARY KEY DEFAULT gen_random_uuid()")
     # Organization-based isolation (superior to Base44's app-only approach)
-    column_definitions << "organization_id UUID NOT NULL" 
+    column_definitions << "organization_id UUID NOT NULL"
     column_definitions << "app_id UUID NOT NULL DEFAULT '#{@app.id}'::uuid"
     column_definitions << "app_user_id UUID" # Optional - for user-specific data
     column_definitions << "created_at TIMESTAMP WITH TIME ZONE DEFAULT now()"
     column_definitions << "updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()"
-    
+
     sql = "CREATE TABLE #{full_table_name} (\n"
     sql += "  #{column_definitions.join(",\n  ")}\n"
     sql += ")"
-    
+
     sql
   end
-  
+
   def map_column_type(type)
     case type
-    when 'text' then 'TEXT'
-    when 'number' then 'NUMERIC'
-    when 'boolean' then 'BOOLEAN'
-    when 'date' then 'DATE'
-    when 'datetime' then 'TIMESTAMP WITH TIME ZONE'
-    when 'select', 'multiselect' then 'TEXT'
-    else 'TEXT'
+    when "text" then "TEXT"
+    when "number" then "NUMERIC"
+    when "boolean" then "BOOLEAN"
+    when "date" then "DATE"
+    when "datetime" then "TIMESTAMP WITH TIME ZONE"
+    when "select", "multiselect" then "TEXT"
+    else "TEXT"
     end
   end
-  
+
   def setup_row_level_security(schema_name)
     Rails.logger.info "Setting up superior organization-based RLS for schema: #{schema_name}"
-    
+
     # Our approach: Multi-layered security that's transparent and auditable
     # Superior to Base44's proprietary system in several ways:
     # 1. Organization-based isolation (not just app-based)
@@ -233,21 +233,21 @@ class Supabase::AppDatabaseService
     # 3. Complete audit trail for compliance
     # 4. Data portability support
     # 5. Hybrid architecture support (user can use own Supabase)
-    
+
     # 1. Create organization context functions
     create_organization_context_functions
-    
+
     # 2. Create audit logging system for transparency
     create_audit_logging_system(schema_name)
-    
+
     # 3. Create organization isolation functions
     create_organization_isolation_functions(schema_name)
-    
+
     Rails.logger.info "Superior multi-tenant RLS setup completed for #{schema_name}"
   end
-  
+
   private
-  
+
   def create_organization_context_functions
     # Create efficient organization context functions
     # More performant than Base44's approach with proper caching
@@ -303,14 +303,14 @@ class Supabase::AppDatabaseService
       END;
       $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
     SQL
-    
+
     execute_sql(sql)
   end
-  
+
   def create_audit_logging_system(schema_name)
     # Create comprehensive audit system (Base44 doesn't provide this level of transparency)
     audit_table = "#{schema_name}_audit_log"
-    
+
     sql = <<~SQL
       -- Audit log table for complete transparency
       CREATE TABLE IF NOT EXISTS #{audit_table} (
@@ -351,10 +351,10 @@ class Supabase::AppDatabaseService
         FOR ALL TO authenticated
         USING (get_user_organization_role(auth.uid(), organization_id) = 'super_admin');
     SQL
-    
+
     execute_sql(sql)
   end
-  
+
   def create_organization_isolation_functions(schema_name)
     # Create the core RLS functions for organization-based isolation
     sql = <<~SQL
@@ -443,58 +443,58 @@ class Supabase::AppDatabaseService
       END;
       $$ LANGUAGE plpgsql SECURITY DEFINER;
     SQL
-    
+
     execute_sql(sql)
   end
-  
+
   def setup_table_rls_policy(schema_name, table_name)
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     # Enable RLS on the table
     execute_sql("ALTER TABLE #{full_table_name} ENABLE ROW LEVEL SECURITY")
-    
+
     # Create superior organization-based RLS policies
     # Multiple policies for different access patterns (more flexible than Base44)
-    
+
     # 1. Primary organization isolation policy
-    organization_policy = """
+    organization_policy = "
       CREATE POLICY \"#{table_name}_organization_isolation\" ON #{full_table_name}
         FOR ALL TO authenticated
         USING (#{schema_name}.organization_has_access(organization_id))
         WITH CHECK (#{schema_name}.organization_has_access(organization_id))
-    """
-    
+    "
+
     # 2. Role-based access policy for sensitive operations
-    admin_policy = """
+    admin_policy = "
       CREATE POLICY \"#{table_name}_admin_access\" ON #{full_table_name}
         FOR ALL TO authenticated
         USING (#{schema_name}.user_can_access(organization_id, 'admin'))
         WITH CHECK (#{schema_name}.user_can_access(organization_id, 'admin'))
-    """
-    
+    "
+
     # 3. Read-only policy for viewers
-    viewer_policy = """
+    viewer_policy = "
       CREATE POLICY \"#{table_name}_viewer_access\" ON #{full_table_name}
         FOR SELECT TO authenticated
         USING (#{schema_name}.user_can_access(organization_id, 'viewer'))
-    """
-    
+    "
+
     # Execute all policies
     execute_sql(organization_policy)
-    execute_sql(admin_policy) 
+    execute_sql(admin_policy)
     execute_sql(viewer_policy)
-    
+
     # Create audit trigger for this table
     create_audit_trigger(schema_name, table_name)
   end
-  
+
   def create_audit_trigger(schema_name, table_name)
     # Create audit trigger for complete transparency (Base44 lacks this)
     full_table_name = "#{schema_name}.#{table_name}"
     trigger_function = "#{schema_name}_#{table_name}_audit_trigger"
-    
+
     # Create trigger function
-    trigger_sql = """
+    trigger_sql = "
       CREATE OR REPLACE FUNCTION #{trigger_function}()
       RETURNS TRIGGER AS $$
       DECLARE
@@ -503,7 +503,7 @@ class Supabase::AppDatabaseService
       BEGIN
         -- Determine operation type
         operation_type := TG_OP;
-        
+
         -- Build changes object
         IF TG_OP = 'INSERT' THEN
           changes := jsonb_build_object('new', to_jsonb(NEW));
@@ -512,7 +512,7 @@ class Supabase::AppDatabaseService
         ELSE -- UPDATE
           changes := jsonb_build_object('old', to_jsonb(OLD), 'new', to_jsonb(NEW));
         END IF;
-        
+
         -- Insert audit record
         INSERT INTO #{schema_name}_audit_log (
           organization_id,
@@ -537,7 +537,7 @@ class Supabase::AppDatabaseService
           current_setting('app.rls_policy_used', true),
           inet_client_addr()
         );
-        
+
         -- Return appropriate record
         IF TG_OP = 'DELETE' THEN
           RETURN OLD;
@@ -546,22 +546,22 @@ class Supabase::AppDatabaseService
         END IF;
       END;
       $$ LANGUAGE plpgsql SECURITY DEFINER;
-      
+
       -- Create the trigger
       DROP TRIGGER IF EXISTS #{table_name}_audit_trigger ON #{full_table_name};
       CREATE TRIGGER #{table_name}_audit_trigger
-        AFTER INSERT OR UPDATE OR DELETE ON #{full_table_name}  
+        AFTER INSERT OR UPDATE OR DELETE ON #{full_table_name}
         FOR EACH ROW EXECUTE FUNCTION #{trigger_function}()
-    """
-    
+    "
+
     execute_sql(trigger_sql)
   end
-  
+
   def create_updated_at_trigger(schema_name, table_name)
     full_table_name = "#{schema_name}.#{table_name}"
-    
+
     # Create trigger function if it doesn't exist
-    trigger_function = """
+    trigger_function = "
       CREATE OR REPLACE FUNCTION #{schema_name}.update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -569,18 +569,18 @@ class Supabase::AppDatabaseService
         RETURN NEW;
       END;
       $$ LANGUAGE plpgsql;
-    """
-    
+    "
+
     execute_sql(trigger_function)
-    
+
     # Create trigger
-    trigger_sql = """
+    trigger_sql = "
       CREATE TRIGGER update_#{table_name}_updated_at
         BEFORE UPDATE ON #{full_table_name}
         FOR EACH ROW
         EXECUTE FUNCTION #{schema_name}.update_updated_at_column()
-    """
-    
+    "
+
     execute_sql(trigger_sql)
   end
 end

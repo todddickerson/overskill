@@ -21,8 +21,6 @@ not_found_handling = "single-page-application"
 name = "{{APP_ID}}"
 
 [env.production.vars]
-VITE_SUPABASE_URL = "{{SUPABASE_URL}}"
-VITE_SUPABASE_ANON_KEY = "{{SUPABASE_ANON_KEY}}"
 VITE_APP_ID = "{{APP_ID}}"
 VITE_OWNER_ID = "{{OWNER_ID}}"
 VITE_ENVIRONMENT = "production"
@@ -31,8 +29,6 @@ VITE_ENVIRONMENT = "production"
 name = "preview-{{APP_ID}}"
 
 [env.development.vars]
-VITE_SUPABASE_URL = "{{SUPABASE_URL}}"
-VITE_SUPABASE_ANON_KEY = "{{SUPABASE_ANON_KEY}}"
 VITE_APP_ID = "{{APP_ID}}"
 VITE_OWNER_ID = "{{OWNER_ID}}"
 VITE_ENVIRONMENT = "development"

@@ -1,30 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+// Supabase integration removed for simplified deployment
+// This is a stub file to maintain compatibility with existing imports
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const supabase = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// CRITICAL: Set RLS context before any database operation
 export const setRLSContext = async (userId: string) => {
-  const { error } = await supabase.rpc('set_config', {
-    setting_name: 'app.current_user_id',
-    new_value: userId,
-    is_local: true
-  });
-  if (error) throw error;
+  // No-op: Database integration disabled
+  console.log('Database integration disabled');
 };
 
-// Initialize RLS on app load
 export const initializeApp = async () => {
-  const ownerId = import.meta.env.VITE_OWNER_ID;
-  if (ownerId) {
-    await setRLSContext(ownerId);
-  }
+  // No-op: App initialization simplified
+  console.log('App initialized (database disabled)');
 };
 
-// Helper for authenticated operations
 export const withRLS = async <T>(userId: string, operation: () => Promise<T>): Promise<T> => {
-  await setRLSContext(userId);
+  // No-op: Pass through operation without RLS
   return operation();
 };

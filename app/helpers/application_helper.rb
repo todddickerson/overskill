@@ -19,7 +19,7 @@ module ApplicationHelper
       "fas fa-file text-gray-400"
     end
   end
-  
+
   def next_app_version_number(app)
     last_version = app.app_versions.order(created_at: :desc).first
     if last_version
@@ -30,95 +30,95 @@ module ApplicationHelper
       "1.0.0"
     end
   end
-  
+
   def organize_files_into_tree(files)
     tree = {}
-    
+
     files.each do |file|
-      parts = file.path.split('/')
+      parts = file.path.split("/")
       current = tree
-      
+
       # Build nested structure
       parts[0...-1].each do |part|
-        current[part] ||= { _type: 'folder', _children: {} }
+        current[part] ||= {_type: "folder", _children: {}}
         current = current[part][:_children]
       end
-      
+
       # Add file
       filename = parts.last
-      current[filename] = { _type: 'file', _file: file }
+      current[filename] = {_type: "file", _file: file}
     end
-    
+
     tree
   end
-  
+
   def file_extension_icon(path)
     ext = File.extname(path).downcase
     case ext
-    when '.html', '.htm'
-      'fab fa-html5'
-    when '.js', '.jsx', '.mjs'
-      'fab fa-js-square'
-    when '.ts', '.tsx'
-      'fab fa-js-square'
-    when '.css', '.scss', '.sass'
-      'fab fa-css3-alt'
-    when '.json'
-      'fas fa-code'
-    when '.md'
-      'fab fa-markdown'
-    when '.xml'
-      'fas fa-code'
-    when '.svg'
-      'fas fa-image'
-    when '.png', '.jpg', '.jpeg', '.gif', '.webp'
-      'fas fa-image'
+    when ".html", ".htm"
+      "fab fa-html5"
+    when ".js", ".jsx", ".mjs"
+      "fab fa-js-square"
+    when ".ts", ".tsx"
+      "fab fa-js-square"
+    when ".css", ".scss", ".sass"
+      "fab fa-css3-alt"
+    when ".json"
+      "fas fa-code"
+    when ".md"
+      "fab fa-markdown"
+    when ".xml"
+      "fas fa-code"
+    when ".svg"
+      "fas fa-image"
+    when ".png", ".jpg", ".jpeg", ".gif", ".webp"
+      "fas fa-image"
     else
-      'fas fa-file-code'
+      "fas fa-file-code"
     end
   end
-  
+
   def file_extension_color(path)
     ext = File.extname(path).downcase
     case ext
-    when '.html', '.htm'
-      'text-orange-500 dark:text-orange-400'
-    when '.js', '.jsx', '.mjs'
-      'text-yellow-500 dark:text-yellow-400'
-    when '.ts', '.tsx'
-      'text-blue-600 dark:text-blue-400'
-    when '.css', '.scss', '.sass'
-      'text-blue-500 dark:text-blue-400'
-    when '.json'
-      'text-yellow-600 dark:text-yellow-400'
-    when '.md'
-      'text-gray-600 dark:text-gray-400'
-    when '.xml'
-      'text-orange-600 dark:text-orange-400'
-    when '.svg'
-      'text-purple-500 dark:text-purple-400'
-    when '.png', '.jpg', '.jpeg', '.gif', '.webp'
-      'text-green-500 dark:text-green-400'
+    when ".html", ".htm"
+      "text-orange-500 dark:text-orange-400"
+    when ".js", ".jsx", ".mjs"
+      "text-yellow-500 dark:text-yellow-400"
+    when ".ts", ".tsx"
+      "text-blue-600 dark:text-blue-400"
+    when ".css", ".scss", ".sass"
+      "text-blue-500 dark:text-blue-400"
+    when ".json"
+      "text-yellow-600 dark:text-yellow-400"
+    when ".md"
+      "text-gray-600 dark:text-gray-400"
+    when ".xml"
+      "text-orange-600 dark:text-orange-400"
+    when ".svg"
+      "text-purple-500 dark:text-purple-400"
+    when ".png", ".jpg", ".jpeg", ".gif", ".webp"
+      "text-green-500 dark:text-green-400"
     else
-      'text-gray-600 dark:text-gray-400'
+      "text-gray-600 dark:text-gray-400"
     end
   end
 
   def deployment_status_badge(status)
     case status.to_s
-    when 'deployed', 'success', 'live'
+    when "deployed", "success", "live"
       content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" do
         content_tag(:i, "", class: "fas fa-check-circle mr-1") + status.to_s.humanize
       end
-    when 'deploying', 'pending', 'in_progress'
+    when "deploying", "pending", "in_progress"
       content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" do
         content_tag(:i, "", class: "fas fa-spinner fa-spin mr-1") + status.to_s.humanize
       end
-    when 'failed', 'error'
+    when "failed", "error"
       content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" do
         content_tag(:i, "", class: "fas fa-times-circle mr-1") + status.to_s.humanize
       end
-    when 'not_deployed', 'inactive'
+    when "not_deployed", "inactive"
       content_tag :span, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" do
         content_tag(:i, "", class: "fas fa-circle mr-1") + status.to_s.humanize
       end

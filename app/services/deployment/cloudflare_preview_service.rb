@@ -1,47 +1,47 @@
 # Service for managing Cloudflare preview workers that auto-update with changes
 class Deployment::CloudflarePreviewService
   include HTTParty
-  
-  base_uri 'https://api.cloudflare.com/client/v4'
-  
+
+  base_uri "https://api.cloudflare.com/client/v4"
+
   def initialize(app)
     @app = app
-    @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
-    @api_key = ENV['CLOUDFLARE_API_KEY']
-    @api_token = ENV['CLOUDFLARE_API_TOKEN']
-    @email = ENV['CLOUDFLARE_EMAIL']
-    @zone_id = ENV['CLOUDFLARE_ZONE_ID'] || ENV['CLOUDFLARE_ZONE'] # For app domain
-    @base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
-    
+    @account_id = ENV["CLOUDFLARE_ACCOUNT_ID"]
+    @api_key = ENV["CLOUDFLARE_API_KEY"]
+    @api_token = ENV["CLOUDFLARE_API_TOKEN"]
+    @email = ENV["CLOUDFLARE_EMAIL"]
+    @zone_id = ENV["CLOUDFLARE_ZONE_ID"] || ENV["CLOUDFLARE_ZONE"] # For app domain
+    @base_domain = ENV["APP_BASE_DOMAIN"] || "overskillproject.com"
+
     # Use API Token if available, otherwise use Global API Key
     if @api_token.present?
-      self.class.headers 'Authorization' => "Bearer #{@api_token}"
+      self.class.headers "Authorization" => "Bearer #{@api_token}"
     elsif @api_key.present? && @email.present?
       self.class.headers({
-        'X-Auth-Email' => @email,
-        'X-Auth-Key' => @api_key
+        "X-Auth-Email" => @email,
+        "X-Auth-Key" => @api_key
       })
     end
   end
-  
+
   # Create or update the auto-preview worker
   def update_preview!
-    return { success: false, error: "Missing Cloudflare credentials" } unless credentials_present?
-    
+    return {success: false, error: "Missing Cloudflare credentials"} unless credentials_present?
+
     worker_name = "preview-#{@app.obfuscated_id.downcase}"
     preview_subdomain = "preview-#{@app.obfuscated_id.downcase}" # Use preview-{uuid} as subdomain
-    
+
     # Ensure database tables exist before building
     ensure_database_tables_exist!
-    
+
     # Build app with Vite first (with self-healing for TypeScript errors)
     Rails.logger.info "[CloudflarePreview] Building app #{@app.id} with self-healing build service"
-    
+
     # Use self-healing build service if enabled
-    if ENV['ENABLE_SELF_HEALING_BUILD'] != 'false'
+    if ENV["ENABLE_SELF_HEALING_BUILD"] != "false"
       build_service = Deployment::SelfHealingBuildService.new(@app)
       build_result = build_service.build_with_retry!
-      
+
       if build_result[:self_healed]
         Rails.logger.info "[CloudflarePreview] Build self-healed with #{build_result[:fixes_applied].count} fixes"
       end
@@ -49,17 +49,17 @@ class Deployment::CloudflarePreviewService
       build_service = Deployment::ViteBuildService.new(@app)
       build_result = build_service.build_app!
     end
-    
-    return { success: false, error: "Build failed: #{build_result[:error]}" } unless build_result[:success]
-    
+
+    return {success: false, error: "Build failed: #{build_result[:error]}"} unless build_result[:success]
+
     # Upload assets to R2 and get URLs
     Rails.logger.info "[CloudflarePreview] Uploading assets to R2 for app #{@app.id}"
     r2_service = Deployment::R2AssetService.new(@app)
     r2_result = r2_service.upload_assets(build_result[:files])
     asset_urls = r2_result[:asset_urls]
-    
+
     Rails.logger.info "[CloudflarePreview] Uploaded #{r2_result[:stats][:uploaded_count]} assets to R2"
-    
+
     # Separate code files from asset files
     code_files = {}
     build_result[:files].each do |path, file_data|
@@ -67,48 +67,48 @@ class Deployment::CloudflarePreviewService
         code_files[path] = file_data
       end
     end
-    
+
     Rails.logger.info "[CloudflarePreview] Worker will contain #{code_files.keys.size} code files"
-    
+
     # Generate worker script with code files and asset URLs
     worker_script = generate_worker_script_with_r2_assets(code_files, asset_urls)
     upload_response = upload_worker(worker_name, worker_script)
-    
+
     # Set environment variables
     set_worker_env_vars(worker_name)
-    
-    return { success: false, error: "Failed to upload preview worker" } unless upload_response['success']
-    
+
+    return {success: false, error: "Failed to upload preview worker"} unless upload_response["success"]
+
     # Enable workers.dev subdomain for preview access
     enable_workers_dev_subdomain(worker_name)
-    
+
     # Only create custom domain route if not using workers.dev
-    use_workers_dev = ENV['USE_WORKERS_DEV_FOR_PREVIEW'] == 'true' || ENV['OVERSKILL_DOMAIN_DOWN'] == 'true'
+    use_workers_dev = ENV["USE_WORKERS_DEV_FOR_PREVIEW"] == "true" || ENV["OVERSKILL_DOMAIN_DOWN"] == "true"
     unless use_workers_dev
       # Ensure route exists for auto-preview domain (using overskill.app)
       ensure_preview_route(preview_subdomain, worker_name)
     end
-    
+
     # Get both URLs
-    workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+    workers_dev_url = "https://#{worker_name}.#{@account_id.tr("_", "-")}.workers.dev"
     custom_domain_url = "https://#{preview_subdomain}.#{@base_domain}"
-    
+
     # Update app with preview URLs
     # Use workers.dev URL when custom domain is down or disabled
-    use_workers_dev = ENV['USE_WORKERS_DEV_FOR_PREVIEW'] == 'true' || ENV['OVERSKILL_DOMAIN_DOWN'] == 'true'
+    use_workers_dev = ENV["USE_WORKERS_DEV_FOR_PREVIEW"] == "true" || ENV["OVERSKILL_DOMAIN_DOWN"] == "true"
     preview_url = use_workers_dev ? workers_dev_url : custom_domain_url
-    
+
     @app.update!(
       preview_url: preview_url,
       preview_updated_at: Time.current
     )
-    
-    note = use_workers_dev ? 
-      "Using workers.dev URL (#{@base_domain} is down)" : 
+
+    note = use_workers_dev ?
+      "Using workers.dev URL (#{@base_domain} is down)" :
       "Using custom domain #{custom_domain_url}"
-    
-    { 
-      success: true, 
+
+    {
+      success: true,
       preview_url: preview_url,
       workers_dev_url: workers_dev_url,
       custom_domain_url: custom_domain_url,
@@ -116,82 +116,82 @@ class Deployment::CloudflarePreviewService
     }
   rescue => e
     Rails.logger.error "Preview update failed: #{e.message}"
-    { success: false, error: e.message }
+    {success: false, error: e.message}
   end
-  
+
   # Deploy to staging (preview--app-subdomain.overskill.app)
   def deploy_staging!
     staging_subdomain = "preview--#{@app.subdomain}"
     deploy_to_environment(:staging, staging_subdomain)
   end
-  
+
   # Deploy to production (app-subdomain.overskill.app)
   def deploy_production!
     production_subdomain = @app.subdomain
     deploy_to_environment(:production, production_subdomain)
   end
-  
+
   private
-  
+
   def set_worker_env_vars(worker_name, environment = :preview)
     # Set environment variables via Cloudflare API
     all_env_vars = build_env_vars_for_app(environment)
-    
+
     # Cloudflare API expects both plaintext vars and secrets in specific format
     plaintext_bindings = []
     secret_bindings = []
-    
+
     all_env_vars.each do |key, value|
       # SUPABASE_ANON_KEY is public (for browser), SERVICE_KEY is secret (for server)
-      if (key.include?('SECRET') || key.include?('SERVICE_KEY') || key.include?('PRIVATE')) && !key.include?('ANON_KEY')
+      if (key.include?("SECRET") || key.include?("SERVICE_KEY") || key.include?("PRIVATE")) && !key.include?("ANON_KEY")
         # Treat as secret
-        secret_bindings << { name: key, type: 'secret_text' }
+        secret_bindings << {name: key, type: "secret_text"}
         # Secrets need to be set separately via PATCH endpoint
         set_worker_secret(worker_name, key, value)
       else
         # Treat as plaintext (including SUPABASE_ANON_KEY)
-        plaintext_bindings << { 
-          name: key, 
-          type: 'plain_text',
+        plaintext_bindings << {
+          name: key,
+          type: "plain_text",
           text: value
         }
       end
     end
-    
+
     # Update worker with env var bindings
     if plaintext_bindings.any?
       update_worker_env_vars(worker_name, plaintext_bindings)
     end
-    
+
     Rails.logger.info "[CloudflarePreview] Set #{plaintext_bindings.size} env vars and #{secret_bindings.size} secrets"
   end
-  
+
   def build_env_vars_for_app(environment = :preview)
     vars = {}
-    
+
     # System vars
-    vars['APP_ID'] = @app.id.to_s
+    vars["APP_ID"] = @app.id.to_s
     # Ensure app name is safe for JavaScript environments
     # JSON.generate will properly escape quotes and apostrophes
-    vars['APP_NAME'] = @app.name.to_s
-    vars['ENVIRONMENT'] = environment.to_s
-    
+    vars["APP_NAME"] = @app.name.to_s
+    vars["ENVIRONMENT"] = environment.to_s
+
     # Set deployed timestamp based on environment
     case environment
     when :preview
-      vars['DEPLOYED_AT'] = @app.preview_updated_at&.iso8601 || Time.current.iso8601
-      vars['BUILD_ID'] = @app.build_id || "preview-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+      vars["DEPLOYED_AT"] = @app.preview_updated_at&.iso8601 || Time.current.iso8601
+      vars["BUILD_ID"] = @app.build_id || "preview-#{Time.current.strftime("%Y%m%d-%H%M%S")}"
     when :staging
-      vars['DEPLOYED_AT'] = @app.staging_deployed_at&.iso8601 || Time.current.iso8601
-      vars['BUILD_ID'] = @app.build_id || "staging-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+      vars["DEPLOYED_AT"] = @app.staging_deployed_at&.iso8601 || Time.current.iso8601
+      vars["BUILD_ID"] = @app.build_id || "staging-#{Time.current.strftime("%Y%m%d-%H%M%S")}"
     when :production
-      vars['DEPLOYED_AT'] = @app.deployed_at&.iso8601 || Time.current.iso8601
-      vars['BUILD_ID'] = @app.build_id || "production-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+      vars["DEPLOYED_AT"] = @app.deployed_at&.iso8601 || Time.current.iso8601
+      vars["BUILD_ID"] = @app.build_id || "production-#{Time.current.strftime("%Y%m%d-%H%M%S")}"
     else
-      vars['DEPLOYED_AT'] = Time.current.iso8601
-      vars['BUILD_ID'] = @app.build_id || "#{environment}-#{Time.current.strftime('%Y%m%d-%H%M%S')}"
+      vars["DEPLOYED_AT"] = Time.current.iso8601
+      vars["BUILD_ID"] = @app.build_id || "#{environment}-#{Time.current.strftime("%Y%m%d-%H%M%S")}"
     end
-    
+
     # Supabase configuration (from app's shard)
     # Temporarily skip database shard access due to association issue
     # TODO: Fix database shard association circular reference
@@ -200,127 +200,123 @@ class Deployment::CloudflarePreviewService
     #   vars['SUPABASE_ANON_KEY'] = @app.database_shard.supabase_anon_key
     #   vars['SUPABASE_SERVICE_KEY'] = @app.database_shard.supabase_service_key
     # end
-    
+
     # Use fallback Supabase config from environment for testing
-    vars['SUPABASE_URL'] = ENV['SUPABASE_URL'] if ENV['SUPABASE_URL']
-    vars['SUPABASE_ANON_KEY'] = ENV['SUPABASE_ANON_KEY'] if ENV['SUPABASE_ANON_KEY']
-    vars['SUPABASE_SERVICE_KEY'] = ENV['SUPABASE_SERVICE_KEY'] if ENV['SUPABASE_SERVICE_KEY']
-    
+    vars["SUPABASE_URL"] = ENV["SUPABASE_URL"] if ENV["SUPABASE_URL"]
+    vars["SUPABASE_ANON_KEY"] = ENV["SUPABASE_ANON_KEY"] if ENV["SUPABASE_ANON_KEY"]
+    vars["SUPABASE_SERVICE_KEY"] = ENV["SUPABASE_SERVICE_KEY"] if ENV["SUPABASE_SERVICE_KEY"]
+
     # Add auth settings if present
     if @app.app_auth_setting
       auth_config = @app.app_auth_setting.to_frontend_config
-      vars['AUTH_VISIBILITY'] = auth_config[:visibility].to_s
-      vars['AUTH_REQUIRES_AUTH'] = auth_config[:requires_auth].to_s
-      vars['AUTH_ALLOW_SIGNUPS'] = auth_config[:allow_signups].to_s
-      vars['AUTH_ALLOW_ANONYMOUS'] = auth_config[:allow_anonymous].to_s
-      vars['AUTH_REQUIRE_EMAIL_VERIFICATION'] = auth_config[:require_email_verification].to_s
-      vars['AUTH_ALLOWED_PROVIDERS'] = auth_config[:allowed_providers].to_json
-      vars['AUTH_ALLOWED_EMAIL_DOMAINS'] = auth_config[:allowed_email_domains].to_json
+      vars["AUTH_VISIBILITY"] = auth_config[:visibility].to_s
+      vars["AUTH_REQUIRES_AUTH"] = auth_config[:requires_auth].to_s
+      vars["AUTH_ALLOW_SIGNUPS"] = auth_config[:allow_signups].to_s
+      vars["AUTH_ALLOW_ANONYMOUS"] = auth_config[:allow_anonymous].to_s
+      vars["AUTH_REQUIRE_EMAIL_VERIFICATION"] = auth_config[:require_email_verification].to_s
+      vars["AUTH_ALLOWED_PROVIDERS"] = auth_config[:allowed_providers].to_json
+      vars["AUTH_ALLOWED_EMAIL_DOMAINS"] = auth_config[:allowed_email_domains].to_json
     end
-    
+
     # Custom app env vars (but don't override system vars)
     @app.env_vars_for_deployment.each do |key, value|
-      vars[key] = value unless ['APP_ID', 'ENVIRONMENT', 'DEPLOYED_AT', 'BUILD_ID'].include?(key)
+      vars[key] = value unless ["APP_ID", "ENVIRONMENT", "DEPLOYED_AT", "BUILD_ID"].include?(key)
     end
-    
+
     # OAuth secrets (from Rails env)
-    vars['GOOGLE_CLIENT_ID'] = ENV['GOOGLE_CLIENT_ID'] if ENV['GOOGLE_CLIENT_ID']
-    vars['GOOGLE_CLIENT_SECRET'] = ENV['GOOGLE_CLIENT_SECRET'] if ENV['GOOGLE_CLIENT_SECRET']
-    
+    vars["GOOGLE_CLIENT_ID"] = ENV["GOOGLE_CLIENT_ID"] if ENV["GOOGLE_CLIENT_ID"]
+    vars["GOOGLE_CLIENT_SECRET"] = ENV["GOOGLE_CLIENT_SECRET"] if ENV["GOOGLE_CLIENT_SECRET"]
+
     vars
   end
-  
+
   def set_worker_secret(worker_name, key, value)
     # Set individual secret via PATCH endpoint
-    begin
-      response = self.class.patch(
-        "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
-        body: {
-          name: key,
-          text: value,
-          type: 'secret_text'
-        }.to_json,
-        headers: { 'Content-Type' => 'application/json' }
-      )
-      
-      Rails.logger.info "[CloudflarePreview] Set secret #{key} for worker #{worker_name}"
-    rescue => e
-      Rails.logger.warn "[CloudflarePreview] Failed to set secret #{key}: #{e.message}"
-    end
+
+    self.class.patch(
+      "/accounts/#{@account_id}/workers/scripts/#{worker_name}/secrets",
+      body: {
+        name: key,
+        text: value,
+        type: "secret_text"
+      }.to_json,
+      headers: {"Content-Type" => "application/json"}
+    )
+
+    Rails.logger.info "[CloudflarePreview] Set secret #{key} for worker #{worker_name}"
+  rescue => e
+    Rails.logger.warn "[CloudflarePreview] Failed to set secret #{key}: #{e.message}"
   end
-  
+
   def update_worker_env_vars(worker_name, bindings)
     # Update worker metadata with environment variable bindings
-    begin
-      metadata = {
-        bindings: bindings,
-        compatibility_date: '2024-01-01',
-        main_module: 'worker.js'
-      }
-      
-      # This might need adjustment based on Cloudflare's exact API
-      response = self.class.patch(
-        "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
-        body: {
-          metadata: metadata
-        }.to_json,
-        headers: { 'Content-Type' => 'application/json' }
-      )
-      
-      Rails.logger.info "[CloudflarePreview] Updated env vars for worker #{worker_name}"
-    rescue => e
-      Rails.logger.warn "[CloudflarePreview] Failed to update env vars: #{e.message}"
-    end
+
+    metadata = {
+      bindings: bindings,
+      compatibility_date: "2024-01-01",
+      main_module: "worker.js"
+    }
+
+    # This might need adjustment based on Cloudflare's exact API
+    self.class.patch(
+      "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
+      body: {
+        metadata: metadata
+      }.to_json,
+      headers: {"Content-Type" => "application/json"}
+    )
+
+    Rails.logger.info "[CloudflarePreview] Updated env vars for worker #{worker_name}"
+  rescue => e
+    Rails.logger.warn "[CloudflarePreview] Failed to update env vars: #{e.message}"
   end
-  
+
   def ensure_database_tables_exist!
     Rails.logger.info "[CloudflarePreview] Ensuring database tables exist for app #{@app.id}"
-    
+
     begin
       # Use the automatic table creation service
       table_service = Supabase::AutoTableService.new(@app)
       result = table_service.ensure_tables_exist!
-      
+
       if result[:success] && result[:tables].any?
-        Rails.logger.info "[CloudflarePreview] Tables ready: #{result[:tables].join(', ')}"
+        Rails.logger.info "[CloudflarePreview] Tables ready: #{result[:tables].join(", ")}"
       end
     rescue => e
       Rails.logger.warn "[CloudflarePreview] Could not ensure tables: #{e.message}"
       # Continue with deployment - tables will be created on first use
     end
   end
-  
+
   def credentials_present?
-    @account_id.present? && @zone_id.present? && 
+    @account_id.present? && @zone_id.present? &&
       (@api_token.present? || (@api_key.present? && @email.present?))
   end
-  
 
-  
   def deploy_to_environment(environment, subdomain)
-    return { success: false, error: "Missing Cloudflare credentials" } unless credentials_present?
-    
+    return {success: false, error: "Missing Cloudflare credentials"} unless credentials_present?
+
     worker_name = "#{environment}-#{@app.id}"
-    
+
     # Upload worker script with latest files
     worker_script = generate_worker_script
     upload_response = upload_worker(worker_name, worker_script)
-    
+
     # Set environment variables
     set_worker_env_vars(worker_name, environment)
-    
-    return { success: false, error: "Failed to upload #{environment} worker" } unless upload_response['success']
-    
+
+    return {success: false, error: "Failed to upload #{environment} worker"} unless upload_response["success"]
+
     # Enable workers.dev subdomain
     enable_workers_dev_subdomain(worker_name)
-    
+
     # Ensure route exists for the environment
     ensure_preview_route(subdomain, worker_name)
-    
+
     # Get both URLs
-    workers_dev_url = "https://#{worker_name}.#{@account_id.gsub('_', '-')}.workers.dev"
+    workers_dev_url = "https://#{worker_name}.#{@account_id.tr("_", "-")}.workers.dev"
     custom_domain_url = "https://#{subdomain}.#{@base_domain}"
-    
+
     # Update app with deployment info based on environment
     case environment
     when :staging
@@ -332,12 +328,12 @@ class Deployment::CloudflarePreviewService
       @app.update!(
         deployment_url: custom_domain_url,
         deployed_at: Time.current,
-        deployment_status: 'deployed'
+        deployment_status: "deployed"
       )
     end
-    
-    { 
-      success: true, 
+
+    {
+      success: true,
       message: custom_domain_url,
       deployment_url: custom_domain_url,
       workers_dev_url: workers_dev_url,
@@ -345,14 +341,14 @@ class Deployment::CloudflarePreviewService
     }
   rescue => e
     Rails.logger.error "#{environment.to_s.capitalize} deployment failed: #{e.message}"
-    { success: false, error: e.message }
+    {success: false, error: e.message}
   end
 
   def generate_worker_script_with_r2_assets(code_files, asset_urls)
     # Worker script that serves code files and redirects to R2 for assets
     env_vars_js = build_env_vars_for_app(:preview).to_json
     asset_urls_js = asset_urls.to_json
-    
+
     <<~JAVASCRIPT
       // Environment variables embedded at build time
       const ENV_VARS = #{env_vars_js};
@@ -515,13 +511,13 @@ class Deployment::CloudflarePreviewService
       }
     JAVASCRIPT
   end
-  
+
   # Keep the old method for backward compatibility but mark as deprecated
   def generate_worker_script_with_built_files(built_files)
     # Worker script that serves pre-built Vite files
     # Include environment variables directly in script for simplicity
     env_vars_js = build_env_vars_for_app(:preview).to_json
-    
+
     <<~JAVASCRIPT
       // Environment variables embedded at build time
       const ENV_VARS = #{env_vars_js};
@@ -845,15 +841,14 @@ class Deployment::CloudflarePreviewService
       }
     JAVASCRIPT
   end
-  
+
   def built_files_as_json(built_files)
     # Convert built files hash to JSON for embedding in Worker script
-    begin
-      JSON.generate(built_files)
-    rescue JSON::GeneratorError => e
-      Rails.logger.error "JSON generation error for built files: #{e.message}"
-      "{}"
-    end
+
+    JSON.generate(built_files)
+  rescue JSON::GeneratorError => e
+    Rails.logger.error "JSON generation error for built files: #{e.message}"
+    "{}"
   end
 
   def app_files_as_json
@@ -861,23 +856,23 @@ class Deployment::CloudflarePreviewService
     @app.app_files.each do |file|
       # Ensure file content is properly handled for JSON embedding
       content = file.content.to_s
-      
+
       # Remove problematic characters that can cause Cloudflare Workers to fail
       # Replace emojis and other non-ASCII characters with safe alternatives
       sanitized_content = content.gsub(/[^\x20-\x7E\n\r\t]/) do |char|
         case char
-        when '📝' then '// TODO:'
-        when '🎯' then '// GOAL:'
-        when '✅' then '// DONE:'
-        when '❌' then '// ERROR:'
-        when '🚀' then '// LAUNCH:'
-        else ''  # Remove other non-ASCII characters
+        when "📝" then "// TODO:"
+        when "🎯" then "// GOAL:"
+        when "✅" then "// DONE:"
+        when "❌" then "// ERROR:"
+        when "🚀" then "// LAUNCH:"
+        else ""  # Remove other non-ASCII characters
         end
       end
-      
+
       files_hash[file.path] = sanitized_content
     end
-    
+
     # Use safe JSON generation that properly escapes content
     begin
       JSON.generate(files_hash)
@@ -887,110 +882,109 @@ class Deployment::CloudflarePreviewService
       "{}"
     end
   end
-  
+
   def upload_worker(worker_name, script)
     # Try uploading as a regular service worker first
     # Cloudflare should auto-detect the format based on the script content
     response = self.class.put(
       "/accounts/#{@account_id}/workers/scripts/#{worker_name}",
-      headers: { 
-        'Content-Type' => 'application/javascript'
+      headers: {
+        "Content-Type" => "application/javascript"
       },
       body: script
     )
-    
+
     Rails.logger.debug "[CloudflarePreview] Upload response: #{response.code} - #{response.body[0..200]}..."
-    
+
     if response.success?
       begin
         parsed_response = JSON.parse(response.body)
         # Convert Cloudflare format to our expected format
-        if parsed_response['success']
-          { 'success' => true, 'result' => parsed_response['result'] }
+        if parsed_response["success"]
+          {"success" => true, "result" => parsed_response["result"]}
         else
-          { 'success' => false, 'error' => parsed_response['errors']&.first&.dig('message') || 'Upload failed' }
+          {"success" => false, "error" => parsed_response["errors"]&.first&.dig("message") || "Upload failed"}
         end
       rescue JSON::ParserError => e
         Rails.logger.error "[CloudflarePreview] Failed to parse response: #{e.message}"
-        { 'success' => false, 'error' => 'Invalid JSON response' }
+        {"success" => false, "error" => "Invalid JSON response"}
       end
     else
       Rails.logger.error "[CloudflarePreview] Upload failed: #{response.code} - #{response.body}"
-      
+
       # Try to parse error details
       begin
         error_details = JSON.parse(response.body)
-        error_message = error_details['errors']&.first&.dig('message') || "Upload failed with status #{response.code}"
+        error_message = error_details["errors"]&.first&.dig("message") || "Upload failed with status #{response.code}"
       rescue
         error_message = "Upload failed with status #{response.code}: #{response.body[0..200]}"
       end
-      
-      { 'success' => false, 'error' => error_message }
+
+      {"success" => false, "error" => error_message}
     end
   end
-  
+
   def enable_workers_dev_subdomain(worker_name)
     # Enable the workers.dev subdomain for the worker
-    begin
-      # First check if workers.dev is already enabled for this account
-      account_response = self.class.get("/accounts/#{@account_id}/workers/subdomain")
-      
-      if account_response.success?
-        subdomain_enabled = account_response.parsed_response.dig("result", "enabled")
-        
-        if !subdomain_enabled
-          # Enable workers.dev for the account if not already enabled
-          enable_response = self.class.put(
-            "/accounts/#{@account_id}/workers/subdomain",
-            headers: { 'Content-Type' => 'application/json' },
-            body: JSON.generate({ 
-              enabled: true,
-              name: @account_id.gsub('_', '-')  # Ensure valid subdomain format
-            })
-          )
-          
-          if enable_response.success?
-            Rails.logger.info "[CloudflarePreview] Enabled workers.dev subdomain for account"
-          else
-            Rails.logger.warn "[CloudflarePreview] Failed to enable account subdomain: #{enable_response.body}"
-          end
+
+    # First check if workers.dev is already enabled for this account
+    account_response = self.class.get("/accounts/#{@account_id}/workers/subdomain")
+
+    if account_response.success?
+      subdomain_enabled = account_response.parsed_response.dig("result", "enabled")
+
+      if !subdomain_enabled
+        # Enable workers.dev for the account if not already enabled
+        enable_response = self.class.put(
+          "/accounts/#{@account_id}/workers/subdomain",
+          headers: {"Content-Type" => "application/json"},
+          body: JSON.generate({
+            enabled: true,
+            name: @account_id.tr("_", "-")  # Ensure valid subdomain format
+          })
+        )
+
+        if enable_response.success?
+          Rails.logger.info "[CloudflarePreview] Enabled workers.dev subdomain for account"
+        else
+          Rails.logger.warn "[CloudflarePreview] Failed to enable account subdomain: #{enable_response.body}"
         end
       end
-      
-      # Now enable subdomain for the specific worker script
-      response = self.class.patch(
-        "/accounts/#{@account_id}/workers/scripts/#{worker_name}/subdomain",
-        headers: { 'Content-Type' => 'application/json' },
-        body: JSON.generate({ enabled: true })
-      )
-      
-      if response.success? || response.code == 200
-        Rails.logger.info "[CloudflarePreview] Enabled workers.dev subdomain for worker #{worker_name}"
-        true
-      else
-        Rails.logger.warn "[CloudflarePreview] Could not enable worker subdomain: #{response.body}"
-        false
-      end
-    rescue => e
-      Rails.logger.warn "[CloudflarePreview] Workers.dev subdomain setup error: #{e.message}"
+    end
+
+    # Now enable subdomain for the specific worker script
+    response = self.class.patch(
+      "/accounts/#{@account_id}/workers/scripts/#{worker_name}/subdomain",
+      headers: {"Content-Type" => "application/json"},
+      body: JSON.generate({enabled: true})
+    )
+
+    if response.success? || response.code == 200
+      Rails.logger.info "[CloudflarePreview] Enabled workers.dev subdomain for worker #{worker_name}"
+      true
+    else
+      Rails.logger.warn "[CloudflarePreview] Could not enable worker subdomain: #{response.body}"
       false
     end
+  rescue => e
+    Rails.logger.warn "[CloudflarePreview] Workers.dev subdomain setup error: #{e.message}"
+    false
   end
-  
+
   def ensure_preview_route(subdomain, worker_name)
     route_pattern = "#{subdomain}.#{@base_domain}/*"
-    
+
     # Check if route exists
     routes_response = self.class.get("/zones/#{@zone_id}/workers/routes")
-    routes = JSON.parse(routes_response.body)['result'] || []
-    
-    existing_route = routes.find { |r| r['pattern'] == route_pattern }
-    
+    routes = JSON.parse(routes_response.body)["result"] || []
+
+    existing_route = routes.find { |r| r["pattern"] == route_pattern }
+
     if existing_route
       # Update existing route
       self.class.put(
-        "/zones/#{@zone_id}/workers/routes/#{existing_route['id']}",
-        headers: { 'Content-Type' => 'application/json' },
+        "/zones/#{@zone_id}/workers/routes/#{existing_route["id"]}",
+        headers: {"Content-Type" => "application/json"},
         body: JSON.generate({
           pattern: route_pattern,
           script: worker_name
@@ -1000,7 +994,7 @@ class Deployment::CloudflarePreviewService
       # Create new route
       self.class.post(
         "/zones/#{@zone_id}/workers/routes",
-        headers: { 'Content-Type' => 'application/json' },
+        headers: {"Content-Type" => "application/json"},
         body: JSON.generate({
           pattern: route_pattern,
           script: worker_name
@@ -1008,5 +1002,4 @@ class Deployment::CloudflarePreviewService
       )
     end
   end
-  
 end

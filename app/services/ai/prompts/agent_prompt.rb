@@ -61,7 +61,7 @@ module Ai
         # Check for any remaining unsubstituted variables
         remaining_variables = result.scan(/\{\{([^}]+)\}\}/).flatten
         if remaining_variables.any?
-          Rails.logger.warn "Unsubstituted variables in agent prompt: #{remaining_variables.join(', ')}"
+          Rails.logger.warn "Unsubstituted variables in agent prompt: #{remaining_variables.join(", ")}"
         end
 
         result

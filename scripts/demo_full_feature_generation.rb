@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 # Demonstration: AI builds a complete e-commerce product page with all tools
 
-require_relative '../config/environment'
-require 'json'
+require_relative "../config/environment"
+require "json"
 
 puts "🎨 AI Full Feature Generation Demo"
 puts "=" * 60
@@ -45,7 +45,7 @@ orchestrator = Ai::AppUpdateOrchestratorV2.new(user_message)
 status_message = demo_app.app_chat_messages.create!(
   role: "assistant",
   content: "Starting product page generation...",
-  metadata: { type: "status" }
+  metadata: {type: "status"}
 )
 
 puts "\n🚀 AI Execution Plan:"
@@ -53,20 +53,23 @@ puts "-" * 40
 
 # Step 1: Search for existing components
 puts "\n1️⃣ Searching for existing e-commerce components..."
-search_result = orchestrator.send(:search_files_tool, 
-  "(product|cart|review)", 
-  "src/**/*.{js,jsx}", 
-  nil, 
-  false, 
-  status_message
-)
+search_result = orchestrator.send(:search_files_tool,
+  "(product|cart|review)",
+  "src/**/*.{js,jsx}",
+  nil,
+  false,
+  status_message)
 puts "   Found: #{search_result[:count] || 0} existing components"
 
 # Step 2: Check current Git status
 puts "\n2️⃣ Checking Git status..."
 git_status = orchestrator.send(:git_status_tool, status_message)
 if git_status[:success]
-  puts "   Branch: #{git_status[:raw_status][:current_branch] rescue 'main'}"
+  puts "   Branch: #{begin
+    git_status[:raw_status][:current_branch]
+  rescue
+    "main"
+  end}"
   puts "   Clean: #{git_status[:clean]}"
 end
 
@@ -78,7 +81,7 @@ packages.each do |pkg|
   if result[:success]
     puts "   ✅ Added: #{pkg}"
   else
-    puts "   ⚠️  #{pkg}: #{result[:error] || 'Already exists'}"
+    puts "   ⚠️  #{pkg}: #{result[:error] || "Already exists"}"
   end
 end
 
@@ -123,13 +126,12 @@ gallery_component = <<~JS
   export default ProductGallery;
 JS
 
-gallery_result = orchestrator.send(:write_file_tool, 
-  "src/components/ProductGallery.jsx", 
-  gallery_component, 
-  "js", 
-  status_message
-)
-puts "   #{gallery_result[:success] ? '✅ Created' : '❌ Failed'}"
+gallery_result = orchestrator.send(:write_file_tool,
+  "src/components/ProductGallery.jsx",
+  gallery_component,
+  "js",
+  status_message)
+puts "   #{gallery_result[:success] ? "✅ Created" : "❌ Failed"}"
 
 # Step 5: Create main product page
 puts "\n5️⃣ Creating main ProductPage component..."
@@ -314,13 +316,12 @@ product_page = <<~JS
   export default ProductPage;
 JS
 
-page_result = orchestrator.send(:write_file_tool, 
-  "src/components/ProductPage.jsx", 
-  product_page, 
-  "js", 
-  status_message
-)
-puts "   #{page_result[:success] ? '✅ Created' : '❌ Failed'}"
+page_result = orchestrator.send(:write_file_tool,
+  "src/components/ProductPage.jsx",
+  product_page,
+  "js",
+  status_message)
+puts "   #{page_result[:success] ? "✅ Created" : "❌ Failed"}"
 
 # Step 6: Create review component
 puts "\n6️⃣ Creating ReviewSection component..."
@@ -458,13 +459,12 @@ review_component = <<~JS
   export default ReviewSection;
 JS
 
-review_result = orchestrator.send(:write_file_tool, 
-  "src/components/ReviewSection.jsx", 
-  review_component, 
-  "js", 
-  status_message
-)
-puts "   #{review_result[:success] ? '✅ Created' : '❌ Failed'}"
+review_result = orchestrator.send(:write_file_tool,
+  "src/components/ReviewSection.jsx",
+  review_component,
+  "js",
+  status_message)
+puts "   #{review_result[:success] ? "✅ Created" : "❌ Failed"}"
 
 # Step 7: Create analytics utility
 puts "\n7️⃣ Creating analytics tracking utility..."
@@ -538,13 +538,12 @@ analytics_util = <<~JS
   };
 JS
 
-analytics_result = orchestrator.send(:write_file_tool, 
-  "src/utils/analytics.js", 
-  analytics_util, 
-  "js", 
-  status_message
-)
-puts "   #{analytics_result[:success] ? '✅ Created' : '❌ Failed'}"
+analytics_result = orchestrator.send(:write_file_tool,
+  "src/utils/analytics.js",
+  analytics_util,
+  "js",
+  status_message)
+puts "   #{analytics_result[:success] ? "✅ Created" : "❌ Failed"}"
 
 # Step 8: Generate placeholder product images
 puts "\n8️⃣ Attempting to generate product images..."
@@ -577,34 +576,33 @@ package_json = {
   name: "ecommerce-demo",
   version: "1.0.0",
   dependencies: {
-    "react": "^18.2.0",
+    react: "^18.2.0",
     "react-dom": "^18.2.0",
-    "axios": "^1.4.0",
+    axios: "^1.4.0",
     "react-image-gallery": "^1.2.11",
     "react-star-ratings": "^2.3.0",
-    "tailwindcss": "^3.3.0"
+    tailwindcss: "^3.3.0"
   },
   scripts: {
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    start: "vite",
+    build: "vite build",
+    preview: "vite preview"
   }
 }.to_json
 
-package_result = orchestrator.send(:write_file_tool, 
-  "package.json", 
-  package_json, 
-  "json", 
-  status_message
-)
-puts "   #{package_result[:success] ? '✅ Updated' : '❌ Failed'}"
+package_result = orchestrator.send(:write_file_tool,
+  "package.json",
+  package_json,
+  "json",
+  status_message)
+puts "   #{package_result[:success] ? "✅ Updated" : "❌ Failed"}"
 
 # Step 10: Check analytics
 puts "\n🔟 Reading current analytics..."
 analytics_result = orchestrator.send(:read_analytics_tool, "24h", ["overview", "performance"], status_message)
 if analytics_result[:success]
   puts "   Performance Score: #{analytics_result[:performance_score]}/100"
-  if analytics_result[:insights] && analytics_result[:insights].any?
+  if analytics_result[:insights]&.any?
     puts "   Insights:"
     analytics_result[:insights].first(3).each do |insight|
       puts "     • #{insight[:metric]}: #{insight[:value]}"
@@ -618,10 +616,14 @@ git_status = orchestrator.send(:git_status_tool, status_message)
 if git_status[:success] && !git_status[:clean]
   commit_message = "Add complete e-commerce product page with gallery, reviews, and analytics"
   commit_result = orchestrator.send(:git_commit_tool, commit_message, status_message)
-  
+
   if commit_result[:success]
     puts "   ✅ Committed: #{commit_result[:commit_sha][0..7]}"
-    puts "   Files changed: #{commit_result[:files_changed].length rescue 'N/A'}"
+    puts "   Files changed: #{begin
+      commit_result[:files_changed].length
+    rescue
+      "N/A"
+    end}"
   else
     puts "   ⚠️  Commit: #{commit_result[:error]}"
   end
@@ -658,7 +660,7 @@ tools_used = [
   "write_file", "generate_image", "read_analytics",
   "git_commit"
 ]
-puts "   #{tools_used.join(', ')}"
+puts "   #{tools_used.join(", ")}"
 
 puts "\n📈 Business Value:"
 puts "   • Complete e-commerce functionality"

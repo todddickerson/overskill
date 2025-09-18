@@ -5,7 +5,7 @@ class Avo::Resources::WebhooksIncomingOauthGoogleOauth2AccountWebhook < Avo::Bas
   # self.search = {
   #   query: -> { query.ransack(id_eq: params[:q], m: "or").result(distinct: false) }
   # }
-  
+
   def fields
     field :id, as: :id
     field :data, as: :code

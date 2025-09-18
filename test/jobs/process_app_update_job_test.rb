@@ -66,14 +66,14 @@ class ProcessAppUpdateJobTest < ActiveJob::TestCase
 
     assistant_message = AppChatMessage.last
     assert_equal "assistant", assistant_message.role
-    
+
     # Debug output if test fails
     if assistant_message.status != "completed"
       puts "Assistant message status: #{assistant_message.status}"
       puts "Assistant message content: #{assistant_message.content}"
       puts "Chat message response: #{@chat_message.reload.response}"
     end
-    
+
     assert_equal "completed", assistant_message.status
     assert_match "Added a button", assistant_message.content
   end

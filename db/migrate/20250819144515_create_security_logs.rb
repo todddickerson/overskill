@@ -10,7 +10,7 @@ class CreateSecurityLogs < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    
+
     add_index :security_logs, :event_type
     add_index :security_logs, :created_at
     add_index :security_logs, [:user_id, :created_at]

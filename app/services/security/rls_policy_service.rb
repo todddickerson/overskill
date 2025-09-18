@@ -2,29 +2,29 @@ module Security
   class RlsPolicyService
     # This service provides transparent access to Row-Level Security policies
     # Unlike Base44's opaque security, we show users exactly how their data is protected
-    
+
     def initialize(app)
       @app = app
       @team = app.team
     end
-    
+
     def get_all_policies
       # Fetch all RLS policies for the app's tables
       policies = []
-      
+
       @app.app_tables.each do |table|
         table_policies = get_table_policies(table)
         policies.concat(table_policies)
       end
-      
+
       policies
     end
-    
+
     def get_table_policies(table)
       # Get RLS policies for a specific table
       schema_name = "app_#{@app.id}"
       table_name = table.name
-      
+
       # These are the standard policies we create for each table
       [
         {
@@ -69,7 +69,7 @@ module Security
         }
       ]
     end
-    
+
     def get_audit_configuration
       # Return the audit configuration for transparency
       {
@@ -80,7 +80,7 @@ module Security
         configuration_sql: generate_audit_config_sql
       }
     end
-    
+
     def get_security_functions
       # Return the security helper functions we use
       [
@@ -107,7 +107,7 @@ module Security
         }
       ]
     end
-    
+
     def generate_security_report
       # Generate a comprehensive security report for the app
       {
@@ -132,7 +132,7 @@ module Security
         }
       }
     end
-    
+
     def explain_policy(policy_name)
       # Provide a plain-English explanation of what a policy does
       case policy_name
@@ -148,9 +148,9 @@ module Security
         "This policy helps ensure data security and proper access control."
       end
     end
-    
+
     private
-    
+
     def generate_select_policy_sql(schema, table)
       <<~SQL
         CREATE POLICY "#{table}_select_policy" ON #{schema}.#{table}
@@ -159,7 +159,7 @@ module Security
           USING (check_organization_access(organization_id));
       SQL
     end
-    
+
     def generate_insert_policy_sql(schema, table)
       <<~SQL
         CREATE POLICY "#{table}_insert_policy" ON #{schema}.#{table}
@@ -171,7 +171,7 @@ module Security
           );
       SQL
     end
-    
+
     def generate_update_policy_sql(schema, table)
       <<~SQL
         CREATE POLICY "#{table}_update_policy" ON #{schema}.#{table}
@@ -184,7 +184,7 @@ module Security
           );
       SQL
     end
-    
+
     def generate_delete_policy_sql(schema, table)
       <<~SQL
         CREATE POLICY "#{table}_delete_policy" ON #{schema}.#{table}
@@ -193,7 +193,7 @@ module Security
           USING (check_organization_access(organization_id));
       SQL
     end
-    
+
     def generate_org_check_function_sql
       <<~SQL
         CREATE OR REPLACE FUNCTION check_organization_access(org_id UUID)
@@ -213,7 +213,7 @@ module Security
         $$ LANGUAGE plpgsql SECURITY DEFINER;
       SQL
     end
-    
+
     def generate_get_org_function_sql
       <<~SQL
         CREATE OR REPLACE FUNCTION get_current_organization_id()
@@ -254,7 +254,7 @@ module Security
         $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
       SQL
     end
-    
+
     def generate_audit_trigger_sql
       <<~SQL
         CREATE OR REPLACE FUNCTION audit_trigger_function()
@@ -321,7 +321,7 @@ module Security
         $$ LANGUAGE plpgsql SECURITY DEFINER;
       SQL
     end
-    
+
     def generate_audit_config_sql
       <<~SQL
         -- Audit table configuration

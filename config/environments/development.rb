@@ -26,9 +26,9 @@ Rails.application.configure do
   end
 
   # Using Redis cache for V2 coordinator and better performance
-  config.cache_store = :redis_cache_store, { 
-    url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'),
-    namespace: 'overskill_cache_dev',
+  config.cache_store = :redis_cache_store, {
+    url: ENV.fetch("REDIS_URL", "redis://localhost:6379/0"),
+    namespace: "overskill_cache_dev",
     expires_in: 60.minutes,
     race_condition_ttl: 5.seconds
   }
@@ -137,7 +137,7 @@ Rails.application.configure do
   # ✅ YOUR APPLICATION'S CONFIGURATION
   # If you need to customize your application's configuration, this is the place to do it. This helps avoid merge
   # conflicts in the future when Rails or Bullet Train update their own default settings.
-  
+
   # Incremental Tool Streaming - Enable async tool execution for better performance
-  ENV['INCREMENTAL_TOOL_STREAMING'] ||= 'true'
+  ENV["INCREMENTAL_TOOL_STREAMING"] ||= "true"
 end

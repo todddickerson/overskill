@@ -17,8 +17,45 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Ensure compatibility with Cloudflare Workers
-    target: 'esnext',
-    minify: 'esbuild',
+    // Generate manifest for asset mapping
+    manifest: true,
+
+    // Ensure compatibility with modern browsers and Cloudflare Workers
+    target: 'es2022',
+    minify: mode === 'production' ? 'terser' : 'esbuild',
+
+    // Generate proper content-hashed filenames
+    rollupOptions: {
+      output: {
+        // Use content hashing for cache busting
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+
+        // Use standard ES modules format (default)
+        // The EdgePreviewService will embed all chunks in the worker
+        // and serve them with proper MIME types for module loading
+        format: 'es',
+
+        // Smart code splitting for optimal loading performance
+        manualChunks: (id) => {
+          // Vendor chunk for React and core dependencies
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'vendor-react';
+            }
+            return 'vendor';
+          }
+        }
+      }
+    },
+
+    // Terser options for production
+    terserOptions: {
+      compress: {
+        drop_console: mode === 'production',
+        drop_debugger: true
+      }
+    }
   }
 }));

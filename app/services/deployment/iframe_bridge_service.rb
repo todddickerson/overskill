@@ -8,13 +8,13 @@ module Deployment
 
     def initialize(app)
       @app = app
-      @redis = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/1'))
+      @redis = Redis.new(url: ENV.fetch("REDIS_URL", "redis://localhost:6379/1"))
     end
 
     # Setup console logging bridge in deployed app
     def setup_console_bridge
       bridge_code = generate_bridge_javascript
-      
+
       # This would be injected into the deployed app's HTML
       # The bridge captures console logs and network requests
       {
@@ -27,21 +27,21 @@ module Deployment
     # Read console logs for AI debugging (similar to Lovable's lov-read-console-logs)
     def read_console_logs(search_term = nil, limit = 100)
       logs_key = console_logs_cache_key
-      
+
       begin
         # Get logs from Redis cache
         raw_logs = @redis.lrange(logs_key, 0, limit - 1)
         logs = raw_logs.map { |log| JSON.parse(log) }
-        
+
         # Filter by search term if provided
         if search_term.present?
           logs = logs.select do |log|
-            log['message']&.include?(search_term) || 
-            log['level']&.include?(search_term) ||
-            log['stack']&.include?(search_term)
+            log["message"]&.include?(search_term) ||
+              log["level"]&.include?(search_term) ||
+              log["stack"]&.include?(search_term)
           end
         end
-        
+
         {
           success: true,
           logs: logs,
@@ -50,29 +50,29 @@ module Deployment
         }
       rescue => e
         Rails.logger.error "[IframeBridge] Error reading console logs: #{e.message}"
-        { success: false, error: e.message }
+        {success: false, error: e.message}
       end
     end
 
     # Read network requests for AI debugging (similar to Lovable's lov-read-network-requests)
     def read_network_requests(search_term = nil, limit = 50)
       requests_key = network_requests_cache_key
-      
+
       begin
         # Get network requests from Redis cache
         raw_requests = @redis.lrange(requests_key, 0, limit - 1)
         requests = raw_requests.map { |request| JSON.parse(request) }
-        
+
         # Filter by search term if provided
         if search_term.present?
           requests = requests.select do |request|
-            request['url']&.include?(search_term) || 
-            request['method']&.include?(search_term) ||
-            request['status']&.to_s&.include?(search_term) ||
-            request['error']&.include?(search_term)
+            request["url"]&.include?(search_term) ||
+              request["method"]&.include?(search_term) ||
+              request["status"]&.to_s&.include?(search_term) ||
+              request["error"]&.include?(search_term)
           end
         end
-        
+
         {
           success: true,
           requests: requests,
@@ -81,40 +81,40 @@ module Deployment
         }
       rescue => e
         Rails.logger.error "[IframeBridge] Error reading network requests: #{e.message}"
-        { success: false, error: e.message }
+        {success: false, error: e.message}
       end
     end
 
     # Store console log from iframe (called by bridge endpoint)
     def store_console_log(log_data)
       logs_key = console_logs_cache_key
-      
+
       # Add timestamp and app context
       enriched_log = {
         app_id: @app.id,
         timestamp: Time.current.iso8601,
-        level: log_data[:level] || 'log',
+        level: log_data[:level] || "log",
         message: log_data[:message],
         stack: log_data[:stack],
         url: log_data[:url],
         line_number: log_data[:line_number],
         column_number: log_data[:column_number]
       }
-      
+
       # Store in Redis with automatic expiration
       @redis.multi do |pipeline|
         pipeline.lpush(logs_key, enriched_log.to_json)
         pipeline.ltrim(logs_key, 0, MAX_LOG_ENTRIES - 1) # Keep only recent logs
         pipeline.expire(logs_key, CONSOLE_LOG_TTL)
       end
-      
+
       Rails.logger.info "[IframeBridge] Stored console log for app #{@app.id}: #{log_data[:level]} - #{log_data[:message]}"
     end
 
     # Store network request from iframe (called by bridge endpoint)
     def store_network_request(request_data)
       requests_key = network_requests_cache_key
-      
+
       # Add timestamp and app context
       enriched_request = {
         app_id: @app.id,
@@ -124,17 +124,17 @@ module Deployment
         status: request_data[:status],
         response_time: request_data[:response_time],
         error: request_data[:error],
-        request_headers: request_data[:request_headers]&.slice('content-type', 'authorization')&.transform_values { |v| v.include?('Bearer') ? '[REDACTED]' : v },
-        response_headers: request_data[:response_headers]&.slice('content-type', 'cache-control')
+        request_headers: request_data[:request_headers]&.slice("content-type", "authorization")&.transform_values { |v| v.include?("Bearer") ? "[REDACTED]" : v },
+        response_headers: request_data[:response_headers]&.slice("content-type", "cache-control")
       }
-      
+
       # Store in Redis with automatic expiration
       @redis.multi do |pipeline|
         pipeline.lpush(requests_key, enriched_request.to_json)
         pipeline.ltrim(requests_key, 0, MAX_NETWORK_ENTRIES - 1) # Keep only recent requests
         pipeline.expire(requests_key, CONSOLE_LOG_TTL)
       end
-      
+
       Rails.logger.info "[IframeBridge] Stored network request for app #{@app.id}: #{request_data[:method]} #{request_data[:url]} - #{request_data[:status]}"
     end
 
@@ -142,7 +142,7 @@ module Deployment
     def clear_debugging_data
       @redis.del(console_logs_cache_key)
       @redis.del(network_requests_cache_key)
-      
+
       Rails.logger.info "[IframeBridge] Cleared debugging data for app #{@app.id}"
     end
 
@@ -157,7 +157,7 @@ module Deployment
     end
 
     def bridge_endpoint_url
-      "#{ENV.fetch('APP_BASE_URL', 'https://overskill.app')}/api/v1/iframe_bridge/#{@app.id}/log"
+      "#{ENV.fetch("APP_BASE_URL", "https://overskill.app")}/api/v1/iframe_bridge/#{@app.id}/log"
     end
 
     # Generate JavaScript bridge code to inject into deployed apps

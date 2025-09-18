@@ -1,4 +1,4 @@
-require 'test_helper'
+require "test_helper"
 
 class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
   setup do
@@ -123,7 +123,7 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
   test "fixes console.log patterns" do
     content = 'console.log("Hello World");'
     result = @validator.validate_and_fix_typescript("test.js", content)
-    
+
     # Should not change valid console.log
     assert_equal content, result
   end
@@ -132,7 +132,7 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     malformed_content = '"System.out.println("Hello World");"'
     # The validator adds extra escaping for nested quotes
     expected_content = '"System.out.println(\\\\"Hello World\\\\");"'
-    
+
     result = @validator.validate_and_fix_typescript("test.js", malformed_content)
     assert_equal expected_content, result
   end
@@ -144,7 +144,7 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
   test "only processes TypeScript and JavaScript files" do
     css_content = ".class { color: red; }"
     result = @validator.validate_and_fix_typescript("styles.css", css_content)
-    
+
     # Should return unchanged for non-TS/JS files
     assert_equal css_content, result
   end
@@ -152,7 +152,7 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
   test "processes .tsx files" do
     tsx_content = '<p className="test\\">Hello</p>'
     result = @validator.validate_and_fix_typescript("component.tsx", tsx_content)
-    
+
     # Should fix JSX in .tsx files
     assert_equal '<p className="test">Hello</p>', result
   end
@@ -160,8 +160,8 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
   test "processes .jsx files" do
     jsx_content = '<div className="container\\">Content</div>'
     result = @validator.validate_and_fix_typescript("component.jsx", jsx_content)
-    
-    # Should fix JSX in .jsx files  
+
+    # Should fix JSX in .jsx files
     assert_equal '<div className="container">Content</div>', result
   end
 
@@ -203,15 +203,15 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     MIXED
 
     result = @validator.validate_and_fix_typescript("mixed.tsx", mixed_content)
-    
+
     # Should only fix the JSX part
-    assert_includes result, 'console.log(greeting);'
+    assert_includes result, "console.log(greeting);"
     assert_includes result, 'className="text-lg mb-2"'
     refute_includes result, 'mb-2\\"'
   end
 
   # ========================
-  # Validation Error Detection Tests  
+  # Validation Error Detection Tests
   # ========================
 
   test "detects and reports validation errors" do
@@ -227,7 +227,7 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     JSX
 
     result = @validator.validate_and_fix_typescript("broken.tsx", problematic_content)
-    
+
     # Should have validation_errors reader available
     assert_respond_to @validator, :validation_errors
     # Should return some content (even if not perfectly fixed)
@@ -262,7 +262,7 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     JSX
 
     result = @validator.validate_and_fix_typescript("src/pages/SalesPage.tsx", malformed_content)
-    
+
     # Verify the validator processes the content (even if it can't fix structural issues)
     refute_empty result
     assert_respond_to @validator, :validation_errors
@@ -368,14 +368,14 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     JSX
 
     result = @validator.validate_and_fix_typescript("src/App.tsx", malformed_content)
-    
+
     # Should fix all the className backslash issues
     refute_includes result, 'className="navigation\\"'
     refute_includes result, 'className="nav-link\\"'
     refute_includes result, 'className="content\\"'
     refute_includes result, 'className="hero\\"'
     refute_includes result, 'className="title\\"'
-    
+
     # Should have correct JSX syntax
     assert_includes result, 'className="navigation"'
     assert_includes result, 'className="nav-link"'
@@ -400,11 +400,11 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     JSX
 
     result = @validator.validate_and_fix_typescript("src/pages/PseudoOrderForm.tsx", real_world_content)
-    
+
     # Verify all backslash quote issues are fixed
     refute_includes result, '\\">'
     refute_includes result, 'className=\\"'
-    
+
     # Verify proper JSX structure
     assert_includes result, 'className="text-sm text-gray-600 mb-2"'
     assert_includes result, 'className="line-through"'
@@ -420,11 +420,11 @@ class Ai::TypescriptValidatorServiceTest < ActiveSupport::TestCase
     JSX
 
     result = @validator.validate_and_fix_typescript("src/pages/Upsell.tsx", upsell_content)
-    
+
     # Verify all issues are fixed
     refute_includes result, '\\">'
     refute_includes result, 'className=\\"'
-    
+
     # Verify correct JSX syntax
     assert_includes result, 'className="text-lg mb-2"'
     assert_includes result, 'className="line-through"'

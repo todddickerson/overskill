@@ -5,7 +5,7 @@ class RemoveCloudflareWorkerNameFromApps < ActiveRecord::Migration[8.0]
     # - Namespaces: overskill-{rails_env}-{deployment_env} (e.g., overskill-development-preview)
     # - Script names: Generated using obfuscated_id for each app
     # See: app/services/deployment/workers_for_platforms_service.rb
-    
+
     remove_column :apps, :cloudflare_worker_name, :string
   end
 end

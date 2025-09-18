@@ -11,7 +11,7 @@ class Account::AppEditorsController < Account::ApplicationController
       format.html do
         # For Turbo Frame requests, render just the code editor partial
         if turbo_frame_request? && turbo_frame_request_id == "code_editor"
-          render partial: "account/app_editors/code_editor", locals: { file: @selected_file, app: @app }
+          render partial: "account/app_editors/code_editor", locals: {file: @selected_file, app: @app}
         else
           render :show
         end
@@ -22,7 +22,7 @@ class Account::AppEditorsController < Account::ApplicationController
           render turbo_stream: turbo_stream.replace(
             "code_editor",
             partial: "account/app_editors/code_editor",
-            locals: { file: @selected_file, app: @app }
+            locals: {file: @selected_file, app: @app}
           )
         else
           # Fallback: serve the full HTML page so Turbo performs a normal visit
@@ -39,7 +39,7 @@ class Account::AppEditorsController < Account::ApplicationController
     if @file.update(content: content)
       # Update size based on content
       @file.update(size_bytes: content.bytesize)
-      
+
       # Create a version for manual edits with file snapshot
       @app.app_versions.create!(
         team: @app.team,
@@ -47,11 +47,11 @@ class Account::AppEditorsController < Account::ApplicationController
         version_number: next_version_number(@app),
         changelog: "Manual edit: #{@file.path}",
         changed_files: @file.path,
-        files_snapshot: @app.app_files.map { |f| 
-          { path: f.path, content: f.content, file_type: f.file_type }
+        files_snapshot: @app.app_files.map { |f|
+          {path: f.path, content: f.content, file_type: f.file_type}
         }.to_json
       )
-      
+
       # Update preview worker with latest changes
       UpdatePreviewJob.perform_later(@app.id)
 
@@ -80,11 +80,11 @@ class Account::AppEditorsController < Account::ApplicationController
   def create_message
     # Build and save the user's message
     @message = build_user_message
-    
+
     if @message.save
       # Queue AI processing of the message
       queue_ai_processing(@message)
-      
+
       # Reset the chat form (messages appear via ActionCable broadcasts)
       render_chat_form_reset
     else
@@ -92,9 +92,9 @@ class Account::AppEditorsController < Account::ApplicationController
       render_chat_form_with_errors
     end
   end
-  
+
   private
-  
+
   # Build a new user message from params
   def build_user_message
     message = @app.app_chat_messages.build(message_params)
@@ -102,7 +102,7 @@ class Account::AppEditorsController < Account::ApplicationController
     message.user = current_user
     message
   end
-  
+
   # Queue the appropriate AI processing job
   def queue_ai_processing(message)
     # Use the App model's unified method which handles all the logic
@@ -110,7 +110,7 @@ class Account::AppEditorsController < Account::ApplicationController
     Rails.logger.info "[AI] Delegating to App model for message ##{message.id}"
     @app.initiate_generation!
   end
-  
+
   # Render the chat form reset (successful message creation)
   def render_chat_form_reset
     respond_to do |format|
@@ -118,12 +118,12 @@ class Account::AppEditorsController < Account::ApplicationController
         render turbo_stream: turbo_stream.replace(
           "chat_form",
           partial: "account/app_editors/chat_input_wrapper",
-          locals: { app: @app }
+          locals: {app: @app}
         )
       end
     end
   end
-  
+
   # Render the chat form with errors
   def render_chat_form_with_errors
     respond_to do |format|
@@ -131,66 +131,63 @@ class Account::AppEditorsController < Account::ApplicationController
         render turbo_stream: turbo_stream.replace(
           "chat_form",
           partial: "account/app_editors/chat_input_wrapper",
-          locals: { app: @app, message: @message }
+          locals: {app: @app, message: @message}
         )
       end
     end
   end
 
-
-  
   def versions
     @versions = @app.app_versions.order(created_at: :desc)
-    render partial: "version_history_list", locals: { app: @app, versions: @versions }
+    render partial: "version_history_list", locals: {app: @app, versions: @versions}
   end
-  
 
   def update_preview
     # Trigger preview update (already handled by UpdatePreviewJob)
     UpdatePreviewJob.perform_later(@app.id)
-    render json: { success: true }
+    render json: {success: true}
   end
 
   def restore_version
     version = @app.app_versions.find(params[:version_id])
-    
+
     begin
       # Use the new restoration service for better reliability
       restoration_service = Deployment::AppVersionRestorationService.new(@app)
       result = restoration_service.restore_to_version(
-        version, 
+        version,
         auto_deploy: false,  # Don't auto-deploy, just restore files
         sync_to_github: true  # Sync to GitHub if repo exists
       )
-      
+
       if result[:success]
         # Update preview
         UpdatePreviewJob.perform_later(@app.id)
-        
-        render json: { 
-          success: true, 
+
+        render json: {
+          success: true,
           message: result[:message] || "Successfully restored to version #{version.version_number}",
           version_id: result[:version]&.id
         }
       else
-        render json: { 
-          success: false, 
+        render json: {
+          success: false,
           error: result[:error] || "Failed to restore version"
         }
       end
     rescue => e
       Rails.logger.error "Version restore failed: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      render json: { success: false, error: e.message }
+      render json: {success: false, error: e.message}
     end
   end
 
   def bookmark_version
     version = @app.app_versions.find(params[:version_id])
     version.update!(bookmarked: !version.bookmarked)
-    
-    render json: { 
-      success: true, 
+
+    render json: {
+      success: true,
       bookmarked: version.bookmarked,
       message: version.bookmarked? ? "Version bookmarked" : "Bookmark removed"
     }
@@ -198,7 +195,7 @@ class Account::AppEditorsController < Account::ApplicationController
 
   def compare_version
     version = @app.app_versions.find(params[:version_id])
-    
+
     # For now, redirect to a comparison view (could be enhanced)
     redirect_to account_app_path(@app, version: version.id)
   end
@@ -208,7 +205,7 @@ class Account::AppEditorsController < Account::ApplicationController
   def set_app
     @app = current_team.apps.find(params[:app_id])
   end
-  
+
   # Generate the next version number for an app
   def next_version_number(app)
     last_version = app.app_versions.order(created_at: :desc).first
@@ -224,6 +221,6 @@ class Account::AppEditorsController < Account::ApplicationController
 
   def message_params
     content = params.require(:app_chat_message)[:content] || params.require(:app_chat_message)[:content_mobile]
-    { content: content }
+    {content: content}
   end
 end

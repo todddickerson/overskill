@@ -1,6 +1,6 @@
 class Account::AppsController < Account::ApplicationController
   account_load_and_authorize_resource :app, through: :team, through_association: :apps
-  
+
   # Load app for custom actions that might not be covered by account_load_and_authorize_resource
   before_action :load_app_for_custom_actions, only: [:deploy, :activity_monitor, :deployment_info, :generate_logo, :upload_logo, :debug_error]
 
@@ -34,7 +34,7 @@ class Account::AppsController < Account::ApplicationController
       if @app.save
         # App model's after_create callback automatically handles AI generation
         # if prompt is present. No need to manually create generation records.
-        
+
         # Redirect to editor for new apps
         format.html { redirect_to account_app_editor_path(@app), notice: I18n.t("apps.notifications.created") }
         format.json { render :show, status: :created, location: [:account, @app] }
@@ -72,23 +72,23 @@ class Account::AppsController < Account::ApplicationController
   # POST /account/apps/:id/generate_logo
   def generate_logo
     GenerateAppLogoJob.perform_later(@app.id)
-    
+
     respond_to do |format|
-      format.json { 
-        render json: { 
-          success: true, 
-          message: "Logo generation started. This may take a few moments..." 
-        } 
+      format.json {
+        render json: {
+          success: true,
+          message: "Logo generation started. This may take a few moments..."
+        }
       }
     end
   rescue => e
     Rails.logger.error "Logo generation error: #{e.message}"
     respond_to do |format|
-      format.json { 
-        render json: { 
-          success: false, 
-          error: "Failed to start logo generation" 
-        }, status: :unprocessable_entity 
+      format.json {
+        render json: {
+          success: false,
+          error: "Failed to start logo generation"
+        }, status: :unprocessable_entity
       }
     end
   end
@@ -96,52 +96,52 @@ class Account::AppsController < Account::ApplicationController
   # POST /account/apps/:id/upload_logo
   def upload_logo
     unless params[:logo].present?
-      return render json: { 
-        success: false, 
-        error: "No logo file provided" 
+      return render json: {
+        success: false,
+        error: "No logo file provided"
       }, status: :bad_request
     end
 
     logo_file = params[:logo]
-    
+
     # Validate file type
-    unless logo_file.content_type&.start_with?('image/')
-      return render json: { 
-        success: false, 
-        error: "Please upload an image file" 
+    unless logo_file.content_type&.start_with?("image/")
+      return render json: {
+        success: false,
+        error: "Please upload an image file"
       }, status: :bad_request
     end
-    
+
     # Validate file size (5MB max)
     if logo_file.size > 5.megabytes
-      return render json: { 
-        success: false, 
-        error: "File size must be less than 5MB" 
+      return render json: {
+        success: false,
+        error: "File size must be less than 5MB"
       }, status: :bad_request
     end
-    
+
     # Remove existing logo if present
     @app.logo.purge if @app.logo.attached?
-    
+
     # Attach new logo
     @app.logo.attach(logo_file)
-    
+
     respond_to do |format|
-      format.json { 
-        render json: { 
-          success: true, 
-          message: "Logo uploaded successfully!" 
-        } 
+      format.json {
+        render json: {
+          success: true,
+          message: "Logo uploaded successfully!"
+        }
       }
     end
   rescue => e
     Rails.logger.error "Logo upload error: #{e.message}"
     respond_to do |format|
-      format.json { 
-        render json: { 
-          success: false, 
-          error: "Failed to upload logo" 
-        }, status: :unprocessable_entity 
+      format.json {
+        render json: {
+          success: false,
+          error: "Failed to upload logo"
+        }, status: :unprocessable_entity
       }
     end
   end
@@ -152,41 +152,41 @@ class Account::AppsController < Account::ApplicationController
     auto_debug = params[:auto_debug]
 
     unless error_info.present?
-      return render json: { 
-        success: false, 
-        error: "No error information provided" 
+      return render json: {
+        success: false,
+        error: "No error information provided"
       }, status: :bad_request
     end
 
     # Create AI debugging message
     debug_message = build_debug_message(error_info)
-    
+
     # Create a chat message for the debugging request
     chat_message = @app.app_chat_messages.create!(
       content: debug_message,
-      role: 'system',
+      role: "system",
       auto_debug: auto_debug || false
     )
 
     # Queue AI response job
     ChatResponseJob.perform_later(chat_message.id)
-    
+
     respond_to do |format|
-      format.json { 
-        render json: { 
-          success: true, 
-          message: "AI is analyzing and fixing the error..." 
-        } 
+      format.json {
+        render json: {
+          success: true,
+          message: "AI is analyzing and fixing the error..."
+        }
       }
     end
   rescue => e
     Rails.logger.error "Error debugging failed: #{e.message}"
     respond_to do |format|
-      format.json { 
-        render json: { 
-          success: false, 
-          error: "Failed to start error debugging" 
-        }, status: :unprocessable_entity 
+      format.json {
+        render json: {
+          success: false,
+          error: "Failed to start error debugging"
+        }, status: :unprocessable_entity
       }
     end
   end
@@ -194,57 +194,57 @@ class Account::AppsController < Account::ApplicationController
   # POST /account/apps/:id/deploy
   def deploy
     Rails.logger.info "[Deploy] Starting deployment for app #{@app.id} with params: #{params.inspect}"
-    
+
     # Check if app has files to deploy
     unless @app.app_files.any?
       Rails.logger.info "[Deploy] App #{@app.id} has no files to deploy"
-      render json: { error: "No files to deploy" }, status: :unprocessable_entity
+      render json: {error: "No files to deploy"}, status: :unprocessable_entity
       return
     end
 
     # Determine deployment target
     environment = params[:environment] || "production"
     Rails.logger.info "[Deploy] Deploying app #{@app.id} to #{environment}"
-    
+
     begin
       # Queue deployment job with environment
       job = DeployAppJob.perform_later(@app.id, environment)
-      
+
       # Handle case where job is rejected due to uniqueness constraint
       if job == false
         Rails.logger.warn "[Deploy] Deployment job already running for app #{@app.id}"
-        
+
         respond_to do |format|
-          format.json { render json: { message: "Deployment already in progress", status: "deploying", environment: environment } }
+          format.json { render json: {message: "Deployment already in progress", status: "deploying", environment: environment} }
           format.turbo_stream do
             render turbo_stream: turbo_stream.replace("deploy_status",
-              html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deployment already in progress...</span>})
+              html: %(<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deployment already in progress...</span>))
           end
         end
         return
       end
-      
+
       Rails.logger.info "[Deploy] Successfully queued deployment job #{job.job_id} for app #{@app.id}"
 
       respond_to do |format|
-        format.json { render json: { message: "Deployment started", status: "deploying", environment: environment } }
+        format.json { render json: {message: "Deployment started", status: "deploying", environment: environment} }
         format.turbo_stream do
           render turbo_stream: turbo_stream.replace("deploy_status",
-            html: %Q{<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>})
+            html: %(<span class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying to #{environment}...</span>))
         end
       end
     rescue => e
       Rails.logger.error "[Deploy] Failed to queue deployment job for app #{@app.id}: #{e.message}"
       Rails.logger.error "[Deploy] Error backtrace: #{e.backtrace.join("\n")}"
-      
-      render json: { error: "Failed to start deployment: #{e.message}" }, status: :internal_server_error
+
+      render json: {error: "Failed to start deployment: #{e.message}"}, status: :internal_server_error
     end
   end
 
   # GET /account/apps/:id/activity_monitor
   def activity_monitor
     respond_to do |format|
-      format.html { render partial: "account/app_editors/activity_monitor", locals: { app: @app } }
+      format.html { render partial: "account/app_editors/activity_monitor", locals: {app: @app} }
       format.json { redirect_to account_app_api_calls_path(@app) }
     end
   end
@@ -255,7 +255,7 @@ class Account::AppsController < Account::ApplicationController
     preview_url = @app.preview_url
     production_url = @app.production_url  # Actual production URL
     published_url = @app.published_url    # Smart URL (production if published, otherwise preview)
-    
+
     render json: {
       preview_url: preview_url,
       production_url: production_url,
@@ -271,12 +271,12 @@ class Account::AppsController < Account::ApplicationController
   end
 
   private
-  
+
   def load_app_for_custom_actions
     @app ||= current_team.apps.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     Rails.logger.error "[#{action_name}] App not found with ID: #{params[:id]}"
-    render json: { error: "App not found" }, status: :not_found
+    render json: {error: "App not found"}, status: :not_found
   end
 
   if defined?(Api::V1::ApplicationController)
@@ -291,16 +291,16 @@ class Account::AppsController < Account::ApplicationController
 
   def build_debug_message(error_info)
     error_type = detect_error_type(error_info)
-    
+
     message = "🔧 **Automatic Error Detection**\n\n"
     message += "I detected a #{error_type} error in your app preview:\n\n"
     message += "**Error Details:**\n"
-    message += "```\n#{error_info['message']}\n```\n\n"
-    
-    if error_info['filename'].present? && error_info['line'].present?
-      message += "**Location:** #{error_info['filename']}:#{error_info['line']}\n\n"
+    message += "```\n#{error_info["message"]}\n```\n\n"
+
+    if error_info["filename"].present? && error_info["line"].present?
+      message += "**Location:** #{error_info["filename"]}:#{error_info["line"]}\n\n"
     end
-    
+
     message += "**What I'll do:**\n"
     case error_type
     when "Reference Error"
@@ -320,19 +320,19 @@ class Account::AppsController < Account::ApplicationController
       message += "- Implement the appropriate fix\n"
       message += "- Test to ensure the error is resolved\n"
     end
-    
+
     message += "\nLet me analyze your code and fix this issue..."
     message
   end
 
   def detect_error_type(error_info)
-    message = error_info['message'].to_s.downcase
-    
+    message = error_info["message"].to_s.downcase
+
     return "Reference Error" if message.include?("is not defined") || message.include?("referenceerror")
     return "Syntax Error" if message.include?("syntaxerror") || message.include?("unexpected token")
     return "Type Error" if message.include?("cannot read propert") || message.include?("typeerror")
     return "Module Error" if message.include?("module") && message.include?("not found")
-    
+
     "JavaScript Error"
   end
 end

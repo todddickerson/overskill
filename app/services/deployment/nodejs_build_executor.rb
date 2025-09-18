@@ -5,30 +5,32 @@ module Deployment
     include HTTParty
 
     # Cloudflare API configuration
-    base_uri 'https://api.cloudflare.com/client/v4'
-    
-    BUILD_WORKER_NAME = 'overskill-build-executor'
+    base_uri "https://api.cloudflare.com/client/v4"
+
+    BUILD_WORKER_NAME = "overskill-build-executor"
     BUILD_TIMEOUT = 300.seconds # 5 minutes max build time
-    NODE_VERSION = '18.x'
-    
+    NODE_VERSION = "18.x"
+
     class BuildExecutionError < StandardError; end
+
     class BuildTimeoutError < BuildExecutionError; end
+
     class WorkerDeploymentError < BuildExecutionError; end
 
     def initialize(app)
       @app = app
-      @account_id = ENV['CLOUDFLARE_ACCOUNT_ID']
-      @api_token = ENV['CLOUDFLARE_API_TOKEN']
+      @account_id = ENV["CLOUDFLARE_ACCOUNT_ID"]
+      @api_token = ENV["CLOUDFLARE_API_TOKEN"]
       @build_id = SecureRandom.hex(8)
-      
+
       Rails.logger.info "[NodejsBuildExecutor] Initializing for app ##{@app.id}, build_id: #{@build_id}"
-      
+
       setup_http_headers
     end
 
     def execute_vite_build(source_files, build_config = {})
       Rails.logger.info "[NodejsBuildExecutor] Starting Vite build execution for app ##{@app.id}"
-      
+
       # 1. Deploy build worker with Node.js environment
       deploy_build_worker
 
@@ -40,25 +42,29 @@ module Deployment
 
       build_result
     rescue => e
-      cleanup_build_worker rescue nil # Best effort cleanup
+      begin
+        cleanup_build_worker
+      rescue
+        nil
+      end # Best effort cleanup
       raise BuildExecutionError, "Build execution failed: #{e.message}"
     end
 
     def execute_fast_build(source_files)
       config = {
-        mode: 'development',
+        mode: "development",
         optimization: false,
         minify: false,
         sourcemaps: true,
         target_time: 45
       }
-      
+
       execute_vite_build(source_files, config)
     end
 
     def execute_production_build(source_files)
       config = {
-        mode: 'production',
+        mode: "production",
         optimization: true,
         minify: true,
         sourcemaps: false,
@@ -66,7 +72,7 @@ module Deployment
         code_splitting: true,
         target_time: 180
       }
-      
+
       execute_vite_build(source_files, config)
     end
 
@@ -74,25 +80,25 @@ module Deployment
 
     def setup_http_headers
       self.class.headers({
-        'Authorization' => "Bearer #{@api_token}",
-        'Content-Type' => 'application/json',
-        'X-Auth-Email' => ENV['CLOUDFLARE_EMAIL']
+        "Authorization" => "Bearer #{@api_token}",
+        "Content-Type" => "application/json",
+        "X-Auth-Email" => ENV["CLOUDFLARE_EMAIL"]
       })
     end
 
     def deploy_build_worker
       Rails.logger.info "[NodejsBuildExecutor] Deploying build worker: #{BUILD_WORKER_NAME}"
-      
+
       worker_script = generate_build_worker_script
-      
+
       response = self.class.put(
         "/accounts/#{@account_id}/workers/scripts/#{BUILD_WORKER_NAME}",
         body: worker_script,
-        headers: { 'Content-Type' => 'application/javascript' }
+        headers: {"Content-Type" => "application/javascript"}
       )
 
-      handle_api_response(response, 'Worker deployment failed')
-      
+      handle_api_response(response, "Worker deployment failed")
+
       Rails.logger.info "[NodejsBuildExecutor] Build worker deployed successfully"
     end
 
@@ -396,7 +402,7 @@ module Deployment
 
     def invoke_build_worker(source_files, config)
       Rails.logger.info "[NodejsBuildExecutor] Invoking build worker for #{source_files.size} files"
-      
+
       build_request = {
         build_id: @build_id,
         source_files: source_files,
@@ -407,12 +413,12 @@ module Deployment
       }
 
       start_time = Time.current
-      
+
       # Invoke the build worker
       response = self.class.post(
         "https://#{BUILD_WORKER_NAME}.#{@account_id}.workers.dev/",
         body: build_request.to_json,
-        headers: { 'Content-Type' => 'application/json' },
+        headers: {"Content-Type" => "application/json"},
         timeout: BUILD_TIMEOUT
       )
 
@@ -420,12 +426,12 @@ module Deployment
 
       if response.success?
         result = JSON.parse(response.body)
-        
-        if result['success']
+
+        if result["success"]
           Rails.logger.info "[NodejsBuildExecutor] Build completed successfully in #{build_time}s"
-          result.merge('actual_build_time' => build_time)
+          result.merge("actual_build_time" => build_time)
         else
-          raise BuildExecutionError, "Build failed: #{result['error']}"
+          raise BuildExecutionError, "Build failed: #{result["error"]}"
         end
       else
         raise BuildExecutionError, "Worker invocation failed: #{response.code} #{response.message}"
@@ -438,10 +444,10 @@ module Deployment
 
     def cleanup_build_worker
       Rails.logger.info "[NodejsBuildExecutor] Cleaning up build worker: #{BUILD_WORKER_NAME}"
-      
+
       # Delete the temporary build worker
       response = self.class.delete("/accounts/#{@account_id}/workers/scripts/#{BUILD_WORKER_NAME}")
-      
+
       if response.success?
         Rails.logger.info "[NodejsBuildExecutor] Build worker cleaned up successfully"
       else
@@ -453,8 +459,12 @@ module Deployment
 
     def handle_api_response(response, error_message)
       unless response.success?
-        error_details = JSON.parse(response.body) rescue { 'message' => 'Unknown error' }
-        raise WorkerDeploymentError, "#{error_message}: #{error_details['message'] || response.message}"
+        error_details = begin
+          JSON.parse(response.body)
+        rescue
+          {"message" => "Unknown error"}
+        end
+        raise WorkerDeploymentError, "#{error_message}: #{error_details["message"] || response.message}"
       end
     rescue JSON::ParserError
       raise WorkerDeploymentError, "#{error_message}: Invalid API response"

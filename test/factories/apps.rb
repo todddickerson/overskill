@@ -9,7 +9,7 @@ FactoryBot.define do
     framework { "react" }
     status { "draft" }
     visibility { "private" }
-    
+
     after(:build) do |app|
       if app.creator.nil?
         # Find existing membership or create a new one

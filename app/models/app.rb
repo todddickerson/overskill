@@ -1,10 +1,10 @@
-require 'timeout'
+require "timeout"
 
 class App < ApplicationRecord
   include AutoPreview
   include TemplateConfig
   # 🚅 add concerns above.
-  
+
   # DEPRECATED FIELDS (January 2025)
   # cloudflare_worker_name: No longer used with Workers for Platforms (WFP)
   #   - WFP uses dispatch namespaces and script names instead of individual workers
@@ -52,18 +52,18 @@ class App < ApplicationRecord
 
   # Repository status enum for GitHub migration
   # Only define enum if the column exists (fixes BulletTrain roles initialization issue)
-  if column_names.include?('repository_status')
+  if column_names.include?("repository_status")
     enum :repository_status, {
-      pending: 'pending',
-      creating: 'creating', 
-      ready: 'ready',
-      failed: 'failed'
+      pending: "pending",
+      creating: "creating",
+      ready: "ready",
+      failed: "failed"
     }, prefix: :repository
   end
 
   validates :name, presence: true
   validates :subdomain, presence: true, uniqueness: true,
-    format: { 
+    format: {
       with: /\A[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?\z/,
       message: "must be alphanumeric with hyphens, 1-63 characters"
     }
@@ -99,7 +99,7 @@ class App < ApplicationRecord
   def failed?
     status == "failed"
   end
-  
+
   def published?
     status == "published"
   end
@@ -108,58 +108,58 @@ class App < ApplicationRecord
     # Return production URL if published, otherwise preview URL
     return production_url if production_url.present? && published?
     return preview_url if preview_url.present?
-    
+
     # Fallback to predicted URL based on subdomain
-    base_domain = ENV['APP_BASE_DOMAIN'] || 'overskillproject.com'
+    base_domain = ENV["APP_BASE_DOMAIN"] || "overskillproject.com"
     "https://#{subdomain}.#{base_domain}" if subdomain.present?
   end
-  
+
   # Check if app can be published to production
   def can_publish?
-    status == 'ready' && preview_url.present? && app_files.exists?
+    status == "ready" && preview_url.present? && app_files.exists?
   end
-  
+
   # Publish app to production
   def publish_to_production!
     # FIXED: Use DeployAppJob instead of deprecated ProductionDeploymentService
     DeployAppJob.perform_later(self, "production")
   end
-  
+
   # Update subdomain (with uniqueness check and one-change limit)
   def update_subdomain!(new_subdomain)
     # Check if subdomain has already been changed once
     if subdomain_change_count && subdomain_change_count >= 1
       return {success: false, error: "Subdomain can only be changed once. Current subdomain: #{subdomain}"}
     end
-    
+
     # Validate new subdomain format
-    unless new_subdomain =~ /\A[a-z0-9][a-z0-9-]*[a-z0-9]\z/
+    unless /\A[a-z0-9][a-z0-9-]*[a-z0-9]\z/.match?(new_subdomain)
       return {success: false, error: "Invalid subdomain format. Use lowercase letters, numbers, and hyphens only."}
     end
-    
+
     # Check uniqueness
     if App.where(subdomain: new_subdomain).where.not(id: id).exists?
       return {success: false, error: "Subdomain '#{new_subdomain}' is already taken"}
     end
-    
+
     # Update subdomain with tracking
     old_subdomain = subdomain
     self.subdomain = new_subdomain
     self.subdomain_changed_at = Time.current
     self.subdomain_change_count = (subdomain_change_count || 0) + 1
-    
+
     if save
       # If app is deployed, trigger redeployment with new subdomain
-      if status == 'published' || status == 'ready'
+      if status == "published" || status == "ready"
         # FIXED: Queue deployment job instead of using deprecated service
         # The deployment job will handle subdomain updates
         DeployAppJob.perform_later(self, "production")
       end
-      
+
       Rails.logger.info "[App #{id}] Subdomain changed from '#{old_subdomain}' to '#{new_subdomain}'"
       {success: true, subdomain: new_subdomain, old_subdomain: old_subdomain}
     else
-      {success: false, error: errors.full_messages.join(', ')}
+      {success: false, error: errors.full_messages.join(", ")}
     end
   end
 
@@ -174,9 +174,8 @@ class App < ApplicationRecord
 
     # Sanitize and trim to valid subdomain
     candidate = base.downcase
-      .gsub(/[^a-z0-9\-]/, '-')
-      .gsub(/-+/, '-')
-      .gsub(/^-|-$/, '')
+      .gsub(/[^a-z0-9\-]/, "-").squeeze("-")
+      .gsub(/^-|-$/, "")
       .slice(0, 63)
 
     # Ensure uniqueness against other apps
@@ -205,11 +204,10 @@ class App < ApplicationRecord
     if published? && redeploy_if_published
       result = update_subdomain!(candidate)
       return result.merge(subdomain: candidate) if result.is_a?(Hash)
-      {success: true, subdomain: candidate}
     else
       update!(subdomain: candidate)
-      {success: true, subdomain: candidate}
     end
+    {success: true, subdomain: candidate}
   rescue => e
     {success: false, error: e.message}
   end
@@ -220,10 +218,10 @@ class App < ApplicationRecord
 
   def generate_app_name
     Rails.logger.info "[App] Generating app name inline for app ##{id}"
-    
+
     # Add a small delay to prevent conflicts with other callbacks
-    sleep(0.1) 
-    
+    sleep(0.1)
+
     begin
       # Use timeout to ensure we don't wait too long
       Timeout.timeout(2) do
@@ -239,7 +237,7 @@ class App < ApplicationRecord
         if result[:success]
           update(name_generated_at: Time.current)
           Rails.logger.info "[App] Successfully generated name for app: #{result[:new_name]}"
-          
+
           # Broadcast the updated navigation to refresh the app name
           broadcast_navigation_update
         else
@@ -253,15 +251,15 @@ class App < ApplicationRecord
       Rails.logger.error e.backtrace.join("\n")
     end
   end
-  
+
   # Unified AI generation entry point
   # Set skip_job_trigger to true only when the controller will handle job triggering separately
   def initiate_generation!(initial_prompt = nil, skip_job_trigger: false)
     Rails.logger.info "[App] Initiating AI generation for app ##{id}"
-    
+
     # Update prompt if provided
     update!(prompt: initial_prompt) if initial_prompt.present?
-    
+
     # Create initial user message if needed
     message = if app_chat_messages.empty? && prompt.present?
       app_chat_messages.create!(
@@ -272,14 +270,14 @@ class App < ApplicationRecord
     else
       app_chat_messages.last
     end
-    
+
     # Default prompt if none provided
     if prompt.blank? && message.content.blank?
       default_prompt = "Generate a simple app with a home page and about page"
       update!(prompt: default_prompt)
       message.update!(content: default_prompt) if message.persisted?
     end
-    
+
     # Create assistant placeholder message for V5 builder to update
     # This ensures Action Cable has something to broadcast to immediately
     assistant_message = app_chat_messages.create!(
@@ -293,7 +291,7 @@ class App < ApplicationRecord
       thinking_status: "",
       is_code_generation: false
     )
-    
+
     Rails.logger.info "[App] Created assistant placeholder ##{assistant_message.id} for AI generation"
 
     # Trigger job unless explicitly told not to (e.g., when controller handles it)
@@ -301,40 +299,40 @@ class App < ApplicationRecord
       Rails.logger.info "[App] Triggering V5 orchestrator for message ##{assistant_message.id}"
       ProcessAppUpdateJobV5.perform_later(assistant_message) # V5 wrapper delegates to V4 - FIXED: Use assistant_message not user message
     end
-    
+
     # Update status
     update!(status: "generating") unless generating?
   end
-  
+
   # AI Model selection for A/B testing
   AI_MODELS = {
-    'gpt-5' => 'GPT-5 (Fast & Efficient)',
-    'claude-sonnet-4' => 'Claude Sonnet 4 (Advanced Reasoning)'
+    "gpt-5" => "GPT-5 (Fast & Efficient)",
+    "claude-sonnet-4" => "Claude Sonnet 4 (Advanced Reasoning)"
   }.freeze
-  
+
   def ai_model_name
-    AI_MODELS[ai_model] || AI_MODELS['gpt-5']
+    AI_MODELS[ai_model] || AI_MODELS["gpt-5"]
   end
-  
+
   def using_claude?
-    ai_model == 'claude-sonnet-4'
+    ai_model == "claude-sonnet-4"
   end
-  
+
   def using_gpt5?
-    ai_model == 'gpt-5' || ai_model.nil?
+    ai_model == "gpt-5" || ai_model.nil?
   end
-  
+
   # Badge and referral system
   def hide_badge!
     update!(show_overskill_badge: false)
   end
-  
+
   def show_badge!
     update!(show_overskill_badge: true)
   end
-  
+
   def remix_url
-    base_url = ENV.fetch('BASE_URL', 'https://overskill.app')
+    base_url = ENV.fetch("BASE_URL", "https://overskill.app")
     "#{base_url}/remix?template=#{obfuscated_id}"
   end
 
@@ -344,7 +342,7 @@ class App < ApplicationRecord
       "app_#{id}",
       target: "app_navigation_#{id}",
       partial: "account/app_editors/app_navigation",
-      locals: { app: self }
+      locals: {app: self}
     )
   rescue => e
     Rails.logger.error "[App] Failed to broadcast navigation update: #{e.message}"
@@ -376,10 +374,10 @@ class App < ApplicationRecord
 
   def deployment_status
     # Return deployment status based on app state
-    return 'deployed' if status == 'published' && last_deployed_at.present?
-    return 'deploying' if status == 'generating'
-    return 'failed' if status == 'failed'
-    'pending'
+    return "deployed" if status == "published" && last_deployed_at.present?
+    return "deploying" if status == "generating"
+    return "failed" if status == "failed"
+    "pending"
   end
 
   # Get all environment variables for deployment
@@ -394,7 +392,7 @@ class App < ApplicationRecord
   # Get environment variables available to AI (non-secret)
   def env_vars_for_ai
     app_env_vars.select(&:available_for_ai?).map do |env_var|
-      { key: env_var.key, description: env_var.description }
+      {key: env_var.key, description: env_var.description}
     end
   end
 
@@ -423,11 +421,11 @@ class App < ApplicationRecord
 
   # Multi-environment deployment workflow methods
   def can_promote_to_staging?
-    repository_ready? && preview_url.present? && deployment_status != 'failed'
+    repository_ready? && preview_url.present? && deployment_status != "failed"
   end
 
   def can_promote_to_production?
-    staging_deployed_at.present? && staging_url.present? && deployment_status != 'failed'
+    staging_deployed_at.present? && staging_url.present? && deployment_status != "failed"
   end
 
   # Repository service integration
@@ -442,72 +440,71 @@ class App < ApplicationRecord
   # Create GitHub repository via forking (ultra-fast 2-3 seconds)
   def create_repository_via_fork!
     result = github_repository_service.create_app_repository_via_fork
-    
+
     if result[:success]
       Rails.logger.info "[App] ✅ Repository created via fork: #{repository_url}"
-      
+
       # NOTE: Cloudflare Worker creation moved to DeployAppJob
       # Worker should only be created after app files are generated
       # This prevents premature worker creation with empty repositories
-      
-      result
+
     else
       Rails.logger.error "[App] ❌ Repository creation failed: #{result[:error]}"
-      update!(repository_status: 'failed')
-      result
+      update!(repository_status: "failed")
     end
+    result
   end
 
   # Promote app from preview to staging environment
   def promote_to_staging!
-    return { success: false, error: 'Cannot promote to staging' } unless can_promote_to_staging?
-    
+    return {success: false, error: "Cannot promote to staging"} unless can_promote_to_staging?
+
     result = cloudflare_workers_service.promote_to_staging
-    
+
     if result[:success]
       update!(
-        deployment_status: 'staging_deployed',
+        deployment_status: "staging_deployed",
         staging_deployed_at: Time.current
       )
-      
+
       # Create deployment record
       app_deployments.create!(
-        environment: 'staging',
+        environment: "staging",
         deployment_id: result[:deployment_id],
         deployment_url: staging_url,
         deployed_at: Time.current
       )
-      
+
       Rails.logger.info "[App] ✅ Promoted to staging: #{staging_url}"
     end
-    
+
     result
   end
 
   # Promote app from staging to production environment
   def promote_to_production!
-    return { success: false, error: 'Cannot promote to production' } unless can_promote_to_production?
-    
+    return {success: false, error: "Cannot promote to production"} unless can_promote_to_production?
+
     result = cloudflare_workers_service.promote_to_production
-    
+
     if result[:success]
       update!(
-        deployment_status: 'production_deployed',
+        deployment_status: "production_deployed",
         last_deployed_at: Time.current,
-        status: 'published'  # Mark as published when deployed to production
+        status: "published"  # Mark as published when deployed to production
       )
-      
+
       # Create deployment record
       app_deployments.create!(
-        environment: 'production',
+        environment: "production",
         deployment_id: result[:deployment_id],
         deployment_url: production_url,
         deployed_at: Time.current
       )
-      
+
       Rails.logger.info "[App] ✅ Promoted to production: #{production_url}"
     end
-    
+
     result
   end
 
@@ -521,9 +518,9 @@ class App < ApplicationRecord
         success: true,
         legacy_mode: true,
         environments: {
-          preview: { url: preview_url, status: preview_url.present? ? 'deployed' : 'not_deployed' },
-          staging: { url: staging_url, status: staging_deployed_at ? 'deployed' : 'not_deployed' },
-          production: { url: production_url, status: deployment_status == 'production_deployed' ? 'deployed' : 'not_deployed' }
+          preview: {url: preview_url, status: preview_url.present? ? "deployed" : "not_deployed"},
+          staging: {url: staging_url, status: staging_deployed_at ? "deployed" : "not_deployed"},
+          production: {url: production_url, status: (deployment_status == "production_deployed") ? "deployed" : "not_deployed"}
         }
       }
     end
@@ -539,7 +536,7 @@ class App < ApplicationRecord
     base_name = name.parameterize
     "#{base_name}-#{obfuscated_id}"
   end
-  
+
   # =============================================================================
   # END GITHUB MIGRATION PROJECT METHODS
   # =============================================================================
@@ -547,43 +544,42 @@ class App < ApplicationRecord
   # =============================================================================
   # END OF PUBLIC METHODS
   # =============================================================================
-  
+
   private
 
   def generate_subdomain
     return if subdomain.present?
-    
+
     # Generate from name
     base = name&.parameterize
     return unless base.present?
-    
+
     # Sanitize for subdomain requirements
     candidate = base.downcase
-      .gsub(/[^a-z0-9\-]/, '-')
-      .gsub(/-+/, '-')
-      .gsub(/^-|-$/, '')
+      .gsub(/[^a-z0-9\-]/, "-").squeeze("-")
+      .gsub(/^-|-$/, "")
       .slice(0, 63)
-    
+
     # Ensure uniqueness - if duplicate, add random suffix
     if App.where(subdomain: candidate).where.not(id: id).exists?
       # Try up to 5 times with random 4-character suffixes
       5.times do
         # Generate random 4-character alphanumeric string
         random_suffix = SecureRandom.alphanumeric(4).downcase
-        
+
         # Truncate base to make room for suffix (max 63 chars total)
         # Leave room for hyphen and 4 character suffix
         truncated_base = candidate.slice(0, 58)
-        
+
         # Create candidate with random suffix
         candidate_with_suffix = "#{truncated_base}-#{random_suffix}"
-        
+
         unless App.where(subdomain: candidate_with_suffix).where.not(id: id).exists?
           candidate = candidate_with_suffix
           break
         end
       end
-      
+
       # If still not unique after 5 attempts, use timestamp + random for guaranteed uniqueness
       if App.where(subdomain: candidate).where.not(id: id).exists?
         timestamp = Time.current.to_i.to_s.last(6) # Last 6 digits of timestamp
@@ -592,42 +588,42 @@ class App < ApplicationRecord
         candidate = "#{truncated_base}-#{timestamp}#{random_part}"
       end
     end
-    
+
     self.subdomain = candidate
   end
 
   def copy_template_files
     template_dir = current_template_path
-    
+
     unless Dir.exist?(template_dir)
       Rails.logger.warn "[App] Template directory not found: #{template_dir}"
       return
     end
-    
+
     files_copied = 0
-    
+
     # Files to exclude from template copying (large/generated files)
     excluded_files = [
-      'package-lock.json',
-      'yarn.lock',
-      'pnpm-lock.yaml',
-      '.git',
-      'node_modules'
+      "package-lock.json",
+      "yarn.lock",
+      "pnpm-lock.yaml",
+      ".git",
+      "node_modules"
     ]
-    
+
     Dir.glob(::File.join(template_dir, "**/*")).each do |file_path|
       next unless ::File.file?(file_path)
-      
-      relative_path = file_path.sub("#{template_dir}/", '')
-      
+
+      relative_path = file_path.sub("#{template_dir}/", "")
+
       # Skip excluded files and directories
       next if excluded_files.any? { |excluded| relative_path.include?(excluded) }
-      
+
       content = ::File.read(file_path)
-      
+
       # Skip empty files
       next if content.blank?
-      
+
       # Create AppFile for each template file
       app_files.create!(
         path: relative_path,
@@ -635,52 +631,52 @@ class App < ApplicationRecord
         team: team,
         file_type: determine_app_file_type(relative_path)
       )
-      
+
       files_copied += 1
     end
-    
+
     Rails.logger.info "[App] Copied #{files_copied} template files from #{current_template_version} for app ##{id}"
-    
+
     # Also track which template version was used
     update_column(:template_version_used, current_template_version) if respond_to?(:template_version_used)
   rescue => e
     Rails.logger.error "[App] Failed to copy template files: #{e.message}"
     Rails.logger.error e.backtrace.first(5).join("\n")
   end
-  
+
   def determine_app_file_type(path)
     case ::File.extname(path).downcase
-    when '.tsx', '.ts' then 'typescript'
-    when '.jsx', '.js' then 'javascript'
-    when '.css' then 'css'
-    when '.html' then 'html'
-    when '.json' then 'json'
-    when '.md' then 'markdown'
-    when '.yml', '.yaml' then 'yaml'
-    when '.svg' then 'svg'
-    when '.png', '.jpg', '.jpeg', '.gif' then 'image'
-    else 'text'
+    when ".tsx", ".ts" then "typescript"
+    when ".jsx", ".js" then "javascript"
+    when ".css" then "css"
+    when ".html" then "html"
+    when ".json" then "json"
+    when ".md" then "markdown"
+    when ".yml", ".yaml" then "yaml"
+    when ".svg" then "svg"
+    when ".png", ".jpg", ".jpeg", ".gif" then "image"
+    else "text"
     end
   end
-  
+
   def create_default_env_vars
     AppEnvVar.create_defaults_for_app(self)
   end
-  
+
   def should_auto_generate?
     # Auto-generate if:
     # 1. Prompt is present
     # 2. Status is not already generating/generated/failed
     # 3. No existing chat messages (new app)
-    prompt.present? && 
-    status.in?(['draft', 'pending', nil]) && 
-    app_chat_messages.empty?
+    prompt.present? &&
+      status.in?(["draft", "pending", nil]) &&
+      app_chat_messages.empty?
   end
-  
+
   def initiate_ai_generation
     Rails.logger.info "[App] Auto-initiating generation for new app ##{id}"
     initiate_generation!  # Default behavior is to trigger job
   end
-  
+
   # 🚅 add methods above.
 end

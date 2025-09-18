@@ -82,6 +82,9 @@ bin/rails runner "Testing::GoldenFlowBaselineService.new.measure_all_flows"
 # 1. ProcessAppUpdateJobV5 → 2. AppBuilderV5 → 3. Database files → 4. DeployAppJob → 5. WFP + GitHub
 # Preview: Automatic immediate deployment via EdgePreviewService
 # Production: User-triggered via publish modal only
+
+# ULTRATHINK: Comprehensive deployment test (Documented for future use)
+bin/rails runner "scripts/test_full_pipeline_with_verification.rb"
 ```
 
 ## ðŸ—ï¸ Rails/BulletTrain Patterns

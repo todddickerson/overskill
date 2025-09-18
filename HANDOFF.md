@@ -1,9 +1,9 @@
 # 🚀 OverSkill Development Handoff - UNLIMITED SCALABILITY ACHIEVED!
 
-## ⚡ IMMEDIATE STATUS (January 2025 - DEPLOYMENT PIPELINE & CHANNEL CONSOLIDATION COMPLETE!)
+## ⚡ IMMEDIATE STATUS (January 2025 - ES MODULES & REACT RENDERING FIXED!)
 
-### ✅ DEPLOYMENT PIPELINE & ACTIONCABLE CHANNELS FULLY OPTIMIZED
-**All issues resolved - Ready for testing**
+### ✅ REACT PREVIEW RENDERING FULLY FIXED
+**All issues resolved - Apps now render correctly with ES modules and code splitting**
 
 #### Complete Fix List (January 2025):
 1. **Timeout Fixes** ✅ - CleanupStuckMessagesJob: 20min timeout + activity checking
@@ -13,6 +13,9 @@
 5. **Preview UI Auto-Refresh** ✅ - Turbo Streams + HMR working correctly
 6. **Production User-Triggered** ✅ - Only via publish modal button
 7. **Channel Consolidation** ✅ - Single `app_#{app.id}` channel per BulletTrain standards
+8. **ES Modules Fix** ✅ - Removed IIFE forcing, now using standard Vite ES module output with chunks
+9. **Asset Collection** ✅ - FastBuildService collects ALL built assets (chunks, CSS, HTML)
+10. **Worker Embedding** ✅ - EdgePreviewService embeds all chunks in worker for proper serving
 
 #### Deployment Architecture:
 ```
@@ -30,7 +33,12 @@ Production (User-Triggered):
 4. WorkersForPlatformsService promotes to production
 ```
 
-#### Modified Files Ready to Commit:
+#### Modified Files Ready to Commit (ES Modules Fix - Jan 18, 2025):
+- `app/services/fast_build_service.rb` - Removed IIFE forcing, collect all chunks
+- `app/services/edge_preview_service.rb` - Embed all assets, use built index.html
+- `app/services/ai/templates/overskill_20250728/vite.config.ts` - Standard ES modules config
+
+#### Previously Modified Files (Channel Consolidation):
 - `app/jobs/cleanup_stuck_messages_job.rb` - Timeout handling
 - `app/services/ai/app_builder_v5.rb` - Message touching during tools
 - `app/jobs/deploy_app_job.rb` - Immediate WFP + Turbo Streams

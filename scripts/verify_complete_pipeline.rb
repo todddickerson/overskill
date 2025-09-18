@@ -6,22 +6,33 @@ puts "COMPLETE PIPELINE VERIFICATION - App Generation to Deployment"
 puts "=" * 80
 
 # Color helpers
-def green(text); "\e[32m#{text}\e[0m"; end
-def yellow(text); "\e[33m#{text}\e[0m"; end
-def red(text); "\e[31m#{text}\e[0m"; end
-def blue(text); "\e[34m#{text}\e[0m"; end
+def green(text)
+  "\e[32m#{text}\e[0m"
+end
 
-puts "\n#{blue('1. APP GENERATION FLOW')}"
+def yellow(text)
+  "\e[33m#{text}\e[0m"
+end
+
+def red(text)
+  "\e[31m#{text}\e[0m"
+end
+
+def blue(text)
+  "\e[34m#{text}\e[0m"
+end
+
+puts "\n#{blue("1. APP GENERATION FLOW")}"
 puts "-" * 40
 
 # 1. User submits prompt via app_chats#create
-puts "✅ User submits prompt → #{green('app_chats#create')}"
+puts "✅ User submits prompt → #{green("app_chats#create")}"
 puts "   └─ Creates AppChatMessage with role='user'"
 puts "   └─ Triggers: ProcessAppUpdateJobV5.perform_later(@message)"
 puts "   └─ Redirects to editor view immediately"
 
 # 2. ProcessAppUpdateJobV5 delegates to AppBuilderV5
-puts "\n✅ ProcessAppUpdateJobV5 → #{green('AppBuilderV5')}"
+puts "\n✅ ProcessAppUpdateJobV5 → #{green("AppBuilderV5")}"
 puts "   └─ Updates app.status = 'processing'"
 puts "   └─ Calls: Ai::AppBuilderV5.new(message).execute!"
 puts "   └─ Updates app.status = 'generated' or 'failed'"
@@ -33,9 +44,9 @@ puts "   └─ Creates AppFiles in database"
 puts "   └─ Calls finalize_with_app_version"
 puts "   └─ finalize_with_app_version → trigger_deployment_if_ready"
 puts "   └─ trigger_deployment_if_ready → deploy_app → deploy_standard"
-puts "   └─ #{yellow('FIXED:')} DeployAppJob.perform_later(@app.id, #{green('\"preview\"')}) [was 'production']"
+puts "   └─ #{yellow("FIXED:")} DeployAppJob.perform_later(@app.id, #{green('\"preview\"')}) [was 'production']"
 
-puts "\n#{blue('2. DEPLOYMENT PIPELINE')}"
+puts "\n#{blue("2. DEPLOYMENT PIPELINE")}"
 puts "-" * 40
 
 # 4. DeployAppJob handles preview deployment
@@ -57,7 +68,7 @@ puts "   1. ActionCable broadcast to 'app_\#{app.id}' channel"
 puts "      └─ action: 'preview_deployed', preview_url: url"
 puts "   2. ActionCable broadcast to 'app_preview_\#{app.id}' channel"
 puts "      └─ action: 'refresh', url: preview_url"
-puts "   3. #{green('Turbo::StreamsChannel.broadcast_replace_to')}"
+puts "   3. #{green("Turbo::StreamsChannel.broadcast_replace_to")}"
 puts "      └─ Channel: 'app_\#{app.id}' (consolidated from app_editor_\#{app.id})"
 puts "      └─ Target: 'preview_frame'"
 puts "      └─ Partial: 'account/app_editors/preview_frame'"
@@ -66,10 +77,10 @@ puts "      └─ Partial: 'account/app_editors/preview_frame'"
 puts "\n✅ GitHub Backup Deployment (After WFP)"
 puts "   └─ Push files to GitHub repository"
 puts "   └─ GitHub Actions workflow triggered"
-puts "   └─ #{green('Workflow skips preview deployment')} (already done by WFP)"
+puts "   └─ #{green("Workflow skips preview deployment")} (already done by WFP)"
 puts "   └─ Workflow only handles production/staging"
 
-puts "\n#{blue('3. PRODUCTION DEPLOYMENT GATE')}"
+puts "\n#{blue("3. PRODUCTION DEPLOYMENT GATE")}"
 puts "-" * 40
 
 # 8. Production requires user action
@@ -82,7 +93,7 @@ puts "   └─ DeployAppJob.perform_later(@app.id, 'production')"
 puts "   └─ WorkersForPlatformsService promotes to production"
 puts "   └─ Domain: {subdomain}.overskill.app"
 
-puts "\n#{blue('4. ISSUES FIXED')}"
+puts "\n#{blue("4. ISSUES FIXED")}"
 puts "-" * 40
 
 issues_fixed = [
@@ -99,7 +110,7 @@ issues_fixed.each do |issue|
   puts "✅ #{green(issue)}"
 end
 
-puts "\n#{blue('5. CRITICAL FILES')}"
+puts "\n#{blue("5. CRITICAL FILES")}"
 puts "-" * 40
 
 critical_files = {
@@ -117,40 +128,40 @@ critical_files.each do |file, purpose|
   puts "   └─ #{purpose}"
 end
 
-puts "\n#{blue('6. DEPLOYMENT FLOW SUMMARY')}"
+puts "\n#{blue("6. DEPLOYMENT FLOW SUMMARY")}"
 puts "-" * 40
 
-puts <<-FLOW
-User Prompt
-    ↓
-app_chats#create
-    ↓
-ProcessAppUpdateJobV5 (Sidekiq)
-    ↓
-AppBuilderV5.execute!
-    ↓
-Generate Files + Store in DB
-    ↓
-finalize_with_app_version
-    ↓
-trigger_deployment_if_ready
-    ↓
-DeployAppJob(app, "preview") ← #{green('FIXED: was "production"')}
-    ↓
-┌─────────────────┬─────────────────┐
-│  EdgePreview    │   GitHub Push   │
-│  (Immediate)    │   (Backup)      │
-│  <2 seconds     │   Async         │
-└─────────────────┴─────────────────┘
-    ↓
-Turbo Stream Broadcast
-    ↓
-Preview Auto-Refreshes ✨
-
-Production: User clicks button → DeployAppJob(app, "production")
+puts <<~FLOW
+  User Prompt
+      ↓
+  app_chats#create
+      ↓
+  ProcessAppUpdateJobV5 (Sidekiq)
+      ↓
+  AppBuilderV5.execute!
+      ↓
+  Generate Files + Store in DB
+      ↓
+  finalize_with_app_version
+      ↓
+  trigger_deployment_if_ready
+      ↓
+  DeployAppJob(app, "preview") ← #{green('FIXED: was "production"')}
+      ↓
+  ┌─────────────────┬─────────────────┐
+  │  EdgePreview    │   GitHub Push   │
+  │  (Immediate)    │   (Backup)      │
+  │  <2 seconds     │   Async         │
+  └─────────────────┴─────────────────┘
+      ↓
+  Turbo Stream Broadcast
+      ↓
+  Preview Auto-Refreshes ✨
+  
+  Production: User clicks button → DeployAppJob(app, "production")
 FLOW
 
-puts "\n#{green('✅ PIPELINE VERIFICATION COMPLETE')}"
+puts "\n#{green("✅ PIPELINE VERIFICATION COMPLETE")}"
 puts "All components properly connected for:"
 puts "- Immediate preview deployment to *.overskill.app"
 puts "- Automatic preview refresh without manual reload"

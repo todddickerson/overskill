@@ -11,7 +11,7 @@ result = service.ensure_tables_exist!
 if result[:success]
   puts "✅ Tables created successfully:"
   result[:tables].each { |t| puts "  - #{t}" }
-  
+
   # Update metadata
   app.app_tables.reload
   puts "\nMetadata updated:"

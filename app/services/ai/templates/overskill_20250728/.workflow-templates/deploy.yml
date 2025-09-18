@@ -24,11 +24,8 @@ jobs:
       run: |
         cat > .env << EOF
         VITE_APP_ID={{APP_ID}}
-        VITE_SUPABASE_URL=https://vhctutvepgdgtpsbnzvp.supabase.co
-        VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoY3R1dHZlcGdkZ3Rwc2JuenZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA1MDM4NjIsImV4cCI6MjA0NjA3OTg2Mn0.mKKEi_IqJMGy6vl9sLX_DSlP-ZG7Kw-6VR_zKBOqoJ0
         VITE_OWNER_ID={{OWNER_ID}}
         VITE_ENVIRONMENT=production
-        VITE_ANALYTICS_ENABLED=true
         VITE_R2_BASE_URL=https://pub.overskill.com
         VITE_USE_LOCAL_ASSETS=false
         EOF

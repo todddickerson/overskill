@@ -1,21 +1,21 @@
 # Service to sync OAuth providers between Rails and Supabase
 class SupabaseOauthSyncService
   include Singleton
-  
+
   # Map Rails OAuth providers to Supabase provider names
   PROVIDER_MAPPING = {
-    'google_oauth2' => 'google',
-    'github' => 'github',
-    'facebook' => 'facebook',
-    'twitter' => 'twitter',
-    'apple' => 'apple',
-    'discord' => 'discord',
-    'linkedin' => 'linkedin'
+    "google_oauth2" => "google",
+    "github" => "github",
+    "facebook" => "facebook",
+    "twitter" => "twitter",
+    "apple" => "apple",
+    "discord" => "discord",
+    "linkedin" => "linkedin"
   }.freeze
-  
+
   def sync_oauth_user(user, auth_hash)
     Rails.logger.info "[SupabaseOauthSync] Syncing OAuth user: #{user.email}, provider: #{auth_hash.provider}"
-    
+
     # Get or create Supabase user
     if user.supabase_user_id.present?
       # Update existing user
@@ -25,14 +25,14 @@ class SupabaseOauthSyncService
       create_oauth_user(user, auth_hash)
     end
   end
-  
+
   def link_oauth_identity(user, provider, uid, auth_data = {})
     return unless user.supabase_user_id.present?
-    
+
     supabase_provider = PROVIDER_MAPPING[provider] || provider
-    
+
     Rails.logger.info "[SupabaseOauthSync] Linking #{supabase_provider} identity for user #{user.id}"
-    
+
     # This would typically be done through Supabase Admin API
     # For now, we'll store the mapping in user metadata
     result = SupabaseService.instance.update_user(
@@ -49,21 +49,21 @@ class SupabaseOauthSyncService
         }
       }
     )
-    
+
     if result[:success]
       Rails.logger.info "[SupabaseOauthSync] Successfully linked OAuth identity"
     else
       Rails.logger.error "[SupabaseOauthSync] Failed to link OAuth identity: #{result[:error]}"
     end
-    
+
     result
   end
-  
+
   private
-  
+
   def create_oauth_user(user, auth_hash)
     Rails.logger.info "[SupabaseOauthSync] Creating new Supabase user with OAuth"
-    
+
     # Create user in Supabase with OAuth metadata
     result = SupabaseService.instance.create_user(
       user.email,
@@ -75,7 +75,7 @@ class SupabaseOauthSyncService
         name: user.name,
         oauth_provider: auth_hash.provider,
         oauth_uid: auth_hash.uid,
-        created_via: 'oauth',
+        created_via: "oauth",
         oauth_identities: {
           PROVIDER_MAPPING[auth_hash.provider] || auth_hash.provider => {
             uid: auth_hash.uid,
@@ -87,25 +87,25 @@ class SupabaseOauthSyncService
         }
       }
     )
-    
+
     if result[:success]
       supabase_user = result[:data]
       user.update!(
-        supabase_user_id: supabase_user['id'],
-        supabase_sync_status: 'synced',
+        supabase_user_id: supabase_user["id"],
+        supabase_sync_status: "synced",
         supabase_last_synced_at: Time.current
       )
-      
+
       # Create profile
       SupabaseService.instance.create_profile(user)
     end
-    
+
     result
   end
-  
+
   def update_oauth_identity(user, auth_hash)
     Rails.logger.info "[SupabaseOauthSync] Updating OAuth identity for existing user"
-    
+
     # Add or update OAuth identity in user metadata
     link_oauth_identity(
       user,

@@ -13,18 +13,17 @@ class Account::AppChatsController < Account::ApplicationController
     if @message.save
       # Process the request with AI - use V5 wrapper (delegates to V4)
       ProcessAppUpdateJobV5.perform_later(@message)
-     
 
       respond_to do |format|
         format.turbo_stream do
           # Use enhanced message partial for V4 Enhanced, basic for others
           message_partial = case orchestrator_version
-                           when :v4_enhanced
-                             "chat_messages/enhanced_message"
-                           else
-                             "account/app_chats/message"
-                           end
-          
+          when :v4_enhanced
+            "chat_messages/enhanced_message"
+          else
+            "account/app_chats/message"
+          end
+
           render turbo_stream: [
             turbo_stream.append("chat_messages", partial: message_partial, locals: {chat_message: @message}),
             turbo_stream.replace("chat_form", partial: "account/app_chats/form", locals: {app: @app, message: @app.app_chat_messages.build}),

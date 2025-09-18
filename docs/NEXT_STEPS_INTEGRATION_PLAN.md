@@ -35,40 +35,76 @@
 
 ## Immediate Next Steps
 
-### 1. Frontend HMR Integration (Priority: HIGH)
-**Goal**: Enable HMR in preview iframe
+### 1. Frontend HMR Integration via ActionCable (Priority: HIGH)
+**Goal**: Enable HMR in preview iframe using ActionCable (NOT Durable Objects)
+
+#### Architecture Decision: ActionCable over Durable Objects
+**Date**: September 2025
+**Decision**: Use ActionCable for HMR instead of Durable Objects
+
+**Why ActionCable Wins**:
+- **No hibernation delays**: Always instant 50ms updates (vs 2s wake-up after idle)
+- **Simpler architecture**: Users already connected to Rails for editing
+- **Cost-free**: Uses existing Rails infrastructure (vs $5/month per 1000 apps)
+- **More reliable**: Single connection path (vs complex edge routing)
+- **Consistent UX**: Predictable latency regardless of idle time
 
 #### Tasks:
 ```erb
 # app/views/account/app_editors/_preview_frame.html.erb
 # Add after line 45 (before iframe):
-<% if app.preview_url.present? && Rails.env.development? %>
-  <script>
-    window.APP_ID = '<%= app.id %>';
-    window.HMR_ENABLED = true;
-  </script>
-  <%= javascript_include_tag 'hmr_client' %>
+<% if app.preview_url.present? %>
+  <div data-controller="hmr"
+       data-hmr-app-id-value="<%= app.id %>"
+       data-hmr-channel-value="AppPreviewChannel">
+    <!-- ActionCable HMR connection managed by Stimulus -->
+    <%= turbo_stream_from "app_preview_#{app.id}" %>
+  </div>
 <% end %>
 ```
 
-#### Create Stimulus controller:
+#### Update Stimulus controller for ActionCable:
 ```javascript
 // app/javascript/controllers/hmr_controller.js
 import { Controller } from "@hotwired/stimulus"
-import HMRClient from "../hmr_client"
+import consumer from "../channels/consumer"
 
 export default class extends Controller {
+  static values = { appId: String }
+
   connect() {
-    const appId = this.element.dataset.appId
-    if (appId && window.HMR_ENABLED) {
-      this.hmrClient = new HMRClient(appId)
-      this.hmrClient.connect()
+    // Connect to ActionCable AppPreviewChannel (NOT Durable Objects)
+    this.channel = consumer.subscriptions.create(
+      {
+        channel: "AppPreviewChannel",
+        app_id: this.appIdValue
+      },
+      {
+        received: (data) => this.handleHMRUpdate(data),
+        connected: () => console.log("[HMR] Connected via ActionCable"),
+        disconnected: () => console.log("[HMR] Disconnected")
+      }
+    )
+  }
+
+  handleHMRUpdate(data) {
+    if (data.type === 'file_update') {
+      // Update preview iframe without full reload
+      const iframe = document.querySelector('#preview_frame iframe')
+      if (iframe && data.path && data.content) {
+        // Inject updated file via postMessage to iframe
+        iframe.contentWindow.postMessage({
+          type: 'hmr_update',
+          path: data.path,
+          content: data.content
+        }, '*')
+      }
     }
   }
-  
+
   disconnect() {
-    if (this.hmrClient) {
-      this.hmrClient.disconnect()
+    if (this.channel) {
+      this.channel.unsubscribe()
     }
   }
 }

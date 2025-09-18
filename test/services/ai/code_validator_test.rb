@@ -1,4 +1,4 @@
-require 'test_helper'
+require "test_helper"
 
 class Ai::CodeValidatorTest < ActiveSupport::TestCase
   # Test TypeScript validation
@@ -19,7 +19,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         );
       }
     TS
-    
+
     result = Ai::CodeValidator.validate_typescript(content, "OrderForm.tsx")
     assert result[:valid], "Should accept valid function component with return statement"
     assert_empty result[:errors] || []
@@ -39,7 +39,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         return <div>Complex Component</div>;
       }
     TS
-    
+
     result = Ai::CodeValidator.validate_typescript(content, "ComplexComponent.tsx")
     assert result[:valid], "Should accept function with nested blocks and return"
     assert_empty result[:errors] || []
@@ -52,7 +52,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         return <div>Bad</div>;
       }
     TS
-    
+
     result = Ai::CodeValidator.validate_typescript(content, "BadComponent.tsx")
     assert_not result[:valid], "Should detect incorrect useState syntax"
     assert_includes result[:errors], "Incorrect useState destructuring syntax"
@@ -66,7 +66,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         return <div>Good</div>;
       }
     TS
-    
+
     result = Ai::CodeValidator.validate_typescript(content, "GoodComponent.tsx")
     assert result[:valid], "Should accept correct useState syntax"
     assert_empty result[:errors] || []
@@ -86,7 +86,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         </main>
       </div>
     JSX
-    
+
     result = Ai::CodeValidator.validate_jsx_syntax(content, "Component.jsx")
     assert result[:valid], "Should accept valid JSX with balanced tags"
   end
@@ -98,7 +98,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         </div>
       </span>
     JSX
-    
+
     result = Ai::CodeValidator.validate_jsx_syntax(content, "BadComponent.jsx")
     assert_not result[:valid], "Should detect mismatched tags"
     assert result[:errors].any? { |e| e.include?("Mismatched") }
@@ -111,7 +111,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
           Content
       </div>
     JSX
-    
+
     result = Ai::CodeValidator.validate_jsx_syntax(content, "UnclosedComponent.jsx")
     assert_not result[:valid], "Should detect unclosed tags"
     assert result[:errors].any? { |e| e.include?("Unclosed") || e.include?("Mismatched") }
@@ -125,7 +125,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         <img src="test.png" alt="test" />
       </div>
     JSX
-    
+
     result = Ai::CodeValidator.validate_jsx_syntax(content, "SelfClosing.jsx")
     assert result[:valid], "Should accept self-closing tags"
   end
@@ -136,7 +136,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         <p>Content</p>
       </div>
     JSX
-    
+
     result = Ai::CodeValidator.validate_jsx_syntax(content, "ClassAttribute.jsx")
     assert_not result[:valid], "Should detect class instead of className"
     assert result[:errors].any? { |e| e.include?("className") }
@@ -148,7 +148,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         <p className="text">Content</p>
       </div>
     JSX
-    
+
     result = Ai::CodeValidator.validate_jsx_syntax(content, "ClassNameAttribute.jsx")
     assert result[:valid], "Should accept className attribute"
   end
@@ -171,16 +171,16 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         }
       }
     CSS
-    
+
     fixed = Ai::CodeValidator.validate_and_fix_css(content)
     # Should add missing closing brace for body selector
     assert fixed.include?("body {"), "Should preserve body selector"
     assert fixed.match?(/body\s*\{[^}]*@apply[^}]*\}/m), "Should close body block properly"
     # Should properly close both @layer blocks
     assert_equal 2, fixed.scan(/@layer/).count, "Should have 2 @layer directives"
-    assert_equal fixed.count('{'), fixed.count('}'), "Should have balanced braces"
+    assert_equal fixed.count("{"), fixed.count("}"), "Should have balanced braces"
   end
-  
+
   test "should fix extra closing braces in CSS" do
     content = <<~CSS
       .container {
@@ -192,9 +192,9 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         to { left: 100%; }
       }}
     CSS
-    
+
     fixed = Ai::CodeValidator.validate_and_fix_css(content)
-    assert_equal fixed.count('{'), fixed.count('}'), "Should have balanced braces"
+    assert_equal fixed.count("{"), fixed.count("}"), "Should have balanced braces"
     assert fixed.include?(".container {"), "Should preserve valid CSS"
   end
 
@@ -205,7 +205,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         margin: 10px;
       }
     CSS
-    
+
     fixed = Ai::CodeValidator.validate_and_fix_css(content)
     assert fixed.include?("padding: 20px;"), "Should add missing semicolon"
     assert fixed.include?("margin: 10px;"), "Should preserve existing semicolon"
@@ -223,7 +223,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         }
       }
     CSS
-    
+
     fixed = Ai::CodeValidator.validate_and_fix_css(content)
     assert fixed.include?("@media"), "Should preserve media query"
     assert fixed.include?(".container"), "Should preserve nested rules"
@@ -243,17 +243,17 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         }
       }
     CSS
-    
+
     # Should detect structural issues and fix them
     syntax_check = Ai::CodeValidator.fix_css_syntax_issues(content)
-    
+
     if syntax_check[:fixed]
       fixed_content = syntax_check[:content]
       # Verify braces are balanced after fix
-      opening_braces = fixed_content.count('{')
-      closing_braces = fixed_content.count('}')
+      opening_braces = fixed_content.count("{")
+      closing_braces = fixed_content.count("}")
       assert_equal opening_braces, closing_braces, "Should balance braces after fixing"
-      
+
       # Should have proper structure
       assert fixed_content.match?(/body\s*\{[^}]*\}/m), "Body selector should be properly closed"
       assert fixed_content.match?(/@layer\s+components\s*\{/), "Components layer should be preserved"
@@ -270,14 +270,14 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
       }
       }
     CSS
-    
+
     syntax_check = Ai::CodeValidator.fix_css_syntax_issues(content)
     assert syntax_check[:fixed], "Should detect extra closing braces"
     assert syntax_check[:fixes].any? { |f| f.include?("extra closing brace") }, "Should report extra brace fixes"
-    
+
     fixed_content = syntax_check[:content]
-    opening_braces = fixed_content.count('{')
-    closing_braces = fixed_content.count('}')
+    opening_braces = fixed_content.count("{")
+    closing_braces = fixed_content.count("}")
     assert_equal opening_braces, closing_braces, "Should balance braces after removing extras"
   end
 
@@ -292,13 +292,13 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         }
       /* Missing closing brace for selector-one and @layer base */
     CSS
-    
+
     syntax_check = Ai::CodeValidator.fix_css_syntax_issues(content)
     assert syntax_check[:fixed], "Should detect missing closing braces"
-    
+
     fixed_content = syntax_check[:content]
-    opening_braces = fixed_content.count('{')
-    closing_braces = fixed_content.count('}')
+    opening_braces = fixed_content.count("{")
+    closing_braces = fixed_content.count("}")
     assert_equal opening_braces, closing_braces, "Should balance braces after adding missing ones"
   end
 
@@ -312,7 +312,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         @apply flex items-center
       }
     CSS
-    
+
     fixed = Ai::CodeValidator.validate_and_fix_css(content)
     # Should add semicolon after @apply without one
     assert fixed.include?("@apply flex items-center;"), "Should add missing semicolon after @apply"
@@ -342,12 +342,12 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         }
       }
     CSS
-    
+
     # Should pass validation without changes
     fixed = Ai::CodeValidator.validate_and_fix_css(content)
     syntax_check = Ai::CodeValidator.fix_css_syntax_issues(fixed)
     assert_not syntax_check[:fixed], "Valid Tailwind structure should not need fixes"
-    
+
     # Verify structure is preserved
     assert fixed.include?("@tailwind base"), "Should preserve Tailwind directives"
     assert fixed.include?("@layer base"), "Should preserve @layer blocks"
@@ -367,7 +367,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         );
       }
     TS
-    
+
     result = Ai::CodeValidator.validate_file(content, "TestComponent.tsx")
     assert_equal content, result, "Should return content unchanged for valid TypeScript"
   end
@@ -378,7 +378,7 @@ class Ai::CodeValidatorTest < ActiveSupport::TestCase
         color: red
       }}
     CSS
-    
+
     result = Ai::CodeValidator.validate_file(content, "styles.css")
     assert_not result.include?("}}"), "Should fix CSS issues"
     assert result.include?("color: red;"), "Should add missing semicolon"

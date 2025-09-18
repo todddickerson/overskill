@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # Debug script to understand tool_use_id mismatch issue
 
-require_relative '../config/environment'
+require_relative "../config/environment"
 
 puts "🔍 Debugging Tool ID Mismatch Issue"
 puts "=" * 60
@@ -25,29 +25,29 @@ puts
 
 # Analyze conversation_flow
 flow = message.conversation_flow
-tools_entries = flow.select { |item| item['type'] == 'tools' }
+tools_entries = flow.select { |item| item["type"] == "tools" }
 
 puts "Found #{tools_entries.count} tools entries in conversation_flow"
 puts
 
 tools_entries.each_with_index do |entry, entry_index|
   puts "Tools Entry ##{entry_index + 1}:"
-  puts "  Execution ID: #{entry['execution_id']}"
-  puts "  Status: #{entry['status']}"
-  puts "  Tools count: #{entry['tools']&.count || 0}"
-  
-  if entry['tools'].present?
-    entry['tools'].each_with_index do |tool, tool_index|
+  puts "  Execution ID: #{entry["execution_id"]}"
+  puts "  Status: #{entry["status"]}"
+  puts "  Tools count: #{entry["tools"]&.count || 0}"
+
+  if entry["tools"].present?
+    entry["tools"].each_with_index do |tool, tool_index|
       next if tool.nil?
-      
+
       puts "    Tool ##{tool_index}:"
-      puts "      ID: #{tool['id'] || 'MISSING!'}"
-      puts "      Name: #{tool['name']}"
-      puts "      Status: #{tool['status']}"
-      puts "      File Path: #{tool['file_path']}" if tool['file_path']
-      
+      puts "      ID: #{tool["id"] || "MISSING!"}"
+      puts "      Name: #{tool["name"]}"
+      puts "      Status: #{tool["status"]}"
+      puts "      File Path: #{tool["file_path"]}" if tool["file_path"]
+
       # Check if tool has all required fields for tool_result
-      if tool['id'].nil?
+      if tool["id"].nil?
         puts "      ⚠️ WARNING: Tool missing 'id' field - will cause tool_result mismatch!"
       end
     end
@@ -62,18 +62,18 @@ puts
 # Try to reconstruct what would happen in IncrementalToolCompletionJob
 if tools_entries.any?
   last_tools_entry = tools_entries.last
-  
+
   puts "Simulating IncrementalToolCompletionJob.format_tool_results:"
   puts
-  
-  if last_tools_entry['tools'].present?
-    last_tools_entry['tools'].each_with_index do |tool, index|
+
+  if last_tools_entry["tools"].present?
+    last_tools_entry["tools"].each_with_index do |tool, index|
       next if tool.nil?
-      
-      tool_use_id = tool['id'] || "tool_#{index}"
+
+      tool_use_id = tool["id"] || "tool_#{index}"
       puts "Tool #{index}: would generate tool_use_id = '#{tool_use_id}'"
-      
-      if tool['id'].nil?
+
+      if tool["id"].nil?
         puts "  ⚠️ Using fallback ID because tool['id'] is nil"
       end
     end
@@ -91,18 +91,18 @@ begin
   Rails.cache.redis.then do |redis|
     pattern = "incremental_tool:*:state"
     redis_keys = redis.keys(pattern)
-    
+
     if redis_keys.any?
       redis_keys.last(5).each do |key|
-        execution_id = key.split(':')[1]
+        execution_id = key.split(":")[1]
         state = Rails.cache.read("incremental_tool:#{execution_id}:state")
-        
+
         if state
           puts "Execution #{execution_id}:"
-          puts "  Status: #{state['status']}"
-          puts "  Dispatched: #{state['dispatched_count']}"
-          puts "  Completed: #{state['completed_count']}"
-          puts "  Started: #{Time.at(state['started_at']).strftime('%Y-%m-%d %H:%M:%S')}" if state['started_at']
+          puts "  Status: #{state["status"]}"
+          puts "  Dispatched: #{state["dispatched_count"]}"
+          puts "  Completed: #{state["completed_count"]}"
+          puts "  Started: #{Time.at(state["started_at"]).strftime("%Y-%m-%d %H:%M:%S")}" if state["started_at"]
         end
       end
     else

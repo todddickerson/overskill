@@ -5,23 +5,23 @@ module Auth
     def initialize(app)
       @app = app
     end
-    
+
     # Generate OAuth configuration for Worker
     def oauth_config_for_worker
       {
         google: {
-          client_id: ENV['GOOGLE_CLIENT_ID'],
+          client_id: ENV["GOOGLE_CLIENT_ID"],
           redirect_uri: "#{@app.preview_url}/auth/callback/google",
-          scopes: ['openid', 'email', 'profile']
+          scopes: ["openid", "email", "profile"]
         },
         github: {
-          client_id: ENV['GITHUB_CLIENT_ID'], 
+          client_id: ENV["GITHUB_CLIENT_ID"],
           redirect_uri: "#{@app.preview_url}/auth/callback/github",
-          scopes: ['user:email']
+          scopes: ["user:email"]
         }
       }.compact
     end
-    
+
     # Generate OAuth JavaScript for Worker embedding
     def oauth_worker_code
       <<~JAVASCRIPT
@@ -261,21 +261,21 @@ module Auth
         }
       JAVASCRIPT
     end
-    
+
     # Integration instructions for generated apps
     def integration_instructions
       {
         environment_variables: [
-          'GOOGLE_CLIENT_ID',
-          'GOOGLE_CLIENT_SECRET', 
-          'GITHUB_CLIENT_ID',
-          'GITHUB_CLIENT_SECRET'
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "GITHUB_CLIENT_ID",
+          "GITHUB_CLIENT_SECRET"
         ],
         worker_endpoints: [
-          'GET /auth/login/:provider - Redirect to OAuth provider',
-          'GET /auth/callback/:provider - Handle OAuth callback', 
-          'POST /auth/logout - Clear session',
-          'GET /auth/user - Get current user info'
+          "GET /auth/login/:provider - Redirect to OAuth provider",
+          "GET /auth/callback/:provider - Handle OAuth callback",
+          "POST /auth/logout - Clear session",
+          "GET /auth/user - Get current user info"
         ],
         frontend_integration: <<~JAVASCRIPT
           // Add to your React app

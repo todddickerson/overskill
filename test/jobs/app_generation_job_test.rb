@@ -23,14 +23,14 @@ class AppGenerationJobTest < ActiveJob::TestCase
 
     # Track if service was instantiated
     service_called = false
-    
+
     Ai::AppGeneratorService.stub :new, ->(*args) {
       service_called = true
       raise "Service should not be called for completed generation"
     } do
       AppGenerationJob.perform_now(@generation)
     end
-    
+
     assert_equal false, service_called, "Service should not be instantiated for completed generation"
   end
 
@@ -42,7 +42,7 @@ class AppGenerationJobTest < ActiveJob::TestCase
       @generation.update!(status: "completed", completed_at: Time.current)
       {success: true}
     end
-    
+
     # Set instance variables on the mock
     mock_service.instance_variable_set(:@app, @app)
     mock_service.instance_variable_set(:@generation, @generation)
@@ -66,7 +66,7 @@ class AppGenerationJobTest < ActiveJob::TestCase
       @generation.update!(status: "failed", error_message: "Test error", completed_at: Time.current)
       {success: false, error: "Test error"}
     end
-    
+
     # Set instance variables on the mock
     mock_service.instance_variable_set(:@app, @app)
     mock_service.instance_variable_set(:@generation, @generation)
@@ -90,7 +90,7 @@ class AppGenerationJobTest < ActiveJob::TestCase
       @generation.update!(status: "completed", completed_at: Time.current)
       {success: true}
     end
-    
+
     # Set instance variables on the mock
     mock_service.instance_variable_set(:@app, @app)
     mock_service.instance_variable_set(:@generation, @generation)
@@ -113,7 +113,7 @@ class AppGenerationJobTest < ActiveJob::TestCase
     # Test that exceptions are properly handled and status is updated
     # Create a stub that raises an exception
     exception_raised = false
-    
+
     Ai::AppGeneratorService.stub :new, ->(*args) {
       mock = Object.new
       mock.define_singleton_method(:generate!) do
@@ -124,7 +124,7 @@ class AppGenerationJobTest < ActiveJob::TestCase
     } do
       # In test environment, perform_now might return the exception instead of raising
       result = AppGenerationJob.perform_now(@generation)
-      
+
       # Check if result is the exception (ActiveJob test behavior)
       if result.is_a?(StandardError)
         assert_equal "Unexpected error", result.message
@@ -133,9 +133,9 @@ class AppGenerationJobTest < ActiveJob::TestCase
         assert false, "Expected StandardError to be raised or returned"
       end
     end
-    
+
     assert exception_raised, "The service generate! method should have been called"
-    
+
     # Verify status was updated before re-raising
     @generation.reload
     @app.reload

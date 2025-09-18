@@ -2,40 +2,40 @@ module Ai
   class CodeValidatorService
     FORBIDDEN_PATTERNS = [
       # Module syntax
-      { pattern: /\bimport\s+.*from\s+['"]/, message: "ES6 import statements are not allowed. Use script tags in HTML." },
-      { pattern: /\bexport\s+(default|const|function|class)/, message: "ES6 export statements are not allowed. Use global functions." },
-      { pattern: /\brequire\s*\(/, message: "CommonJS require() is not allowed. Use script tags in HTML." },
-      { pattern: /\bmodule\.exports/, message: "CommonJS exports are not allowed. Use global functions." },
-      
+      {pattern: /\bimport\s+.*from\s+['"]/, message: "ES6 import statements are not allowed. Use script tags in HTML."},
+      {pattern: /\bexport\s+(default|const|function|class)/, message: "ES6 export statements are not allowed. Use global functions."},
+      {pattern: /\brequire\s*\(/, message: "CommonJS require() is not allowed. Use script tags in HTML."},
+      {pattern: /\bmodule\.exports/, message: "CommonJS exports are not allowed. Use global functions."},
+
       # localStorage without try/catch - simplified pattern
       # Note: This is a simplified check - it won't catch all cases but avoids Ruby regex limitations
-      { pattern: /\blocalStorage\.(getItem|setItem|removeItem|clear)/, message: "localStorage access should be wrapped in try/catch for sandboxed environments." },
-      
+      {pattern: /\blocalStorage\.(getItem|setItem|removeItem|clear)/, message: "localStorage access should be wrapped in try/catch for sandboxed environments."},
+
       # JSX (when not using Babel)
-      { pattern: /<[A-Z]\w*[^>]*\/?>/, message: "JSX syntax detected. Use React.createElement() instead." },
-      { pattern: /<\/[A-Z]\w*>/, message: "JSX closing tags detected. Use React.createElement() instead." },
-      { pattern: /<div[^>]*>/, message: "JSX syntax detected. Use React.createElement() instead." },
-      { pattern: /<\/div>/, message: "JSX closing tags detected. Use React.createElement() instead." },
-      
+      {pattern: /<[A-Z]\w*[^>]*\/?>/, message: "JSX syntax detected. Use React.createElement() instead."},
+      {pattern: /<\/[A-Z]\w*>/, message: "JSX closing tags detected. Use React.createElement() instead."},
+      {pattern: /<div[^>]*>/, message: "JSX syntax detected. Use React.createElement() instead."},
+      {pattern: /<\/div>/, message: "JSX closing tags detected. Use React.createElement() instead."},
+
       # Development CDNs
-      { pattern: /unpkg\.com.*development\.js/, message: "Use production builds from CDN, not development builds." },
-      { pattern: /babel.*standalone/, message: "Babel standalone should not be used. Write browser-compatible code." }
+      {pattern: /unpkg\.com.*development\.js/, message: "Use production builds from CDN, not development builds."},
+      {pattern: /babel.*standalone/, message: "Babel standalone should not be used. Write browser-compatible code."}
     ]
-    
+
     def self.validate_files(files)
       errors = []
       warnings = []
-      
+
       files.each do |file|
         next unless file[:path].match?(/\.(js|jsx|html)$/)
-        
+
         content = file[:content]
-        
+
         # For HTML files, check specific patterns
         if file[:path].match?(/\.html$/)
           # Extract non-script content for validation
-          non_script_content = content.gsub(/<script[^>]*>.*?<\/script>/m, '')
-          
+          non_script_content = content.gsub(/<script[^>]*>.*?<\/script>/m, "")
+
           # Only check for JSX in non-script parts of HTML
           if non_script_content.match?(/<[A-Z]\w*[^>]*\/?>/) || non_script_content.match?(/<\/[A-Z]\w*>/)
             errors << {
@@ -44,7 +44,7 @@ module Ai
               pattern: "JSX in HTML"
             }
           end
-          
+
           # Check for development CDN builds in HTML
           if content.match?(/unpkg\.com.*development\.js/)
             errors << {
@@ -53,11 +53,11 @@ module Ai
               pattern: "development.js"
             }
           end
-          
+
           # Skip other pattern checks for HTML files
           next
         end
-        
+
         # Check for forbidden patterns in JS/JSX files
         FORBIDDEN_PATTERNS.each do |rule|
           if content.match?(rule[:pattern])
@@ -68,7 +68,7 @@ module Ai
             }
           end
         end
-        
+
         # Additional checks for React files
         if file[:path].match?(/\.(js|jsx)$/) && content.include?("React")
           # Check for proper React usage
@@ -78,7 +78,7 @@ module Ai
               message: "React components should destructure from global React object"
             }
           end
-          
+
           # Check for proper mounting
           if file[:path] == "app.js" && !content.match?(/ReactDOM\.createRoot|ReactDOM\.render/)
             errors << {
@@ -87,7 +87,7 @@ module Ai
             }
           end
         end
-        
+
         # Check HTML files
         if file[:path].match?(/\.html$/)
           # Ensure React is loaded from CDN
@@ -97,7 +97,7 @@ module Ai
               message: "HTML should load React from CDN (production build)"
             }
           end
-          
+
           # CRITICAL: Ensure Tailwind CSS is loaded
           unless content.match?(/cdn\.tailwindcss\.com/)
             errors << {
@@ -105,7 +105,7 @@ module Ai
               message: "HTML MUST include Tailwind CSS CDN: <script src=\"https://cdn.tailwindcss.com\"></script>"
             }
           end
-          
+
           # Ensure OverSkill attribution
           unless content.match?(/OverSkill/i)
             warnings << {
@@ -113,7 +113,7 @@ module Ai
               message: "HTML should include OverSkill attribution in meta tags"
             }
           end
-          
+
           # Check for proper meta tags
           unless content.match?(/<meta\s+name=["']generator["']\s+content=["']OverSkill/i)
             warnings << {
@@ -121,7 +121,7 @@ module Ai
               message: "HTML should include generator meta tag with 'OverSkill AI'"
             }
           end
-          
+
           # Check script order
           if content.include?("app.js") && content.include?("components.js")
             app_index = content.index("app.js")
@@ -135,67 +135,66 @@ module Ai
           end
         end
       end
-      
+
       {
         valid: errors.empty?,
         errors: errors,
         warnings: warnings
       }
     end
-    
+
     def self.fix_common_issues(content, file_type)
       case file_type
       when "javascript"
         # Fix imports to use global React
         fixed = content.gsub(/import\s+React.*from\s+['"]react['"].*\n/, "const { useState, useEffect, useRef } = React;\n")
         fixed = fixed.gsub(/import\s+ReactDOM.*from\s+['"]react-dom['"].*\n/, "")
-        
+
         # Fix exports to global functions
         fixed = fixed.gsub(/export\s+default\s+function\s+(\w+)/, 'window.\1 = function')
         fixed = fixed.gsub(/export\s+function\s+(\w+)/, 'window.\1 = function')
         fixed = fixed.gsub(/export\s+const\s+(\w+)/, 'window.\1')
-        
+
         # Remove export statements at end
-        fixed = fixed.gsub(/export\s*{\s*[^}]+\s*}.*\n?/, '')
-        
-        fixed
+        fixed.gsub(/export\s*{\s*[^}]+\s*}.*\n?/, "")
+
       when "html"
         fixed = content.dup
-        
+
         # Add Tailwind CSS if missing
         unless fixed.match?(/cdn\.tailwindcss\.com/)
           tailwind_script = '  <script src="https://cdn.tailwindcss.com"></script>'
-          
+
           if fixed.match?(/<\/head>/)
-            fixed = fixed.sub(/<\/head>/, "#{tailwind_script}\n</head>")
+            fixed = fixed.sub("</head>", "#{tailwind_script}\n</head>")
           elsif fixed.match?(/<head>/)
-            fixed = fixed.sub(/<head>/, "<head>\n#{tailwind_script}")
+            fixed = fixed.sub("<head>", "<head>\n#{tailwind_script}")
           end
         end
-        
+
         # Add OverSkill meta tags if missing
         unless fixed.match?(/<meta\s+name=["']generator["']/i)
           overskill_meta = <<~META.strip
-              <meta name="description" content="Created with OverSkill - Build apps without code">
-              <meta name="author" content="OverSkill">
-              <meta name="generator" content="OverSkill AI">
-              
-              <!-- Open Graph -->
-              <meta property="og:description" content="Created with OverSkill - Build apps without code">
-              <meta property="og:type" content="website">
-              
-              <!-- Twitter Card -->
-              <meta name="twitter:card" content="summary">
-              <meta name="twitter:site" content="@overskill_app">
+            <meta name="description" content="Created with OverSkill - Build apps without code">
+            <meta name="author" content="OverSkill">
+            <meta name="generator" content="OverSkill AI">
+            
+            <!-- Open Graph -->
+            <meta property="og:description" content="Created with OverSkill - Build apps without code">
+            <meta property="og:type" content="website">
+            
+            <!-- Twitter Card -->
+            <meta name="twitter:card" content="summary">
+            <meta name="twitter:site" content="@overskill_app">
           META
-          
+
           if fixed.match?(/<title>(.*?)<\/title>/i)
-            fixed = fixed.sub(/<\/title>/, "</title>\n  #{overskill_meta}")
+            fixed = fixed.sub("</title>", "</title>\n  #{overskill_meta}")
           elsif fixed.match?(/<\/head>/)
-            fixed = fixed.sub(/<\/head>/, "  #{overskill_meta}\n</head>")
+            fixed = fixed.sub("</head>", "  #{overskill_meta}\n</head>")
           end
         end
-        
+
         # Add Remix CTA badge if missing
         unless fixed.match?(/Remix with OverSkill/i)
           remix_badge = <<~BADGE.strip
@@ -215,12 +214,12 @@ module Ai
               <span style="font-weight: 600;">Remix with OverSkill</span>
             </a>
           BADGE
-          
+
           if fixed.match?(/<\/body>/i)
             fixed = fixed.sub(/<\/body>/i, "#{remix_badge}\n</body>")
           end
         end
-        
+
         fixed
       else
         content

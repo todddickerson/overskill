@@ -30,11 +30,11 @@ class Api::V1::AppEnvVarsControllerTest < Api::Test
     # Fetch the app_env_var in question and prepare to compare it's attributes.
     app_env_var = AppEnvVar.find(app_env_var_data["id"])
 
-    assert_equal_or_nil app_env_var_data['key'], app_env_var.key
-    assert_equal_or_nil app_env_var_data['value'], app_env_var.value
-    assert_equal_or_nil app_env_var_data['description'], app_env_var.description
-    assert_equal_or_nil app_env_var_data['is_secret'], app_env_var.is_secret
-    assert_equal_or_nil app_env_var_data['is_system'], app_env_var.is_system
+    assert_equal_or_nil app_env_var_data["key"], app_env_var.key
+    assert_equal_or_nil app_env_var_data["value"], app_env_var.value
+    assert_equal_or_nil app_env_var_data["description"], app_env_var.description
+    assert_equal_or_nil app_env_var_data["is_secret"], app_env_var.is_secret
+    assert_equal_or_nil app_env_var_data["is_system"], app_env_var.is_system
     # 🚅 super scaffolding will insert new fields above this line.
 
     assert_equal app_env_var_data["app_id"], app_env_var.app_id
@@ -93,9 +93,9 @@ class Api::V1::AppEnvVarsControllerTest < Api::Test
     put "/api/v1/app_env_vars/#{@app_env_var.id}", params: {
       access_token: access_token,
       app_env_var: {
-        key: 'Alternative String Value',
-        value: 'Alternative String Value',
-        description: 'Alternative String Value',
+        key: "Alternative String Value",
+        value: "Alternative String Value",
+        description: "Alternative String Value",
         # 🚅 super scaffolding will also insert new fields above this line.
       }
     }
@@ -107,9 +107,9 @@ class Api::V1::AppEnvVarsControllerTest < Api::Test
 
     # But we have to manually assert the value was properly updated.
     @app_env_var.reload
-    assert_equal @app_env_var.key, 'Alternative String Value'
-    assert_equal @app_env_var.value, 'Alternative String Value'
-    assert_equal @app_env_var.description, 'Alternative String Value'
+    assert_equal @app_env_var.key, "Alternative String Value"
+    assert_equal @app_env_var.value, "Alternative String Value"
+    assert_equal @app_env_var.description, "Alternative String Value"
     # 🚅 super scaffolding will additionally insert new fields above this line.
 
     # Also ensure we can't do that same action as another user.

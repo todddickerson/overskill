@@ -60,7 +60,7 @@ module Ai
     def generate_app_logo(app_name, app_description)
       # Create a prompt optimized for app logo generation
       prompt = build_logo_prompt(app_name, app_description)
-      
+
       # Generate with square dimensions suitable for app logos
       generate_image(prompt, size: "1024x1024", quality: "standard")
     end

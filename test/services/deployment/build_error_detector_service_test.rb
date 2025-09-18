@@ -1,4 +1,4 @@
-require 'test_helper'
+require "test_helper"
 
 class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
   setup do
@@ -15,11 +15,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/pages/SalesPage.tsx(127,7): error TS2315: JSX element 'section' has no corresponding closing tag.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :jsx_unclosed_tag, error[:type]
     assert_equal "src/pages/SalesPage.tsx", error[:file]
     assert_equal 127, error[:line]
@@ -34,11 +34,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/components/Calculator.tsx(45,12): error TS17008: Unexpected closing 'div' tag does not match opening 'section' tag
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :jsx_tag_mismatch, error[:type]
     assert_equal "src/components/Calculator.tsx", error[:file]
     assert_equal 45, error[:line]
@@ -53,11 +53,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/pages/Home.tsx(23,18): error TS1003: JSX expression expected.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :jsx_expression_error, error[:type]
     assert_equal "src/pages/Home.tsx", error[:file]
     assert_equal 23, error[:line]
@@ -70,11 +70,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/components/Button.tsx(15,25): error TS1002: Unterminated string literal.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :unterminated_string, error[:type]
     assert_equal "src/components/Button.tsx", error[:file]
     assert_equal 15, error[:line]
@@ -88,11 +88,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/utils/helpers.tsx(8,32): error TS1109: Unexpected token.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :unexpected_token, error[:type]
     assert_equal "src/utils/helpers.tsx", error[:file]
     assert_equal 8, error[:line]
@@ -106,11 +106,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/hooks/useData.tsx(42,15): error TS1005: ')' expected.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :missing_parenthesis, error[:type]
     assert_equal "src/hooks/useData.tsx", error[:file]
     assert_equal 42, error[:line]
@@ -124,11 +124,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/types/index.ts(28,5): error TS1005: ';' expected.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :missing_semicolon, error[:type]
     assert_equal "src/types/index.ts", error[:file]
     assert_equal 28, error[:line]
@@ -146,9 +146,9 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/test.tsx(10,5): error TS17008: Unexpected closing 'span' tag does not match opening 'div' tag
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
+    errors = @detector.analyze_build_errors([{logs: log_content}])
     error = errors.first
-    
+
     assert_equal "div", error[:context][:opening_tag]
     assert_equal "span", error[:context][:closing_tag]
   end
@@ -158,9 +158,9 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/test.tsx(10,5): error TS2339: Property 'nonexistent' does not exist on type
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
+    errors = @detector.analyze_build_errors([{logs: log_content}])
     error = errors.first
-    
+
     assert_equal "nonexistent", error[:context][:property_name]
   end
 
@@ -173,11 +173,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/components/Old.tsx:25:10: Unexpected closing 'div' tag does not match opening 'section' tag
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :jsx_tag_mismatch, error[:type]
     assert_equal "src/components/Old.tsx", error[:file]
     assert_equal 25, error[:line]
@@ -193,11 +193,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/components/Form.tsx:15:20: Property 'invalidProp' does not exist on type 'Props'
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :property_not_found, error[:type]
     assert_equal "src/components/Form.tsx", error[:file]
     assert_equal 15, error[:line]
@@ -210,11 +210,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/utils/calc.ts:8:15: Cannot find name 'unknownVariable'
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :undefined_variable, error[:type]
     assert_equal "src/utils/calc.ts", error[:file]
     assert_equal 8, error[:line]
@@ -227,11 +227,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/hooks/useApi.ts:22:10: Type 'string' is not assignable to type 'number'
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :type_mismatch, error[:type]
     assert_equal "src/hooks/useApi.ts", error[:file]
     assert_equal 22, error[:line]
@@ -248,11 +248,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: Cannot resolve module './nonexistent' from 'src/components/App.tsx'
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :module_not_found, error[:type]
     assert_equal "src/components/App.tsx", error[:file]
     assert_equal "./nonexistent", error[:module_name]
@@ -264,11 +264,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/pages/Home.tsx: Cannot find module 'react-router' or its corresponding type declarations
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :missing_import, error[:type]
     assert_equal "src/pages/Home.tsx", error[:file]
     assert_equal "react-router", error[:module_name]
@@ -284,11 +284,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/styles/main.css:15:25: Expected '}' but found ';'
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :css_syntax_error, error[:type]
     assert_equal "src/styles/main.css", error[:file]
     assert_equal 15, error[:line]
@@ -301,11 +301,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       warn - The utility `invalid-tailwind-class` is not available
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :invalid_tailwind_class, error[:type]
     assert_equal "invalid-tailwind-class", error[:class_name]
     assert_equal :low, error[:severity]
@@ -320,11 +320,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       npm ERR! Cannot resolve dependency tree
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :dependency_resolution_error, error[:type]
     assert_equal :high, error[:severity]
   end
@@ -334,11 +334,11 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       npm ERR! ERESOLVE unable to resolve dependency tree
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 1, errors.length
     error = errors.first
-    
+
     assert_equal :dependency_conflict, error[:type]
     assert_equal :high, error[:severity]
   end
@@ -352,9 +352,9 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]/github/workspace/src/components/Test.tsx(10,5): error TS2315: JSX element 'div' has no corresponding closing tag.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
+    errors = @detector.analyze_build_errors([{logs: log_content}])
     error = errors.first
-    
+
     assert_equal "src/components/Test.tsx", error[:file]
   end
 
@@ -363,9 +363,9 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/pages/About.tsx(20,8): error TS1005: ';' expected.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
+    errors = @detector.analyze_build_errors([{logs: log_content}])
     error = errors.first
-    
+
     assert_equal "src/pages/About.tsx", error[:file]
   end
 
@@ -380,10 +380,10 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/utils/helpers.ts(42,5): error TS1005: ';' expected.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 3, errors.length
-    
+
     # Verify each error type
     assert_equal :jsx_unclosed_tag, errors[0][:type]
     assert_equal :unterminated_string, errors[1][:type]
@@ -396,8 +396,8 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/old/Legacy.tsx:25:10: Unexpected closing 'div' tag does not match opening 'span' tag
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
-    
+    errors = @detector.analyze_build_errors([{logs: log_content}])
+
     assert_equal 2, errors.length
     assert_equal :jsx_unclosed_tag, errors[0][:type]
     assert_equal :jsx_tag_mismatch, errors[1][:type]
@@ -408,7 +408,7 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
   # ========================
 
   test "handles empty log content gracefully" do
-    errors = @detector.analyze_build_errors([{ logs: "" }])
+    errors = @detector.analyze_build_errors([{logs: ""}])
     assert_equal 0, errors.length
   end
 
@@ -419,7 +419,7 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Build completed successfully!
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
+    errors = @detector.analyze_build_errors([{logs: log_content}])
     assert_equal 0, errors.length
   end
 
@@ -428,7 +428,7 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/test.tsx(10,5): error TS9999: Some unknown error type that we don't handle
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: log_content }])
+    errors = @detector.analyze_build_errors([{logs: log_content}])
     assert_equal 0, errors.length # Should skip unknown error types
   end
 
@@ -443,8 +443,8 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       ##[error]src/test.tsx(20,12): error TS1002: Unterminated string literal.
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: fixable_log }])
-    
+    errors = @detector.analyze_build_errors([{logs: fixable_log}])
+
     assert_equal 3, errors.length
     errors.each do |error|
       assert error[:auto_fixable], "Error #{error[:type]} should be auto-fixable"
@@ -456,8 +456,8 @@ class Deployment::BuildErrorDetectorServiceTest < ActiveSupport::TestCase
       Error: src/test.tsx:10:5: Property 'complexProperty' does not exist on type 'ComplexInterface'
     LOG
 
-    errors = @detector.analyze_build_errors([{ logs: non_fixable_log }])
-    
+    errors = @detector.analyze_build_errors([{logs: non_fixable_log}])
+
     assert_equal 1, errors.length
     refute errors.first[:auto_fixable], "Property errors should not be auto-fixable"
   end

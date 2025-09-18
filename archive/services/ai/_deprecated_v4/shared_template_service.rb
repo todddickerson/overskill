@@ -7,12 +7,12 @@ module Ai
       @app = app
       @team = app.team
     end
-    
+
     def generate_foundation_files
       Rails.logger.info "[SharedTemplateService] Generating foundation files for app ##{@app.id}"
-      
+
       files_created = []
-      
+
       # Generate each category of templates
       files_created += generate_core_config_files
       files_created += generate_entry_point_files
@@ -20,9 +20,9 @@ module Ai
       files_created += generate_auth_files
       files_created += generate_routing_files
       files_created += generate_layout_files
-      
+
       Rails.logger.info "[SharedTemplateService] Generated #{files_created.size} foundation files"
-      
+
       # Return data format expected by AppBuilderV4Enhanced
       files_created.map do |file_path|
         app_file = @app.app_files.find_by(path: file_path)
@@ -32,153 +32,153 @@ module Ai
         }
       end
     end
-    
+
     # Keep the old method name for backward compatibility
     alias_method :generate_core_files, :generate_foundation_files
-    
+
     private
-    
+
     def generate_core_config_files
       files = []
-      
+
       # package.json
-      create_file('package.json', package_json_template)
-      files << 'package.json'
-      
+      create_file("package.json", package_json_template)
+      files << "package.json"
+
       # vite.config.ts
-      create_file('vite.config.ts', vite_config_template)
-      files << 'vite.config.ts'
-      
+      create_file("vite.config.ts", vite_config_template)
+      files << "vite.config.ts"
+
       # tsconfig.json
-      create_file('tsconfig.json', tsconfig_template)
-      files << 'tsconfig.json'
-      
+      create_file("tsconfig.json", tsconfig_template)
+      files << "tsconfig.json"
+
       # tsconfig.node.json
-      create_file('tsconfig.node.json', tsconfig_node_template)
-      files << 'tsconfig.node.json'
-      
+      create_file("tsconfig.node.json", tsconfig_node_template)
+      files << "tsconfig.node.json"
+
       # tailwind.config.js
-      create_file('tailwind.config.js', tailwind_config_template)
-      files << 'tailwind.config.js'
-      
+      create_file("tailwind.config.js", tailwind_config_template)
+      files << "tailwind.config.js"
+
       # postcss.config.js
-      create_file('postcss.config.js', postcss_config_template)
-      files << 'postcss.config.js'
-      
+      create_file("postcss.config.js", postcss_config_template)
+      files << "postcss.config.js"
+
       # .env.example
-      create_file('.env.example', env_example_template)
-      files << '.env.example'
-      
+      create_file(".env.example", env_example_template)
+      files << ".env.example"
+
       files
     end
-    
+
     def generate_entry_point_files
       files = []
-      
+
       # index.html
-      create_file('index.html', index_html_template)
-      files << 'index.html'
-      
+      create_file("index.html", index_html_template)
+      files << "index.html"
+
       # src/main.tsx - CRITICAL entry point
-      create_file('src/main.tsx', main_tsx_template)
-      files << 'src/main.tsx'
-      
+      create_file("src/main.tsx", main_tsx_template)
+      files << "src/main.tsx"
+
       # src/index.css
-      create_file('src/index.css', index_css_template)
-      files << 'src/index.css'
-      
+      create_file("src/index.css", index_css_template)
+      files << "src/index.css"
+
       # src/lib/common-icons.ts - Pre-exported commonly used icons
-      create_file('src/lib/common-icons.ts', common_icons_template)
-      files << 'src/lib/common-icons.ts'
-      
+      create_file("src/lib/common-icons.ts", common_icons_template)
+      files << "src/lib/common-icons.ts"
+
       # src/App.tsx
-      create_file('src/App.tsx', app_tsx_template)
-      files << 'src/App.tsx'
-      
+      create_file("src/App.tsx", app_tsx_template)
+      files << "src/App.tsx"
+
       files
     end
-    
+
     def generate_database_files
       files = []
-      
+
       # src/lib/supabase.ts
-      create_file('src/lib/supabase.ts', supabase_client_template)
-      files << 'src/lib/supabase.ts'
-      
+      create_file("src/lib/supabase.ts", supabase_client_template)
+      files << "src/lib/supabase.ts"
+
       # src/lib/app-scoped-db.ts
-      create_file('src/lib/app-scoped-db.ts', app_scoped_db_template)
-      files << 'src/lib/app-scoped-db.ts'
-      
+      create_file("src/lib/app-scoped-db.ts", app_scoped_db_template)
+      files << "src/lib/app-scoped-db.ts"
+
       # src/types/database.ts
-      create_file('src/types/database.ts', database_types_template)
-      files << 'src/types/database.ts'
-      
+      create_file("src/types/database.ts", database_types_template)
+      files << "src/types/database.ts"
+
       files
     end
-    
+
     def generate_auth_files
       files = []
-      
+
       # src/hooks/useAuth.ts
-      create_file('src/hooks/useAuth.ts', use_auth_hook_template)
-      files << 'src/hooks/useAuth.ts'
-      
+      create_file("src/hooks/useAuth.ts", use_auth_hook_template)
+      files << "src/hooks/useAuth.ts"
+
       # src/components/auth/AuthForm.tsx
-      create_file('src/components/auth/AuthForm.tsx', auth_form_template)
-      files << 'src/components/auth/AuthForm.tsx'
-      
+      create_file("src/components/auth/AuthForm.tsx", auth_form_template)
+      files << "src/components/auth/AuthForm.tsx"
+
       # src/components/auth/ProtectedRoute.tsx
-      create_file('src/components/auth/ProtectedRoute.tsx', protected_route_template)
-      files << 'src/components/auth/ProtectedRoute.tsx'
-      
+      create_file("src/components/auth/ProtectedRoute.tsx", protected_route_template)
+      files << "src/components/auth/ProtectedRoute.tsx"
+
       files
     end
-    
+
     def generate_routing_files
       files = []
-      
+
       # src/router.tsx
-      create_file('src/router.tsx', router_template)
-      files << 'src/router.tsx'
-      
+      create_file("src/router.tsx", router_template)
+      files << "src/router.tsx"
+
       # src/pages/Home.tsx
-      create_file('src/pages/Home.tsx', home_page_template)
-      files << 'src/pages/Home.tsx'
-      
+      create_file("src/pages/Home.tsx", home_page_template)
+      files << "src/pages/Home.tsx"
+
       # src/pages/auth/Login.tsx
-      create_file('src/pages/auth/Login.tsx', login_page_template)
-      files << 'src/pages/auth/Login.tsx'
-      
+      create_file("src/pages/auth/Login.tsx", login_page_template)
+      files << "src/pages/auth/Login.tsx"
+
       files
     end
-    
+
     def generate_layout_files
       files = []
-      
+
       # src/components/Layout.tsx
-      create_file('src/components/Layout.tsx', layout_template)
-      files << 'src/components/Layout.tsx'
-      
+      create_file("src/components/Layout.tsx", layout_template)
+      files << "src/components/Layout.tsx"
+
       # src/components/Navigation.tsx
-      create_file('src/components/Navigation.tsx', navigation_template)
-      files << 'src/components/Navigation.tsx'
-      
+      create_file("src/components/Navigation.tsx", navigation_template)
+      files << "src/components/Navigation.tsx"
+
       files
     end
-    
+
     def create_file(path, content)
       # Process template variables
       processed_content = process_template_variables(content)
-      
+
       # Ensure content is not blank
       if processed_content.blank?
         Rails.logger.error "[SharedTemplateService] Blank content for file: #{path}"
         processed_content = "// Placeholder for #{path}"
       end
-      
+
       # Create or update the file
       existing_file = @app.app_files.find_by(path: path)
-      
+
       if existing_file
         existing_file.update!(content: processed_content)
       else
@@ -188,20 +188,20 @@ module Ai
           team: @team
         )
       end
-      
+
       Rails.logger.debug "[SharedTemplateService] Created file: #{path}"
     end
-    
+
     def process_template_variables(content)
       content
-        .gsub('{{APP_NAME}}', @app.name)
-        .gsub('{{APP_ID}}', @app.id.to_s)
-        .gsub('{{APP_SLUG}}', @app.name.parameterize)
-        .gsub('{{TEAM_ID}}', @team.id.to_s)
+        .gsub("{{APP_NAME}}", @app.name)
+        .gsub("{{APP_ID}}", @app.id.to_s)
+        .gsub("{{APP_SLUG}}", @app.name.parameterize)
+        .gsub("{{TEAM_ID}}", @team.id.to_s)
     end
-    
+
     # Template content methods
-    
+
     def package_json_template
       <<~JSON
         {
@@ -240,7 +240,7 @@ module Ai
         }
       JSON
     end
-    
+
     def vite_config_template
       <<~TS
         import { defineConfig } from 'vite'
@@ -273,7 +273,7 @@ module Ai
         })
       TS
     end
-    
+
     def tsconfig_node_template
       <<~JSON
         {
@@ -288,7 +288,7 @@ module Ai
         }
       JSON
     end
-    
+
     def tsconfig_template
       <<~JSON
         {
@@ -317,7 +317,7 @@ module Ai
         }
       JSON
     end
-    
+
     def tailwind_config_template
       <<~JS
         /** @type {import('tailwindcss').Config} */
@@ -348,7 +348,7 @@ module Ai
         }
       JS
     end
-    
+
     def postcss_config_template
       <<~JS
         export default {
@@ -359,7 +359,7 @@ module Ai
         }
       JS
     end
-    
+
     def env_example_template
       <<~ENV
         # Supabase Configuration
@@ -371,7 +371,7 @@ module Ai
         VITE_APP_NAME={{APP_NAME}}
       ENV
     end
-    
+
     def index_html_template
       <<~HTML
         <!DOCTYPE html>
@@ -389,7 +389,7 @@ module Ai
         </html>
       HTML
     end
-    
+
     def main_tsx_template
       <<~TSX
         import React from 'react'
@@ -404,7 +404,7 @@ module Ai
         )
       TSX
     end
-    
+
     def index_css_template
       <<~CSS
         @tailwind base;
@@ -428,7 +428,7 @@ module Ai
         }
       CSS
     end
-    
+
     def common_icons_template
       <<~TS
         /**
@@ -483,7 +483,7 @@ module Ai
         export * from 'lucide-react'
       TS
     end
-    
+
     def app_tsx_template
       <<~TSX
         import { BrowserRouter } from 'react-router-dom'
@@ -511,7 +511,7 @@ module Ai
         export default App
       TSX
     end
-    
+
     def supabase_client_template
       <<~TS
         import { createClient } from '@supabase/supabase-js'
@@ -545,7 +545,7 @@ module Ai
         })
       TS
     end
-    
+
     def app_scoped_db_template
       <<~TS
         import { supabase } from './supabase'
@@ -594,7 +594,7 @@ module Ai
         export const db = new AppScopedDatabase()
       TS
     end
-    
+
     def database_types_template
       <<~TS
         /**
@@ -620,7 +620,7 @@ module Ai
         // Add your app-specific types below
       TS
     end
-    
+
     def use_auth_hook_template
       <<~TSX
         import { useEffect, useState } from 'react'
@@ -677,7 +677,7 @@ module Ai
         }
       TSX
     end
-    
+
     def auth_form_template
       <<~TSX
         import { useState } from 'react'
@@ -760,7 +760,7 @@ module Ai
         }
       TSX
     end
-    
+
     def protected_route_template
       <<~TSX
         import { Navigate } from 'react-router-dom'
@@ -789,7 +789,7 @@ module Ai
         }
       TSX
     end
-    
+
     def router_template
       <<~TSX
         import { Routes, Route } from 'react-router-dom'
@@ -819,7 +819,7 @@ module Ai
         }
       TSX
     end
-    
+
     def home_page_template
       <<~TSX
         import { useAuth } from '@/hooks/useAuth'
@@ -845,7 +845,7 @@ module Ai
         }
       TSX
     end
-    
+
     def login_page_template
       <<~TSX
         import { Link } from 'react-router-dom'
@@ -882,7 +882,7 @@ module Ai
         }
       TSX
     end
-    
+
     def layout_template
       <<~TSX
         import { Outlet } from 'react-router-dom'
@@ -900,7 +900,7 @@ module Ai
         }
       TSX
     end
-    
+
     def navigation_template
       <<~TSX
         import { Link } from 'react-router-dom'

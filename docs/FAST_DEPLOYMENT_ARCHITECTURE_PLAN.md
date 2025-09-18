@@ -33,11 +33,25 @@ This plan outlines a new deployment architecture for OverSkill that achieves sub
 
 **✅ UPDATE**: As of September 9, 2025, we have successfully implemented Phase 1 achieving 5-8 second preview deployments with 50-80ms HMR updates.
 
-### Architecture Validation (Perplexity Research)
-✅ **ESBuild Server-Side Compilation**: Confirmed best practice for Workers deployment  
-✅ **Durable Objects + WebSockets**: Ideal for HMR with connection hibernation support  
-✅ **Cost Efficiency**: WFP at $0.30/million requests vs Vercel/Netlify $55/TB bandwidth  
+### Architecture Validation (Perplexity Research + Implementation Decision)
+✅ **ESBuild Server-Side Compilation**: Confirmed best practice for Workers deployment
+🔄 **ActionCable for HMR**: Superior to Durable Objects for our use case (see decision below)
+✅ **Cost Efficiency**: WFP at $0.30/million requests vs Vercel/Netlify $55/TB bandwidth
 ✅ **PuckEditor Integration**: Dynamic component registration supports AI-generated UI
+
+#### HMR Architecture Decision: ActionCable over Durable Objects (Sep 2025)
+After extensive analysis, we chose **ActionCable** instead of Durable Objects for HMR because:
+
+**User Experience Comparison**:
+- ActionCable: **Always 50ms** updates, even after 1hr idle
+- Durable Objects: 30ms when hot, but **2000ms wake-up delay** after hibernation
+
+**Technical Advantages**:
+1. **No hibernation delays** - Consistent instant updates
+2. **Simpler architecture** - Users already connected to Rails
+3. **Zero additional cost** - Uses existing infrastructure
+4. **More reliable** - Single connection path vs complex routing
+5. **Better developer experience** - Familiar Rails patterns
 
 ## Current State Analysis
 

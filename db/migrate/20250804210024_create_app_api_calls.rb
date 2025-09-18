@@ -14,7 +14,7 @@ class CreateAppApiCalls < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    
+
     add_index :app_api_calls, [:app_id, :occurred_at]
     add_index :app_api_calls, :occurred_at
     add_index :app_api_calls, :http_method

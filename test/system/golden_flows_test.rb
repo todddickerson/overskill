@@ -27,17 +27,17 @@ class GoldenFlowsTest < ApplicationSystemTestCase
 
     # Verify generated files are visible to user
     assert_selector '[data-testid="app-files-list"]'
-    
+
     within('[data-testid="app-files-list"]') do
       assert_text "index.html"
-      assert_text ".js"  
+      assert_text ".js"
       assert_text ".css"
     end
 
     # Verify no error alerts shown to user
-    assert_no_selector '.alert-danger'
-    assert_no_selector '.error'
-    
+    assert_no_selector ".alert-danger"
+    assert_no_selector ".error"
+
     # Verify JavaScript console has no severe errors
     verify_no_js_errors
 
@@ -66,7 +66,7 @@ class GoldenFlowsTest < ApplicationSystemTestCase
     # Extract and verify production URL
     production_url_element = find('[data-testid="production-url"]')
     production_url = production_url_element.text
-    
+
     assert_not_empty production_url
     assert production_url.include?("overskill.app"), "Production URL should use overskill.app domain"
 
@@ -74,8 +74,8 @@ class GoldenFlowsTest < ApplicationSystemTestCase
     assert_selector '[data-testid="production-url"] a', text: production_url
 
     # Verify no deployment errors
-    assert_no_selector '.deployment-error'
-    assert_no_selector '.alert-danger'
+    assert_no_selector ".deployment-error"
+    assert_no_selector ".alert-danger"
 
     # Capture publishing success state
     save_screenshot("golden_flow_publishing_complete.png")
@@ -102,15 +102,15 @@ class GoldenFlowsTest < ApplicationSystemTestCase
 
     # Verify user can access app creation (core functionality)
     assert_link "New App"
-    
+
     # Verify user info is displayed correctly
     assert_text test_email
 
     # Verify no authentication errors
-    assert_no_selector '.authentication-error'
-    assert_no_selector '.alert-danger'
+    assert_no_selector ".authentication-error"
+    assert_no_selector ".alert-danger"
 
-    # Capture authenticated dashboard state  
+    # Capture authenticated dashboard state
     save_screenshot("golden_flow_authentication_complete.png")
   end
 
@@ -120,16 +120,16 @@ class GoldenFlowsTest < ApplicationSystemTestCase
     # Check browser console for JavaScript errors
     # This helps catch client-side issues that might break user workflows
     return unless page.driver.respond_to?(:browser)
-    
+
     begin
       logs = page.driver.browser.logs.get(:browser)
-      severe_errors = logs.select { |log| log.level == 'SEVERE' }
-      
+      severe_errors = logs.select { |log| log.level == "SEVERE" }
+
       if severe_errors.any?
         puts "⚠️ JavaScript errors detected in golden flow:"
         severe_errors.each { |error| puts "  - #{error.message}" }
       end
-      
+
       assert_empty severe_errors, "JavaScript errors detected in golden flow execution"
     rescue => e
       puts "Note: Could not check JavaScript console logs: #{e.message}"
