@@ -777,7 +777,8 @@ class FastBuildService
       /Module not found: Error: Can't resolve ['"]([^'"]+)['"]/ => '$1',
       /@rollup\/plugin-(\w+) not found/ => '@rollup/plugin-$1',
       /Failed to resolve import ['"]([^'"]+)['"]/ => '$1',
-      /Could not resolve ['"]([^'"]+)['"]/ => '$1'
+      /Could not resolve ['"]([^'"]+)['"]/ => '$1',
+      /Could not resolve entry module ['"]([^'"]+)['"]/ => '$1'
     }
 
     patterns.each do |pattern, replacement|
