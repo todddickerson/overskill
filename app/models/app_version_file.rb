@@ -6,12 +6,13 @@ class AppVersionFile < ApplicationRecord
   validates :action, presence: true
   validates :r2_content_key, uniqueness: true, allow_blank: true
 
-  # Actions: created, updated, deleted, restored
+  # Actions: created, updated, deleted, restored, unchanged
   enum :action, {
     created: "create",
     updated: "update",
     deleted: "delete",
-    restored: "restored"
+    restored: "restored",
+    unchanged: "unchanged"
   }
 
   # Scopes for different storage strategies

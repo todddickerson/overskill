@@ -258,11 +258,10 @@ module Ai
       begin
         # Phase 1: Send user's raw message to Claude - system context handles the rest
         if is_continuation
-          # update_thinking_status("Analyzing your request and updating the app...")
+          update_thinking_status("Analyzing your request and updating the app...")
         else
-          # update_thinking_status("Phase 1/3: Analyzing requirements and generating app...")
+          update_thinking_status("Phase 1/6: Analyzing requirements and planning features...")
         end
-        update_thinking_status("Thinking...")
 
         # Enhance the user message with additional instructions for first-time app generation
         user_message = if is_continuation
@@ -563,7 +562,7 @@ module Ai
 
     def plan_app_implementation(action)
       update_thinking_status("Phase 2/6: Planning Architecture")
-      update_thinking_status("Thinking..")
+      update_thinking_status("Designing app structure and features...")
 
       # Generate comprehensive plan using template structure
       plan_prompt = build_planning_prompt
