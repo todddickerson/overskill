@@ -917,11 +917,12 @@ module Ai
         if custom_subdomain.present?
           # If custom subdomain provided, use update_subdomain! method
           result = @app.update_subdomain!(custom_subdomain)
-          unless result[:success]
-            # return { success: false, error: "Failed to update subdomain: #{result[:error]}" } # don't return error, just note the subdomain stayed the same
+          if result&.dig(:success)
+            final_subdomain = result[:subdomain] || custom_subdomain
+          else
+            # Failed to update subdomain, keep existing one
             final_subdomain = @app.subdomain
           end
-          final_subdomain = result[:subdomain] || custom_subdomain
         else
           # Otherwise regenerate from name using existing model method
           result = @app.regenerate_subdomain_from_name!(redeploy_if_published: false)
